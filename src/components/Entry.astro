@@ -1,0 +1,34 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { url, formatDate, readingTime } from '../lib/site';
+
+interface Props {
+  post: CollectionEntry<'posts'>;
+}
+
+const { post } = Astro.props;
+const minutes = readingTime(post.body ?? '');
+---
+
+<li class="entry">
+  <a href={url(`/posts/${post.id}/`)}>
+    <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+    <div>
+      <h3>{post.data.title}</h3>
+      {post.data.description && <p>{post.data.description}</p>}
+      <div class="meta">
+        {post.data.category && <span>{post.data.category}</span>}
+        {post.data.category && <span class="dot"></span>}
+        <span>约 {minutes} 分钟</span>
+        {
+          post.data.tags.length > 0 && (
+            <>
+              <span class="dot"></span>
+              <span>{post.data.tags.map((t: string) => `#${t}`).join(' ')}</span>
+            </>
+          )
+        }
+      </div>
+    </div>
+  </a>
+</li>

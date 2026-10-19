@@ -1,0 +1,153 @@
+---
+import { getCollection, render } from 'astro:content';
+import type { CollectionEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { url, formatDate, readingTime } from '../../lib/site';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts', ({ data }) => !data.draft);
+  const sorted = posts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+  return sorted.map((post, index) => ({
+    params: { slug: post.id },
+    props: {
+      post,
+      newer: sorted[index - 1] ?? null,
+      older: sorted[index + 1] ?? null,
+    },
+  }));
+}
+
+interface Props {
+  post: CollectionEntry<'posts'>;
+  newer: CollectionEntry<'posts'> | null;
+  older: CollectionEntry<'posts'> | null;
+}
+
+const { post, newer, older } = Astro.props;
+const { Content, headings } = await render(post);
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
+const minutes = readingTime(post.body ?? '');
+---
+
+<BaseLayout title={post.data.title} description={post.data.description}>
+  <article class="article">
+    <div class="shell article-grid">
+      <div>
+        <header class="post-head">
+          <h1>{post.data.title}</h1>
+          <div class="post-meta">
+            <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+            <span class="sep">/</span>
+            <span>约 {minutes} 分钟</span>
+            {
+              post.data.category && (
+                <>
+                  <span class="sep">/</span>
+                  <span class="category">{post.data.category}</span>
+                </>
+              )
+            }
+          </div>
+        </header>
+
+        <div class="prose">
+          <Content />
+        </div>
+
+        <footer class="post-foot">
+          {
+            post.data.tags.length > 0 && (
+              <div class="post-tags">
+                {post.data.tags.map((tag: string) => (
+                  <a class="tag-pill" href={url(`/tags/${encodeURIComponent(tag)}/`)}>
+                    #{tag}
+                  </a>
+                ))}
+              </div>
+            )
+          }
+
+          <nav class="post-nav" aria-label="上下篇">
+            {
+              older ? (
+                <a href={url(`/posts/${older.id}/`)}>
+                  <span class="label">上一篇</span>
+                  <span class="title">{older.data.title}</span>
+                </a>
+              ) : (
+                <span></span>
+              )
+            }
+            {
+              newer ? (
+                <a class="next" href={url(`/posts/${newer.id}/`)}>
+                  <span class="label">下一篇</span>
+                  <span class="title">{newer.data.title}</span>
+                </a>
+              ) : (
+                <span></span>
+              )
+            }
+          </nav>
+        </footer>
+      </div>
+
+      {
+        toc.length > 0 && (
+          <aside class="toc" aria-label="目录">
+            <p class="toc-title">目录</p>
+            <ul>
+              {toc.map((h) => (
+                <li class={`depth-${h.depth}`}>
+                  <a href={`#${h.slug}`}>{h.text}</a>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )
+      }
+    </div>
+  </article>
+
+  <script>
+    document.querySelectorAll('.prose pre').forEach((pre) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'code-block';
+      pre.parentNode?.insertBefore(wrap, pre);
+      wrap.appendChild(pre);
+
+      const btn = document.createElement('button');
+      btn.className = 'copy-btn';
+      btn.type = 'button';
+      btn.textContent = '复制';
+      btn.addEventListener('click', async () => {
+        const text = pre.querySelector('code')?.textContent ?? '';
+        try {
+          await navigator.clipboard.writeText(text);
+          btn.textContent = '已复制';
+        } catch {
+          btn.textContent = '失败';
+        }
+        setTimeout(() => (btn.textContent = '复制'), 1600);
+      });
+      wrap.appendChild(btn);
+    });
+
+    const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('.toc a'));
+    const map = new Map(links.map((a) => [decodeURIComponent(a.hash.slice(1)), a]));
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          links.forEach((a) => a.classList.remove('active'));
+          map.get(entry.target.id)?.classList.add('active');
+        });
+      },
+      { rootMargin: '-96px 0px -70% 0px' }
+    );
+
+    document.querySelectorAll('.prose h2, .prose h3').forEach((h) => observer.observe(h));
+  </script>
+</BaseLayout>

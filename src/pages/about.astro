@@ -1,0 +1,68 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SITE, url } from '../lib/site';
+---
+
+<BaseLayout title="关于" description="关于 Cui & Jing 和这个博客">
+  <div class="page-head">
+    <div class="shell">
+      <h1>关于</h1>
+    </div>
+  </div>
+
+  <div class="shell about-grid">
+    <div class="prose">
+      <p>
+        你好，我是 <strong>Cui</strong>，和 <strong>Jing</strong> 一起维护这个小小的角落。
+        我们都不是那种“一年写一百篇”的人，但遇到真正想明白的事，会认真写下来。
+      </p>
+
+      <h2>这里写什么</h2>
+      <p>大致三个方向，不做严格划分：</p>
+      <ul>
+        <li><strong>技术</strong>：踩过的坑、读过的源码、做过的东西。尽量写清“为什么”，而不只是“怎么做”。</li>
+        <li><strong>学习</strong>：读过值得记一笔的书和文章，以及它们带来的想法。</li>
+        <li><strong>生活</strong>：偶尔的碎碎念。不承诺更新频率。</li>
+      </ul>
+
+      <h2>关于这个站</h2>
+      <p>
+        这里原来是 Hexo + 安知鱼主题，2026 年 10 月重写成了 Astro。
+        换的理由很简单：想按自己的方式排版，也想让页面轻一点。
+        现在整站是纯静态的，没有数据库，没有前端框架运行时，文章用 Markdown 写。
+      </p>
+
+      <h2>写字的规矩</h2>
+      <blockquote>
+        宁可写得少，也不要写得敷衍。一篇文章如果三天后自己都不想再看，那就不该发。
+      </blockquote>
+
+      <h2>联系</h2>
+      <p>
+        有想法欢迎在 <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a> 找我，
+        或者给文章留个评论（评论功能正在筹备中）。
+      </p>
+
+      <p style="color: var(--text-mute); font-size: 14px; margin-top: 2.4em;">
+        本站文字采用 CC BY-NC-SA 4.0 许可，转载请注明出处。
+      </p>
+    </div>
+
+    <aside class="facts">
+      <dl>
+        <dt>站点</dt>
+        <dd>{SITE.title}</dd>
+        <dt>始于</dt>
+        <dd>{SITE.since} 年</dd>
+        <dt>技术栈</dt>
+        <dd>Astro · Markdown · GitHub Pages</dd>
+        <dt>写作者</dt>
+        <dd>Cui &amp; Jing</dd>
+        <dt>订阅</dt>
+        <dd><a href={url('/rss.xml')} style="color: var(--accent)">RSS</a></dd>
+        <dt>许可</dt>
+        <dd>CC BY-NC-SA 4.0</dd>
+      </dl>
+    </aside>
+  </div>
+</BaseLayout>

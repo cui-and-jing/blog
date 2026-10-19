@@ -1,0 +1,44 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { url, formatDate } from '../lib/site';
+
+const all = await getCollection('posts', ({ data }) => !data.draft);
+const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+const byYear = new Map<string, typeof posts>();
+for (const post of posts) {
+  const year = String(post.data.date.getFullYear());
+  if (!byYear.has(year)) byYear.set(year, []);
+  byYear.get(year)!.push(post);
+}
+const years = [...byYear.keys()];
+---
+
+<BaseLayout title="归档" description="按年份归档的全部文章">
+  <div class="page-head">
+    <div class="shell">
+      <h1>归档</h1>
+      <p>{posts.length} 篇，{years.length} 年。</p>
+    </div>
+  </div>
+
+  <div class="shell">
+    {
+      years.map((year) => (
+        <section class="year-group">
+          <h2 class="year-label">{year}</h2>
+          <div>
+            {byYear.get(year)!.map((post) => (
+              <div class="archive-item">
+                <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+                <a href={url(`/posts/${post.id}/`)}>{post.data.title}</a>
+                <span class="cat">{post.data.category ?? ''}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))
+    }
+  </div>
+</BaseLayout>

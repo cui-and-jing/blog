@@ -1,0 +1,41 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Entry from '../components/Entry.astro';
+import { SITE, url, formatDate } from '../lib/site';
+
+const all = await getCollection('posts', ({ data }) => !data.draft);
+const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const recent = posts.slice(0, 6);
+const latest = posts[0]?.data.date;
+const tagCount = new Set(posts.flatMap((p) => p.data.tags)).size;
+---
+
+<BaseLayout>
+  <section class="hero">
+    <div class="shell">
+      <p class="eyebrow">{SITE.tagline}</p>
+      <h1>写下来的，才算想清楚了。</h1>
+      <p>
+        这里记录技术上的折腾、读过的书和一些没想明白的问题。更新不快，但每篇都认真写。
+      </p>
+      <div class="hero-meta">
+        <span><strong>{posts.length}</strong> 篇文章</span>
+        <span><strong>{tagCount}</strong> 个标签</span>
+        {latest && <span>最近更新 <strong>{formatDate(latest)}</strong></span>}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="shell">
+      <div class="section-head">
+        <h2>最近</h2>
+        <a href={url('/posts/')}>全部文章 →</a>
+      </div>
+      <ul class="entries">
+        {recent.map((post) => <Entry post={post} />)}
+      </ul>
+    </div>
+  </section>
+</BaseLayout>

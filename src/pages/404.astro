@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { url } from '../lib/site';
+---
+
+<BaseLayout title="页面不存在" description="没有找到这个页面">
+  <div class="shell notfound">
+    <p class="code">404</p>
+    <h1>这页好像不在了</h1>
+    <p>可能是链接过期，或者我改过文章标题。</p>
+    <a class="btn" href={url('/')}>回到首页</a>
+  </div>
+</BaseLayout>

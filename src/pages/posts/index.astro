@@ -1,0 +1,25 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Entry from '../../components/Entry.astro';
+
+const all = await getCollection('posts', ({ data }) => !data.draft);
+const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+---
+
+<BaseLayout title="文章" description="全部文章列表">
+  <div class="page-head">
+    <div class="shell">
+      <h1>文章</h1>
+      <p>共 {posts.length} 篇，按发布时间倒序。</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="shell">
+      <ul class="entries">
+        {posts.map((post) => <Entry post={post} />)}
+      </ul>
+    </div>
+  </section>
+</BaseLayout>

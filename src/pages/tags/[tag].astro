@@ -1,0 +1,39 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Entry from '../../components/Entry.astro';
+
+export async function getStaticPaths() {
+  const all = await getCollection('posts', ({ data }) => !data.draft);
+  const tags = [...new Set(all.flatMap((post) => post.data.tags))];
+
+  return tags.map((tag) => ({
+    params: { tag },
+    props: {
+      tag,
+      posts: all
+        .filter((post) => post.data.tags.includes(tag))
+        .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf()),
+    },
+  }));
+}
+
+const { tag, posts } = Astro.props;
+---
+
+<BaseLayout title={`#${tag}`} description={`标签 ${tag} 下的全部文章`}>
+  <div class="page-head">
+    <div class="shell">
+      <h1>#{tag}</h1>
+      <p>{posts.length} 篇文章</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="shell">
+      <ul class="entries">
+        {posts.map((post) => <Entry post={post} />)}
+      </ul>
+    </div>
+  </section>
+</BaseLayout>
