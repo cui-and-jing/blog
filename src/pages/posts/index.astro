@@ -1,7 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import Entry from '../../components/Entry.astro';
+import PostCard from '../../components/PostCard.astro';
 
 const all = await getCollection('posts', ({ data }) => !data.draft);
 const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
@@ -15,11 +15,9 @@ const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
     </div>
   </div>
 
-  <section class="section">
-    <div class="shell">
-      <ul class="entries">
-        {posts.map((post) => <Entry post={post} />)}
-      </ul>
-    </div>
-  </section>
+  <div class="shell" style="padding-bottom:40px">
+    <ul class="card-grid card-grid--three">
+      {posts.map((post) => <PostCard post={post} />)}
+    </ul>
+  </div>
 </BaseLayout>

@@ -29,6 +29,7 @@ tags:
   - Astro
   - 博客
 category: 技术
+cover: /covers/my-post.jpg   # 可选，不填则自动生成渐变封面
 draft: false
 ---
 ```
@@ -42,9 +43,19 @@ draft: false
 | description | 否 | 摘要，列表页与 RSS 使用 |
 | tags | 否 | 字符串数组 |
 | category | 否 | 单个分类，用于归档页 |
+| cover | 否 | 封面图路径（放 `public/` 下）。**不填会自动按文章名生成一张渐变封面**，不会出现空图 |
 | draft | 否 | `true` 时不出现在任何列表里 |
 | featured | 否 | 预留，用于首页精选 |
 | updated | 否 | 更新日期 |
+
+### 封面是怎么来的
+
+没配 `cover` 时，`src/lib/cover.ts` 用文章 slug 算出一个稳定哈希，从 8 组预置色板里挑一组，
+再配一张抽象的 SVG 图形和一个大字水印。同一篇文章的封面永远一致，不同文章之间会自动错开色相，
+不依赖任何外链图床——旧站用 `picsum.photos` 随机图，同一篇刷新还会换图，这里不会。
+
+想换成真实图片，把图放进 `public/covers/`，frontmatter 写 `cover: /covers/xxx.jpg` 即可，
+卡片和文章页会自动改用图片并保留遮罩，保证标题可读。
 
 写完提交推送，GitHub Actions 会自动构建部署。
 
@@ -55,8 +66,13 @@ src/
 ├── content.config.ts        内容集合 schema
 ├── content/posts/           文章（Markdown / MDX）
 ├── layouts/BaseLayout.astro 全站外壳：head、导航、页脚、主题切换
-├── components/Entry.astro   列表项
+├── components/
+│   ├── Cover.astro          封面：有图用图，无图生成渐变
+│   ├── PostCard.astro       文章卡片
+│   ├── Featured.astro       首页主推大卡
+│   └── Sidebar.astro        作者卡 + 标签 + 最近更新
 ├── lib/site.ts              站点信息、导航、URL 与日期工具
+├── lib/cover.ts             封面色板与哈希
 ├── pages/
 │   ├── index.astro          首页
 │   ├── posts/               文章列表 + 详情
@@ -67,6 +83,12 @@ src/
 │   └── 404.astro
 └── styles/global.css        全站样式（设计变量在文件顶部）
 ```
+
+## 设计
+
+卡片式布局：纸感暖灰底 + 白卡 + 18px 圆角 + 双层阴影，首页为主推大卡 + 双列网格 + 右侧粘性侧栏。
+配色索引在 `--accent`（陶土 #bf4a26）与 `--accent-2`（墨绿 #2f6f66），封面色板在 `src/lib/cover.ts`。
+深色模式跟随系统并可手动切换，切换无闪烁。
 
 ## 改站点信息
 

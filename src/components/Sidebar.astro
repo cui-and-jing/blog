@@ -1,0 +1,73 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { SITE, url, daysSince } from '../lib/site';
+
+interface Props {
+  posts: CollectionEntry<'posts'>[];
+  currentId?: string;
+}
+
+const { posts, currentId } = Astro.props;
+
+const tagCounts = new Map<string, number>();
+for (const post of posts) {
+  for (const tag of post.data.tags) {
+    tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+  }
+}
+const tags = [...tagCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN')).slice(0, 14);
+const recent = posts.filter((post) => post.id !== currentId).slice(0, 4);
+const days = daysSince(SITE.since);
+---
+
+<aside class="sidebar">
+  <div class="author">
+    <div class="author-avatar">
+      <img src={url('/avatar.svg')} alt={SITE.author} width="76" height="76" />
+    </div>
+    <h3>{SITE.author}</h3>
+    <p class="bio">{SITE.tagline}</p>
+    <div class="author-actions">
+      <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href={url('/rss.xml')}>RSS</a>
+    </div>
+    <div class="author-stats">
+      <div><b>{posts.length}</b><span>文章</span></div>
+      <div><b>{tagCounts.size}</b><span>标签</span></div>
+      <div><b>{days}</b><span>天</span></div>
+    </div>
+  </div>
+
+  <slot />
+
+  {
+    tags.length > 0 && (
+      <section class="widget">
+        <h4>标签</h4>
+        <div class="widget-tags">
+          {tags.map(([tag]) => (
+            <a href={url(`/tags/${encodeURIComponent(tag)}/`)}>{tag}</a>
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  {
+    recent.length > 0 && (
+      <section class="widget">
+        <h4>最近更新</h4>
+        <ul class="widget-list">
+          {recent.map((post, i) => (
+            <li>
+              <a href={url(`/posts/${post.id}/`)}>
+                <span class="idx">{String(i + 1).padStart(2, '0')}</span>
+                <span>{post.data.title}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+</aside>

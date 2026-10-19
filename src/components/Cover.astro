@@ -1,0 +1,52 @@
+---
+import { coverStyle, coverVars } from '../lib/cover';
+
+interface Props {
+  seed: string;
+  title?: string;
+  image?: string;
+  showGlyph?: boolean;
+  class?: string;
+}
+
+const { seed, title = '', image, showGlyph = true, class: className = '' } = Astro.props;
+const style = coverStyle(seed, title);
+const glyph = Array.from(title.replace(/^[\s「『《"'#]+/, ''))[0] ?? '·';
+---
+
+<div class={`cover ${className}`} style={coverVars(style)}>
+  {
+    image ? (
+      <img src={image} alt="" loading="lazy" decoding="async" />
+    ) : (
+      <>
+        <svg class="cover-art" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          {style.variant === 0 && (
+            <>
+              <circle cx="322" cy="34" r="150" fill="rgba(255,255,255,0.13)" />
+              <circle cx="352" cy="188" r="104" fill="rgba(255,255,255,0.08)" />
+              <circle cx="46" cy="214" r="92" fill="rgba(0,0,0,0.09)" />
+            </>
+          )}
+          {style.variant === 1 && (
+            <>
+              <path d="M-40 168 L200 8 L288 8 L48 168 Z" fill="rgba(255,255,255,0.1)" />
+              <path d="M120 225 L400 22 L400 96 L212 225 Z" fill="rgba(255,255,255,0.07)" />
+              <circle cx="60" cy="46" r="34" fill="rgba(255,255,255,0.14)" />
+            </>
+          )}
+          {style.variant === 2 && (
+            <>
+              <circle cx="330" cy="120" r="46" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.2" />
+              <circle cx="330" cy="120" r="86" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="1.2" />
+              <circle cx="330" cy="120" r="128" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1.2" />
+              <circle cx="40" cy="200" r="70" fill="rgba(0,0,0,0.08)" />
+            </>
+          )}
+        </svg>
+        {showGlyph && <span class="cover-glyph" aria-hidden="true">{glyph}</span>}
+        <span class="cover-sheen" aria-hidden="true"></span>
+      </>
+    )
+  }
+</div>

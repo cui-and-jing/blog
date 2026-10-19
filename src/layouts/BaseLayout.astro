@@ -8,7 +8,7 @@ interface Props {
   image?: string;
 }
 
-const { title, description = SITE.description } = Astro.props;
+const { title, description = SITE.description, image } = Astro.props;
 const pageTitle = title ? `${title} · ${SITE.title}` : `${SITE.title} · ${SITE.tagline}`;
 const canonical = new URL(Astro.url.pathname, Astro.site ?? SITE.github).toString();
 const current = Astro.url.pathname.replace(/\/$/, '') || '/';
@@ -25,8 +25,8 @@ const current = Astro.url.pathname.replace(/\/$/, '') || '/';
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />
     <link rel="alternate" type="application/rss+xml" title={SITE.title} href={url('/rss.xml')} />
-    <meta name="theme-color" content="#fbfaf6" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f2f0e9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#131311" media="(prefers-color-scheme: dark)" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content={pageTitle} />
@@ -34,6 +34,7 @@ const current = Astro.url.pathname.replace(/\/$/, '') || '/';
     <meta property="og:url" content={canonical} />
     <meta property="og:site_name" content={SITE.title} />
     <meta property="og:locale" content="zh_CN" />
+    {image && <meta property="og:image" content={new URL(image, canonical).toString()} />}
     <meta name="twitter:card" content="summary" />
 
     <script is:inline>

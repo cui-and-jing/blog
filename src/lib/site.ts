@@ -36,3 +36,8 @@ export function readingTime(body: string): number {
   const text = body.replace(/```[\s\S]*?```/g, ' ').replace(/\s+/g, '');
   return Math.max(1, Math.round(text.length / 400));
 }
+
+export function daysSince(year: number): number {
+  const start = new Date(year, 0, 1).getTime();
+  return Math.max(1, Math.floor((Date.now() - start) / 86_400_000) + 1);
+}

@@ -23,12 +23,12 @@ const years = [...byYear.keys()];
     </div>
   </div>
 
-  <div class="shell">
+  <div class="shell" style="padding-bottom:40px">
     {
       years.map((year) => (
         <section class="year-group">
           <h2 class="year-label">{year}</h2>
-          <div>
+          <div class="archive-card">
             {byYear.get(year)!.map((post) => (
               <div class="archive-item">
                 <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>

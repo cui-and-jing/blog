@@ -2,6 +2,8 @@
 import { getCollection, render } from 'astro:content';
 import type { CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Cover from '../../components/Cover.astro';
+import Sidebar from '../../components/Sidebar.astro';
 import { url, formatDate, readingTime } from '../../lib/site';
 
 export async function getStaticPaths() {
@@ -28,45 +30,49 @@ const { post, newer, older } = Astro.props;
 const { Content, headings } = await render(post);
 const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
 const minutes = readingTime(post.body ?? '');
+
+const all = await getCollection('posts', ({ data }) => !data.draft);
+const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
 ---
 
-<BaseLayout title={post.data.title} description={post.data.description}>
-  <article class="article">
-    <div class="shell article-grid">
-      <div>
-        <header class="post-head">
-          <h1>{post.data.title}</h1>
-          <div class="post-meta">
+<BaseLayout title={post.data.title} description={post.data.description} image={post.data.cover}>
+  <div class="shell">
+    <article>
+      <header class="post-hero">
+        <Cover seed={post.id} title={post.data.title} image={post.data.cover} showGlyph={false} />
+        <span class="post-hero-veil"></span>
+        <div class="post-hero-body">
+          <div class="kicker">
+            {post.data.category && <span class="chip">{post.data.category}</span>}
             <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
-            <span class="sep">/</span>
+            <span class="dot"></span>
             <span>约 {minutes} 分钟</span>
+          </div>
+          <h1>{post.data.title}</h1>
+        </div>
+      </header>
+
+      <div class="article-wrap">
+        <div>
+          <div class="article-card">
+            <div class="prose">
+              <Content />
+            </div>
+
             {
-              post.data.category && (
-                <>
-                  <span class="sep">/</span>
-                  <span class="category">{post.data.category}</span>
-                </>
+              post.data.tags.length > 0 && (
+                <footer class="post-foot">
+                  <div class="post-tags">
+                    {post.data.tags.map((tag: string) => (
+                      <a class="tag-pill" href={url(`/tags/${encodeURIComponent(tag)}/`)}>
+                        #{tag}
+                      </a>
+                    ))}
+                  </div>
+                </footer>
               )
             }
           </div>
-        </header>
-
-        <div class="prose">
-          <Content />
-        </div>
-
-        <footer class="post-foot">
-          {
-            post.data.tags.length > 0 && (
-              <div class="post-tags">
-                {post.data.tags.map((tag: string) => (
-                  <a class="tag-pill" href={url(`/tags/${encodeURIComponent(tag)}/`)}>
-                    #{tag}
-                  </a>
-                ))}
-              </div>
-            )
-          }
 
           <nav class="post-nav" aria-label="上下篇">
             {
@@ -90,25 +96,29 @@ const minutes = readingTime(post.body ?? '');
               )
             }
           </nav>
-        </footer>
-      </div>
+        </div>
 
-      {
-        toc.length > 0 && (
-          <aside class="toc" aria-label="目录">
-            <p class="toc-title">目录</p>
-            <ul>
-              {toc.map((h) => (
-                <li class={`depth-${h.depth}`}>
-                  <a href={`#${h.slug}`}>{h.text}</a>
-                </li>
-              ))}
-            </ul>
-          </aside>
-        )
-      }
-    </div>
-  </article>
+        <Sidebar posts={posts} currentId={post.id}>
+          {
+            toc.length > 0 && (
+              <section class="widget">
+                <h4>目录</h4>
+                <nav class="toc" aria-label="目录">
+                  <ul>
+                    {toc.map((h) => (
+                      <li class={`depth-${h.depth}`}>
+                        <a href={`#${h.slug}`}>{h.text}</a>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              </section>
+            )
+          }
+        </Sidebar>
+      </div>
+    </article>
+  </div>
 
   <script>
     document.querySelectorAll('.prose pre').forEach((pre) => {

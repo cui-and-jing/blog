@@ -1,0 +1,27 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import Cover from './Cover.astro';
+import { url, formatDate, readingTime } from '../lib/site';
+
+interface Props {
+  post: CollectionEntry<'posts'>;
+}
+
+const { post } = Astro.props;
+const minutes = readingTime(post.body ?? '');
+---
+
+<a class="featured" href={url(`/posts/${post.id}/`)}>
+  <Cover seed={post.id} title={post.data.title} image={post.data.cover} showGlyph={false} />
+  <span class="featured-veil"></span>
+  <div class="featured-body">
+    <div class="kicker">
+      {post.data.category && <span class="chip">{post.data.category}</span>}
+      <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+      <span class="dot"></span>
+      <span>约 {minutes} 分钟</span>
+    </div>
+    <h2>{post.data.title}</h2>
+    {post.data.description && <p>{post.data.description}</p>}
+  </div>
+</a>
