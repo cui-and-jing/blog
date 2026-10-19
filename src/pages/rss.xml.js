@@ -1,6 +1,6 @@
 import rss from '@astrojs/rss';
 import { getCollection } from 'astro:content';
-import { SITE } from '../lib/site';
+import { SITE, base } from '../lib/site';
 
 export async function GET(context) {
   const posts = await getCollection('posts', ({ data }) => !data.draft);
@@ -9,12 +9,12 @@ export async function GET(context) {
   return rss({
     title: SITE.title,
     description: SITE.description,
-    site: context.site ?? 'https://cui-and-jing.github.io',
+    site: new URL(`${base}/`, context.site ?? 'https://cui-and-jing.github.io').href,
     items: sorted.map((post) => ({
       title: post.data.title,
       pubDate: post.data.date,
       description: post.data.description,
-      link: `/posts/${post.id}/`,
+      link: `${base}/posts/${post.id}/`,
     })),
     customData: `<language>${SITE.lang}</language>`,
   });
