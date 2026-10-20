@@ -1763,7 +1763,10 @@ html[data-theme='dark'] .about-banner-avatar {
 .about-banner-avatar img {
   width: 100%;
   height: 100%;
+  margin: 0;
+  max-width: none;
   border-radius: 50%;
+  box-shadow: none;
   object-fit: cover;
   display: block;
 }
