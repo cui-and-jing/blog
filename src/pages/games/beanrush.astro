@@ -1,0 +1,239 @@
+---
+import { GAMES, url } from '../../lib/site';
+
+const game = GAMES[0];
+const src = url(game.file);
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{game.title} · {game.subtitle}</title>
+    <meta name="description" content={`${game.title} ${game.subtitle}：${game.description}`} />
+    <meta name="theme-color" content="#0f1014" />
+    <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bar: 52px;
+        --ink: #eae7df;
+        --mute: #9a958a;
+        --line: rgba(255, 255, 255, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        background: #0f1014;
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+          'Microsoft YaHei', sans-serif;
+        overflow: hidden;
+      }
+
+      .bar {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        height: var(--bar);
+        padding: 0 14px;
+        background: rgba(20, 21, 26, 0.92);
+        border-bottom: 1px solid var(--line);
+        backdrop-filter: blur(10px);
+      }
+
+      .back {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px 6px 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--ink);
+        font-size: 13px;
+        text-decoration: none;
+        transition: background 0.18s ease, border-color 0.18s ease;
+      }
+
+      .back:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.22);
+      }
+
+      .title {
+        margin-left: 2px;
+        font-size: 13px;
+        letter-spacing: 0.02em;
+        color: var(--mute);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .title b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .spacer {
+        flex: 1;
+      }
+
+      .fs {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        background: transparent;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--ink);
+        font-size: 13px;
+        font-family: inherit;
+        cursor: pointer;
+        transition: background 0.18s ease, border-color 0.18s ease;
+      }
+
+      .fs:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.22);
+      }
+
+      .fs svg {
+        width: 13px;
+        height: 13px;
+      }
+
+      .stage {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        background: #0b0c10;
+      }
+
+      iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #0b0c10;
+      }
+
+      .loader {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 16px;
+        background: #0b0c10;
+        color: var(--mute);
+        font-size: 13px;
+        transition: opacity 0.45s ease, visibility 0.45s ease;
+        z-index: 2;
+      }
+
+      .loader.done {
+        opacity: 0;
+        visibility: hidden;
+      }
+
+      .spinner {
+        width: 26px;
+        height: 26px;
+        border: 2px solid rgba(255, 255, 255, 0.14);
+        border-top-color: #ff5f9e;
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+
+      .loader small {
+        color: #6f6a62;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .spinner {
+          animation-duration: 3s;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .title {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="bar">
+      <a class="back" href={url('/games/')}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 6l-6 6 6 6"></path>
+        </svg>
+        游戏列表
+      </a>
+      <span class="title"><b>{game.title}</b> · {game.subtitle}</span>
+      <span class="spacer"></span>
+      <button class="fs" id="fs" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path>
+        </svg>
+        全屏
+      </button>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="loader" id="loader">
+        <span class="spinner"></span>
+        <span>正在加载游戏…</span>
+        <small>首次打开约 2MB，之后会走浏览器缓存</small>
+      </div>
+      <iframe id="game" src={src} title={`${game.title} ${game.subtitle}`} allow="fullscreen; autoplay; gamepad"></iframe>
+    </div>
+
+    <script>
+      const frame = document.getElementById('game') as HTMLIFrameElement | null;
+      const loader = document.getElementById('loader');
+      const stage = document.getElementById('stage');
+      const fsBtn = document.getElementById('fs');
+
+      frame?.addEventListener('load', () => {
+        loader?.classList.add('done');
+        frame.focus();
+      });
+
+      fsBtn?.addEventListener('click', async () => {
+        try {
+          if (document.fullscreenElement) {
+            await document.exitFullscreen();
+          } else {
+            await stage?.requestFullscreen();
+          }
+        } catch {
+          /* 浏览器拒绝时忽略 */
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -43,12 +43,17 @@ const current = Astro.url.pathname.replace(/\/$/, '') || '/';
           var stored = localStorage.getItem('theme');
           var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
           document.documentElement.dataset.theme = stored || (prefersDark ? 'dark' : 'light');
+          if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            document.documentElement.dataset.motion = 'on';
+          }
         } catch (e) {}
       })();
     </script>
   </head>
 
   <body>
+    <div class="read-progress" id="read-progress" aria-hidden="true"><span></span></div>
+
     <header class="site-header" id="site-header">
       <div class="shell header-inner">
         <a class="wordmark" href={url('/')}>
@@ -111,20 +116,130 @@ const current = Astro.url.pathname.replace(/\/$/, '') || '/';
       </div>
     </footer>
 
+    <button class="to-top" id="to-top" type="button" aria-label="回到顶部">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 19V5M6 11l6-6 6 6"></path>
+      </svg>
+    </button>
+
     <script>
+      const root = document.documentElement;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+      /* 主题切换：支持 View Transition 时用圆形扩散过渡 */
       const toggle = document.getElementById('theme-toggle');
-      toggle?.addEventListener('click', () => {
-        const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-        document.documentElement.dataset.theme = next;
+      const applyTheme = (next: string) => {
+        root.dataset.theme = next;
         try {
           localStorage.setItem('theme', next);
         } catch (e) {}
+      };
+
+      toggle?.addEventListener('click', (event) => {
+        const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        const startViewTransition = (document as any).startViewTransition as
+          | ((cb: () => void) => { ready: Promise<void> })
+          | undefined;
+
+        if (reduceMotion.matches || !startViewTransition) {
+          applyTheme(next);
+          return;
+        }
+
+        const x = (event as MouseEvent).clientX || window.innerWidth / 2;
+        const y = (event as MouseEvent).clientY || 40;
+        const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+
+        const transition = startViewTransition.call(document, () => applyTheme(next));
+        transition.ready
+          .then(() => {
+            root.animate(
+              { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+              { duration: 540, easing: 'ease-in-out', pseudoElement: '::view-transition-new(root)' }
+            );
+          })
+          .catch(() => {});
       });
 
+      /* 滚动状态 */
       const header = document.getElementById('site-header');
-      const onScroll = () => header?.setAttribute('data-scrolled', String(window.scrollY > 8));
+      const toTop = document.getElementById('to-top');
+      const progress = document.getElementById('read-progress');
+      const progressFill = progress?.firstElementChild as HTMLElement | null;
+      const hasArticle = Boolean(document.querySelector('.article-card'));
+
+      const onScroll = () => {
+        const y = window.scrollY;
+        header?.setAttribute('data-scrolled', String(y > 8));
+        toTop?.classList.toggle('show', y > 700);
+
+        if (progressFill) {
+          const max = document.documentElement.scrollHeight - window.innerHeight;
+          const ratio = max > 0 ? Math.min(1, Math.max(0, y / max)) : 0;
+          progressFill.style.transform = `scaleX(${ratio})`;
+        }
+      };
+
+      if (progress && hasArticle) progress.classList.add('active');
       onScroll();
       window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll);
+
+      toTop?.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+      });
+
+      /* 滚动入场：按同组顺序错峰，元素只在 JS 就绪后隐藏 */
+      if (root.dataset.motion === 'on' && 'IntersectionObserver' in window) {
+        const nodes: HTMLElement[] = [];
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (!entry.isIntersecting) return;
+              entry.target.classList.add('is-in');
+              observer.unobserve(entry.target);
+            });
+          },
+          { rootMargin: '0px 0px -6% 0px', threshold: 0.06 }
+        );
+
+        try {
+          const selector = [
+            '.hero-copy > *',
+            '.hero-card',
+            '.section-head',
+            '.featured',
+            '.card',
+            '.cat-tile',
+            '.widget',
+            '.page-head .shell > *',
+            '.post-hero',
+            '.article-card',
+            '.archive-year',
+            '.tag-cloud li',
+            '.game-card',
+            '.game-note',
+          ].join(',');
+
+          document.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+            nodes.push(el);
+            el.setAttribute('data-reveal', '');
+            const parent = el.parentElement;
+            if (!parent) return;
+            const siblings = Array.from(parent.children).filter((child) => child.hasAttribute('data-reveal'));
+            const index = siblings.indexOf(el);
+            if (index > 0) el.style.setProperty('--d', `${Math.min(index, 6) * 55}ms`);
+          });
+
+          nodes.forEach((el) => observer.observe(el));
+          root.dataset.motionReady = 'on';
+        } catch {
+          nodes.forEach((el) => {
+            el.removeAttribute('data-reveal');
+            el.classList.add('is-in');
+          });
+        }
+      }
     </script>
   </body>
 </html>

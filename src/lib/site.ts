@@ -12,7 +12,39 @@ export const NAV = [
   { label: '文章', href: '/posts/' },
   { label: '归档', href: '/archive/' },
   { label: '标签', href: '/tags/' },
+  { label: '游戏', href: '/games/' },
   { label: '关于', href: '/about/' },
+];
+
+export interface Game {
+  slug: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  tags: string[];
+  facts: { value: string; label: string }[];
+  /** public/ 下的单文件游戏路径 */
+  file: string;
+  accent: [string, string];
+}
+
+export const GAMES: Game[] = [
+  {
+    slug: 'beanrush',
+    title: 'BEAN RUSH 7',
+    subtitle: '糖河奇遇',
+    description:
+      '四个岛屿、九种竞技场、双人同屏的 3D 派对游戏。可以一个人和 AI 逐关挑战，也可以两个人挤在一台电脑上互相推搡，把糖包搬回自家仓库。',
+    tags: ['Three.js', '3D 派对', '离线单机'],
+    facts: [
+      { value: '9', label: '种竞技场' },
+      { value: '16', label: '人同场' },
+      { value: '12', label: '关挑战' },
+      { value: '双人', label: '同屏对战' },
+    ],
+    file: '/games/beanrush.html',
+    accent: ['#ff4e95', '#ff9c6b'],
+  },
 ];
 
 /** Astro 的 BASE_URL 以 / 结尾，统一去掉，便于拼接 */

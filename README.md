@@ -80,10 +80,24 @@ src/
 │   ├── archive.astro        归档
 │   ├── tags/                标签总览 + 单标签
 │   ├── category/            分类页（每个分类一页）
+│   ├── games/               游戏：大厅 + 全屏试玩外壳
 │   ├── about.astro          关于
 │   ├── rss.xml.js           RSS
 │   └── 404.astro
-└── styles/global.css        全站样式（设计变量在文件顶部）
+├── styles/global.css        全站样式（设计变量在文件顶部）
+└── public/games/            游戏单文件（构建时原样拷贝，不进打包）
+
+## 游戏模块
+
+游戏大厅在 `/games/`，试玩在 `/games/beanrush/`（细栏 + iframe 铺满视口，支持全屏）。
+游戏本体是一个自包含 HTML（Three.js 内联，无 CDN、无后端），放在 `public/games/beanrush.html`，
+构建时原样拷进 `dist/games/`。
+
+要加新游戏：把单文件丢进 `public/games/`，在 `src/lib/site.ts` 的 `GAMES` 里加一条
+（标题、描述、标签、`file` 路径），大厅页会自动渲染。试玩页目前按 `beanrush` 单独一个路由，
+新游戏可以复用同样的外壳或直接链接到 HTML。
+
+游戏用 `bean-rush.*` 前缀写 localStorage，和博客的 `theme` 键不冲突。
 ```
 
 ## 设计
@@ -91,6 +105,16 @@ src/
 卡片式布局：纸感暖灰底 + 白卡 + 18px 圆角 + 双层阴影，首页为主推大卡 + 双列网格 + 右侧粘性侧栏。
 配色索引在 `--accent`（陶土 #bf4a26）与 `--accent-2`（墨绿 #2f6f66），封面色板在 `src/lib/cover.ts`。
 深色模式跟随系统并可手动切换，切换无闪烁。
+
+## 动效
+
+- 滚动入场：`BaseLayout` 里的 IntersectionObserver 给常见块（卡片、侧栏、标题区等）自动加
+  `data-reveal`，同组元素按顺序错峰 55ms。**只有在 JS 就绪后才加这个属性**，所以禁用 JS
+  或脚本报错时内容不会消失。
+- 全部动效都在 `@media (prefers-reduced-motion: no-preference)` 内，系统开启「减少动态效果」时自动关闭。
+- 位置动画统一用 `translate` / `scale` 这两个独立属性，避免和卡片 hover 的 `transform` 互相覆盖。
+- 文章页有顶部阅读进度条，滚动超过 700px 出现「回到顶部」。
+- 主题切换在支持的浏览器里用 View Transitions 做圆形扩散，不支持时直接切换。
 
 ## 改站点信息
 
