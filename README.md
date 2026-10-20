@@ -68,9 +68,10 @@ src/
 ├── layouts/BaseLayout.astro 全站外壳：head、导航、页脚、主题切换
 ├── components/
 │   ├── Cover.astro          封面：有图用图，无图生成渐变
-│   ├── PostCard.astro       文章卡片
+│   ├── PostCard.astro       文章卡片（整卡拉伸链接，分类可单独点）
 │   ├── Featured.astro       首页主推大卡
-│   └── Sidebar.astro        作者卡 + 标签 + 最近更新
+│   ├── CategoryTiles.astro  技术/学习/生活三块渐变分类卡
+│   └── Sidebar.astro        作者卡 + 标签 + 最近更新（首页可关掉作者卡）
 ├── lib/site.ts              站点信息、导航、URL 与日期工具
 ├── lib/cover.ts             封面色板与哈希
 ├── pages/
@@ -78,6 +79,7 @@ src/
 │   ├── posts/               文章列表 + 详情
 │   ├── archive.astro        归档
 │   ├── tags/                标签总览 + 单标签
+│   ├── category/            分类页（每个分类一页）
 │   ├── about.astro          关于
 │   ├── rss.xml.js           RSS
 │   └── 404.astro

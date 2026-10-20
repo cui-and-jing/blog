@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .astro/
+.shots/
+qa-shots.mjs
 .DS_Store
 Thumbs.db
 *.log

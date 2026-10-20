@@ -86,11 +86,27 @@ const current = Astro.url.pathname.replace(/\/$/, '') || '/';
     </main>
 
     <footer class="site-footer">
-      <div class="shell footer-inner">
+      <div class="shell footer-grid">
+        <div class="footer-brand">
+          <span class="footer-mark"><span class="mark"></span>{SITE.title}</span>
+          <p>{SITE.description}</p>
+        </div>
+        <nav class="footer-col" aria-label="页脚导航">
+          <h5>导航</h5>
+          {NAV.map((item) => <a href={url(item.href)}>{item.label}</a>)}
+        </nav>
+        <div class="footer-col">
+          <h5>订阅与源码</h5>
+          <a href={url('/rss.xml')}>RSS 订阅</a>
+          <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href={url('/about/')}>关于本站</a>
+        </div>
+      </div>
+      <div class="shell footer-bottom">
         <span>© {SITE.since === new Date().getFullYear() ? SITE.since : `${SITE.since}–${new Date().getFullYear()}`} {SITE.author} · 文字采用 CC BY-NC-SA 4.0</span>
         <span class="footer-links">
-          <a href={url('/rss.xml')}>RSS</a>
-          <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+          <span>Powered by Astro</span>
+          <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub Pages</a>
         </span>
       </div>
     </footer>

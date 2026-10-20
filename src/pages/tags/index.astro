@@ -1,11 +1,13 @@
 ---
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { url } from '../../lib/site';
+import CategoryTiles from '../../components/CategoryTiles.astro';
+import { url, tagHue } from '../../lib/site';
 
 const all = await getCollection('posts', ({ data }) => !data.draft);
+const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
 const counts = new Map<string, number>();
-for (const post of all) {
+for (const post of posts) {
   for (const tag of post.data.tags) {
     counts.set(tag, (counts.get(tag) ?? 0) + 1);
   }
@@ -25,12 +27,22 @@ const tags = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeComp
     <div class="tag-cloud">
       {
         tags.map(([tag, count]) => (
-          <a href={url(`/tags/${encodeURIComponent(tag)}/`)}>
+          <a href={url(`/tags/${encodeURIComponent(tag)}/`)} style={`--h:${tagHue(tag)}`}>
             {tag}
             <span class="count">{count}</span>
           </a>
         ))
       }
+    </div>
+  </div>
+
+  <div class="shell" style="padding-bottom:48px">
+    <div class="section-head">
+      <h2>按分类看</h2>
+      <a href={url('/posts/')}>全部文章 →</a>
+    </div>
+    <div class="cat-tiles cat-tiles--inline">
+      <CategoryTiles posts={posts} />
     </div>
   </div>
 </BaseLayout>

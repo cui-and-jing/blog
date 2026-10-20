@@ -1,0 +1,48 @@
+---
+import { getCollection } from 'astro:content';
+import type { CollectionEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostCard from '../../components/PostCard.astro';
+import { url } from '../../lib/site';
+
+export async function getStaticPaths() {
+  const all = await getCollection('posts', ({ data }) => !data.draft);
+  const sorted = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+  const byCat = new Map<string, CollectionEntry<'posts'>[]>();
+  for (const post of sorted) {
+    const c = post.data.category;
+    if (!c) continue;
+    if (!byCat.has(c)) byCat.set(c, []);
+    byCat.get(c)!.push(post);
+  }
+
+  return [...byCat.entries()].map(([cat, list]) => ({
+    params: { cat },
+    props: { cat, posts: list },
+  }));
+}
+
+interface Props {
+  cat: string;
+  posts: CollectionEntry<'posts'>[];
+}
+
+const { cat, posts } = Astro.props;
+---
+
+<BaseLayout title={`分类：${cat}`} description={`分类「${cat}」下的全部文章`}>
+  <div class="page-head">
+    <div class="shell">
+      <p class="page-kicker">分 类</p>
+      <h1>{cat}</h1>
+      <p>{posts.length} 篇文章。<a href={url('/posts/')} style="color:var(--accent)">查看全部 →</a></p>
+    </div>
+  </div>
+
+  <div class="shell" style="padding-bottom: 48px">
+    <ul class="card-grid card-grid--three">
+      {posts.map((post) => <PostCard post={post} />)}
+    </ul>
+  </div>
+</BaseLayout>

@@ -1,17 +1,39 @@
 ---
+import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { SITE, url } from '../lib/site';
+import Sidebar from '../components/Sidebar.astro';
+import { SITE, url, daysSince } from '../lib/site';
+
+const all = await getCollection('posts', ({ data }) => !data.draft);
+const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const days = daysSince(SITE.since);
 ---
 
 <BaseLayout title="关于" description="关于 Cui & Jing 和这个博客">
   <div class="page-head">
     <div class="shell">
       <h1>关于</h1>
+      <p>这个角落的来历，和写在这里的规矩。</p>
     </div>
   </div>
 
-  <div class="shell about-grid">
+  <div class="shell with-aside about-wrap">
     <div class="about-card prose">
+      <div class="about-banner">
+        <div class="about-banner-avatar"><img src={url('/avatar.svg')} alt={SITE.author} width="72" height="72" /></div>
+        <div class="about-banner-text">
+          <b>Cui &amp; Jing</b>
+          <span>两个人的小角落 · 始于 {SITE.since} 年</span>
+        </div>
+        <div class="about-banner-links">
+          <a href={SITE.github} target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.91-.63.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.36 1.12 2.94.86.09-.67.35-1.12.63-1.38-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.7 0 0 .84-.28 2.75 1.05a9.36 9.36 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.4.2 2.44.1 2.7.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.6.69.49A10.26 10.26 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z"/></svg>
+            GitHub
+          </a>
+          <a href={url('/rss.xml')}>RSS</a>
+        </div>
+      </div>
+
       <p>
         你好，我是 <strong>Cui</strong>，和 <strong>Jing</strong> 一起维护这个小小的角落。
         我们都不是那种“一年写一百篇”的人，但遇到真正想明白的事，会认真写下来。
@@ -48,21 +70,17 @@ import { SITE, url } from '../lib/site';
       </p>
     </div>
 
-    <aside class="widget facts">
-      <dl>
-        <dt>站点</dt>
-        <dd>{SITE.title}</dd>
-        <dt>始于</dt>
-        <dd>{SITE.since} 年</dd>
-        <dt>技术栈</dt>
-        <dd>Astro · Markdown · GitHub Pages</dd>
-        <dt>写作者</dt>
-        <dd>Cui &amp; Jing</dd>
-        <dt>订阅</dt>
-        <dd><a href={url('/rss.xml')} style="color: var(--accent)">RSS</a></dd>
-        <dt>许可</dt>
-        <dd>CC BY-NC-SA 4.0</dd>
-      </dl>
-    </aside>
+    <Sidebar posts={posts}>
+      <section class="widget facts">
+        <h4>站点信息</h4>
+        <dl>
+          <div><dt>名称</dt><dd>{SITE.title}</dd></div>
+          <div><dt>始于</dt><dd>{SITE.since} 年 · 第 {days} 天</dd></div>
+          <div><dt>技术栈</dt><dd>Astro · Markdown · GitHub Pages</dd></div>
+          <div><dt>订阅</dt><dd><a href={url('/rss.xml')} class="facts-link">RSS</a></dd></div>
+          <div><dt>许可</dt><dd>CC BY-NC-SA 4.0</dd></div>
+        </dl>
+      </section>
+    </Sidebar>
   </div>
 </BaseLayout>

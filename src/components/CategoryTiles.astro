@@ -1,0 +1,70 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { url } from '../lib/site';
+
+interface Props {
+  posts: CollectionEntry<'posts'>[];
+}
+
+const { posts } = Astro.props;
+
+const CATS = [
+  { name: '技术', icon: 'code', desc: '折腾与实现', from: '#243a63', to: '#456999' },
+  { name: '学习', icon: 'book', desc: '输入与消化', from: '#17514d', to: '#37857a' },
+  { name: '生活', icon: 'coffee', desc: '碎碎念与观察', from: '#c9482a', to: '#e8853f' },
+];
+
+const counts = new Map<string, number>();
+for (const post of posts) {
+  const c = post.data.category;
+  if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+}
+const latestAt = new Map<string, string>();
+for (const post of posts) {
+  const c = post.data.category;
+  if (c && !latestAt.has(c)) latestAt.set(c, post.data.date.toISOString().slice(0, 10));
+}
+---
+
+{
+  CATS.map((cat) => (
+    <a
+      class="cat-tile"
+      href={url(`/category/${encodeURIComponent(cat.name)}/`)}
+      style={`--tile-from:${cat.from};--tile-to:${cat.to}`}
+    >
+      <span class="cat-tile-icon" aria-hidden="true">
+        {cat.icon === 'code' && (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5" />
+          </svg>
+        )}
+        {cat.icon === 'book' && (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15.5H6.5A2.5 2.5 0 0 0 4 21V5.5Z" />
+            <path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20" />
+          </svg>
+        )}
+        {cat.icon === 'coffee' && (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 9h12v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5V9Z" />
+            <path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16M7.5 5.5c0-1 .8-1.2.8-2M11 5.5c0-1 .8-1.2.8-2" />
+          </svg>
+        )}
+      </span>
+      <span class="cat-tile-body">
+        <b>{cat.name}</b>
+        <span class="cat-tile-desc">{cat.desc}</span>
+      </span>
+      <span class="cat-tile-meta">
+        <b>{counts.get(cat.name) ?? 0}</b>
+        <span>篇</span>
+      </span>
+      <span class="cat-tile-arrow" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      </span>
+    </a>
+  ))
+}

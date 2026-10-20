@@ -4,7 +4,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Featured from '../components/Featured.astro';
 import PostCard from '../components/PostCard.astro';
 import Sidebar from '../components/Sidebar.astro';
-import { SITE, url, formatDate } from '../lib/site';
+import CategoryTiles from '../components/CategoryTiles.astro';
+import { SITE, url, formatDate, daysSince } from '../lib/site';
 
 const all = await getCollection('posts', ({ data }) => !data.draft);
 const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
@@ -12,23 +13,54 @@ const [featured, ...rest] = posts;
 const recent = rest.slice(0, 6);
 const tagCount = new Set(posts.flatMap((p) => p.data.tags)).size;
 const latest = posts[0]?.data.date;
+const days = daysSince(SITE.since);
 ---
 
 <BaseLayout>
   <section class="hero">
-    <div class="shell">
-      <p class="eyebrow">{SITE.tagline}</p>
-      <h1>写下来的，才算想清楚了。</h1>
-      <p class="hero-lead">
-        这里记录技术上的折腾、读过的书和一些没想明白的问题。更新不快，但每篇都认真写。
-      </p>
-      <div class="hero-stats">
-        <span class="stat"><b>{posts.length}</b> 篇文章</span>
-        <span class="stat"><b>{tagCount}</b> 个标签</span>
-        {latest && <span class="stat"><b>{formatDate(latest)}</b> 最近更新</span>}
+    <div class="shell hero-inner">
+      <div class="hero-copy">
+        <p class="eyebrow">{SITE.tagline}</p>
+        <h1>写下来的，<br />才算想清楚了。</h1>
+        <p class="hero-lead">
+          这里记录技术上的折腾、读过的书和一些没想明白的问题。更新不快，但每篇都认真写。
+        </p>
+        <div class="hero-stats">
+          <span class="stat"><b>{posts.length}</b> 篇文章</span>
+          <span class="stat"><b>{tagCount}</b> 个标签</span>
+          {latest && <span class="stat"><b>{formatDate(latest)}</b> 最近更新</span>}
+        </div>
       </div>
+
+      <aside class="hero-card">
+        <div class="hero-card-avatar">
+          <img src={url('/avatar.svg')} alt={SITE.author} width="88" height="88" />
+        </div>
+        <p class="hero-card-name">{SITE.author}</p>
+        <p class="hero-card-type">
+          <span id="type-line">你好，我们是 Cui &amp; Jing。</span><span class="type-caret" aria-hidden="true"></span>
+        </p>
+        <div class="hero-card-links">
+          <a href={SITE.github} target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.91-.63.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.36 1.12 2.94.86.09-.67.35-1.12.63-1.38-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.7 0 0 .84-.28 2.75 1.05a9.36 9.36 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.4.2 2.44.1 2.7.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.6.69.49A10.26 10.26 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z"/></svg>
+            GitHub
+          </a>
+          <a href={url('/rss.xml')}>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4.5A15.5 15.5 0 0 1 19.5 20h-3A12.5 12.5 0 0 0 4 7.5v-3Zm0 6a9.5 9.5 0 0 1 9.5 9.5h-3A6.5 6.5 0 0 0 4 13.5v-3ZM6 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
+            RSS
+          </a>
+          <a href={url('/about/')}>关于</a>
+        </div>
+        <p class="hero-card-foot">已写了 <b>{days}</b> 天，还在继续。</p>
+      </aside>
     </div>
   </section>
+
+  <div class="shell">
+    <div class="cat-tiles">
+      <CategoryTiles posts={posts} />
+    </div>
+  </div>
 
   <div class="shell with-aside">
     <div>
@@ -37,8 +69,13 @@ const latest = posts[0]?.data.date;
       {
         recent.length > 0 && (
           <>
-            <div class="section-head" style="margin-top:30px">
-              <h2>最近更新</h2>
+            <div class="section-head" style="margin-top:34px">
+              <h2>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M7 3v3M17 3v3M4 8.5h16M5 6h14a1.5 1.5 0 0 1 1.5 1.5v12A1.5 1.5 0 0 1 19 21H5a1.5 1.5 0 0 1-1.5-1.5v-12A1.5 1.5 0 0 1 5 6Z" />
+                </svg>
+                最近更新
+              </h2>
               <a href={url('/posts/')}>全部文章 →</a>
             </div>
             <ul class="card-grid">
@@ -57,6 +94,38 @@ const latest = posts[0]?.data.date;
       }
     </div>
 
-    <Sidebar posts={posts} />
+    <Sidebar posts={posts} showAuthor={false} />
   </div>
 </BaseLayout>
+
+<script>
+  const line = document.getElementById('type-line');
+  const full = line?.textContent ?? '';
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // 保持静态全文
+  } else if (line) {
+    const lines = [full, '不追热点，只写想清楚的事。', '更新不快，但每篇都认真写。'];
+    let li = 0;
+    let ci = 0;
+    let deleting = false;
+
+    const tick = () => {
+      const text = lines[li];
+      ci += deleting ? -1 : 1;
+      line!.textContent = text.slice(0, ci);
+
+      let delay = deleting ? 34 : 92;
+      if (!deleting && ci === text.length) {
+        delay = 2600;
+        deleting = true;
+      } else if (deleting && ci === 0) {
+        deleting = false;
+        li = (li + 1) % lines.length;
+        delay = 420;
+      }
+      setTimeout(tick, delay);
+    };
+    setTimeout(tick, 900);
+  }
+</script>

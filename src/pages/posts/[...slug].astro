@@ -4,7 +4,7 @@ import type { CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Cover from '../../components/Cover.astro';
 import Sidebar from '../../components/Sidebar.astro';
-import { url, formatDate, readingTime } from '../../lib/site';
+import { url, formatDate, readingTime, tagHue } from '../../lib/site';
 
 export async function getStaticPaths() {
   const posts = await getCollection('posts', ({ data }) => !data.draft);
@@ -59,12 +59,18 @@ const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
               <Content />
             </div>
 
+            <div class="end-mark" aria-hidden="true">
+              <span class="end-line"></span>
+              <span class="end-dot">全文完</span>
+              <span class="end-line"></span>
+            </div>
+
             {
               post.data.tags.length > 0 && (
                 <footer class="post-foot">
                   <div class="post-tags">
                     {post.data.tags.map((tag: string) => (
-                      <a class="tag-pill" href={url(`/tags/${encodeURIComponent(tag)}/`)}>
+                      <a class="tag-pill" style={`--h:${tagHue(tag)}`} href={url(`/tags/${encodeURIComponent(tag)}/`)}>
                         #{tag}
                       </a>
                     ))}

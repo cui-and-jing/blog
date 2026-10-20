@@ -1,13 +1,15 @@
 ---
 import type { CollectionEntry } from 'astro:content';
-import { SITE, url, daysSince } from '../lib/site';
+import { SITE, url, daysSince, tagHue } from '../lib/site';
 
 interface Props {
   posts: CollectionEntry<'posts'>[];
   currentId?: string;
+  /** 首页 hero 已有作者卡时传 false，避免一屏两张自我介绍 */
+  showAuthor?: boolean;
 }
 
-const { posts, currentId } = Astro.props;
+const { posts, currentId, showAuthor = true } = Astro.props;
 
 const tagCounts = new Map<string, number>();
 for (const post of posts) {
@@ -21,24 +23,41 @@ const days = daysSince(SITE.since);
 ---
 
 <aside class="sidebar">
-  <div class="author">
-    <div class="author-avatar">
-      <img src={url('/avatar.svg')} alt={SITE.author} width="76" height="76" />
-    </div>
-    <h3>{SITE.author}</h3>
-    <p class="bio">{SITE.tagline}</p>
-    <div class="author-actions">
-      <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>
-      <a href={url('/rss.xml')}>RSS</a>
-    </div>
-    <div class="author-stats">
-      <div><b>{posts.length}</b><span>文章</span></div>
-      <div><b>{tagCounts.size}</b><span>标签</span></div>
-      <div><b>{days}</b><span>天</span></div>
-    </div>
-  </div>
+  {
+    showAuthor && (
+      <div class="author">
+        <div class="author-avatar">
+          <img src={url('/avatar.svg')} alt={SITE.author} width="76" height="76" />
+        </div>
+        <h3>{SITE.author}</h3>
+        <p class="bio">{SITE.tagline}</p>
+        <div class="author-actions">
+          <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href={url('/rss.xml')}>RSS</a>
+        </div>
+        <div class="author-stats">
+          <div><b>{posts.length}</b><span>文章</span></div>
+          <div><b>{tagCounts.size}</b><span>标签</span></div>
+          <div><b>{days}</b><span>天</span></div>
+        </div>
+      </div>
+    )
+  }
 
   <slot />
+
+  {
+    !showAuthor && (
+      <section class="widget widget-cta">
+        <h4>别错过新文章</h4>
+        <p>没有推送、没有弹窗，想看的时候用 RSS 读就好。也可以去 GitHub 看这个站是怎么写的。</p>
+        <div class="widget-cta-actions">
+          <a href={url('/rss.xml')}>RSS 订阅</a>
+          <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </section>
+    )
+  }
 
   {
     tags.length > 0 && (
@@ -46,7 +65,7 @@ const days = daysSince(SITE.since);
         <h4>标签</h4>
         <div class="widget-tags">
           {tags.map(([tag]) => (
-            <a href={url(`/tags/${encodeURIComponent(tag)}/`)}>{tag}</a>
+            <a href={url(`/tags/${encodeURIComponent(tag)}/`)} style={`--h:${tagHue(tag)}`}>{tag}</a>
           ))}
         </div>
       </section>
