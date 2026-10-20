@@ -657,6 +657,12 @@ html[data-theme='dark'] .hero-card-avatar {
   scrollbar-width: thin;
 }
 
+/* flex 容器受 max-height 限制时会按 flex-shrink 压缩子项，
+   作者卡因 overflow:hidden 最小高度失效会被压扁，这里锁死不收缩，交由容器滚动 */
+.sidebar > * {
+  flex: 0 0 auto;
+}
+
 .sidebar::-webkit-scrollbar {
   width: 4px;
 }
