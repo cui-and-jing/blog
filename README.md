@@ -123,6 +123,27 @@ src/
 - 正文图片可点击放大，支持 `←` `→` 切换、`Esc` 关闭；图片未加载时不影响正文。
 - 文章页有阅读进度条，滚动超过 700px 出现「回到顶部」。
 
+## 评论
+
+文章底部用 [Giscus](https://giscus.app) 接 GitHub Discussions，静态站不需要后端。
+`src/components/Comments.astro` 负责懒加载（滚到附近才拉 iframe）、深浅色同步、加载骨架与失败兜底，
+并把评论总数显示在标题旁。
+
+启用只要两步（各点一次）：
+
+1. 仓库 Settings → General → Features → 勾选 **Discussions**
+2. 打开 <https://github.com/apps/giscus> → Install → 只勾选本仓库
+
+然后写配置：
+
+```bash
+npm run comments:setup            # 自动取 repoId / categoryId，写入 src/data/comments.json
+npm run comments:setup -- --list  # 只列出仓库里的讨论分类
+```
+
+两个 ID 都齐了评论区才渲染；没配置时整块不出现，线上不会留一个坏掉的框。
+讨论按 `pathname` 关联，改标题不影响已有评论，改 slug 会让评论「迷路」。
+
 ## 分享与 SEO
 
 - 每页输出 `WebSite` 结构化数据；文章页额外输出 `BlogPosting` 与 `BreadcrumbList`。
@@ -175,7 +196,7 @@ BLOG_SITE=https://blog.example.com BLOG_BASE=/ npm run build
 ## 待办
 
 - [x] 站内搜索（构建时索引，客户端匹配）
-- [ ] 评论系统（Twikoo 重新部署，或换 Giscus）
+- [x] 评论系统（Giscus，见上文配置）
 - [ ] 旧站文章迁移
 - [ ] 每篇文章单独的分享封面图（目前统一用 `public/og.png`）
 - [ ] 文章内图片压缩与响应式尺寸（`astro:assets`）

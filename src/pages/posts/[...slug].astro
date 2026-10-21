@@ -4,6 +4,7 @@ import type { CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Cover from '../../components/Cover.astro';
 import Sidebar from '../../components/Sidebar.astro';
+import Comments from '../../components/Comments.astro';
 import { url, formatDate, readingTime, tagHue } from '../../lib/site';
 
 export async function getStaticPaths() {
@@ -113,6 +114,8 @@ const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
               )
             }
           </nav>
+
+          <Comments />
         </div>
 
         <Sidebar posts={posts} currentId={post.id}>

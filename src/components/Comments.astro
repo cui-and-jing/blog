@@ -1,0 +1,257 @@
+---
+import { COMMENTS, commentsThreadUrl } from '../lib/comments';
+
+interface Props {
+  /** 区块标题，默认「评论」 */
+  title?: string;
+  /** 标题下的一句说明 */
+  hint?: string;
+}
+
+const {
+  title = '评论',
+  hint = '用 GitHub 账号登录后留言，评论会同步到仓库的 Discussions；有人回复时 GitHub 会通知你。',
+} = Astro.props;
+---
+
+{
+  COMMENTS.enabled ? (
+    <section
+      class="comments"
+      id="comments"
+      aria-labelledby="comments-title"
+      data-comments
+      data-state="idle"
+      data-repo={COMMENTS.repo}
+      data-repo-id={COMMENTS.repoId}
+      data-category={COMMENTS.category}
+      data-category-id={COMMENTS.categoryId}
+      data-mapping={COMMENTS.mapping}
+      data-lang={COMMENTS.lang}
+    >
+      <header class="comments-head">
+        <div class="comments-heading">
+          <span class="comments-kicker">DISCUSSION</span>
+          <h2 id="comments-title">
+            {title}
+            <span class="comments-count" data-comment-count hidden></span>
+          </h2>
+        </div>
+        <a class="comments-link" href={commentsThreadUrl} target="_blank" rel="noopener noreferrer">
+          GitHub 讨论区
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M7 17 17 7M8 7h9v9"></path>
+          </svg>
+        </a>
+      </header>
+
+      <p class="comments-hint">{hint}</p>
+
+      <div class="comments-body">
+        <div class="comments-skeleton" aria-hidden="true">
+          <span class="sk-line"></span>
+          <span class="sk-line"></span>
+          <span class="sk-line"></span>
+        </div>
+        <p class="comments-status" data-comments-status role="status">正在准备评论区…</p>
+
+        <div class="giscus"></div>
+
+        <div class="comments-fallback" hidden>
+          <p>评论没能加载出来，多半是网络把它挡了一下。</p>
+          <div class="comments-fallback-actions">
+            <button class="btn" type="button" data-comments-retry>重试</button>
+            <a class="btn" href={commentsThreadUrl} target="_blank" rel="noopener noreferrer">去 GitHub 留言</a>
+          </div>
+        </div>
+
+        <noscript>
+          <style>
+            .comments-skeleton,
+            .comments-status {
+              display: none;
+            }
+          </style>
+          <p class="comments-hint">
+            评论区需要 JavaScript。也可以直接去 <a href={commentsThreadUrl}>GitHub 讨论区</a> 留言。
+          </p>
+        </noscript>
+      </div>
+    </section>
+  ) : (
+    import.meta.env.DEV && (
+      <section class="comments comments--muted" aria-label="评论（未启用）">
+        <header class="comments-head">
+          <div class="comments-heading">
+            <span class="comments-kicker">DISCUSSION</span>
+            <h2>评论</h2>
+          </div>
+          <span class="comments-badge">未接通</span>
+        </header>
+        <p class="comments-hint">
+          评论区还没拿到 Giscus 的 repo / category ID。在仓库开启 Discussions 并安装 giscus App
+          后，运行 <code>npm run comments:setup</code> 自动写入配置。
+        </p>
+      </section>
+    )
+  )
+}
+
+<script>
+  const section = document.querySelector<HTMLElement>('[data-comments]');
+
+  if (section) {
+    const host = section.querySelector<HTMLElement>('.giscus');
+    const status = section.querySelector<HTMLElement>('[data-comments-status]');
+    const fallback = section.querySelector<HTMLElement>('.comments-fallback');
+    const countNode = section.querySelector<HTMLElement>('[data-comment-count]');
+    const retry = section.querySelector<HTMLButtonElement>('[data-comments-retry]');
+    const root = document.documentElement;
+
+    const currentTheme = () => (root.dataset.theme === 'dark' ? 'transparent_dark' : 'light');
+
+    let frame: HTMLIFrameElement | null = null;
+    let timer = 0;
+    /* giscus 自己报错（没装 App、限流、配置不对）之后就不再翻盘 */
+    let broken = false;
+
+    /* giscus 会给 iframe 加 loading 类、把 opacity 置 0，等它自己 load 才恢复；
+       实测慢网络下 load 会被拖很久，所以收到任何“已渲染”信号后由我们主动放行 */
+    const reveal = (target = frame) => {
+      if (!target) return;
+      target.style.removeProperty('opacity');
+      target.classList.remove('giscus-frame--loading');
+      /* 个别网络下 giscus 迟迟不上报高度，先给个能看的高度，收到真实值会被覆盖 */
+      window.setTimeout(() => {
+        if (!target.style.height) target.style.height = '440px';
+      }, 1200);
+    };
+
+    const markReady = () => {
+      if (broken) return;
+      if (section.dataset.state !== 'ready') {
+        section.dataset.state = 'ready';
+        fallback?.setAttribute('hidden', '');
+        window.clearTimeout(timer);
+      }
+      reveal();
+    };
+
+    const fail = () => {
+      section.dataset.state = 'error';
+      fallback?.removeAttribute('hidden');
+      window.clearTimeout(timer);
+    };
+
+    /* client.js 动态插入 iframe：等到它摘掉 loading 类就算画出来了 */
+    const adopt = (next: HTMLIFrameElement | null) => {
+      if (!next || next === frame) return;
+      frame = next;
+      const check = () => {
+        if (!next.classList.contains('giscus-frame--loading')) markReady();
+      };
+      next.addEventListener('load', check);
+      new MutationObserver(check).observe(next, { attributes: true, attributeFilter: ['class'] });
+      check();
+    };
+
+    const mount = () => {
+      if (!host) return;
+      window.clearTimeout(timer);
+      broken = false;
+      section.dataset.state = 'loading';
+      fallback?.setAttribute('hidden', '');
+      if (status) status.textContent = '正在准备评论区…';
+      host.replaceChildren();
+      frame = null;
+
+      const script = document.createElement('script');
+      script.src = 'https://giscus.app/client.js';
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.setAttribute('data-repo', section.dataset.repo ?? '');
+      script.setAttribute('data-repo-id', section.dataset.repoId ?? '');
+      script.setAttribute('data-category', section.dataset.category ?? '');
+      script.setAttribute('data-category-id', section.dataset.categoryId ?? '');
+      script.setAttribute('data-mapping', section.dataset.mapping ?? 'pathname');
+      script.setAttribute('data-strict', '1');
+      script.setAttribute('data-reactions-enabled', '1');
+      script.setAttribute('data-emit-metadata', '1');
+      script.setAttribute('data-input-position', 'top');
+      script.setAttribute('data-theme', currentTheme());
+      script.setAttribute('data-lang', section.dataset.lang ?? 'zh-CN');
+      script.addEventListener('error', () => {
+        broken = true;
+        fail();
+      });
+      host.append(script);
+
+      /* 慢网络下别让骨架屏一直转；后面真加载出来了还可以翻回来 */
+      timer = window.setTimeout(() => {
+        if (section.dataset.state !== 'ready') fail();
+      }, 18000);
+    };
+
+    new MutationObserver(() =>
+      adopt(host?.querySelector<HTMLIFrameElement>('iframe.giscus-frame') ?? null)
+    ).observe(host ?? section, { childList: true, subtree: true });
+
+    /* 站点切深浅色后，同步 iframe 里的配色 */
+    new MutationObserver(() => {
+      frame?.contentWindow?.postMessage(
+        { giscus: { setConfig: { theme: currentTheme() } } },
+        'https://giscus.app'
+      );
+    }).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+
+    window.addEventListener('message', (event) => {
+      if (event.origin !== 'https://giscus.app') return;
+      const payload = (event.data as { giscus?: Record<string, any> })?.giscus;
+      if (!payload) return;
+
+      /* 有尺寸上报说明 iframe 已经渲染；几十像素的多半是 giscus 自己的错误条 */
+      if (typeof payload.resizeHeight === 'number' && payload.resizeHeight > 0) {
+        if (frame) frame.style.height = `${payload.resizeHeight}px`;
+        if (payload.resizeHeight < 160) {
+          broken = true;
+          fail();
+          return;
+        }
+        markReady();
+      }
+
+      /* 新文章还没有讨论时也会报 Discussion not found，这是正常的 */
+      if (payload.error && !/Discussion not found/i.test(String(payload.error))) {
+        broken = true;
+        fail();
+      }
+
+      const raw = payload.totalCommentCount ?? payload.discussion?.totalCommentCount;
+      const count = typeof raw === 'number' ? raw : Number(raw);
+      if (!countNode || !Number.isFinite(count)) return;
+      countNode.textContent = `${count} 条`;
+      countNode.hidden = count <= 0;
+    });
+
+    retry?.addEventListener('click', mount);
+
+    /* 滚到附近才加载，文章一打开不必先去拉 GitHub */
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver(
+        (entries, observer) => {
+          if (!entries.some((entry) => entry.isIntersecting)) return;
+          observer.disconnect();
+          mount();
+        },
+        { rootMargin: '600px 0px' }
+      );
+      io.observe(section);
+      if (location.hash === '#comments') {
+        io.disconnect();
+        mount();
+      }
+    } else {
+      mount();
+    }
+  }
+</script>
