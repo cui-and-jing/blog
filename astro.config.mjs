@@ -10,6 +10,10 @@ export default defineConfig({
   base,
   trailingSlash: 'always',
   integrations: [mdx(), sitemap()],
+  prefetch: {
+    prefetchAll: true,
+    defaultStrategy: 'hover',
+  },
   markdown: {
     theme: 'github-dark',
     shikiConfig: {

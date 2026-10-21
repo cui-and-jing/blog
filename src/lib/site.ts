@@ -55,6 +55,13 @@ export function url(path = '/'): string {
   return `${base}/${clean}`;
 }
 
+/** public/ 下的静态资源统一带 base 前缀；外链原样返回 */
+export function mediaUrl(path: string): string {
+  if (/^(https?:)?\/\//.test(path)) return path;
+  if (path.startsWith(`${base}/`)) return path;
+  return url(path);
+}
+
 export function formatDate(date: Date): string {
   const d = new Date(date);
   const y = d.getFullYear();

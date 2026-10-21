@@ -81,11 +81,17 @@ src/
 │   ├── tags/                标签总览 + 单标签
 │   ├── category/            分类页（每个分类一页）
 │   ├── games/               游戏：大厅 + 全屏试玩外壳
+│   ├── search.astro         站内搜索
+│   ├── search-index.json.ts 构建时生成搜索索引
+│   ├── robots.txt.ts        robots（含 sitemap 地址）
 │   ├── about.astro          关于
 │   ├── rss.xml.js           RSS
 │   └── 404.astro
 ├── styles/global.css        全站样式（设计变量在文件顶部）
-└── public/games/            游戏单文件（构建时原样拷贝，不进打包）
+└── public/
+    ├── og.png               默认分享图（1200×630）
+    └── games/               游戏单文件（构建时原样拷贝，不进打包）
+```
 
 ## 游戏模块
 
@@ -98,7 +104,32 @@ src/
 新游戏可以复用同样的外壳或直接链接到 HTML。
 
 游戏用 `bean-rush.*` 前缀写 localStorage，和博客的 `theme` 键不冲突。
-```
+
+## 搜索
+
+`/search/` 是纯客户端搜索，不需要后端或第三方服务：
+
+- 构建时 `src/pages/search-index.json.ts` 把每篇文章压成纯文本，输出 `/search-index.json`（含标题、
+  摘要、标签、分类、日期、链接与正文）。
+- 页面按 标题 > 标签 > 分类 > 摘要 > 正文 加权打分，多个关键词按 AND 组合，命中处高亮。
+- 支持 `↑` `↓` 选择、`Enter` 打开、`Esc` 清空；顶栏搜索图标、`Ctrl / ⌘ + K`、`/` 都能进入搜索。
+- 索引很小（当前 3 篇文章约 3 KB），文章多了以后仍然是一次请求；如果将来上千篇，可以换 Pagefind。
+
+## 阅读体验
+
+- 文章页右侧目录跟随滚动高亮；侧栏内容超出一屏时，当前条目会自动滚进可视区。
+- 宽度 ≤1080px 时出现左下角「目录」按钮，点开是底部抽屉（原生 `<dialog>`，Esc 可关）。
+- 代码块自动显示语言标签和复制按钮（触屏设备上按钮常显）。
+- 正文图片可点击放大，支持 `←` `→` 切换、`Esc` 关闭；图片未加载时不影响正文。
+- 文章页有阅读进度条，滚动超过 700px 出现「回到顶部」。
+
+## 分享与 SEO
+
+- 每页输出 `WebSite` 结构化数据；文章页额外输出 `BlogPosting` 与 `BreadcrumbList`。
+- 默认分享图 `public/og.png`（1200×630），文章可被 `cover` 覆盖；同时输出 `og:*` 与
+  `twitter:summary_large_image`。
+- `robots.txt` 由 `src/pages/robots.txt.ts` 生成，自动带上 sitemap 地址。
+- 页头有「跳到正文」链接，键盘 Tab 第一下就能用。
 
 ## 设计
 
@@ -143,7 +174,8 @@ BLOG_SITE=https://blog.example.com BLOG_BASE=/ npm run build
 
 ## 待办
 
+- [x] 站内搜索（构建时索引，客户端匹配）
 - [ ] 评论系统（Twikoo 重新部署，或换 Giscus）
-- [ ] 站内搜索（Pagefind）
 - [ ] 旧站文章迁移
-- [ ] 每篇文章的分享封面图
+- [ ] 每篇文章单独的分享封面图（目前统一用 `public/og.png`）
+- [ ] 文章内图片压缩与响应式尺寸（`astro:assets`）

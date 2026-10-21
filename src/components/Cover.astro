@@ -1,5 +1,6 @@
 ---
 import { coverStyle, coverVars } from '../lib/cover';
+import { mediaUrl } from '../lib/site';
 
 interface Props {
   seed: string;
@@ -17,7 +18,7 @@ const glyph = Array.from(title.replace(/^[\s「『《"'#]+/, ''))[0] ?? '·';
 <div class={`cover ${className}`} style={coverVars(style)}>
   {
     image ? (
-      <img src={image} alt="" loading="lazy" decoding="async" />
+      <img src={mediaUrl(image)} alt="" loading="lazy" decoding="async" />
     ) : (
       <>
         <svg class="cover-art" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" aria-hidden="true">

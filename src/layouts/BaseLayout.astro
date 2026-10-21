@@ -1,17 +1,74 @@
 ---
 import '../styles/global.css';
-import { SITE, NAV, url } from '../lib/site';
+import { SITE, NAV, url, mediaUrl } from '../lib/site';
 
 interface Props {
   title?: string;
   description?: string;
   image?: string;
+  article?: {
+    published: Date;
+    updated?: Date;
+    tags: string[];
+    category?: string;
+    minutes?: number;
+  };
 }
 
-const { title, description = SITE.description, image } = Astro.props;
+const { title, description = SITE.description, image, article } = Astro.props;
 const pageTitle = title ? `${title} · ${SITE.title}` : `${SITE.title} · ${SITE.tagline}`;
+const siteRoot = (Astro.site ?? new URL(SITE.github)).toString().replace(/\/$/, '');
 const canonical = new URL(Astro.url.pathname, Astro.site ?? SITE.github).toString();
 const current = Astro.url.pathname.replace(/\/$/, '') || '/';
+const ogImage = image ? new URL(mediaUrl(image), siteRoot).toString() : `${siteRoot}${url('/og.png')}`;
+
+const websiteSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: SITE.title,
+  description: SITE.description,
+  url: `${siteRoot}${url('/')}`,
+  inLanguage: SITE.lang,
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: `${siteRoot}${url('/search/')}?q={search_term_string}`,
+    'query-input': 'required name=search_term_string',
+  },
+};
+
+const articleSchema = article
+  ? {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: title,
+      description,
+      url: canonical,
+      mainEntityOfPage: canonical,
+      datePublished: article.published.toISOString(),
+      dateModified: (article.updated ?? article.published).toISOString(),
+      inLanguage: SITE.lang,
+      image: ogImage,
+      author: { '@type': 'Person', name: SITE.author, url: SITE.github },
+      publisher: { '@type': 'Organization', name: SITE.title },
+      ...(article.category ? { articleSection: article.category } : {}),
+      ...(article.tags.length ? { keywords: article.tags.join(', ') } : {}),
+      ...(article.minutes ? { timeRequired: `PT${article.minutes}M` } : {}),
+    }
+  : null;
+
+const breadcrumbSchema = article
+  ? {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: '首页', item: `${siteRoot}${url('/')}` },
+        { '@type': 'ListItem', position: 2, name: '文章', item: `${siteRoot}${url('/posts/')}` },
+        { '@type': 'ListItem', position: 3, name: title, item: canonical },
+      ],
+    }
+  : null;
+
+const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 ---
 
 <!doctype html>
@@ -28,14 +85,24 @@ const current = Astro.url.pathname.replace(/\/$/, '') || '/';
     <meta name="theme-color" content="#f2f0e9" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#131311" media="(prefers-color-scheme: dark)" />
 
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={article ? 'article' : 'website'} />
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:site_name" content={SITE.title} />
     <meta property="og:locale" content="zh_CN" />
-    {image && <meta property="og:image" content={new URL(image, canonical).toString()} />}
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={pageTitle} />
+    {article && <meta property="article:published_time" content={article.published.toISOString()} />}
+    {article?.updated && <meta property="article:modified_time" content={article.updated.toISOString()} />}
+    {article?.tags.map((tag) => <meta property="article:tag" content={tag} />)}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <script type="application/ld+json" set:html={JSON.stringify(schema)} is:inline />
 
     <script is:inline>
       (function () {
@@ -51,7 +118,8 @@ const current = Astro.url.pathname.replace(/\/$/, '') || '/';
     </script>
   </head>
 
-  <body>
+  <body data-search-url={url('/search/')}>
+    <a class="skip-link" href="#main">跳到正文</a>
     <div class="read-progress" id="read-progress" aria-hidden="true"><span></span></div>
 
     <header class="site-header" id="site-header">
@@ -73,6 +141,12 @@ const current = Astro.url.pathname.replace(/\/$/, '') || '/';
               );
             })
           }
+          <a class="nav-icon search-link" href={url('/search/')} aria-label="搜索文章" title="搜索（Ctrl / ⌘ + K）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.4"></circle>
+              <path d="m16 16 4.2 4.2"></path>
+            </svg>
+          </a>
           <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换深浅色">
             <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
               <circle cx="12" cy="12" r="4.2"></circle>
@@ -86,7 +160,7 @@ const current = Astro.url.pathname.replace(/\/$/, '') || '/';
       </div>
     </header>
 
-    <main>
+    <main id="main" tabindex="-1">
       <slot />
     </main>
 
@@ -125,6 +199,47 @@ const current = Astro.url.pathname.replace(/\/$/, '') || '/';
     <script>
       const root = document.documentElement;
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+      /* 搜索：⌘/Ctrl+K 或 / 直接聚焦，其他页面跳到搜索页 */
+      const searchUrl = document.body.dataset.searchUrl || '/search/';
+      const searchField = () => document.getElementById('search-input') as HTMLInputElement | null;
+      const isTyping = (target: EventTarget | null) => {
+        const el = target as HTMLElement | null;
+        if (!el || !el.tagName) return false;
+        return (
+          el.tagName === 'INPUT' ||
+          el.tagName === 'TEXTAREA' ||
+          el.tagName === 'SELECT' ||
+          el.isContentEditable
+        );
+      };
+
+      document.addEventListener('keydown', (event) => {
+        const mod = event.metaKey || event.ctrlKey;
+        if (mod && event.key.toLowerCase() === 'k') {
+          event.preventDefault();
+          const field = searchField();
+          if (field) {
+            field.focus();
+            field.select();
+          } else {
+            location.href = searchUrl;
+          }
+          return;
+        }
+
+        if (event.key === '/' && !mod && !event.altKey && !isTyping(event.target)) {
+          const field = searchField();
+          if (field) {
+            event.preventDefault();
+            field.focus();
+            field.select();
+          } else {
+            event.preventDefault();
+            location.href = searchUrl;
+          }
+        }
+      });
 
       /* 主题切换：支持 View Transition 时用圆形扩散过渡 */
       const toggle = document.getElementById('theme-toggle');

@@ -35,7 +35,18 @@ const all = await getCollection('posts', ({ data }) => !data.draft);
 const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
 ---
 
-<BaseLayout title={post.data.title} description={post.data.description} image={post.data.cover}>
+<BaseLayout
+  title={post.data.title}
+  description={post.data.description}
+  image={post.data.cover}
+  article={{
+    published: post.data.date,
+    updated: post.data.updated,
+    tags: post.data.tags,
+    category: post.data.category,
+    minutes,
+  }}
+>
   <div class="shell">
     <article>
       <header class="post-hero">
@@ -126,44 +137,217 @@ const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
     </article>
   </div>
 
+  {
+    toc.length > 0 && (
+      <>
+        <button
+          class="toc-fab"
+          id="toc-fab"
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded="false"
+          aria-controls="toc-dialog"
+          hidden
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 6h16M4 12h11M4 18h7"></path>
+          </svg>
+          目录
+        </button>
+
+        <dialog class="toc-dialog" id="toc-dialog" aria-label="文章目录">
+          <div class="toc-dialog-head">
+            <span>目录</span>
+            <button class="toc-dialog-close" type="button" aria-label="关闭目录">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="toc-body"></div>
+        </dialog>
+      </>
+    )
+  }
+
+  <dialog class="lightbox" id="lightbox" aria-label="图片预览">
+    <button class="lightbox-close" type="button" aria-label="关闭预览">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6 6 18"></path>
+      </svg>
+    </button>
+    <img id="lightbox-img" alt="" />
+    <p class="lightbox-caption" id="lightbox-caption"></p>
+    <button class="lightbox-nav prev" type="button" aria-label="上一张">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M15 5l-7 7 7 7"></path>
+      </svg>
+    </button>
+    <button class="lightbox-nav next" type="button" aria-label="下一张">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 5l7 7-7 7"></path>
+      </svg>
+    </button>
+  </dialog>
+
   <script>
+    /* ---------- 代码块：语言标签 + 复制 ---------- */
     document.querySelectorAll('.prose pre').forEach((pre) => {
       const wrap = document.createElement('div');
       wrap.className = 'code-block';
       pre.parentNode?.insertBefore(wrap, pre);
       wrap.appendChild(pre);
 
+      const lang = pre.getAttribute('data-language');
+      if (lang) {
+        wrap.classList.add('has-lang');
+        const label = document.createElement('span');
+        label.className = 'code-lang';
+        label.textContent = lang;
+        wrap.appendChild(label);
+      }
+
       const btn = document.createElement('button');
       btn.className = 'copy-btn';
       btn.type = 'button';
       btn.textContent = '复制';
+      btn.setAttribute('aria-label', '复制代码');
       btn.addEventListener('click', async () => {
         const text = pre.querySelector('code')?.textContent ?? '';
         try {
           await navigator.clipboard.writeText(text);
           btn.textContent = '已复制';
+          btn.classList.add('copied');
         } catch {
-          btn.textContent = '失败';
+          btn.textContent = '复制失败';
         }
-        setTimeout(() => (btn.textContent = '复制'), 1600);
+        setTimeout(() => {
+          btn.textContent = '复制';
+          btn.classList.remove('copied');
+        }, 1600);
       });
       wrap.appendChild(btn);
     });
 
-    const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('.toc a'));
+    /* ---------- 目录高亮 ---------- */
+    const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('.sidebar .toc a'));
     const map = new Map(links.map((a) => [decodeURIComponent(a.hash.slice(1)), a]));
+    const sidebar = document.querySelector<HTMLElement>('.sidebar');
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
           links.forEach((a) => a.classList.remove('active'));
-          map.get(entry.target.id)?.classList.add('active');
+          const link = map.get(entry.target.id);
+          link?.classList.add('active');
+
+          /* 侧栏内容超出一屏时，让当前目录项保持可见 */
+          if (link && sidebar && sidebar.scrollHeight > sidebar.clientHeight + 4) {
+            const box = sidebar.getBoundingClientRect();
+            const item = link.getBoundingClientRect();
+            if (item.top < box.top + 40 || item.bottom > box.bottom - 40) {
+              sidebar.scrollTo({
+                top: sidebar.scrollTop + (item.top - box.top) - sidebar.clientHeight / 2,
+                behavior: 'smooth',
+              });
+            }
+          }
         });
       },
       { rootMargin: '-96px 0px -70% 0px' }
     );
 
     document.querySelectorAll('.prose h2, .prose h3').forEach((h) => observer.observe(h));
+
+    /* ---------- 移动端目录 ---------- */
+    const fab = document.getElementById('toc-fab') as HTMLButtonElement | null;
+    const tocDialog = document.getElementById('toc-dialog') as HTMLDialogElement | null;
+
+    if (fab && tocDialog) {
+      const body = tocDialog.querySelector('.toc-body');
+      const source = document.querySelector('.sidebar .toc ul');
+      if (body && source) {
+        const nav = document.createElement('nav');
+        nav.className = 'toc';
+        nav.setAttribute('aria-label', '文章目录');
+        nav.append(source.cloneNode(true));
+        body.append(nav);
+      }
+
+      const close = tocDialog.querySelector('.toc-dialog-close');
+      fab.addEventListener('click', () => {
+        tocDialog.showModal();
+        fab.setAttribute('aria-expanded', 'true');
+      });
+      close?.addEventListener('click', () => tocDialog.close());
+      tocDialog.addEventListener('click', (event) => {
+        if (event.target === tocDialog) tocDialog.close();
+      });
+      tocDialog.addEventListener('close', () => fab.setAttribute('aria-expanded', 'false'));
+      tocDialog.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => tocDialog.close()));
+      fab.hidden = false;
+    }
+
+    /* ---------- 图片灯箱 ---------- */
+    const images = Array.from(document.querySelectorAll<HTMLImageElement>('.prose img'));
+    const lightbox = document.getElementById('lightbox') as HTMLDialogElement | null;
+
+    if (lightbox && images.length > 0) {
+      const view = document.getElementById('lightbox-img') as HTMLImageElement;
+      const caption = document.getElementById('lightbox-caption');
+      const prev = lightbox.querySelector<HTMLButtonElement>('.lightbox-nav.prev');
+      const next = lightbox.querySelector<HTMLButtonElement>('.lightbox-nav.next');
+      let index = 0;
+
+      if (images.length < 2) {
+        prev?.setAttribute('hidden', '');
+        next?.setAttribute('hidden', '');
+      }
+
+      const show = (i: number) => {
+        index = (i + images.length) % images.length;
+        const image = images[index];
+        view.src = image.currentSrc || image.src;
+        view.alt = image.alt;
+        if (caption) {
+          caption.textContent = image.alt || '';
+          caption.hidden = !image.alt;
+        }
+      };
+
+      const open = (i: number) => {
+        show(i);
+        lightbox.showModal();
+        document.documentElement.style.overflow = 'hidden';
+      };
+
+      images.forEach((image, i) => {
+        image.tabIndex = 0;
+        image.setAttribute('role', 'button');
+        image.setAttribute('aria-label', `放大图片：${image.alt || '正文图片'}`);
+        image.addEventListener('click', () => open(i));
+        image.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            open(i);
+          }
+        });
+      });
+
+      lightbox.querySelector('.lightbox-close')?.addEventListener('click', () => lightbox.close());
+      prev?.addEventListener('click', () => show(index - 1));
+      next?.addEventListener('click', () => show(index + 1));
+      lightbox.addEventListener('click', (event) => {
+        if (event.target === lightbox) lightbox.close();
+      });
+      lightbox.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowLeft') show(index - 1);
+        if (event.key === 'ArrowRight') show(index + 1);
+      });
+      lightbox.addEventListener('close', () => {
+        document.documentElement.style.overflow = '';
+      });
+    }
   </script>
 </BaseLayout>
