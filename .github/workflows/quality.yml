@@ -29,19 +29,14 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Start preview
+      - name: Accessibility audit (axe, light + dark)
         run: |
           npx astro preview --port 4321 > /tmp/preview.log 2>&1 &
           for _ in $(seq 1 30); do
             if curl -sf -o /dev/null http://localhost:4321/blog/; then
               echo "preview ready"
-              exit 0
+              break
             fi
             sleep 1
           done
-          echo "preview 没能启动："
-          cat /tmp/preview.log
-          exit 1
-
-      - name: Accessibility audit (axe, light + dark)
-        run: npm run a11y
+          npm run a11y
