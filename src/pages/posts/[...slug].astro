@@ -5,6 +5,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Cover from '../../components/Cover.astro';
 import Sidebar from '../../components/Sidebar.astro';
 import Comments from '../../components/Comments.astro';
+import RelatedPosts from '../../components/RelatedPosts.astro';
 import { url, formatDate, readingTime, tagHue } from '../../lib/site';
 
 export async function getStaticPaths() {
@@ -31,6 +32,8 @@ const { post, newer, older } = Astro.props;
 const { Content, headings } = await render(post);
 const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
 const minutes = readingTime(post.body ?? '');
+/* 与阅读时长同口径：去掉代码块再数字，避免把代码行算进正文 */
+const wordCount = (post.body ?? '').replace(/```[\s\S]*?```/g, ' ').replace(/\s+/g, '').length;
 
 const all = await getCollection('posts', ({ data }) => !data.draft);
 const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
@@ -82,9 +85,9 @@ const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
               <span class="end-line"></span>
             </div>
 
-            {
-              post.data.tags.length > 0 && (
-                <footer class="post-foot">
+            <footer class="post-foot">
+              {
+                post.data.tags.length > 0 && (
                   <div class="post-tags">
                     {post.data.tags.map((tag: string) => (
                       <a class="tag-pill" style={`--h:${tagHue(tag)}`} href={url(`/tags/${encodeURIComponent(tag)}/`)}>
@@ -92,9 +95,22 @@ const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
                       </a>
                     ))}
                   </div>
-                </footer>
-              )
-            }
+                )
+              }
+              <p class="post-stats">
+                <span>{`${wordCount} 字`}</span>
+                <span class="sep" aria-hidden="true">·</span>
+                <span>{`约 ${minutes} 分钟`}</span>
+                {
+                  post.data.updated && (
+                    <>
+                      <span class="sep" aria-hidden="true">·</span>
+                      <span>{`最后更新 ${formatDate(post.data.updated)}`}</span>
+                    </>
+                  )
+                }
+              </p>
+            </footer>
           </div>
 
           <nav class="post-nav" aria-label="上下篇">
@@ -119,6 +135,8 @@ const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
               )
             }
           </nav>
+
+          <RelatedPosts current={post} posts={posts} />
 
           <Comments />
         </div>
@@ -235,6 +253,45 @@ const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
         }, 1600);
       });
       wrap.appendChild(btn);
+    });
+
+    /* ---------- 标题锚点 ---------- */
+    const copyText = async (text: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        /* 非 https、页面没焦点或浏览器不给权限时，退回老办法 */
+        const box = document.createElement('textarea');
+        box.value = text;
+        box.setAttribute('readonly', '');
+        box.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+        document.body.append(box);
+        box.select();
+        const ok = document.execCommand('copy');
+        box.remove();
+        return ok;
+      }
+    };
+
+    document.querySelectorAll<HTMLElement>('.prose h2, .prose h3').forEach((heading) => {
+      if (!heading.id) return;
+      const anchor = document.createElement('a');
+      anchor.className = 'heading-anchor';
+      anchor.href = `#${heading.id}`;
+      anchor.setAttribute('aria-label', `复制「${heading.textContent?.trim() ?? ''}」的链接`);
+      anchor.textContent = '#';
+      anchor.addEventListener('click', async () => {
+        const link = `${location.origin}${location.pathname}#${heading.id}`;
+        if (!(await copyText(link))) return;
+        anchor.dataset.copied = '1';
+        anchor.textContent = '已复制';
+        setTimeout(() => {
+          delete anchor.dataset.copied;
+          anchor.textContent = '#';
+        }, 1400);
+      });
+      heading.append(anchor);
     });
 
     /* ---------- 目录高亮 ---------- */

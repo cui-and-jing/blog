@@ -1,0 +1,56 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import Cover from './Cover.astro';
+import { url, formatDate } from '../lib/site';
+
+interface Props {
+  current: CollectionEntry<'posts'>;
+  posts: CollectionEntry<'posts'>[];
+}
+
+const { current, posts } = Astro.props;
+
+/* 同分类 +3，每个共同标签 +2；都不沾边就按时间补位，至少让读者有下一站 */
+const scored = posts
+  .filter((post) => post.id !== current.id)
+  .map((post) => {
+    let score = 0;
+    if (post.data.category && post.data.category === current.data.category) score += 3;
+    score += post.data.tags.filter((tag) => current.data.tags.includes(tag)).length * 2;
+    return { post, score };
+  })
+  .sort((a, b) => b.score - a.score || b.post.data.date.valueOf() - a.post.data.date.valueOf());
+
+const related = scored.slice(0, 3).map((item) => item.post);
+---
+
+{
+  related.length > 0 && (
+    <section class="related" aria-labelledby="related-title">
+      <div class="related-head">
+        <h2 id="related-title">接着读</h2>
+        <a href={url('/posts/')}>全部文章 →</a>
+      </div>
+      <ul class="related-grid" style={`--cols:${Math.min(related.length, 3)}`}>
+        {related.map((post) => (
+          <li class="related-card">
+            <a class="related-hit" href={url(`/posts/${post.id}/`)} aria-label={post.data.title}></a>
+            <Cover
+              seed={post.id}
+              title={post.data.title}
+              image={post.data.cover}
+              class="related-cover"
+            />
+            <div class="related-body">
+              <div class="related-meta">
+                {post.data.category && <span>{post.data.category}</span>}
+                <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+              </div>
+              <h3>{post.data.title}</h3>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}

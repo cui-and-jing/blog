@@ -1376,6 +1376,40 @@ html[data-theme='dark'] .widget-tags a {
   border-bottom-color: var(--accent);
 }
 
+/* 标题右侧的锚点：平时隐身，鼠标移到标题上才现形；点一下把这一节的链接收进剪贴板。
+   放在 .prose a 之后，靠同特异性 + 后出现覆盖链接的橙色与下划线 */
+.prose .heading-anchor,
+.prose .heading-anchor:hover {
+  margin-left: 0.3em;
+  font-family: var(--font-mono);
+  font-size: 0.66em;
+  font-weight: 400;
+  color: var(--text-mute);
+  text-decoration: none;
+  border-bottom: none;
+  opacity: 0;
+  transition:
+    opacity 0.2s var(--ease),
+    color 0.2s var(--ease);
+}
+
+.prose h2:hover .heading-anchor,
+.prose h3:hover .heading-anchor,
+.prose .heading-anchor:focus-visible {
+  opacity: 1;
+}
+
+.prose .heading-anchor:hover,
+.prose .heading-anchor[data-copied] {
+  color: var(--accent);
+}
+
+@media (hover: none) {
+  .prose .heading-anchor {
+    opacity: 0.35;
+  }
+}
+
 .prose ul,
 .prose ol {
   margin: 0 0 1.55em;
@@ -1565,6 +1599,22 @@ html[data-theme='dark'] .prose pre {
   gap: 8px;
 }
 
+.post-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+}
+
+.post-stats .sep {
+  opacity: 0.45;
+}
+
 .post-nav {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1608,6 +1658,145 @@ html[data-theme='dark'] .prose pre {
 .post-nav .next {
   text-align: right;
 }
+
+/* ---------- related ---------- */
+.related {
+  margin-top: 26px;
+  padding: 26px 30px 28px;
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.related-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.related-head h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.related-head a {
+  font-size: 12.5px;
+  color: var(--text-mute);
+  white-space: nowrap;
+  transition: color 0.25s var(--ease);
+}
+
+.related-head a:hover {
+  color: var(--accent);
+}
+
+.related-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+  gap: 16px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.related-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--card-flat);
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  transition:
+    transform 0.35s var(--ease),
+    box-shadow 0.35s var(--ease),
+    border-color 0.35s var(--ease);
+}
+
+.related-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--line);
+  box-shadow: var(--shadow-sm);
+}
+
+.related-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+}
+
+.related-cover {
+  aspect-ratio: 16 / 9;
+}
+
+.related-cover .cover-glyph {
+  font-size: 96px;
+}
+
+.related-body {
+  padding: 12px 14px 15px;
+}
+
+.related-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+}
+
+.related-meta span {
+  padding: 1px 8px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+}
+
+.related-body h3 {
+  display: -webkit-box;
+  margin: 7px 0 0;
+  overflow: hidden;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@media (max-width: 900px) {
+  .related {
+    padding: 22px 22px 24px;
+  }
+
+  .related-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .related-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .related-cover {
+    aspect-ratio: 21 / 9;
+  }
+
+  .related-cover .cover-glyph {
+    font-size: 120px;
+  }
+}
+
 
 /* ---------- comments ---------- */
 .comments {
