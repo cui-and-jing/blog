@@ -113,6 +113,11 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             document.documentElement.dataset.motion = 'on';
           }
+          /* 字号偏好要在首帧之前落上，否则文章会先按标准字号闪一下再变大 */
+          var reading = localStorage.getItem('reading');
+          if (reading === 'small' || reading === 'large') {
+            document.documentElement.dataset.reading = reading;
+          }
         } catch (e) {}
       })();
     </script>

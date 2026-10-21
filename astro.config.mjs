@@ -9,7 +9,13 @@ export default defineConfig({
   site,
   base,
   trailingSlash: 'always',
-  integrations: [mdx(), sitemap()],
+  integrations: [
+    mdx(),
+    sitemap({
+      /* 搜索页是纯客户端工具，没有独立内容，放进 sitemap 只是让爬虫白跑一趟 */
+      filter: (page) => !page.replace(/\/$/, '').endsWith('/search'),
+    }),
+  ],
   prefetch: {
     prefetchAll: true,
     defaultStrategy: 'hover',

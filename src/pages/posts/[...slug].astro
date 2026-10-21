@@ -83,6 +83,15 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
 
       <div class="article-wrap">
         <div>
+          <div class="article-tools">
+            <span class="article-tools-label">字号</span>
+            <div class="size-switch" role="group" aria-label="正文字号" data-read-size>
+              <button type="button" data-size="small" aria-pressed="false" title="小一号">A−</button>
+              <button type="button" data-size="normal" aria-pressed="true" title="标准字号">A</button>
+              <button type="button" data-size="large" aria-pressed="false" title="大一号">A+</button>
+            </div>
+          </div>
+
           <div class="article-card">
             <div class="prose">
               <Content />
@@ -251,6 +260,52 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
   </dialog>
 
   <script>
+    /* ---------- 表格：窄屏不再撑破正文，改成横向滚动 ---------- */
+    document.querySelectorAll<HTMLTableElement>('.prose table').forEach((table) => {
+      const box = document.createElement('div');
+      box.className = 'table-wrap';
+      box.tabIndex = 0;
+      box.setAttribute('role', 'region');
+      box.setAttribute('aria-label', '表格，可横向滚动查看');
+      table.replaceWith(box);
+      box.append(table);
+
+      /* 只有真能滚动时才加边缘阴影，否则会误伤放得下的表格 */
+      const sync = () => {
+        box.classList.toggle('is-scrollable', box.scrollWidth - box.clientWidth > 2);
+      };
+      box.addEventListener('scroll', sync, { passive: true });
+      if ('ResizeObserver' in window) new ResizeObserver(sync).observe(box);
+      sync();
+    });
+
+    /* ---------- 正文字号 ---------- */
+    const sizeSwitch = document.querySelector<HTMLElement>('[data-read-size]');
+    if (sizeSwitch) {
+      const buttons = Array.from(sizeSwitch.querySelectorAll<HTMLButtonElement>('button'));
+
+      const apply = (value: string) => {
+        if (value === 'normal') delete document.documentElement.dataset.reading;
+        else document.documentElement.dataset.reading = value;
+        try {
+          localStorage.setItem('reading', value);
+        } catch {}
+        buttons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn.dataset.size === value)));
+      };
+
+      buttons.forEach((btn) =>
+        btn.addEventListener('click', () => apply(btn.dataset.size ?? 'normal'))
+      );
+
+      apply(document.documentElement.dataset.reading ?? 'normal');
+
+      /* 在另一个标签页改过字号，切回来时跟上 */
+      window.addEventListener('storage', (event) => {
+        if (event.key !== 'reading') return;
+        apply(event.newValue ?? 'normal');
+      });
+    }
+
     /* ---------- 代码块：语言标签 + 复制 ---------- */
     document.querySelectorAll('.prose pre').forEach((pre) => {
       const wrap = document.createElement('div');
@@ -454,6 +509,9 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
       };
 
       images.forEach((image, i) => {
+        /* 正文图片统一懒加载，长文首屏不必拉完全部配图 */
+        image.loading = 'lazy';
+        image.decoding = 'async';
         image.tabIndex = 0;
         image.setAttribute('role', 'button');
         image.setAttribute('aria-label', `放大图片：${image.alt || '正文图片'}`);

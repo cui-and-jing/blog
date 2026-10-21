@@ -3,6 +3,11 @@ import { GAMES, url } from '../../lib/site';
 
 const game = GAMES[0];
 const src = url(game.file);
+const origin = (Astro.site ?? new URL('https://cui-and-jing.github.io')).origin;
+const canonical = new URL(Astro.url.pathname, origin).toString();
+const ogImage = new URL(url('/og.png'), origin).toString();
+const pageTitle = `${game.title} · ${game.subtitle}`;
+const pageDesc = `${game.title} ${game.subtitle}：${game.description}`;
 ---
 
 <!doctype html>
@@ -10,10 +15,21 @@ const src = url(game.file);
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>{game.title} · {game.subtitle}</title>
-    <meta name="description" content={`${game.title} ${game.subtitle}：${game.description}`} />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDesc} />
     <meta name="theme-color" content="#0f1014" />
     <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:locale" content="zh_CN" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={pageDesc} />
+    <meta name="twitter:image" content={ogImage} />
     <style>
       :root {
         color-scheme: dark;
@@ -74,8 +90,10 @@ const src = url(game.file);
       }
 
       .title {
-        margin-left: 2px;
+        margin: 0 0 0 2px;
         font-size: 13px;
+        font-weight: 400;
+        line-height: 1.2;
         letter-spacing: 0.02em;
         color: var(--mute);
         white-space: nowrap;
@@ -177,9 +195,18 @@ const src = url(game.file);
         }
       }
 
+      /* 小屏收起标题，但别从无障碍树里摘掉：视觉隐藏即可 */
       @media (max-width: 640px) {
         .title {
-          display: none;
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          margin: -1px;
+          padding: 0;
+          overflow: hidden;
+          clip: rect(0 0 0 0);
+          white-space: nowrap;
+          border: 0;
         }
       }
     </style>
@@ -193,7 +220,7 @@ const src = url(game.file);
         </svg>
         游戏列表
       </a>
-      <span class="title"><b>{game.title}</b> · {game.subtitle}</span>
+      <h1 class="title"><b>{game.title}</b> · {game.subtitle}</h1>
       <span class="spacer"></span>
       <button class="fs" id="fs" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -209,7 +236,7 @@ const src = url(game.file);
         <span>正在加载游戏…</span>
         <small>首次打开约 2MB，之后会走浏览器缓存</small>
       </div>
-      <iframe id="game" src={src} title={`${game.title} ${game.subtitle}`} allow="fullscreen; autoplay; gamepad"></iframe>
+      <iframe id="game" src={src} title={pageTitle} allow="fullscreen; autoplay; gamepad"></iframe>
     </div>
 
     <script>

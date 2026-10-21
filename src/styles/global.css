@@ -28,6 +28,19 @@
   --radius: 18px;
   --radius-lg: 24px;
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  /* 正文字号三档，只影响正文，不动导航与卡片 */
+  --prose-scale: 1;
+  --prose-leading: 1.95;
+}
+
+html[data-reading='small'] {
+  --prose-scale: 0.94;
+}
+
+html[data-reading='large'] {
+  --prose-scale: 1.12;
+  --prose-leading: 1.82;
 }
 
 html[data-theme='dark'] {
@@ -1309,6 +1322,60 @@ html[data-theme='dark'] .widget-tags a {
   padding: 30px 0 0;
 }
 
+/* 正文上方的阅读控件：只有字号，尽量安静 */
+.article-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 2px 10px;
+}
+
+.article-tools-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-mute);
+}
+
+.size-switch {
+  display: inline-flex;
+  gap: 1px;
+  padding: 3px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+}
+
+.size-switch button {
+  min-width: 32px;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-mute);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.18s var(--ease),
+    color 0.18s var(--ease);
+}
+
+.size-switch button:hover {
+  color: var(--text);
+}
+
+/* 选中的那一档用站点主色轻轻标出来，深浅色下都看得清 */
+.size-switch button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .article-card {
   padding: 46px 48px 52px;
   background: var(--card);
@@ -1319,8 +1386,8 @@ html[data-theme='dark'] .widget-tags a {
 
 /* ---------- prose ---------- */
 .prose {
-  font-size: 16.5px;
-  line-height: 1.95;
+  font-size: calc(16.5px * var(--prose-scale));
+  line-height: var(--prose-leading);
   color: var(--text);
   overflow-wrap: break-word;
 }
@@ -1347,18 +1414,18 @@ html[data-theme='dark'] .widget-tags a {
 .prose h2 {
   margin: 2.4em 0 0.85em;
   padding-bottom: 0.3em;
-  font-size: 25px;
+  font-size: calc(25px * var(--prose-scale));
   border-bottom: 1px solid var(--line-soft);
 }
 
 .prose h3 {
   margin: 2em 0 0.68em;
-  font-size: 20px;
+  font-size: calc(20px * var(--prose-scale));
 }
 
 .prose h4 {
   margin: 1.8em 0 0.6em;
-  font-size: 17px;
+  font-size: calc(17px * var(--prose-scale));
 }
 
 .prose strong {
@@ -1432,7 +1499,7 @@ html[data-theme='dark'] .widget-tags a {
   border-radius: 0 10px 10px 0;
   color: var(--text-soft);
   font-family: var(--font-serif);
-  font-size: 16.5px;
+  font-size: calc(16.5px * var(--prose-scale));
 }
 
 .prose blockquote p:last-child {
@@ -1510,6 +1577,55 @@ html[data-theme='dark'] .prose pre {
   color: var(--text-mute);
   letter-spacing: 0.04em;
   border-bottom-color: var(--text-mute);
+}
+
+/* 窄屏表格不进正文流：横向滚动，列才不会被挤成一条线 */
+.prose .table-wrap {
+  margin: 1.9em 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border-radius: 10px;
+}
+
+.prose .table-wrap table {
+  margin: 0;
+  min-width: 100%;
+}
+
+.prose .table-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+
+.prose .table-wrap::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+}
+
+/* 可横向滚动时补一道边缘阴影，别让人以为表格被裁掉了 */
+.prose .table-wrap.is-scrollable {
+  background:
+    linear-gradient(to right, var(--card) 20%, transparent) left center / 26px 100% no-repeat local,
+    linear-gradient(to left, var(--card) 20%, transparent) right center / 26px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(27, 25, 22, 0.13), transparent) left center / 12px 100%
+      no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(27, 25, 22, 0.13), transparent) right center / 12px 100%
+      no-repeat scroll;
+}
+
+html[data-theme='dark'] .prose .table-wrap.is-scrollable {
+  background:
+    linear-gradient(to right, var(--card) 20%, transparent) left center / 26px 100% no-repeat local,
+    linear-gradient(to left, var(--card) 20%, transparent) right center / 26px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.5), transparent) left center / 12px 100% no-repeat
+      scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.5), transparent) right center / 12px 100%
+      no-repeat scroll;
+}
+
+@media (max-width: 720px) {
+  .prose .table-wrap table {
+    min-width: 460px;
+  }
 }
 
 /* code copy */
@@ -2773,26 +2889,6 @@ html[data-theme='dark'] .about-banner-avatar {
   }
 }
 
-@media print {
-  .site-header,
-  .site-footer,
-  .toc,
-  .post-nav,
-  .sidebar {
-    display: none;
-  }
-
-  body {
-    background: #fff;
-    color: #000;
-  }
-
-  .article-card,
-  .post-hero {
-    box-shadow: none;
-    border: 0;
-  }
-}
 
 /* ---------- games ---------- */
 .game-card {
@@ -3854,8 +3950,201 @@ kbd {
   }
 }
 
+
+/* ---------- 打印：把网页上的交互件都摘掉，留一份能直接读的稿子 ---------- */
 @media print {
-  .comments {
-    display: none;
+  @page {
+    margin: 16mm 14mm;
+  }
+
+  .site-header,
+  .site-footer,
+  .skip-link,
+  .read-progress,
+  .to-top,
+  .toc,
+  .toc-fab,
+  .sidebar,
+  .post-nav,
+  .related,
+  .share-bar,
+  .comments,
+  .lightbox,
+  .article-tools,
+  .notfound-actions,
+  .prose .code-block .copy-btn,
+  .prose .code-block .code-lang,
+  .prose .heading-anchor {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  body {
+    font-size: 11.5pt;
+  }
+
+  .shell {
+    max-width: none;
+    padding: 0;
+  }
+
+  .article-wrap {
+    display: block;
+    padding: 0;
+  }
+
+  .article-card {
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* 封面是装饰，打印出来是一整块深色，既费墨又压住标题 */
+  .post-hero {
+    margin: 0 0 16pt;
+    background: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .post-hero .cover,
+  .post-hero-veil {
+    display: none !important;
+  }
+
+  .post-hero-body {
+    position: static;
+    padding: 0;
+    color: #111;
+  }
+
+  .post-hero-body h1 {
+    margin: 6pt 0 0;
+    color: #111;
+    font-size: 22pt;
+    text-shadow: none;
+  }
+
+  .kicker,
+  .kicker time,
+  .kicker .chip {
+    color: #444;
+    background: none;
+    border-color: #bbb;
+    text-shadow: none;
+  }
+
+  .prose {
+    color: #111;
+    font-size: 11pt;
+    line-height: 1.75;
+  }
+
+  .prose h2,
+  .prose h3,
+  .prose h4 {
+    color: #111;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .prose h2 {
+    font-size: 15pt;
+  }
+
+  .prose h3 {
+    font-size: 12.5pt;
+  }
+
+  .prose h4 {
+    font-size: 11.5pt;
+  }
+
+  .prose a {
+    color: #111;
+    border-bottom: 1px solid #c9c4b8;
+  }
+
+  /* 纸上点不动链接，把地址印在括号里 */
+  .prose a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    font-size: 8.5pt;
+    color: #666;
+    word-break: break-all;
+  }
+
+  .prose pre {
+    padding: 10pt 12pt;
+    background: #f7f6f2 !important;
+    border: 1px solid #ddd8cc;
+    border-radius: 6px;
+    font-size: 8.5pt;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    break-inside: avoid;
+  }
+
+  .prose pre code,
+  .prose pre code span {
+    background: none !important;
+    color: #1f1f1f !important;
+  }
+
+  .prose blockquote {
+    padding: 8pt 12pt;
+    background: #faf9f5;
+    border-left: 2pt solid #c9c4b8;
+    color: #333;
+    break-inside: avoid;
+  }
+
+  .prose img {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .prose table {
+    font-size: 9.5pt;
+    break-inside: avoid;
+  }
+
+  .prose .table-wrap,
+  .prose .table-wrap.is-scrollable {
+    overflow: visible;
+    background: none;
+  }
+
+  .prose .table-wrap table {
+    min-width: 0 !important;
+  }
+
+  .prose p,
+  .prose li {
+    orphans: 3;
+    widows: 3;
+  }
+
+  .post-foot,
+  .end-mark {
+    break-inside: avoid;
+  }
+
+  .end-mark .end-line {
+    background: #ddd;
+  }
+
+  .tag-pill {
+    background: none;
+    border: 1px solid #ccc;
+    color: #444;
   }
 }
