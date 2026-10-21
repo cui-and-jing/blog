@@ -57,7 +57,7 @@ draft: false
 想换成真实图片，把图放进 `public/covers/`，frontmatter 写 `cover: /covers/xxx.jpg` 即可，
 卡片和文章页会自动改用图片并保留遮罩，保证标题可读。
 
-写完提交推送，GitHub Actions 会自动构建部署。
+写完跑一次 `npm run og` 生成分享封面（详见「分享与 SEO」），然后提交推送，GitHub Actions 会自动构建部署。
 
 ## 目录结构
 
@@ -71,9 +71,13 @@ src/
 │   ├── PostCard.astro       文章卡片（整卡拉伸链接，分类可单独点）
 │   ├── Featured.astro       首页主推大卡
 │   ├── CategoryTiles.astro  技术/学习/生活三块渐变分类卡
+│   ├── RelatedPosts.astro   文末「接着读」（同分类 +3、共同标签各 +2 打分）
+│   ├── Comments.astro       Giscus 评论区（懒加载 + 主题同步 + 失败兜底）
 │   └── Sidebar.astro        作者卡 + 标签 + 最近更新（首页可关掉作者卡）
+├── data/comments.json       Giscus 的 repoId / categoryId
 ├── lib/site.ts              站点信息、导航、URL 与日期工具
 ├── lib/cover.ts             封面色板与哈希
+├── lib/comments.ts          评论配置读取（缺 ID 时整块不渲染）
 ├── pages/
 │   ├── index.astro          首页
 │   ├── posts/               文章列表 + 详情
@@ -88,8 +92,10 @@ src/
 │   ├── rss.xml.js           RSS
 │   └── 404.astro
 ├── styles/global.css        全站样式（设计变量在文件顶部）
+├── scripts/og-cards.mjs     生成每篇文章的分享封面
 └── public/
     ├── og.png               默认分享图（1200×630）
+    ├── og/                  每篇文章的分享封面（npm run og 生成）
     └── games/               游戏单文件（构建时原样拷贝，不进打包）
 ```
 
@@ -154,10 +160,25 @@ npm run comments:setup -- --list  # 只列出仓库里的讨论分类
 ## 分享与 SEO
 
 - 每页输出 `WebSite` 结构化数据；文章页额外输出 `BlogPosting` 与 `BreadcrumbList`。
-- 默认分享图 `public/og.png`（1200×630），文章可被 `cover` 覆盖；同时输出 `og:*` 与
-  `twitter:summary_large_image`。
+- 每篇文章有自己的分享封面 `public/og/<slug>.png`（1200×630，纸感底 + 文章配色卡叠 +
+  标题/摘要/标签），由 `npm run og` 生成；`cover` 字段优先，没生成过则退回 `public/og.png`。
+- 文末有分享条：复制链接（带降级）、微博、以及手机上可用的系统分享。
 - `robots.txt` 由 `src/pages/robots.txt.ts` 生成，自动带上 sitemap 地址。
 - 页头有「跳到正文」链接，键盘 Tab 第一下就能用。
+
+### 分享封面怎么生成
+
+```bash
+npm run og
+```
+
+需要本机装 Chrome 或 Edge（脚本用 `puppeteer-core`，可用 `CHROME_PATH` 指定路径）。
+**新文章写完、改了标题后跑一次**，把 `public/og/*.png` 一起提交——图是构建产物之外的静态文件，
+CI 不生成（GitHub Actions 里没有中文字体，渲染会变成方框）。
+
+配色复用了 `src/lib/cover.ts` 的色板，所以分享图和列表里的渐变封面是同一套颜色；
+背面两张卡固定用品牌色（陶土 / 墨绿）打底，正面撞色时会自动换成深蓝。
+
 
 ## 设计
 
@@ -204,6 +225,7 @@ BLOG_SITE=https://blog.example.com BLOG_BASE=/ npm run build
 
 - [x] 站内搜索（构建时索引，客户端匹配）
 - [x] 评论系统（Giscus，见上文配置）
+- [x] 每篇文章单独的分享封面图（`npm run og`）
 - [ ] 旧站文章迁移
-- [ ] 每篇文章单独的分享封面图（目前统一用 `public/og.png`）
+- [ ] RSS 全文输出（目前只有摘要，读者要跳回站内）
 - [ ] 文章内图片压缩与响应式尺寸（`astro:assets`）
