@@ -130,7 +130,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 
     <header class="site-header" id="site-header">
       <div class="shell header-inner">
-        <a class="wordmark" href={url('/')}>
+        <a class="wordmark" href={url('/')} aria-label={`${SITE.title}，回到首页`}>
           <span class="mark"></span>
           <span>{SITE.title}</span>
         </a>
@@ -153,7 +153,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
               <path d="m16 16 4.2 4.2"></path>
             </svg>
           </a>
-          <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换深浅色">
+          <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换到深色主题" title="切换到深色主题">
             <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
               <circle cx="12" cy="12" r="4.2"></circle>
               <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"></path>
@@ -170,6 +170,8 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       <slot />
     </main>
 
+    <div class="sr-only" id="a11y-status" role="status" aria-live="polite"></div>
+
     <footer class="site-footer">
       <div class="shell footer-grid">
         <div class="footer-brand">
@@ -177,11 +179,11 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           <p>{SITE.description}</p>
         </div>
         <nav class="footer-col" aria-label="页脚导航">
-          <h5>导航</h5>
+          <h2>导航</h2>
           {NAV.map((item) => <a href={url(item.href)}>{item.label}</a>)}
         </nav>
         <div class="footer-col">
-          <h5>订阅与源码</h5>
+          <h2>订阅与源码</h2>
           <a href={url('/rss.xml')}>RSS 订阅</a>
           <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>
           <a href={url('/about/')}>关于本站</a>
@@ -249,8 +251,17 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 
       /* 主题切换：支持 View Transition 时用圆形扩散过渡 */
       const toggle = document.getElementById('theme-toggle');
+      const syncThemeLabel = () => {
+        const dark = root.dataset.theme === 'dark';
+        const label = dark ? '切换到浅色主题' : '切换到深色主题';
+        toggle?.setAttribute('aria-label', label);
+        toggle?.setAttribute('title', label);
+      };
+      syncThemeLabel();
+
       const applyTheme = (next: string) => {
         root.dataset.theme = next;
+        syncThemeLabel();
         try {
           localStorage.setItem('theme', next);
         } catch (e) {}

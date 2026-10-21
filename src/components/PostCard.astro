@@ -5,9 +5,12 @@ import { url, formatDate, readingTime, tagHue } from '../lib/site';
 
 interface Props {
   post: CollectionEntry<'posts'>;
+  /** 列表页若没有 h2 分区，卡片标题直接用 h2，避免 h1 直接跳到 h3 */
+  headingLevel?: 'h2' | 'h3';
 }
 
-const { post } = Astro.props;
+const { post, headingLevel = 'h3' } = Astro.props;
+const Heading = headingLevel;
 const minutes = readingTime(post.body ?? '');
 ---
 
@@ -20,7 +23,7 @@ const minutes = readingTime(post.body ?? '');
       <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
       <span>· 约 {minutes} 分钟</span>
     </div>
-    <h3>{post.data.title}</h3>
+    <Heading>{post.data.title}</Heading>
     {post.data.description && <p>{post.data.description}</p>}
     {
       post.data.tags.length > 0 && (

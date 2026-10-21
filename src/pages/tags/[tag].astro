@@ -31,7 +31,7 @@ const { tag, posts } = Astro.props;
 
   <div class="shell" style="padding-bottom:40px">
     <ul class="card-grid card-grid--three">
-      {posts.map((post) => <PostCard post={post} />)}
+      {posts.map((post) => <PostCard post={post} headingLevel="h2" />)}
     </ul>
   </div>
 </BaseLayout>

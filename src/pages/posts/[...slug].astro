@@ -224,7 +224,7 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
           目录
         </button>
 
-        <dialog class="toc-dialog" id="toc-dialog" aria-label="文章目录">
+        <dialog class="toc-dialog" id="toc-dialog" aria-label="文章目录" aria-modal="true">
           <div class="toc-dialog-head">
             <span>目录</span>
             <button class="toc-dialog-close" type="button" aria-label="关闭目录">
@@ -239,7 +239,7 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
     )
   }
 
-  <dialog class="lightbox" id="lightbox" aria-label="图片预览">
+  <dialog class="lightbox" id="lightbox" aria-label="图片预览" aria-modal="true">
     <button class="lightbox-close" type="button" aria-label="关闭预览">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
         <path d="M6 6l12 12M18 6 6 18"></path>
@@ -260,6 +260,12 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
   </dialog>
 
   <script>
+    /* 视觉反馈之外，再给读屏留一条播报通道 */
+    const announce = (message: string) => {
+      const status = document.getElementById('a11y-status');
+      if (status) status.textContent = message;
+    };
+
     /* ---------- 表格：窄屏不再撑破正文，改成横向滚动 ---------- */
     document.querySelectorAll<HTMLTableElement>('.prose table').forEach((table) => {
       const box = document.createElement('div');
@@ -284,17 +290,21 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
     if (sizeSwitch) {
       const buttons = Array.from(sizeSwitch.querySelectorAll<HTMLButtonElement>('button'));
 
-      const apply = (value: string) => {
+      const apply = (value: string, notify = false) => {
         if (value === 'normal') delete document.documentElement.dataset.reading;
         else document.documentElement.dataset.reading = value;
         try {
           localStorage.setItem('reading', value);
         } catch {}
         buttons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn.dataset.size === value)));
+        if (notify) {
+          const label = value === 'small' ? '小' : value === 'large' ? '大' : '标准';
+          announce(`字号：${label}`);
+        }
       };
 
       buttons.forEach((btn) =>
-        btn.addEventListener('click', () => apply(btn.dataset.size ?? 'normal'))
+        btn.addEventListener('click', () => apply(btn.dataset.size ?? 'normal', true))
       );
 
       apply(document.documentElement.dataset.reading ?? 'normal');
@@ -333,8 +343,10 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
           await navigator.clipboard.writeText(text);
           btn.textContent = '已复制';
           btn.classList.add('copied');
+          announce('代码已复制');
         } catch {
           btn.textContent = '复制失败';
+          announce('复制失败，请手动选择代码');
         }
         setTimeout(() => {
           btn.textContent = '复制';
@@ -407,6 +419,7 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
         if (!(await copyText(link))) return;
         anchor.dataset.copied = '1';
         anchor.textContent = '已复制';
+        announce('小节链接已复制');
         setTimeout(() => {
           delete anchor.dataset.copied;
           anchor.textContent = '#';

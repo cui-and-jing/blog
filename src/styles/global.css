@@ -6,10 +6,11 @@
   --card-flat: #fbf9f3;
   --text: #1b1916;
   --text-soft: #55504a;
-  --text-mute: #8c8579;
+  /* 次级文字必须在最亮的卡片底色上也达到 4.5:1，否则小字在廉价屏/户外几乎看不清 */
+  --text-mute: #696359;
   --line: #e2dcd0;
   --line-soft: #ece7dc;
-  --accent: #bf4a26;
+  --accent: #b4431f;
   --accent-2: #2f6f66;
   --accent-soft: #f7e7de;
   --code-bg: #1d1c19;
@@ -50,7 +51,7 @@ html[data-theme='dark'] {
   --card-flat: #202020;
   --text: #ede9e0;
   --text-soft: #a9a49a;
-  --text-mute: #78746b;
+  --text-mute: #989186;
   --line: #2b2a26;
   --line-soft: #24241f;
   --accent: #e2825c;
@@ -113,7 +114,6 @@ a {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
-  border-radius: 4px;
 }
 
 /* ---------- shell ---------- */
@@ -952,7 +952,7 @@ html[data-theme='dark'] .card-meta .cat {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
-.card h3 {
+.card :is(h2, h3) {
   margin: 9px 0 7px;
   font-family: var(--font-serif);
   font-weight: 400;
@@ -963,7 +963,7 @@ html[data-theme='dark'] .card-meta .cat {
   text-wrap: balance;
 }
 
-.card:hover h3 {
+.card:hover :is(h2, h3) {
   color: var(--accent);
 }
 
@@ -990,8 +990,8 @@ html[data-theme='dark'] .card-meta .cat {
   padding: 2px 9px;
   font-size: 11px;
   line-height: 1.7;
-  color: hsl(var(--h, 28) 38% 36%);
-  background: hsl(var(--h, 28) 62% 92%);
+  color: hsl(var(--h, 28) 42% 30%);
+  background: hsl(var(--h, 28) 60% 94%);
   border-radius: 999px;
   transition: background 0.18s var(--ease), color 0.18s var(--ease), transform 0.18s var(--ease);
 }
@@ -1003,7 +1003,7 @@ html[data-theme='dark'] .tag-pill {
 
 a.tag-pill:hover {
   color: #fff;
-  background: hsl(var(--h, 28) 45% 38%);
+  background: hsl(var(--h, 28) 45% 30%);
   transform: translateY(-1px);
 }
 
@@ -1108,6 +1108,12 @@ html[data-theme='dark'] .widget-tags a {
   color: #fff;
   background: var(--accent-2);
   border-color: transparent;
+}
+
+/* 深色主题的 accent 本身很亮，白字只剩 2.8:1，必须换成深字 */
+html[data-theme='dark'] .widget-cta-actions a:first-child,
+html[data-theme='dark'] .widget-cta-actions a:hover {
+  color: #16130f;
 }
 
 .widget-list {
@@ -1645,21 +1651,20 @@ html[data-theme='dark'] .prose .table-wrap.is-scrollable {
   padding: 4px 9px;
   font-family: var(--font-sans);
   font-size: 11px;
-  color: #b9b5ab;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #c3c6c9;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 6px;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.code-block:hover .copy-btn {
+  /* 常显：键盘和触屏用户没有 hover，藏起来等于没有这个功能 */
   opacity: 1;
+  transition: opacity 0.2s var(--ease), color 0.2s var(--ease),
+    background 0.2s var(--ease);
 }
 
 .copy-btn:hover {
   color: #fff;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 /* ---------- toc ---------- */
@@ -2542,7 +2547,7 @@ html[data-theme='dark'] .about-banner-avatar {
   color: var(--text-mute);
 }
 
-.footer-col h5 {
+.footer-col h2 {
   margin: 4px 0 12px;
   font-size: 12px;
   font-weight: 600;
@@ -3624,10 +3629,6 @@ kbd {
 }
 
 /* ---------- code block extras ---------- */
-.copy-btn {
-  opacity: 0.55;
-}
-
 .copy-btn.copied {
   color: #9fe3bd;
   border-color: rgba(159, 227, 189, 0.35);
@@ -3641,18 +3642,12 @@ kbd {
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
+  color: rgba(255, 255, 255, 0.62);
   pointer-events: none;
 }
 
 .code-block.has-lang pre {
   padding-top: 38px;
-}
-
-@media (hover: none) {
-  .copy-btn {
-    opacity: 1;
-  }
 }
 
 /* ---------- lightbox ---------- */

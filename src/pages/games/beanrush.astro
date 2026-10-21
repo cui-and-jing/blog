@@ -213,7 +213,7 @@ const pageDesc = `${game.title} ${game.subtitle}：${game.description}`;
   </head>
 
   <body>
-    <div class="bar">
+    <header class="bar">
       <a class="back" href={url('/games/')}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 6l-6 6 6 6"></path>
@@ -228,16 +228,16 @@ const pageDesc = `${game.title} ${game.subtitle}：${game.description}`;
         </svg>
         全屏
       </button>
-    </div>
+    </header>
 
-    <div class="stage" id="stage">
+    <main class="stage" id="stage">
       <div class="loader" id="loader">
         <span class="spinner"></span>
         <span>正在加载游戏…</span>
         <small>首次打开约 2MB，之后会走浏览器缓存</small>
       </div>
       <iframe id="game" src={src} title={pageTitle} allow="fullscreen; autoplay; gamepad"></iframe>
-    </div>
+    </main>
 
     <script>
       const frame = document.getElementById('game') as HTMLIFrameElement | null;
@@ -247,7 +247,6 @@ const pageDesc = `${game.title} ${game.subtitle}：${game.description}`;
 
       frame?.addEventListener('load', () => {
         loader?.classList.add('done');
-        frame.focus();
       });
 
       fsBtn?.addEventListener('click', async () => {
