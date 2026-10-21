@@ -48,6 +48,11 @@ const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
     minutes,
   }}
 >
+  <Fragment slot="head">
+    {/* 评论区在文末，提前把连接建好，能省掉几秒 TLS 握手 */}
+    <link rel="preconnect" href="https://giscus.app" crossorigin />
+    <link rel="dns-prefetch" href="https://giscus.app" />
+  </Fragment>
   <div class="shell">
     <article>
       <header class="post-hero">

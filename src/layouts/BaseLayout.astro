@@ -116,6 +116,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         } catch (e) {}
       })();
     </script>
+    <slot name="head" />
   </head>
 
   <body data-search-url={url('/search/')}>

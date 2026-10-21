@@ -115,18 +115,8 @@ const {
     /* giscus 自己报错（没装 App、限流、配置不对）之后就不再翻盘 */
     let broken = false;
 
-    /* giscus 会给 iframe 加 loading 类、把 opacity 置 0，等它自己 load 才恢复；
-       实测慢网络下 load 会被拖很久，所以收到任何“已渲染”信号后由我们主动放行 */
-    const reveal = (target = frame) => {
-      if (!target) return;
-      target.style.removeProperty('opacity');
-      target.classList.remove('giscus-frame--loading');
-      /* 个别网络下 giscus 迟迟不上报高度，先给个能看的高度，收到真实值会被覆盖 */
-      window.setTimeout(() => {
-        if (!target.style.height) target.style.height = '440px';
-      }, 1200);
-    };
-
+    /* giscus 会给 iframe 加 loading 类做淡入，这个类交给它自己摘；
+       我们只负责在真的出内容时把本站的骨架屏撤掉 */
     const markReady = () => {
       if (broken) return;
       if (section.dataset.state !== 'ready') {
@@ -134,7 +124,6 @@ const {
         fallback?.setAttribute('hidden', '');
         window.clearTimeout(timer);
       }
-      reveal();
     };
 
     const fail = () => {
@@ -175,7 +164,8 @@ const {
       script.setAttribute('data-category-id', section.dataset.categoryId ?? '');
       script.setAttribute('data-mapping', section.dataset.mapping ?? 'pathname');
       script.setAttribute('data-strict', '1');
-      script.setAttribute('data-reactions-enabled', '1');
+      /* 还没有评论时，表情区会占一整行显示「0 个表情」，先关掉；有互动了再开 */
+      script.setAttribute('data-reactions-enabled', '0');
       script.setAttribute('data-emit-metadata', '1');
       script.setAttribute('data-input-position', 'top');
       script.setAttribute('data-theme', currentTheme());
@@ -186,10 +176,19 @@ const {
       });
       host.append(script);
 
-      /* 慢网络下别让骨架屏一直转；后面真加载出来了还可以翻回来 */
+      /* 这个网络下 giscus 要 10s 上下才画出来，骨架屏先撑着；
+         真等太久（iframe 已插入但一直没报尺寸）才放行，顺便给个够看的高度 */
       timer = window.setTimeout(() => {
-        if (section.dataset.state !== 'ready') fail();
-      }, 18000);
+        if (section.dataset.state === 'ready') return;
+        if (!frame) {
+          fail();
+          return;
+        }
+        if (!frame.style.height || parseFloat(frame.style.height) < 200) {
+          frame.style.height = '320px';
+        }
+        markReady();
+      }, 16000);
     };
 
     new MutationObserver(() =>
@@ -209,14 +208,11 @@ const {
       const payload = (event.data as { giscus?: Record<string, any> })?.giscus;
       if (!payload) return;
 
-      /* 有尺寸上报说明 iframe 已经渲染；几十像素的多半是 giscus 自己的错误条 */
+      /* 只要上报了尺寸就说明 iframe 画出来了。
+         新文章没有对应讨论时 giscus 只给一个「登录后评论」的矮框（约 84px），
+         这是正常状态，不能当成加载失败 */
       if (typeof payload.resizeHeight === 'number' && payload.resizeHeight > 0) {
         if (frame) frame.style.height = `${payload.resizeHeight}px`;
-        if (payload.resizeHeight < 160) {
-          broken = true;
-          fail();
-          return;
-        }
         markReady();
       }
 
@@ -243,7 +239,7 @@ const {
           observer.disconnect();
           mount();
         },
-        { rootMargin: '600px 0px' }
+        { rootMargin: '1400px 0px' }
       );
       io.observe(section);
       if (location.hash === '#comments') {

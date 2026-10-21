@@ -144,6 +144,13 @@ npm run comments:setup -- --list  # 只列出仓库里的讨论分类
 两个 ID 都齐了评论区才渲染；没配置时整块不出现，线上不会留一个坏掉的框。
 讨论按 `pathname` 关联，改标题不影响已有评论，改 slug 会让评论「迷路」。
 
+新文章第一次被访问时 giscus 会返回 `Discussion not found`，这是正常的——有人登录后发表第一条评论，
+讨论才在仓库里建出来，之后所有人（包括未登录读者）都能看到列表。所以这个 404 不能当加载失败处理。
+
+> 实测国内网络下 `giscus.app` 首次要 8–13 秒（TLS 握手就占 4 秒），所以评论区做了懒加载（距视口 1400px 开始拉）、
+> `preconnect`、骨架屏和 16 秒兜底。想让读者更快看到评论，可以自建 giscus 到 Vercel 绑自定义域名，
+> 再把 `Comments.astro` 里的 `script.src` 与 postMessage 的 origin 换掉即可。
+
 ## 分享与 SEO
 
 - 每页输出 `WebSite` 结构化数据；文章页额外输出 `BlogPosting` 与 `BreadcrumbList`。
