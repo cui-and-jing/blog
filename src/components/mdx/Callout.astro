@@ -1,0 +1,38 @@
+---
+/**
+ * 正文提示框。四种语气：说明 / 提示 / 注意 / 警告。
+ * 默认标题只在需要提醒读者停一下时出现，普通「说明」不占一行。
+ */
+interface Props {
+  type?: 'note' | 'tip' | 'warn' | 'danger';
+  title?: string;
+}
+
+const { type = 'note', title } = Astro.props;
+
+const labels: Record<string, string> = {
+  note: '说明',
+  tip: '提示',
+  warn: '注意',
+  danger: '警告',
+};
+
+const icons: Record<string, string> = {
+  note: '<circle cx="12" cy="12" r="8.6"/><path d="M12 11.2v5"/><circle cx="12" cy="7.9" r="0.95" fill="currentColor" stroke="none"/>',
+  tip: '<path d="M9.2 18.2h5.6M10.3 21h3.4"/><path d="M12 3.2a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2v.4h5.2v-.4c0-.8.4-1.5 1-2A6 6 0 0 0 12 3.2Z"/>',
+  warn: '<path d="M12 4.2 3.6 19.1h16.8L12 4.2Z"/><path d="M12 9.6v4.2"/><circle cx="12" cy="16.7" r="0.95" fill="currentColor" stroke="none"/>',
+  danger: '<path d="M12 3.4 20.6 12 12 20.6 3.4 12 12 3.4Z"/><path d="M12 8.2v4.6"/><circle cx="12" cy="15.9" r="0.95" fill="currentColor" stroke="none"/>',
+};
+
+const heading = title ?? (type === 'note' ? '' : labels[type]);
+---
+
+<div class:list={['callout', `callout-${type}`]} role="note">
+  <span class="callout-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" set:html={icons[type]} />
+  </span>
+  <div class="callout-body">
+    {heading && <p class="callout-title">{heading}</p>}
+    <div class="callout-content"><slot /></div>
+  </div>
+</div>

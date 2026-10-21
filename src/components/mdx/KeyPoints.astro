@@ -1,0 +1,20 @@
+---
+/**
+ * 要点框：放在长文开头或结尾，把三到五条结论先摆出来。
+ */
+interface Props {
+  title?: string;
+}
+
+const { title = '本文要点' } = Astro.props;
+---
+
+<div class="keypoints">
+  <p class="keypoints-title">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 6.5h10M4 12h16M4 17.5h7" />
+    </svg>
+    {title}
+  </p>
+  <div class="keypoints-body"><slot /></div>
+</div>

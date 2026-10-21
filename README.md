@@ -1,6 +1,6 @@
 # Cui & Jing · 博客
 
-基于 [Astro](https://astro.build) 的静态博客，纯 Markdown 写作，零前端框架运行时。
+基于 [Astro](https://astro.build) 的静态博客，Markdown / MDX 写作，零前端框架运行时。
 部署在 GitHub Pages（项目站点，路径 `/blog/`）。
 
 旧站（Hexo）仍在 `cui-and-jing.github.io`，本站是它的重写版，互不影响。
@@ -18,7 +18,7 @@ npm run preview  # 预览构建结果
 
 ## 写一篇新文章
 
-在 `src/content/posts/` 下新建 `.md` 文件，文件名即 URL（`hello-astro.md` → `/posts/hello-astro/`）。
+在 `src/content/posts/` 下新建 `.md`（或 `.mdx`）文件，文件名即 URL（`hello-astro.md` → `/posts/hello-astro/`）。
 
 ```yaml
 ---
@@ -59,14 +59,36 @@ draft: false
 
 写完跑一次 `npm run og` 生成分享封面（详见「分享与 SEO」），然后提交推送，GitHub Actions 会自动构建部署。
 
+## 正文组件（MDX）
+
+把文章后缀改成 `.mdx` 就能用下面这些组件，**不需要 import**：`src/pages/posts/[...slug].astro`
+在渲染 `<Content />` 时统一注入了。
+
+| 组件 | 用途 | 写法 |
+| --- | --- | --- |
+| `Callout` | 说明 / 提示 / 注意 / 警告 | `<Callout type="warn" title="注意">…</Callout>` |
+| `KeyPoints` | 文首或文末的要点框 | `<KeyPoints>` 里写普通列表 |
+| `Steps` + `Step` | 有先后顺序的操作 | `<Steps><Step title="第一步">…</Step></Steps>` |
+| `Details` | 折叠的可选内容 | `<Details title="展开看配置">…</Details>` |
+| `Figure` | 带图注的配图 | `<Figure src="/x.png" alt="…" caption="…" width={1200} height={630} />` |
+
+几个约定：
+
+- 组件标签和里面的 Markdown 之间**要留空行**，否则 MDX 会当成普通文本。
+- `.md` 文件不能用组件；需要时把后缀改成 `.mdx`，URL 不变（`id` 不含扩展名）。
+- `Figure` 的宽高一定要写，浏览器才能先占位，避免图片加载时正文跳动；图片仍可点开灯箱。
+- 实时效果和全部可用的正文元素都在 `/styleguide/`（`noindex`，不进 sitemap 与站内搜索）。
+
 ## 目录结构
 
 ```
 src/
 ├── content.config.ts        内容集合 schema
 ├── content/posts/           文章（Markdown / MDX）
-├── layouts/BaseLayout.astro 全站外壳：head、导航、页脚、主题切换
+├── layouts/BaseLayout.astro 全站外壳：head、导航、页脚、主题切换、正文增强脚本
+├── layouts/ProsePageLayout.astro  单页正文版式（排版样例页使用）
 ├── components/
+│   ├── mdx/                 写作组件：Callout / KeyPoints / Steps / Step / Details / Figure
 │   ├── Cover.astro          封面：有图用图，无图生成渐变
 │   ├── PostCard.astro       文章卡片（整卡拉伸链接，分类可单独点）
 │   ├── Featured.astro       首页主推大卡
@@ -89,6 +111,7 @@ src/
 │   ├── search-index.json.ts 构建时生成搜索索引
 │   ├── robots.txt.ts        robots（含 sitemap 地址）
 │   ├── about.astro          关于
+│   ├── styleguide.mdx       排版样例（noindex，给自己查的）
 │   ├── rss.xml.js           RSS
 │   └── 404.astro
 ├── styles/global.css        全站样式（设计变量在文件顶部）
@@ -191,7 +214,7 @@ CI 不生成（GitHub Actions 里没有中文字体，渲染会变成方框）�
 ## 设计
 
 卡片式布局：纸感暖灰底 + 白卡 + 18px 圆角 + 双层阴影，首页为主推大卡 + 双列网格 + 右侧粘性侧栏。
-配色索引在 `--accent`（陶土 #bf4a26）与 `--accent-2`（墨绿 #2f6f66），封面色板在 `src/lib/cover.ts`。
+配色索引在 `--accent`（陶土 #b4431f）与 `--accent-2`（墨绿 #2f6f66），封面色板在 `src/lib/cover.ts`。
 深色模式跟随系统并可手动切换，切换无闪烁。
 
 ## 动效
@@ -208,6 +231,18 @@ CI 不生成（GitHub Actions 里没有中文字体，渲染会变成方框）�
 
 编辑 `src/lib/site.ts`：站名、副标题、描述、导航项、GitHub 地址。
 改配色改 `src/styles/global.css` 顶部的 `:root` 与 `[data-theme='dark']` 变量。
+
+## 质量检查
+
+两个脚本都是「先构建、再起 `npm run preview`，然后跑」：
+
+```bash
+npm run a11y       # axe-core 扫全站 14 条路由 × 浅/深两套主题，有 serious 违规就返回非 0
+npm run a11y:keys  # 键盘可达性实测：Tab 顺序、焦点环、复制播报、主题标签、字号、Esc、移动端目录
+```
+
+`.github/workflows/quality.yml` 会在每次 push 与 PR 时跑构建 + `npm run a11y`，
+无障碍回退会直接让检查变红（它和部署工作流相互独立，不会拦住发布）。
 
 ## 部署
 
@@ -236,5 +271,7 @@ BLOG_SITE=https://blog.example.com BLOG_BASE=/ npm run build
 - [x] 每篇文章单独的分享封面图（`npm run og`）
 - [x] RSS 全文输出（`content:encoded`）
 - [x] 阅读字号三档 + 打印样式 + 宽表格横向滚动
+- [x] 正文写作组件（提示框 / 要点 / 步骤 / 折叠 / 图注）与脚注样式
+- [x] 全站无障碍审计脚本 + CI 门禁
 - [ ] 旧站文章迁移
 - [ ] 文章内图片压缩与响应式尺寸（`astro:assets`）

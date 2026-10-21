@@ -6,6 +6,8 @@ interface Props {
   title?: string;
   description?: string;
   image?: string;
+  /** 给排版样例这类只给自己看的页面用，不进搜索引擎 */
+  noindex?: boolean;
   article?: {
     published: Date;
     updated?: Date;
@@ -15,7 +17,7 @@ interface Props {
   };
 }
 
-const { title, description = SITE.description, image, article } = Astro.props;
+const { title, description = SITE.description, image, noindex = false, article } = Astro.props;
 const pageTitle = title ? `${title} · ${SITE.title}` : `${SITE.title} · ${SITE.tagline}`;
 const siteRoot = (Astro.site ?? new URL(SITE.github)).toString().replace(/\/$/, '');
 const canonical = new URL(Astro.url.pathname, Astro.site ?? SITE.github).toString();
@@ -79,6 +81,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
     <meta name="author" content={SITE.author} />
+    {noindex && <meta name="robots" content="noindex" />}
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />
     <link rel="alternate" type="application/rss+xml" title={SITE.title} href={url('/rss.xml')} />
@@ -207,6 +210,94 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
     <script>
       const root = document.documentElement;
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+      /* 站外链接补 target/rel 与箭头标识。Astro 7 的 Markdown 管道已换成 Sätteri，
+         不再支持旧式 rehype 插件，这类纯展示增强放在运行时最省事；
+         即使脚本被禁用，链接本身仍然可点，只是不新开标签页。 */
+      document.querySelectorAll<HTMLAnchorElement>('.prose a[href]').forEach((link) => {
+        let target: URL;
+        try {
+          target = new URL(link.href, location.href);
+        } catch {
+          return;
+        }
+        if (!/^https?:$/.test(target.protocol) || target.host === location.host) return;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.classList.add('external-link');
+      });
+
+      /* 正文里的表格与代码块：只要页面用了 .prose 就统一处理，
+         这样文章页、关于页和排版样例页的表现不会各走一套。 */
+      const announceStatus = (message: string) => {
+        const status = document.getElementById('a11y-status');
+        if (status) status.textContent = message;
+      };
+
+      /* Markdown 任务列表的复选框由解析器输出，本身没有名称；
+         补一个短标签，读屏读到「已完成 / 未完成」，又不会和工作项文字重复。 */
+      document.querySelectorAll<HTMLInputElement>('.prose .task-list-item input[type="checkbox"]').forEach((box) => {
+        box.setAttribute('aria-label', box.checked ? '已完成' : '未完成');
+      });
+
+      document.querySelectorAll<HTMLTableElement>('.prose table').forEach((table) => {
+        if (table.closest('.table-wrap')) return;
+        const box = document.createElement('div');
+        box.className = 'table-wrap';
+        box.tabIndex = 0;
+        box.setAttribute('role', 'region');
+        box.setAttribute('aria-label', '表格，可横向滚动查看');
+        table.replaceWith(box);
+        box.append(table);
+
+        /* 只有真能滚动时才加边缘阴影，否则会误伤放得下的表格 */
+        const sync = () => {
+          box.classList.toggle('is-scrollable', box.scrollWidth - box.clientWidth > 2);
+        };
+        box.addEventListener('scroll', sync, { passive: true });
+        if ('ResizeObserver' in window) new ResizeObserver(sync).observe(box);
+        sync();
+      });
+
+      document.querySelectorAll<HTMLElement>('.prose pre').forEach((pre) => {
+        if (pre.parentElement?.classList.contains('code-block')) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'code-block';
+        pre.parentNode?.insertBefore(wrap, pre);
+        wrap.appendChild(pre);
+
+        const lang = pre.getAttribute('data-language');
+        if (lang) {
+          wrap.classList.add('has-lang');
+          const label = document.createElement('span');
+          label.className = 'code-lang';
+          label.textContent = lang;
+          wrap.appendChild(label);
+        }
+
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.type = 'button';
+        btn.textContent = '复制';
+        btn.setAttribute('aria-label', '复制代码');
+        btn.addEventListener('click', async () => {
+          const text = pre.querySelector('code')?.textContent ?? '';
+          try {
+            await navigator.clipboard.writeText(text);
+            btn.textContent = '已复制';
+            btn.classList.add('copied');
+            announceStatus('代码已复制');
+          } catch {
+            btn.textContent = '复制失败';
+            announceStatus('复制失败，请手动选择代码');
+          }
+          setTimeout(() => {
+            btn.textContent = '复制';
+            btn.classList.remove('copied');
+          }, 1600);
+        });
+        wrap.appendChild(btn);
+      });
 
       /* 搜索：⌘/Ctrl+K 或 / 直接聚焦，其他页面跳到搜索页 */
       const searchUrl = document.body.dataset.searchUrl || '/search/';

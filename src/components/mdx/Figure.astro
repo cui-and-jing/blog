@@ -1,0 +1,22 @@
+---
+/**
+ * 带图注的配图。宽高一定要填，浏览器才能在图还没下载完时先占好位置，避免正文跳动。
+ * 图片仍然走正文的灯箱：点一下可以放大看原图。
+ */
+import { mediaUrl } from '../../lib/site';
+
+interface Props {
+  src: string;
+  alt: string;
+  caption?: string;
+  width?: number;
+  height?: number;
+}
+
+const { src, alt, caption, width, height } = Astro.props;
+---
+
+<figure class="fig">
+  <img src={mediaUrl(src)} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>

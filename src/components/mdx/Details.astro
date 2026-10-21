@@ -1,0 +1,22 @@
+---
+/**
+ * 折叠块。适合放「展开看完整配置」「点开看推导过程」这类可选内容，
+ * 用原生 details，不依赖 JavaScript，打印时也会自动展开（见打印样式）。
+ */
+interface Props {
+  title: string;
+  open?: boolean;
+}
+
+const { title, open = false } = Astro.props;
+---
+
+<details class="details" open={open}>
+  <summary>
+    <span class="details-title">{title}</span>
+    <svg class="details-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  </summary>
+  <div class="details-body"><slot /></div>
+</details>

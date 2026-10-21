@@ -39,6 +39,7 @@ const routes = only.length
       '/games/',
       '/games/beanrush/',
       '/search/',
+      '/styleguide/',
       '/404.html',
     ];
 
@@ -48,6 +49,11 @@ const edgeCandidates = [
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
   'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
+  /* CI（ubuntu-latest）与 Linux 桌面 */
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
 ];
 const executablePath = process.env.CHROME_PATH ?? edgeCandidates.find((p) => fs.existsSync(p));
 if (!executablePath) {

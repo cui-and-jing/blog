@@ -1,0 +1,37 @@
+---
+/**
+ * 给「只有一页正文」的页面用的版式：页头 + 一张文章卡片。
+ * 排版样例页走这里，好处是 MDX 的脚注会被包在正文里，
+ * 而不是像直接写 <BaseLayout> 那样被追加到布局外面。
+ */
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+  frontmatter: {
+    title: string;
+    description?: string;
+    lead?: string;
+  };
+}
+
+const { frontmatter } = Astro.props;
+---
+
+<BaseLayout
+  title={frontmatter.title}
+  description={frontmatter.description ?? frontmatter.title}
+  noindex
+>
+  <div class="page-head page-head--narrow">
+    <div class="shell">
+      <h1>{frontmatter.title}</h1>
+      {frontmatter.lead && <p>{frontmatter.lead}</p>}
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="article-card">
+      <div class="prose"><slot /></div>
+    </div>
+  </div>
+</BaseLayout>

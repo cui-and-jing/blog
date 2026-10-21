@@ -12,8 +12,8 @@ export default defineConfig({
   integrations: [
     mdx(),
     sitemap({
-      /* 搜索页是纯客户端工具，没有独立内容，放进 sitemap 只是让爬虫白跑一趟 */
-      filter: (page) => !page.replace(/\/$/, '').endsWith('/search'),
+      /* 搜索页是纯客户端工具，排版样例页是给作者自己查的，都不该进搜索结果 */
+      filter: (page) => !/\/(search|styleguide)$/.test(page.replace(/\/$/, '')),
     }),
   ],
   prefetch: {

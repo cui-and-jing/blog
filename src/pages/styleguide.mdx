@@ -1,0 +1,173 @@
+---
+layout: ../layouts/ProsePageLayout.astro
+title: 排版样例
+description: 这个站支持的全部正文元素，改样式或写新文章时来这里对照。
+lead: 这个站支持的全部正文元素。写新文章或改样式时，先来这里对照一眼。
+---
+
+import Callout from '../components/mdx/Callout.astro';
+import KeyPoints from '../components/mdx/KeyPoints.astro';
+import Steps from '../components/mdx/Steps.astro';
+import Step from '../components/mdx/Step.astro';
+import Details from '../components/mdx/Details.astro';
+import Figure from '../components/mdx/Figure.astro';
+
+这一页是给自己看的排版清单，不会出现在搜索和 RSS 里。
+
+## 文字与链接
+
+正文、<strong>加粗</strong>、<em>斜体</em>、<code>行内代码</code>、<kbd>Ctrl</kbd> + <kbd>K</kbd> 打开搜索、<mark>高亮的一段</mark>，以及 <abbr title="Application Programming Interface">API</abbr> 这类缩写。
+
+站内链接长这样：[全部文章](/posts/)。站外链接会自动在新标签页打开，并带一个小箭头：[Astro 文档](https://docs.astro.build/)。
+
+## 列表
+
+无序列表：
+
+- 第一条
+- 第二条，里面可以放 `代码`
+- 第三条
+
+有序列表：
+
+1. 先做这个
+2. 再做那个
+3. 最后收尾
+
+任务列表：
+
+- [x] 已经做完的事
+- [ ] 还没做的事
+
+## 引用与分隔
+
+> 电子笔记是「检索」，纸质笔记是「偶遇」。
+>
+> 而想法这件事，偶遇比检索重要得多。
+
+---
+
+## 表格
+
+| 元素 | 用途 | 是否必须 |
+| --- | --- | --- |
+| Callout | 补充说明、风险提醒 | 否 |
+| KeyPoints | 文首给结论 | 否 |
+| Steps | 有先后顺序的操作 | 否 |
+
+## 代码
+
+```ts
+export function readingTime(text: string): number {
+  const chars = text.replace(/\s+/g, '').length;
+  return Math.max(1, Math.round(chars / 400));
+}
+```
+
+## 提示框
+
+<Callout type="note">
+  普通的补充说明。不带标题，阅读时不会打断节奏。
+</Callout>
+
+<Callout type="tip" title="可以这样做">
+  把长文里的「顺带一提」收进提示框，主线会更清楚。
+</Callout>
+
+<Callout type="warn" title="注意">
+  这段配置会覆盖默认值，改之前先确认旧行为有没有被依赖。
+</Callout>
+
+<Callout type="danger" title="不要在生产环境直接执行">
+  下面的命令会清空缓存并重建索引，执行期间站点会短暂不可用。
+</Callout>
+
+## 要点框
+
+<KeyPoints>
+  - 提示框只放「离开主线也不影响理解」的内容
+  - 一篇长文里同类提示框不要超过三个
+  - 警告类必须写清后果，而不是只写「注意」
+</KeyPoints>
+
+## 步骤
+
+<Steps>
+  <Step title="先写粗稿">
+
+目标是写完，不是写好。这个阶段不查资料、不调格式。
+
+  </Step>
+  <Step title="再删一半">
+
+删掉不影响理解的句子，通常能砍掉三到四成。
+
+  </Step>
+  <Step title="最后补证据">
+
+结构定了再去查资料，才不会越查越多。
+
+  </Step>
+</Steps>
+
+## 折叠
+
+<Details title="展开看完整的 frontmatter">
+
+```yaml
+---
+title: 文章标题
+date: 2026-10-21
+description: 一句话摘要，会出现在卡片和搜索结果里
+tags:
+  - Astro
+  - 写作
+category: 技术
+---
+```
+
+</Details>
+
+## 配图
+
+<Figure
+  src="/og.png"
+  alt="站点分享封面"
+  caption="图片会自动懒加载，点一下可以在灯箱里看大图；宽高一定要写，避免正文跳动。"
+  width={1200}
+  height={630}
+/>
+
+## 怎么用
+
+文章写成 `.mdx` 后，这五个组件已经全局注册，不用在开头 import：
+
+```mdx
+<Callout type="warn" title="注意">
+  内容里照样可以写 **Markdown**。
+</Callout>
+
+<KeyPoints>
+  - 要点一
+  - 要点二
+</KeyPoints>
+
+<Steps>
+  <Step title="第一步">先做这个。</Step>
+  <Step title="第二步">再做那个。</Step>
+</Steps>
+
+<Details title="展开看细节">
+  可选内容放在这里。
+</Details>
+
+<Figure src="/og.png" alt="说明" caption="图注" width={1200} height={630} />
+```
+
+普通 `.md` 文件不支持组件。需要图注就把文章改成 `.mdx` 用 `<Figure>`；Markdown 原生图片只有 alt 和浏览器 tooltip，不会生成图注。
+
+## 脚注
+
+正文里可以挂脚注[^1]，读者读到这里再展开看细节。
+
+[^1]: 脚注适合放数据来源、版本说明和延伸阅读，不适合放结论。

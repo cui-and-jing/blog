@@ -8,6 +8,12 @@ import Cover from '../../components/Cover.astro';
 import Sidebar from '../../components/Sidebar.astro';
 import Comments from '../../components/Comments.astro';
 import RelatedPosts from '../../components/RelatedPosts.astro';
+import Callout from '../../components/mdx/Callout.astro';
+import KeyPoints from '../../components/mdx/KeyPoints.astro';
+import Steps from '../../components/mdx/Steps.astro';
+import Step from '../../components/mdx/Step.astro';
+import Details from '../../components/mdx/Details.astro';
+import Figure from '../../components/mdx/Figure.astro';
 import { SITE, url, formatDate, readingTime, tagHue } from '../../lib/site';
 
 export async function getStaticPaths() {
@@ -94,7 +100,9 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
 
           <div class="article-card">
             <div class="prose">
-              <Content />
+              <Content
+                components={{ Callout, KeyPoints, Steps, Step, Details, Figure }}
+              />
             </div>
 
             <div class="end-mark" aria-hidden="true">
@@ -266,25 +274,6 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
       if (status) status.textContent = message;
     };
 
-    /* ---------- 表格：窄屏不再撑破正文，改成横向滚动 ---------- */
-    document.querySelectorAll<HTMLTableElement>('.prose table').forEach((table) => {
-      const box = document.createElement('div');
-      box.className = 'table-wrap';
-      box.tabIndex = 0;
-      box.setAttribute('role', 'region');
-      box.setAttribute('aria-label', '表格，可横向滚动查看');
-      table.replaceWith(box);
-      box.append(table);
-
-      /* 只有真能滚动时才加边缘阴影，否则会误伤放得下的表格 */
-      const sync = () => {
-        box.classList.toggle('is-scrollable', box.scrollWidth - box.clientWidth > 2);
-      };
-      box.addEventListener('scroll', sync, { passive: true });
-      if ('ResizeObserver' in window) new ResizeObserver(sync).observe(box);
-      sync();
-    });
-
     /* ---------- 正文字号 ---------- */
     const sizeSwitch = document.querySelector<HTMLElement>('[data-read-size]');
     if (sizeSwitch) {
@@ -315,46 +304,6 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
         apply(event.newValue ?? 'normal');
       });
     }
-
-    /* ---------- 代码块：语言标签 + 复制 ---------- */
-    document.querySelectorAll('.prose pre').forEach((pre) => {
-      const wrap = document.createElement('div');
-      wrap.className = 'code-block';
-      pre.parentNode?.insertBefore(wrap, pre);
-      wrap.appendChild(pre);
-
-      const lang = pre.getAttribute('data-language');
-      if (lang) {
-        wrap.classList.add('has-lang');
-        const label = document.createElement('span');
-        label.className = 'code-lang';
-        label.textContent = lang;
-        wrap.appendChild(label);
-      }
-
-      const btn = document.createElement('button');
-      btn.className = 'copy-btn';
-      btn.type = 'button';
-      btn.textContent = '复制';
-      btn.setAttribute('aria-label', '复制代码');
-      btn.addEventListener('click', async () => {
-        const text = pre.querySelector('code')?.textContent ?? '';
-        try {
-          await navigator.clipboard.writeText(text);
-          btn.textContent = '已复制';
-          btn.classList.add('copied');
-          announce('代码已复制');
-        } catch {
-          btn.textContent = '复制失败';
-          announce('复制失败，请手动选择代码');
-        }
-        setTimeout(() => {
-          btn.textContent = '复制';
-          btn.classList.remove('copied');
-        }, 1600);
-      });
-      wrap.appendChild(btn);
-    });
 
     /* ---------- 标题锚点 ---------- */
     const copyText = async (text: string) => {
@@ -510,8 +459,11 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
         view.src = image.currentSrc || image.src;
         view.alt = image.alt;
         if (caption) {
-          caption.textContent = image.alt || '';
-          caption.hidden = !image.alt;
+          /* 有图注就显示图注，没有才退回 alt */
+          const figCaption = image.closest('figure')?.querySelector('figcaption')?.textContent?.trim();
+          const text = figCaption || image.alt || '';
+          caption.textContent = text;
+          caption.hidden = !text;
         }
       };
 

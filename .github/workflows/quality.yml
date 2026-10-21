@@ -1,0 +1,47 @@
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  a11y:
+    name: Build & axe audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Start preview
+        run: |
+          npx astro preview --port 4321 > /tmp/preview.log 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -sf -o /dev/null http://localhost:4321/blog/; then
+              echo "preview ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "preview 没能启动："
+          cat /tmp/preview.log
+          exit 1
+
+      - name: Accessibility audit (axe, light + dark)
+        run: npm run a11y
