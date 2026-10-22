@@ -1,13 +1,13 @@
 import type { APIRoute } from 'astro';
 import rss from '@astrojs/rss';
 import { SITE, base } from '../lib/site';
-import { getNotes, noteAnchor, noteText, noteTitle } from '../lib/notes';
+import { getNotes, noteText, noteTitle } from '../lib/notes';
 
 const FALLBACK_ORIGIN = 'https://cui-and-jing.github.io';
 
 /**
  * 笔记单独一份 feed：主 feed 只放文章，订阅「文章」的人不该被短句刷屏。
- * 每条笔记的链接落在 /notes/ 的锚点上，正文也一起给，阅读器里能直接读完。
+ * 每条笔记指向自己的独立页（有分享卡），阅读器里也能直接读完全文。
  */
 export const GET: APIRoute = async (context) => {
   const origin = new URL(context.site ?? FALLBACK_ORIGIN).origin;
@@ -19,7 +19,7 @@ export const GET: APIRoute = async (context) => {
       .replace(/(\s(?:href|src))="#([^"]*)"/g, (_, attr: string, hash: string) => `${attr}="${pageLink}#${hash}"`);
 
   const items = notes.map((note) => {
-    const link = new URL(`${base}/notes/#${noteAnchor(note)}`, context.site ?? FALLBACK_ORIGIN).href;
+    const link = new URL(`${base}/notes/${note.id}/`, context.site ?? FALLBACK_ORIGIN).href;
     /* 构建期每个条目都带 rendered.html；类型定义里没有，取一次即可 */
     const html = absolutize((note as { rendered?: { html?: string } }).rendered?.html ?? '', link);
 

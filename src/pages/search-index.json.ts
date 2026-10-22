@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { url, formatDate, readingTime } from '../lib/site';
 import { getPosts } from '../lib/posts';
-import { getNotes, noteAnchor, noteText, noteTitle } from '../lib/notes';
+import { getNotes, noteText, noteTitle } from '../lib/notes';
 
 /** 把 Markdown 粗略压成可检索的纯文本，保留中文与英文词 */
 function plain(markdown: string): string {
@@ -51,7 +51,7 @@ export const GET: APIRoute = async () => {
       category: '',
       tags: note.data.tags,
       minutes: 0,
-      href: url(`/notes/#${noteAnchor(note)}`),
+      href: url(`/notes/${note.id}/`),
       text: text.slice(0, 2000),
     };
   });

@@ -58,9 +58,11 @@ const rows = [
   {
     name: 'CSS',
     current: sum(css, 'size'),
-    max: 90 * KB,
+    /* 90 → 96：这轮多了订阅页与笔记独立页两套完整页面样式。
+       门槛是防失控的，不是压到极限——留 7KB 余量比为了 1KB 删掉有用样式划算 */
+    max: 96 * KB,
     gzip: sum(css, 'gzip'),
-    gzipMax: 18 * KB,
+    gzipMax: 19.5 * KB,
   },
   {
     name: 'JS',

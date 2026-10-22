@@ -1,37 +1,77 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostCard from '../../components/PostCard.astro';
+import { url, formatDate } from '../../lib/site';
 import { getPosts } from '../../lib/posts';
+import { getNotes, noteTitle, noteExcerpt } from '../../lib/notes';
+import { collectTags } from '../../lib/tags';
 
 export async function getStaticPaths() {
-  const all = await getPosts();
-  const tags = [...new Set(all.flatMap((post) => post.data.tags))];
+  const [posts, notes] = await Promise.all([getPosts(), getNotes()]);
 
-  return tags.map((tag) => ({
-    params: { tag },
-    props: {
-      tag,
-      posts: all
-        .filter((post) => post.data.tags.includes(tag))
-        .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf()),
-    },
+  return collectTags(posts, notes).map((bucket) => ({
+    params: { tag: bucket.tag },
+    props: { bucket },
   }));
 }
 
-const { tag, posts } = Astro.props;
+const { bucket } = Astro.props;
+const { tag, posts, notes } = bucket;
+const summary = [
+  posts.length ? `${posts.length} 篇文章` : '',
+  notes.length ? `${notes.length} 条笔记` : '',
+].filter(Boolean).join(' · ');
 ---
 
-<BaseLayout title={`#${tag}`} description={`标签 ${tag} 下的全部文章`}>
+<BaseLayout title={`#${tag}`} description={`标签 ${tag} 下的全部文章与笔记`}>
   <div class="page-head">
     <div class="shell">
       <h1>#{tag}</h1>
-      <p>{posts.length} 篇文章</p>
+      <p>{summary}</p>
     </div>
   </div>
 
   <div class="shell" style="padding-bottom:40px">
-    <ul class="card-grid card-grid--three">
-      {posts.map((post) => <PostCard post={post} headingLevel="h2" />)}
-    </ul>
+    {
+      posts.length > 0 && (
+        <ul class="card-grid card-grid--three">
+          {posts.map((post) => <PostCard post={post} headingLevel="h2" />)}
+        </ul>
+      )
+    }
+
+    {
+      notes.length > 0 && (
+        <section class="tag-notes" aria-label="笔记">
+          {/* 页头已经写了「1 条笔记」，只有笔记时不必再来一个小标题；
+              和文章并列时才需要把两类内容分开 */}
+          {posts.length > 0 && (
+            <h2 class="tag-notes-title">
+              笔记 <span>{notes.length} 条</span>
+            </h2>
+          )}
+          <ul class="tag-notes-list">
+            {notes.map((note) => (
+              <li>
+                <time datetime={note.data.date.toISOString()}>{formatDate(note.data.date)}</time>
+                <a href={url(`/notes/${note.id}/`)}>
+                  <span class="tag-note-title">{noteTitle(note, 46)}</span>
+                  <span class="tag-note-text">{noteExcerpt(note, 90)}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
+    {
+      posts.length === 0 && notes.length === 0 && (
+        <div class="empty-state">
+          <p>这个标签下还没有内容。</p>
+          <a href={url('/tags/')}>看看别的标签 →</a>
+        </div>
+      )
+    }
   </div>
 </BaseLayout>

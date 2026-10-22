@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import NoteCopy from '../../components/NoteCopy.astro';
 import { render } from 'astro:content';
 import { url, formatDate } from '../../lib/site';
 import { getNotes, noteAnchor } from '../../lib/notes';
@@ -86,7 +87,8 @@ const shortDate = (date: Date) =>
                           <a href={url(`/tags/${encodeURIComponent(tag)}/`)}>#{tag}</a>
                         ))}
                       </div>
-                      <button class="note-copy" type="button" data-note-copy data-anchor={anchor}>
+                      <a class="note-permalink" href={url(`/notes/${note.id}/`)}>单独打开 →</a>
+                      <button class="note-copy" type="button" data-note-link={url(`/notes/${note.id}/`)}>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                           <path d="M10 13.5a4 4 0 0 0 5.7 0l3-3a4 4 0 1 0-5.7-5.7l-1.3 1.3" />
                           <path d="M14 10.5a4 4 0 0 0-5.7 0l-3 3a4 4 0 1 0 5.7 5.7l1.3-1.3" />
@@ -113,60 +115,5 @@ const shortDate = (date: Date) =>
   </div>
 </BaseLayout>
 
-<script>
-  const status = document.getElementById('a11y-status');
+<NoteCopy />
 
-  /**
-   * 剪贴板 API 在文档未聚焦、权限被拒或非安全上下文时都会抛错。
-   * 退回 execCommand 能覆盖其中大部分情况（正文区的复制按钮也是这么做的），
-   * 两条路都走不通才让地址栏承担「至少能手动复制」。
-   */
-  const copyText = async (text: string): Promise<boolean> => {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      /* 选中临时 textarea 会把焦点从按钮上抢走，结束后要还回去，
-         否则键盘用户按完 Enter 就不知道自己在哪了 */
-      const previous = document.activeElement as HTMLElement | null;
-      const area = document.createElement('textarea');
-      area.value = text;
-      area.setAttribute('readonly', '');
-      area.style.position = 'fixed';
-      area.style.top = '-1000px';
-      document.body.append(area);
-      area.select();
-      let ok = false;
-      try {
-        ok = document.execCommand('copy');
-      } catch {
-        ok = false;
-      }
-      area.remove();
-      previous?.focus({ preventScroll: true });
-      return ok;
-    }
-  };
-
-  document.addEventListener('click', async (event) => {
-    const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-note-copy]');
-    if (!button) return;
-
-    const anchor = button.dataset.anchor ?? '';
-    const link = `${location.origin}${location.pathname}#${anchor}`;
-    const label = button.querySelector('span');
-    const ok = await copyText(link);
-
-    if (ok) {
-      if (label) label.textContent = '已复制';
-      if (status) status.textContent = '笔记链接已复制';
-    } else {
-      location.hash = anchor;
-      if (status) status.textContent = `复制失败，地址栏已跳到 #${anchor}`;
-    }
-
-    window.setTimeout(() => {
-      if (label) label.textContent = '复制链接';
-    }, 1600);
-  });
-</script>

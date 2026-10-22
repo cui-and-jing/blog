@@ -219,7 +219,17 @@ const check = (name, pass, detail = '') => {
   check('回车后按钮改文案并有读屏播报', state.label === '已复制' && state.status.length > 0, JSON.stringify(state));
 
   const copied = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
-  check('剪贴板里是带锚点的链接', /#n-\d/.test(copied), copied);
+  /* 时间流里复制的是这条笔记的独立页地址，不再是站内锚点 */
+  check('剪贴板里是笔记独立页地址', /\/notes\/\d{4}-\d{2}-\d{2}-\d{4}\/$/.test(copied), copied);
+
+  /* 独立页上同一个按钮要复制它自己，而不是跳到别处 */
+  await page.goto(`${base}/notes/2026-10-22-1015/`, { waitUntil: 'load' });
+  await page.waitForSelector('.note-copy');
+  await page.evaluate(() => document.querySelector('.note-copy')?.focus());
+  await page.keyboard.press('Enter');
+  await new Promise((r) => setTimeout(r, 300));
+  const own = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
+  check('独立页复制的是自己', /\/notes\/2026-10-22-1015\/$/.test(own), own);
   await page.close();
 }
 

@@ -37,15 +37,18 @@ const ROUTES = only.length
       '/posts/paper-notes/',
       '/posts/writing-workflow/',
       '/notes/',
+      '/notes/2026-10-22-1015/',
       '/archive/',
       '/series/',
       '/series/从笔记到发布/',
       '/tags/',
       '/tags/Astro/',
+      '/tags/CSS/',
       '/category/技术/',
       '/about/',
       '/games/',
       '/search/',
+      '/subscribe/',
       '/styleguide/',
     ];
 

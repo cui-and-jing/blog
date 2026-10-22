@@ -4,23 +4,19 @@ import CategoryTiles from '../../components/CategoryTiles.astro';
 import { url, tagHue } from '../../lib/site';
 import { collectSeries } from '../../lib/series';
 import { getPosts } from '../../lib/posts';
+import { getNotes } from '../../lib/notes';
+import { collectTags } from '../../lib/tags';
 
-const posts = await getPosts();
-const counts = new Map<string, number>();
-for (const post of posts) {
-  for (const tag of post.data.tags) {
-    counts.set(tag, (counts.get(tag) ?? 0) + 1);
-  }
-}
-const tags = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN'));
+const [posts, notes] = await Promise.all([getPosts(), getNotes()]);
+const tags = collectTags(posts, notes);
 const series = collectSeries(posts);
 ---
 
-<BaseLayout title="标签" description="全部标签">
+<BaseLayout title="标签" description="全部标签，文章与笔记一起统计">
   <div class="page-head">
     <div class="shell">
       <h1>标签</h1>
-      <p>{tags.length} 个标签，按文章数排序。</p>
+      <p>{tags.length} 个标签，文章与笔记一起统计。</p>
     </div>
   </div>
 
@@ -33,10 +29,15 @@ const series = collectSeries(posts);
         </div>
       ) : (
         <div class="tag-cloud">
-          {tags.map(([tag, count]) => (
+          {tags.map(({ tag, total, posts: taggedPosts, notes: taggedNotes }) => (
             <a href={url(`/tags/${encodeURIComponent(tag)}/`)} style={`--h:${tagHue(tag)}`}>
               {tag}
-              <span class="count">{count}</span>
+              <span class="count">{total}</span>
+              {/* 读屏要知道这个数字是文章加笔记，光念「笔记 6」没有意义；
+                  写在元素里而不是 aria-label，可见文字才不会被替换掉 */}
+              <span class="sr-only">
+                ，{taggedPosts.length} 篇文章、{taggedNotes.length} 条笔记
+              </span>
             </a>
           ))}
         </div>
@@ -52,6 +53,9 @@ const series = collectSeries(posts);
     <div class="cat-tiles cat-tiles--inline">
       <CategoryTiles posts={posts} />
     </div>
+    <p class="tag-note">
+      分类只属于文章；笔记比较轻，只有标签。想按时间通读，去<a href={url('/archive/')}>归档</a>。
+    </p>
 
     {
       series.length > 0 && (

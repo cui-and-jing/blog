@@ -1,0 +1,67 @@
+---
+/**
+ * 笔记的「复制链接」脚本，时间流与独立页共用。
+ *
+ * Astro 会把这里的内联脚本当模块打包，两处引用只加载一次；
+ * 事件监听挂在 document 上，所以同一页面里多个按钮也不用重复绑定。
+ */
+---
+
+<script>
+  const status = document.getElementById('a11y-status');
+
+  /**
+   * 剪贴板 API 在文档未聚焦、权限被拒或非安全上下文时都会抛错。
+   * 退回 execCommand 能覆盖其中大部分情况（正文区的复制按钮也是这么做的），
+   * 两条路都走不通才让地址栏承担「至少能手动复制」。
+   */
+  const copyText = async (text: string): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      /* 选中临时 textarea 会把焦点从按钮上抢走，结束后要还回去，
+         否则键盘用户按完 Enter 就不知道自己在哪了 */
+      const previous = document.activeElement as HTMLElement | null;
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.top = '-1000px';
+      document.body.append(area);
+      area.select();
+      let ok = false;
+      try {
+        ok = document.execCommand('copy');
+      } catch {
+        ok = false;
+      }
+      area.remove();
+      previous?.focus({ preventScroll: true });
+      return ok;
+    }
+  };
+
+  document.addEventListener('click', async (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-note-link]');
+    if (!button) return;
+
+    const path = button.dataset.noteLink ?? '';
+    const link = path.startsWith('http') ? path : `${location.origin}${path}`;
+    const label = button.querySelector('span');
+    const ok = await copyText(link);
+
+    if (ok) {
+      if (label) label.textContent = '已复制';
+      if (status) status.textContent = '笔记链接已复制';
+    } else {
+      /* 复制失败至少把地址栏指到目标，能手动复制 */
+      if (path.startsWith('/')) location.hash = '';
+      if (status) status.textContent = `复制失败，链接是 ${link}`;
+    }
+
+    window.setTimeout(() => {
+      if (label) label.textContent = '复制链接';
+    }, 1600);
+  });
+</script>

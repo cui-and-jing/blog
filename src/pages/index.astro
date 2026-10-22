@@ -6,7 +6,7 @@ import Sidebar from '../components/Sidebar.astro';
 import CategoryTiles from '../components/CategoryTiles.astro';
 import { SITE, url, formatDate, daysSince } from '../lib/site';
 import { getPosts } from '../lib/posts';
-import { getNotes, noteAnchor, noteText } from '../lib/notes';
+import { getNotes, noteText } from '../lib/notes';
 
 const posts = await getPosts();
 /* featured 字段原来只是躺在 schema 里，首页永远取最新一篇——标了置顶也不生效 */
@@ -88,7 +88,7 @@ const excerpt = (text: string, limit = 72) =>
             <ul class="notes-strip">
               {notes.map((note) => (
                 <li>
-                  <a href={url(`/notes/#${noteAnchor(note)}`)}>
+                  <a href={url(`/notes/${note.id}/`)}>
                     <time datetime={note.data.date.toISOString()}>{formatDate(note.data.date)}</time>
                     <span>{excerpt(noteText(note))}</span>
                   </a>

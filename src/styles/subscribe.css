@@ -1,0 +1,268 @@
+/* ==========================================================================
+   subscribe.css — 订阅落地页（/subscribe/）
+   读者从页脚点进来，要先看懂「RSS 是什么」，再拿到一个能复制的地址
+   ========================================================================== */
+
+.subscribe-shell {
+  max-width: 780px;
+  padding-bottom: 56px;
+}
+
+.subscribe-intro {
+  padding: 22px 24px;
+  background: var(--card-flat);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+}
+
+.subscribe-intro p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--text-soft);
+}
+
+.subscribe-intro p + p {
+  margin-top: 14px;
+}
+
+.subscribe-intro strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.subscribe-h2 {
+  margin: 40px 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- 两个 feed ---------- */
+
+.feed-list {
+  display: grid;
+  gap: 14px;
+}
+
+.feed-card {
+  padding: 20px 22px;
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+
+.feed-card--post {
+  border-left-color: var(--accent);
+}
+
+.feed-card--note {
+  border-left-color: #2f6f66;
+}
+
+.feed-card-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.feed-card-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.feed-card-note {
+  font-size: 11.5px;
+  color: var(--text-mute);
+}
+
+.feed-card-lead {
+  margin: 9px 0 0;
+  font-size: 13.5px;
+  line-height: 1.8;
+  color: var(--text-soft);
+}
+
+.feed-card-addr {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 15px;
+  padding-top: 13px;
+  border-top: 1px dashed var(--line-soft);
+}
+
+.feed-card-addr code {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-soft);
+  background: var(--bg-soft);
+  border-radius: 8px;
+  word-break: break-all;
+}
+
+.feed-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.feed-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--text-soft);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.18s var(--ease), border-color 0.18s var(--ease), background 0.18s var(--ease);
+}
+
+.feed-copy svg {
+  width: 13px;
+  height: 13px;
+}
+
+.feed-copy:hover,
+.feed-copy:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.feed-open {
+  padding: 6px 11px;
+  font-size: 12.5px;
+  color: var(--text-mute);
+  text-decoration: none;
+  border-radius: 999px;
+  transition: color 0.18s var(--ease);
+}
+
+.feed-open:hover {
+  color: var(--accent);
+}
+
+/* ---------- 三步 ---------- */
+
+.subscribe-steps ol {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.subscribe-steps li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.step-num {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 50%;
+}
+
+.subscribe-steps strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.subscribe-steps p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.8;
+  color: var(--text-soft);
+}
+
+/* 段落里的行内链接不能只靠颜色——与周围文字的对比度到不了 3:1 时，
+   axe（link-in-text-block）要求有下划线这类非颜色差异 */
+.subscribe-steps p a,
+.subscribe-end a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.subscribe-steps p a:hover,
+.subscribe-end a:hover {
+  text-decoration-color: var(--accent);
+}
+
+/* ---------- 阅读器 ---------- */
+
+.reader-list ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--line-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.reader-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 16px;
+  background: var(--card);
+}
+
+.reader-list a {
+  font-size: 14px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.reader-list a:hover {
+  color: var(--accent);
+}
+
+.reader-list li span {
+  font-size: 12px;
+  color: var(--text-mute);
+}
+
+.reader-foot {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--text-mute);
+}
+
+.subscribe-end {
+  margin: 40px 0 0;
+  padding-top: 20px;
+  border-top: 1px dashed var(--line-soft);
+  font-size: 13.5px;
+  line-height: 1.9;
+  color: var(--text-mute);
+}

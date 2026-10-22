@@ -296,12 +296,75 @@
   .notes-strip time {
     padding-top: 0;
   }
+
+  /* 笔记独立页 */
+  .note-sheet {
+    padding: 24px 20px 18px;
+  }
+
+  .note-single {
+    padding-top: 22px;
+  }
+
+  .note-adjacent {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .note-adjacent-item.older {
+    text-align: left;
+    align-items: flex-start;
+  }
+
+  /* 标签页与归档页里的笔记行：日期列收窄，缩略文字在窄屏没有意义 */
+  .tag-notes-list li {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 12px;
+    padding: 13px 15px;
+  }
+
+  .archive-notes li {
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  .archive-note-text {
+    display: none;
+  }
+
+  .archive-note-title {
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  /* 订阅页 */
+  .feed-card {
+    padding: 17px 17px 15px;
+  }
+
+  .feed-card-addr code {
+    flex-basis: 100%;
+  }
+
+  .reader-list ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
-@media (max-width: 380px) {
+/* 导航到这一轮有 7 项，720px 那套字号在 560px 以下就贴边了。
+   先收字号，再收站名——站名去掉后 logo 还在，导航才是这个宽度下的主角 */
+@media (max-width: 560px) {
   .nav a {
-    padding: 5px 5px;
+    padding: 5px 6px;
     font-size: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .nav a {
+    padding: 5px 4px;
+    font-size: 11.8px;
   }
 
   .wordmark span:last-child {
@@ -325,7 +388,7 @@
 /* 320px 的老机型：导航塞得下，但只差几像素，这里再收一点 */
 @media (max-width: 340px) {
   .nav a {
-    padding: 5px 4px;
-    font-size: 11.5px;
+    padding: 5px 3px;
+    font-size: 11.2px;
   }
 }

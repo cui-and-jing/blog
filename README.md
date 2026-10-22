@@ -102,10 +102,14 @@ npm run note -- "先存着" --draft      # 草稿，构建不发布
 ```
 
 命令会写一个 `src/content/notes/2026-10-22-1015.md`（文件名带时分，同一天写多条也不撞车），
-并打印这条笔记的锚点 `/notes/#n-2026-10-22-1015`。
+并打印这条笔记的独立页地址 `/notes/2026-10-22-1015/`。
 
 - 标题与摘要都由正文推导（第一句话截到 40 字），所以**不需要写 frontmatter 里的 title**
-- 首页有一块「最近想法」显示最新 3 条；页脚与笔记页都有入口
+- 每条笔记有自己的页面：时间流里「单独打开」，分享出去是一张带标题的卡片（有 OG 图）；
+  独立页是 `noindex`——一百字的碎片不该占搜索结果的位置，但链接照常可点
+- 独立页会把和标题完全重复的第一段去掉，页面从第二句开始读
+- 首页有一块「最近想法」显示最新 3 条；页脚、导航、标签页、归档页都有入口
+- 标签横跨两类内容：`/tags/CSS/` 会同时列出文章和笔记，计数是两者之和
 - 搜索里与文章一起参与打分，结果带「笔记」徽标；**空查询时只列文章**，不让碎片淹没长文
 - 订阅走单独的 `notes.xml`：主 feed 只放文章，订「文章」的人不该被短句刷屏
 - 超过 900 字会被 `lint:content` 提醒「该写成文章了」
@@ -150,6 +154,7 @@ src/
 │   ├── Featured.astro       首页主推大卡
 │   ├── CategoryTiles.astro  技术/学习/生活三块渐变分类卡
 │   ├── RelatedPosts.astro   文末「接着读」（同分类 +3、共同标签各 +2 打分）
+│   ├── NoteCopy.astro       笔记「复制链接」按钮（时间流与独立页共用，剪贴板失败会降级）
 │   ├── Comments.astro       Giscus 评论区（懒加载 + 主题同步 + 失败兜底）
 │   └── Sidebar.astro        作者卡 + 标签 + 最近更新（首页可关掉作者卡）
 ├── data/comments.json       Giscus 的 repoId / categoryId
@@ -161,15 +166,18 @@ src/
 ├── lib/comments.ts          评论配置读取（缺 ID 时整块不渲染）
 ├── lib/posts.ts             取文章：dev 含草稿，构建只取已发布
 ├── lib/notes.ts             取笔记：标题/摘要从正文推导，锚点名统一在这里生成
+├── lib/note-text.ts         纯文本与标题推导（不依赖 astro:content，分享封面脚本也用它）
+├── lib/tags.ts              标签聚合：文章与笔记同一个口径，标签页共用
 ├── pages/
 │   ├── index.astro          首页
 │   ├── posts/               文章列表 + 详情
-│   ├── notes/               笔记时间流（按年月分组，每条带锚点）
+│   ├── notes/               笔记时间流（按年月分组）+ 每条笔记的独立页
 │   ├── series/              系列总览 + 系列详情
 │   ├── archive.astro        归档（年度统计 + 月度节奏条）
 │   ├── tags/                标签总览 + 单标签
 │   ├── category/            分类页（每个分类一页）
 │   ├── games/               游戏：大厅 + 全屏试玩外壳
+│   ├── subscribe.astro      订阅落地页（两个 feed 的说明与复制）
 │   ├── search.astro         站内搜索
 │   ├── search-index.json.ts 构建时生成搜索索引
 │   ├── robots.txt.ts        robots（含 sitemap 地址）
@@ -188,7 +196,8 @@ src/
 │   ├── pages.css            评论、归档、系列、标签、关于、页脚、404
 │   ├── responsive.css       断点覆盖（要排在它覆盖的规则之后）
 │   ├── games.css / motion.css / search.css
-│   ├── notes.css            笔记时间流与首页「最近想法」条
+│   ├── notes.css            笔记时间流、独立页、标签/归档里的笔记行
+│   ├── subscribe.css        订阅落地页
 │   ├── enhance.css          代码块附加件、灯箱、移动端目录
 │   ├── prose-extras.css     提示框、要点、步骤、图注、脚注、表格
 │   └── print.css            打印稿
@@ -196,7 +205,7 @@ src/
 │   ├── new-post.mjs         新建文章骨架（npm run new）
 │   ├── new-note.mjs         新建短笔记（npm run note）
 │   ├── image-inbox.mjs      配图归位 + 生成 Figure 片段（npm run image）
-│   ├── og-cards.mjs         生成每篇文章的分享封面（npm run og）
+│   ├── og-cards.mjs         生成文章与笔记的分享封面（npm run og）
 │   ├── lint-content.mjs     内容体检（npm run lint:content）
 │   ├── budget.mjs           产物体积预算（npm run budget）
 │   ├── a11y-audit.mjs       axe 全站扫描（npm run a11y）
@@ -204,11 +213,11 @@ src/
 │   ├── visual-regression.mjs 视觉回归（npm run visual / visual:update）
 │   └── preflight.mjs        发布前一键跑完全部检查（npm run preflight）
 ├── tests/visual/
-│   ├── baseline/            视觉基线，96 张 JPEG，需随样式改动一起提交
+│   ├── baseline/            视觉基线，114 张 JPEG，需随样式改动一起提交
 │   └── meta.json            基线生成环境（platform + 浏览器版本）
 └── public/
     ├── og.png               默认分享图（1200×630）
-    ├── og/                  每篇文章的分享封面 + manifest.json（供内容体检比对）
+    ├── og/                  文章与笔记的分享封面 + manifest.json（供内容体检比对）
     └── games/               游戏单文件（构建时原样拷贝，不进打包）
 ```
 
@@ -290,11 +299,24 @@ npm run comments:setup -- --list  # 只列出仓库里的讨论分类
 > `preconnect`、骨架屏和 16 秒兜底。想让读者更快看到评论，可以自建 giscus 到 Vercel 绑自定义域名，
 > 再把 `Comments.astro` 里的 `script.src` 与 postMessage 的 origin 换掉即可。
 
+## 订阅
+
+`/subscribe/` 是给人看的落地页，不是 feed 本身。页脚和笔记页的订阅入口都指向它，
+而不是直接甩一个 `/rss.xml`——不熟悉 RSS 的读者点开一段裸 XML 只会把页面关掉。
+
+- 两个 feed 分开：`/rss.xml`（文章）、`/notes.xml`（笔记），页面上各给一个「复制地址」按钮
+- 地址由 `Astro.site` 拼出来，换域名不用改文案
+- 「怎么用」三步 + 四个阅读器外链（`rel="noopener noreferrer"`）
+- 页脚仍保留两个 feed 的直接链接，给已经知道自己在做什么的人
+
 ## 分享与 SEO
 
 - 每页输出 `WebSite` 结构化数据；文章页额外输出 `BlogPosting` 与 `BreadcrumbList`。
 - 每篇文章有自己的分享封面 `public/og/<slug>.png`（1200×630，纸感底 + 文章配色卡叠 +
   标题/摘要/标签），由 `npm run og` 生成；`cover` 字段优先，没生成过则退回 `public/og.png`。
+- 每条笔记也有分享封面 `public/og/note-<id>.png`，标题取正文第一句、摘要从第二句开始。
+  指纹记在 `public/og/manifest.json`；笔记的指纹只含标题/日期/标签，改正文不影响。
+- 笔记独立页 `noindex`，但保留链接（`follow`），碎片页不占搜索结果的位置。
 - 文末有分享条：复制链接（带降级）、微博、以及手机上可用的系统分享。
 - `rss.xml` 输出**全文**（`content:encoded`）而不只是摘要，订阅器里能直接读完；
   正文里的 `/blog/...` 与 `#锚点` 会补成绝对地址，避免在阅读器里点不开。
@@ -345,7 +367,7 @@ CI 不生成（GitHub Actions 里没有中文字体，渲染会变成方框）�
 npm run lint:content  # 不需要构建：frontmatter、标题层级、图片、内链、中文排版、分享封面
 npm run check         # astro check：类型与模板
 npm run budget        # 需要 dist：CSS / JS / 单页 HTML / 图片四类上限
-npm run a11y          # 需要先 build + preview：axe-core 扫全站 18 条路由 × 浅/深两套主题
+npm run a11y          # 需要先 build + preview：axe-core 扫全站 21 条路由 × 浅/深两套主题
 npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、字号、Esc、移动端目录
 npm run visual        # 需要先 build + preview：16 条路由 × 浅/深 × 3 视口，和基线逐像素比
 npm run visual:update # 样式改动确认无误后重建基线
@@ -356,7 +378,7 @@ npm run preflight     # 一条命令串起：og → lint → check → 构建 �
 （CI 没有中文字体，渲染出来是方框），`--skip-build` 复用现有 `dist` 只跑检查，
 `--visual` 额外跑一遍视觉回归（比全站截图慢，改过样式时用）。
 
-`visual` 的基线在 `tests/visual/baseline/`（96 张 JPEG，约 4.2 MB），元信息记在
+`visual` 的基线在 `tests/visual/baseline/`（114 张 JPEG，约 5.0 MB），元信息记在
 `tests/visual/meta.json`，包含生成时的 `platform` 与浏览器版本。**换机器或换浏览器后会直接跳过比对**
 ——字体栅格化不同会让所有页面都"失败"，那种红叉没有信息量，在本机跑一次 `--update` 重建即可。
 3D 游戏页用 canvas 实时渲染，逐帧不同，不在比对范围内。
@@ -375,7 +397,7 @@ npm run preflight     # 一条命令串起：og → lint → check → 构建 �
 - `public/og/<slug>.png` 缺失——**这一条是硬错误**，因为分享封面不会在 CI 里生成（runner 没有中文字体，
   渲染出来是方框）。`npm run og` 会同时写一份 `public/og/manifest.json`，改了标题却没重画也会被提醒。
 
-`budget` 的上限写在 `scripts/budget.mjs` 顶部：CSS 90 KB / gzip 18 KB，JS 32 KB / gzip 12 KB，
+`budget` 的上限写在 `scripts/budget.mjs` 顶部：CSS 96 KB / gzip 19.5 KB，JS 32 KB / gzip 12 KB，
 单页 HTML 80 KB，主站图片 600 KB。游戏与分享封面不计入——它们不在首屏路径上。
 
 `.github/workflows/quality.yml` 在每次 push 与 PR 时依次跑
@@ -440,7 +462,9 @@ BLOG_SITE=https://blog.example.com BLOG_BASE=/ npm run build
 - [x] 体积预算、发布前 preflight、sitemap lastmod
 - [x] 搜索升级（正文覆盖率打分、命中上下文、搜索历史、空态建议）
 - [x] 阅读体验升级（灯箱缩放拖动、阅读位置记忆、代码块折叠、段落深链接）
-- [x] 视觉回归基线（16 路由 × 浅/深 × 3 视口）
+- [x] 视觉回归基线（19 路由 × 浅/深 × 3 视口）
 - [x] 短笔记流（`/notes/` + 独立 feed + 搜索接入 + `npm run note`）
 - [x] 首页置顶（`featured` 真正生效）、CI action 升级、Dependabot
+- [x] 内容入口统一（标签与归档同时认文章和笔记，导航补入口）
+- [x] 订阅落地页 `/subscribe/`、笔记独立页与分享卡
 - [ ] 旧站文章迁移

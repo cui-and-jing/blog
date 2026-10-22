@@ -1,0 +1,105 @@
+---
+import { existsSync } from 'node:fs';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import NoteCopy from '../../components/NoteCopy.astro';
+import { url, formatDate } from '../../lib/site';
+import { getNotes, noteTitle, noteText } from '../../lib/notes';
+
+export async function getStaticPaths() {
+  const notes = await getNotes();
+
+  return notes.map((note, index) => ({
+    /* 比当前这条新的在前、更旧的在后；数组是时间倒序 */
+    params: { id: note.id },
+    props: { note, newer: notes[index - 1], older: notes[index + 1] },
+  }));
+}
+
+const { note, newer, older } = Astro.props;
+
+const title = noteTitle(note, 60);
+const text = noteText(note);
+const ogFile = `public/og/note-${note.id}.png`;
+const ogImage = existsSync(ogFile) ? `/og/note-${note.id}.png` : undefined;
+
+/**
+ * 笔记的标题就是正文第一句，直接渲染会出现「标题 + 一模一样的正文第一段」。
+ * 第一段和标题完全一致时把它去掉，页面从第二句开始读。
+ * 用构建期生成的 HTML（与 RSS 同一个来源），不用再渲染一遍。
+ */
+const rawHtml = (note as { rendered?: { html?: string } }).rendered?.html ?? '';
+const titleKey = title.replace(/…$/, '');
+const bodyHtml = rawHtml.replace(/^<p>([\s\S]*?)<\/p>\s*/, (block, inner) => {
+  const plainText = inner.replace(/<[^>]+>/g, '').trim();
+  return plainText.replace(/[。！？!?]$/, '') === titleKey ? '' : block;
+});
+
+/* 只有一条邻居时不要留半张空卡 */
+const bothNeighbours = Boolean(newer && older);
+
+/* 笔记是短内容，单页在搜索结果里属于薄页面；留 follow 让人能顺着走出去 */
+const link = url(`/notes/${note.id}/`);
+---
+
+<BaseLayout title={title} description={text.slice(0, 120)} image={ogImage} noindex>
+  <div class="shell note-single">
+    <nav class="note-crumb" aria-label="位置">
+      <a href={url('/notes/')}>笔记</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{formatDate(note.data.date)}</span>
+    </nav>
+
+    <article class="note-sheet" aria-labelledby="note-title">
+      <header class="note-sheet-head">
+        <time datetime={note.data.date.toISOString()}>{formatDate(note.data.date)}</time>
+        <h1 id="note-title">{title}</h1>
+      </header>
+
+      <div class="prose note-sheet-body" set:html={bodyHtml} />
+
+      <footer class="note-sheet-foot">
+        <div class="note-tags">
+          {note.data.tags.map((tag) => (
+            <a href={url(`/tags/${encodeURIComponent(tag)}/`)}>#{tag}</a>
+          ))}
+        </div>
+        <button class="note-copy" type="button" data-note-copy data-link={link}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M10 13.5a4 4 0 0 0 5.7 0l3-3a4 4 0 1 0-5.7-5.7l-1.3 1.3" />
+            <path d="M14 10.5a4 4 0 0 0-5.7 0l-3 3a4 4 0 1 0 5.7 5.7l1.3-1.3" />
+          </svg>
+          <span>复制链接</span>
+        </button>
+      </footer>
+    </article>
+
+    <nav class={`note-adjacent${bothNeighbours ? '' : ' single'}`} aria-label="相邻笔记">
+      {
+        newer ? (
+          <a class="note-adjacent-item newer" href={url(`/notes/${newer.id}/`)}>
+            <span class="note-adjacent-label">更新一条</span>
+            <span class="note-adjacent-title">{noteTitle(newer, 34)}</span>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+      {
+        older ? (
+          <a class="note-adjacent-item older" href={url(`/notes/${older.id}/`)}>
+            <span class="note-adjacent-label">更早一条</span>
+            <span class="note-adjacent-title">{noteTitle(older, 34)}</span>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+    </nav>
+
+    <p class="notes-end">
+      这条只有几百字。<a href={url('/notes/')}>回到笔记时间流</a>，或者<a href={url('/posts/')}>去看长文章 →</a>
+    </p>
+  </div>
+</BaseLayout>
+
+<NoteCopy />

@@ -1,7 +1,7 @@
 {
   "platform": "win32",
   "browser": "Edg/153.0.4234.46",
-  "generatedAt": "2026-10-22T05:22:47.173Z",
+  "generatedAt": "2026-10-22T06:13:25.081Z",
   "routes": [
     "/",
     "/posts/",
@@ -9,15 +9,18 @@
     "/posts/paper-notes/",
     "/posts/writing-workflow/",
     "/notes/",
+    "/notes/2026-10-22-1015/",
     "/archive/",
     "/series/",
     "/series/从笔记到发布/",
     "/tags/",
     "/tags/Astro/",
+    "/tags/CSS/",
     "/category/技术/",
     "/about/",
     "/games/",
     "/search/",
+    "/subscribe/",
     "/styleguide/"
   ],
   "viewports": [

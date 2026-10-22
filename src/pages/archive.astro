@@ -2,8 +2,9 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { url, formatDate, readingTime } from '../lib/site';
 import { getPosts } from '../lib/posts';
+import { getNotes, noteTitle, noteExcerpt } from '../lib/notes';
 
-const posts = await getPosts();
+const [posts, notes] = await Promise.all([getPosts(), getNotes()]);
 
 const byYear = new Map<string, typeof posts>();
 for (const post of posts) {
@@ -11,12 +12,21 @@ for (const post of posts) {
   if (!byYear.has(year)) byYear.set(year, []);
   byYear.get(year)!.push(post);
 }
-const years = [...byYear.keys()].sort((a, b) => Number(b) - Number(a));
+
+/* 笔记也按年归位：归档是「全部内容」的时间线，不该只有长文 */
+const notesByYear = new Map<string, typeof notes>();
+for (const note of notes) {
+  const year = String(note.data.date.getFullYear());
+  if (!notesByYear.has(year)) notesByYear.set(year, []);
+  notesByYear.get(year)!.push(note);
+}
+
+const years = [...new Set([...byYear.keys(), ...notesByYear.keys()])].sort((a, b) => Number(b) - Number(a));
 const totalMinutes = posts.reduce((sum, post) => sum + readingTime(post.body ?? ''), 0);
 
-/* 每月一格：有文章的月份填实，用来一眼看出这一年的写作节奏 */
-function monthsOf(list: typeof posts) {
-  return Array.from({ length: 12 }, (_, month) => list.filter((post) => post.data.date.getMonth() === month).length);
+/* 每月一格：文章和笔记一起数，才看得出这一年的写作节奏 */
+function monthsOf(items: { data: { date: Date } }[]) {
+  return Array.from({ length: 12 }, (_, month) => items.filter((item) => item.data.date.getMonth() === month).length);
 }
 
 function topCategories(list: typeof posts) {
@@ -27,54 +37,81 @@ function topCategories(list: typeof posts) {
   }
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2);
 }
+
+const shortDate = (date: Date) =>
+  `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
 ---
 
-<BaseLayout title="归档" description="按年份归档的全部文章">
+<BaseLayout title="归档" description="按年份归档的全部文章与笔记">
   <div class="page-head">
     <div class="shell">
       <h1>归档</h1>
-      <p>{posts.length} 篇，{years.length} 年，合计约 {totalMinutes} 分钟。</p>
+      <p>
+        {posts.length} 篇文章 · {notes.length} 条笔记，{years.length} 年，长文合计约 {totalMinutes} 分钟。
+      </p>
     </div>
   </div>
 
   {
-    posts.length === 0 ? (
+    posts.length === 0 && notes.length === 0 ? (
       <div class="shell" style="padding-bottom:40px">
         <div class="empty-state">
-          <p>还没有文章。第一篇发出来以后，这里会按年份排好。</p>
+          <p>还没有内容。第一篇发出来以后，这里会按年份排好。</p>
           <a href={url('/about/')}>先认识一下 →</a>
         </div>
       </div>
     ) : (
       <div class="shell" style="padding-bottom:40px">
         {years.map((year) => {
-          const list = byYear.get(year)!;
-          const months = monthsOf(list);
+          const list = byYear.get(year) ?? [];
+          const noteList = notesByYear.get(year) ?? [];
+          const months = monthsOf([...list, ...noteList]);
+          const count = [
+            list.length ? `${list.length} 篇` : '',
+            noteList.length ? `${noteList.length} 条笔记` : '',
+          ].filter(Boolean).join(' · ');
           return (
             <section class="year-group">
               <h2 class="year-label">
                 <span class="year-num">{year}</span>
-                <span class="year-count">{list.length} 篇</span>
+                <span class="year-count">{count}</span>
               </h2>
               <div class="year-months" aria-hidden="true">
-                {months.map((count) => (
-                  <span class={`month-cell${count > 0 ? ' has' : ''}`} />
+                {months.map((n) => (
+                  <span class={`month-cell${n > 0 ? ' has' : ''}`} />
                 ))}
               </div>
-              <p class="year-cats">
-                {topCategories(list)
-                  .map(([cat, count]) => `${cat} ${count}`)
-                  .join(' · ')}
-              </p>
-              <div class="archive-card">
-                {list.map((post) => (
-                  <div class="archive-item">
-                    <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
-                    <a href={url(`/posts/${post.id}/`)}>{post.data.title}</a>
-                    <span class="cat">{post.data.category ?? ''}</span>
-                  </div>
-                ))}
-              </div>
+              {list.length > 0 && (
+                <p class="year-cats">
+                  {topCategories(list)
+                    .map(([cat, n]) => `${cat} ${n}`)
+                    .join(' · ')}
+                </p>
+              )}
+              {list.length > 0 && (
+                <div class="archive-card">
+                  {list.map((post) => (
+                    <div class="archive-item">
+                      <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+                      <a href={url(`/posts/${post.id}/`)}>{post.data.title}</a>
+                      <span class="cat">{post.data.category ?? ''}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {noteList.length > 0 && (
+                <ul class="archive-notes">
+                  {noteList.map((note) => (
+                    <li>
+                      <time datetime={note.data.date.toISOString()}>{shortDate(note.data.date)}</time>
+                      <a href={url(`/notes/${note.id}/`)}>
+                        <span class="archive-note-title">{noteTitle(note, 44)}</span>
+                        <span class="archive-note-text">{noteExcerpt(note, 80)}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
           );
         })}

@@ -102,8 +102,13 @@ export default defineConfig({
   integrations: [
     mdx(),
     sitemap({
-      /* 搜索页是纯客户端工具，排版样例页是给作者自己查的，都不该进搜索结果 */
-      filter: (page) => !/\/(search|styleguide)$/.test(page.replace(/\/$/, '')),
+      /* 搜索页是纯客户端工具，排版样例页是给作者自己查的，都不该进搜索结果；
+         笔记独立页带 noindex，也不该一边说别索引、一边写进 sitemap */
+      filter: (page) => {
+        const path = page.replace(/\/$/, '');
+        if (/\/(search|styleguide)$/.test(path)) return false;
+        return !/\/notes\/[^/]+$/.test(path);
+      },
       serialize: (item) => {
         let pathname;
         try {

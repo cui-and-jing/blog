@@ -186,11 +186,11 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         </div>
         <nav class="footer-col" aria-label="页脚导航">
           <h2>导航</h2>
-          <a href={url('/notes/')}>笔记</a>
           {NAV.map((item) => <a href={url(item.href)}>{item.label}</a>)}
         </nav>
         <div class="footer-col">
           <h2>订阅与源码</h2>
+          <a href={url('/subscribe/')}>怎么订阅</a>
           <a href={url('/rss.xml')}>文章 RSS</a>
           <a href={url('/notes.xml')}>笔记 RSS</a>
           <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>

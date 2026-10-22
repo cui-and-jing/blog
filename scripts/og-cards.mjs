@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
 import { parse as parseYaml } from 'yaml';
 import { coverStyle } from '../src/lib/cover.ts';
+import { plainNote, titleFromText } from '../src/lib/note-text.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const postsDir = path.join(root, 'src/content/posts');
@@ -211,6 +212,48 @@ for (const post of posts) {
   });
 }
 
+/* 每条笔记：标题取正文第一句，和页面里显示的是同一套规则 */
+const notesDir = path.join(root, 'src/content/notes');
+const noteMeta = [];
+if (existsSync(notesDir)) {
+  const noteFiles = (await fs.readdir(notesDir)).filter((f) => /\.mdx?$/.test(f));
+  for (const file of noteFiles) {
+    const raw = await fs.readFile(path.join(notesDir, file), 'utf8');
+    const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!match) continue;
+
+    const data = parseYaml(match[1]) ?? {};
+    if (data.draft) continue;
+
+    const id = file.replace(/\.mdx?$/, '');
+    const text = plainNote(raw.slice(match[0].length));
+    if (!text) continue;
+
+    const title = titleFromText(text, 40);
+    /* 标题已经是第一句，摘要就从第二句开始，否则卡上会重复一遍 */
+    const rest = text.startsWith(title.replace(/…$/, '')) ? text.slice(title.replace(/…$/, '').length) : text;
+    const description = rest.replace(/^[。！？!?，、\s]+/, '').slice(0, 76);
+    const date = data.date instanceof Date ? data.date : new Date(String(data.date));
+    const tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
+    const style = coverStyle(`note-${id}`, title);
+    noteMeta.push({ id, title, date, tags });
+
+    cards.push({
+      file: path.join(outDir, `note-${id}.png`),
+      html: html({
+        title,
+        description,
+        kicker: `NOTE · ${fmtDate(date)}`,
+        foot: `${tags.slice(0, 3).map((t) => pill(t, hueOf(t))).join('')}<span class="url">${SITE.url}</span>`,
+        stack:
+          card(backPalettes(style)[0], 'NOTE', '记', 'c1') +
+          card(backPalettes(style)[1], 'NOTE', '记', 'c2') +
+          card(style, 'NOTE', '笔', 'c3'),
+      }),
+    });
+  }
+}
+
 /* ---------- 渲染 ---------- */
 await fs.mkdir(outDir, { recursive: true });
 const browser = await puppeteer.launch({
@@ -239,8 +282,18 @@ const hashOf = (post) =>
     )
     .digest('hex')
     .slice(0, 12);
-const manifest = Object.fromEntries(posts.map((post) => [post.slug.replace(/\//g, '-'), hashOf(post)]));
+/* 笔记换标题等于换了正文第一句，所以指纹里要有 title */
+const noteHashOf = (note) =>
+  crypto
+    .createHash('sha1')
+    .update([note.title, note.date.toISOString().slice(0, 10), note.tags.join(',')].join('|'))
+    .digest('hex')
+    .slice(0, 12);
+const manifest = {
+  ...Object.fromEntries(posts.map((post) => [post.slug.replace(/\//g, '-'), hashOf(post)])),
+  ...Object.fromEntries(noteMeta.map((note) => [`note-${note.id}`, noteHashOf(note)])),
+};
 await fs.writeFile(path.join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
-console.log(`public/og/manifest.json      ${posts.length} 条`);
+console.log(`public/og/manifest.json      ${posts.length} 篇文章 + ${noteMeta.length} 条笔记`);
 
 await browser.close();

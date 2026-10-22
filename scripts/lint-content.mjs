@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { parse as parseYaml } from 'yaml';
+import { plainNote, titleFromText } from '../src/lib/note-text.ts';
 
 const root = process.cwd();
 const postsDir = path.join(root, 'src/content/posts');
@@ -118,6 +119,7 @@ const staticRoutes = [
   '/games/',
   '/games/beanrush/',
   '/search/',
+  '/subscribe/',
   '/styleguide/',
   '/rss.xml',
 ];
@@ -134,6 +136,24 @@ for (const post of posts) {
   if (post.category) {
     categorySet.add(post.category);
     routes.add(`/category/${post.category}/`);
+  }
+}
+
+/* 每条笔记有自己的独立页。这里只读 frontmatter 拿 id——
+   笔记的完整检查在文件后半段，但文章正文里的内链检查在前，路由得先齐 */
+if (fs.existsSync(notesDir)) {
+  for (const file of walk(notesDir)) {
+    const raw = fs.readFileSync(file, 'utf8');
+    const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!match) continue;
+    let data;
+    try {
+      data = parseYaml(match[1]) ?? {};
+    } catch {
+      continue;
+    }
+    if (data.draft) continue;
+    routes.add(`/notes/${path.basename(file).replace(/\.mdx?$/, '')}/`);
   }
 }
 /* 含中文的路径在正文里可能写成百分号编码，两种都收 */
@@ -415,6 +435,7 @@ for (const file of fs.existsSync(notesDir) ? walk(notesDir) : []) {
   }
   notes.push({
     file: rel,
+    id: path.basename(file).replace(/\.mdx?$/, ''),
     body: raw.slice(match[0].length),
     tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
     date: data.date instanceof Date ? data.date : new Date(String(data.date)),
@@ -431,13 +452,8 @@ for (const note of notes) {
   }
 
   const masked = maskCode(body);
-  const plain = masked
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/[#>*_~`|=\-]+/g, ' ')
-    .replace(/\s+/g, '')
-    .trim();
+  /* 与页面、分享封面共用同一套纯文本规则，否则同一句话三处算三个样子 */
+  const plain = plainNote(masked);
 
   if (!plain) {
     add('error', file, 1, '正文是空的');
@@ -445,8 +461,28 @@ for (const note of notes) {
   }
 
   /* 笔记可以长一点，但超过这个量级就该拆成文章了，别让时间流变成杂文集 */
-  if (plain.length > 900) {
-    add('warn', file, 1, `这条 ${plain.length} 字，已经是一篇短文的体量；考虑改成 /posts/ 里的文章`);
+  const chars = plain.replace(/\s+/g, '').length;
+  if (chars > 900) {
+    add('warn', file, 1, `这条 ${chars} 字，已经是一篇短文的体量；考虑改成 /posts/ 里的文章`);
+  }
+
+  /* 每条笔记都会被单独分享出去，所以要有自己的分享封面 */
+  if (!note.draft) {
+    const ogName = `note-${note.id}`;
+    if (!fs.existsSync(path.join(ogDir, `${ogName}.png`))) {
+      add('error', file, 1, `缺少分享封面 public/og/${ogName}.png，跑一次 npm run og`);
+    } else if (!manifest[ogName]) {
+      add('warn', file, 1, '分享封面没有版本记录，跑一次 npm run og 让 manifest 补上');
+    } else {
+      const hash = crypto
+        .createHash('sha1')
+        .update([titleFromText(plain, 40), note.date.toISOString().slice(0, 10), note.tags.join(',')].join('|'))
+        .digest('hex')
+        .slice(0, 12);
+      if (hash !== manifest[ogName]) {
+        add('warn', file, 1, '标题或日期改过但分享封面没重生成，跑一次 npm run og');
+      }
+    }
   }
 
   const markdownImage = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
@@ -481,15 +517,20 @@ for (const post of posts) {
   }
 }
 
+/* 分享封面分两类：文章按 slug，笔记按 note-<id>。两类都要认，否则笔记的图会被当孤儿 */
+const ogOwners = new Set([
+  ...posts.filter((p) => !p.draft && !p.cover).map((p) => ogSlugOf(p.slug)),
+  ...notes.filter((n) => !n.draft).map((n) => `note-${n.id}`),
+]);
 const orphanOg = fs.existsSync(ogDir)
   ? fs
       .readdirSync(ogDir)
       .filter((f) => f.endsWith('.png'))
       .map((f) => f.replace(/\.png$/, ''))
-      .filter((name) => !posts.some((p) => !p.draft && !p.cover && ogSlugOf(p.slug) === name))
+      .filter((name) => !ogOwners.has(name))
   : [];
 for (const name of orphanOg) {
-  add('warn', `public/og/${name}.png`, 1, '这张分享封面没有对应的文章了，可以删掉（跑一次 npm run og 不会自动清理）');
+  add('warn', `public/og/${name}.png`, 1, '这张分享封面没有对应的文章或笔记了，可以删掉（跑一次 npm run og 不会自动清理）');
 }
 
 /* ---------- 输出 ---------- */

@@ -1,0 +1,154 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SITE, url } from '../lib/site';
+
+const origin = (Astro.site ?? new URL(SITE.github)).toString().replace(/\/$/, '');
+const feeds = [
+  {
+    name: '文章',
+    href: '/rss.xml',
+    tone: 'post',
+    lead: '两三千字一篇，写完才发。技术、阅读，以及一些没想明白的问题。',
+    note: '一周到两周一篇，不凑数。',
+  },
+  {
+    name: '笔记',
+    href: '/notes.xml',
+    tone: 'note',
+    lead: '一两百字的碎片：一句结论、一个坑、一段还没长成文章的想法。',
+    note: '想起来就写，可能一天三条，也可能一周没有。',
+  },
+];
+
+const readers = [
+  { name: 'Feedly', href: 'https://feedly.com/', desc: '网页版，注册就能用' },
+  { name: 'Inoreader', href: 'https://www.inoreader.com/', desc: '网页版，免费额度够用' },
+  { name: 'NetNewsWire', href: 'https://netnewswire.com/', desc: 'macOS / iOS，开源免费' },
+  { name: 'Reeder', href: 'https://reederapp.com/', desc: 'macOS / iOS，付费但好用' },
+];
+---
+
+<BaseLayout title="订阅" description="用 RSS 订阅这个博客的文章与笔记，不经过任何推荐算法。">
+  <div class="page-head">
+    <div class="shell">
+      <h1>订阅</h1>
+      <p>不靠推荐算法。有新东西，它自己送到你手上。</p>
+    </div>
+  </div>
+
+  <div class="shell subscribe-shell">
+    <section class="subscribe-intro">
+      <p>
+        这个站没有邮件列表，也没有推送通知——只有 RSS。听起来像上个时代的东西，
+        但它解决的是一个现在越来越难的问题：<strong>你想看的东西，不用等平台决定要不要给你看。</strong>
+      </p>
+      <p>
+        RSS 就是一份「新内容清单」。把下面任意一个地址粘进阅读器，之后每发一篇，阅读器里就多一条，
+        不会漏，也不会有别的东西插进来。
+      </p>
+    </section>
+
+    <section class="feed-list" aria-labelledby="feed-title">
+      <h2 class="subscribe-h2" id="feed-title">挑一个，或者两个都订</h2>
+      {
+        feeds.map((feed) => {
+          const full = `${origin}${url(feed.href)}`;
+          return (
+            <article class={`feed-card feed-card--${feed.tone}`}>
+              <div class="feed-card-head">
+                <h3>{feed.name}</h3>
+                <span class="feed-card-note">{feed.note}</span>
+              </div>
+              <p class="feed-card-lead">{feed.lead}</p>
+              <div class="feed-card-addr">
+                <code>{full}</code>
+                <div class="feed-card-actions">
+                  <button class="feed-copy" type="button" data-copy={full}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="9" y="9" width="11" height="11" rx="2.5" />
+                      <path d="M15 5.5A2.5 2.5 0 0 0 12.5 3h-7A2.5 2.5 0 0 0 3 5.5v7A2.5 2.5 0 0 0 5.5 15" />
+                    </svg>
+                    <span>复制地址</span>
+                  </button>
+                  <a class="feed-open" href={url(feed.href)}>直接打开</a>
+                </div>
+              </div>
+            </article>
+          );
+        })
+      }
+    </section>
+
+    <section class="subscribe-steps" aria-labelledby="how-title">
+      <h2 class="subscribe-h2" id="how-title">怎么用</h2>
+      <ol>
+        <li>
+          <span class="step-num">1</span>
+          <div>
+            <strong>装一个阅读器</strong>
+            <p>网页版打开就能用，客户端要装一下。下面列了几个，随便挑。</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <div>
+            <strong>把地址贴进去</strong>
+            <p>阅读器里一般叫「添加订阅源 / Add feed」，粘贴上面复制的地址，确认。</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <div>
+            <strong>以后不用来了</strong>
+            <p>有新内容它会自己出现。想回顾旧文，站内的<a href={url('/archive/')}>归档</a>和<a href={url('/notes/')}>笔记</a>随时在。</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="reader-list" aria-labelledby="reader-title">
+      <h2 class="subscribe-h2" id="reader-title">几个阅读器</h2>
+      <ul>
+        {
+          readers.map((reader) => (
+            <li>
+              <a href={reader.href} target="_blank" rel="noopener noreferrer">{reader.name}</a>
+              <span>{reader.desc}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="reader-foot">
+        都不是广告。只是这几个我自己用过，或者身边人在用。
+      </p>
+    </section>
+
+    <p class="subscribe-end">
+      不想订也没关系。<a href={url('/posts/')}>文章</a>和<a href={url('/notes/')}>笔记</a>都在站里，想起来了翻一翻就行。
+    </p>
+  </div>
+</BaseLayout>
+
+<script>
+  const status = document.getElementById('a11y-status');
+
+  document.addEventListener('click', async (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-copy]');
+    if (!button) return;
+
+    const text = button.dataset.copy ?? '';
+    const label = button.querySelector('span');
+
+    try {
+      await navigator.clipboard.writeText(text);
+      if (label) label.textContent = '已复制';
+      if (status) status.textContent = '订阅地址已复制';
+    } catch {
+      if (status) status.textContent = `复制失败，地址是 ${text}`;
+    }
+
+    window.setTimeout(() => {
+      if (label) label.textContent = '复制地址';
+    }, 1600);
+  });
+</script>
