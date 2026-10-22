@@ -10,6 +10,7 @@ export const SITE = {
 
 export const NAV = [
   { label: '文章', href: '/posts/' },
+  { label: '系列', href: '/series/' },
   { label: '归档', href: '/archive/' },
   { label: '标签', href: '/tags/' },
   { label: '游戏', href: '/games/' },

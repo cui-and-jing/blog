@@ -87,15 +87,7 @@ const check = (name, pass, detail = '') => {
   const announced = await page.evaluate(() => document.getElementById('a11y-status')?.textContent ?? '');
   check('复制后读屏状态区有播报', /复制/.test(announced), announced);
 
-  const themeBefore = await page.$eval('#theme-toggle', (b) => b.getAttribute('aria-label'));
-  await page.click('#theme-toggle');
-  await new Promise((r) => setTimeout(r, 700));
-  const themeAfter = await page.$eval('#theme-toggle', (b) => b.getAttribute('aria-label'));
-  const themeValue = await page.evaluate(() => document.documentElement.dataset.theme);
-  check('主题按钮标签随状态变化', themeBefore !== themeAfter, `${themeBefore} → ${themeAfter} (${themeValue})`);
-  await page.click('#theme-toggle');
-  await new Promise((r) => setTimeout(r, 700));
-
+  /* 字号先测：主题切换有圆形扩散过渡（View Transitions），过渡期间点击会被遮罩吃掉 */
   await page.click('[data-size="large"]');
   const large = await page.evaluate(() => {
     const prose = document.querySelector('.prose');
@@ -107,6 +99,15 @@ const check = (name, pass, detail = '') => {
   });
   check('字号切换生效且有 aria-pressed', large.reading === 'large' && large.pressed === 'true', JSON.stringify(large));
   await page.click('[data-size="normal"]');
+
+  const themeBefore = await page.$eval('#theme-toggle', (b) => b.getAttribute('aria-label'));
+  await page.click('#theme-toggle');
+  await new Promise((r) => setTimeout(r, 700));
+  const themeAfter = await page.$eval('#theme-toggle', (b) => b.getAttribute('aria-label'));
+  const themeValue = await page.evaluate(() => document.documentElement.dataset.theme);
+  check('主题按钮标签随状态变化', themeBefore !== themeAfter, `${themeBefore} → ${themeAfter} (${themeValue})`);
+  await page.click('#theme-toggle');
+  await new Promise((r) => setTimeout(r, 900));
 
   await page.screenshot({ path: '.shots/kb-article-focus.png' });
   await page.close();

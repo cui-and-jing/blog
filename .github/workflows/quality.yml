@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  a11y:
-    name: Build & axe audit
+  quality:
+    name: Lint, build & axe audit
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -25,6 +25,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # 先查内容，再查类型，最后才构建——前两步失败时没必要等整站构建
+      - name: Content lint (frontmatter, links, images, share cards)
+        run: npm run lint:content
+
+      - name: Type check
+        run: npm run check
 
       - name: Build
         run: npm run build

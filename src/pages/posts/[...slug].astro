@@ -15,6 +15,7 @@ import Step from '../../components/mdx/Step.astro';
 import Details from '../../components/mdx/Details.astro';
 import Figure from '../../components/mdx/Figure.astro';
 import { SITE, url, formatDate, readingTime, tagHue } from '../../lib/site';
+import { findSeries, positionIn } from '../../lib/series';
 
 export async function getStaticPaths() {
   const posts = await getCollection('posts', ({ data }) => !data.draft);
@@ -52,6 +53,12 @@ const ogFile = path.join(process.cwd(), 'public', 'og', `${ogSlug}.png`);
 const ogImage = post.data.cover ?? (existsSync(ogFile) ? `/og/${ogSlug}.png` : undefined);
 const canonicalUrl = new URL(Astro.url.pathname, Astro.site ?? SITE.github).toString();
 const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURIComponent(canonicalUrl)}&title=${encodeURIComponent(post.data.title)}`;
+
+/* 所属系列：放在正文之前，让读者知道这篇不是孤立的 */
+const series = post.data.series ? findSeries(posts, post.data.series) ?? null : null;
+const seriesIndex = series ? positionIn(series, post) : -1;
+const seriesPrev = series && seriesIndex > 0 ? series.posts[seriesIndex - 1] : null;
+const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.posts[seriesIndex + 1] : null;
 ---
 
 <BaseLayout
@@ -99,6 +106,37 @@ const weiboShare = `https://service.weibo.com/share/share.php?url=${encodeURICom
           </div>
 
           <div class="article-card">
+            {
+              series && (
+                <aside class="series-note" aria-label="所属系列">
+                  <div class="series-note-head">
+                    <span class="series-note-kicker">系列</span>
+                    <a class="series-note-title" href={series.href}>
+                      {series.title}
+                    </a>
+                    <span class="series-note-count">
+                      第 {seriesIndex + 1} / {series.count} 篇
+                    </span>
+                  </div>
+                  {(seriesPrev || seriesNext) && (
+                    <div class="series-note-links">
+                      {seriesPrev && (
+                        <a class="prev" href={url(`/posts/${seriesPrev.id}/`)}>
+                          <span aria-hidden="true">←</span>
+                          <span>{seriesPrev.data.title}</span>
+                        </a>
+                      )}
+                      {seriesNext && (
+                        <a class="next" href={url(`/posts/${seriesNext.id}/`)}>
+                          <span>{seriesNext.data.title}</span>
+                          <span aria-hidden="true">→</span>
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </aside>
+              )
+            }
             <div class="prose">
               <Content
                 components={{ Callout, KeyPoints, Steps, Step, Details, Figure }}

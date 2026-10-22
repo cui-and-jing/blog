@@ -1,0 +1,60 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { url, formatDate, readingTime } from '../../lib/site';
+import { collectSeries } from '../../lib/series';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts', ({ data }) => !data.draft);
+  return collectSeries(posts).map((item) => ({
+    params: { series: item.name },
+    props: { series: item },
+  }));
+}
+
+const { series } = Astro.props;
+const minutes = series.posts.reduce((sum, post) => sum + readingTime(post.body ?? ''), 0);
+---
+
+<BaseLayout title={`系列：${series.title}`} description={series.description || `系列「${series.title}」的全部文章`}>
+  <div class="page-head">
+    <div class="shell">
+      <p class="page-kicker">系 列</p>
+      <h1>{series.title}</h1>
+      <p>
+        {series.count} 篇，按顺序读大约 {minutes} 分钟。
+        {series.description && <span class="series-lede">{series.description}</span>}
+      </p>
+      <p class="series-head-meta">
+        <time datetime={series.start.toISOString()}>{formatDate(series.start)}</time>
+        <span aria-hidden="true">–</span>
+        <time datetime={series.end.toISOString()}>{formatDate(series.end)}</time>
+        <a href={url('/series/')}>全部系列 →</a>
+      </p>
+    </div>
+  </div>
+
+  <div class="shell" style="padding-bottom:56px">
+    <ol class="series-timeline">
+      {
+        series.posts.map((post, index) => (
+          <li class="series-step">
+            <p class="series-step-num" aria-hidden="true">{String(index + 1).padStart(2, '0')}</p>
+            <div class="series-step-body">
+              <p class="series-step-meta">
+                <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+                <span aria-hidden="true">·</span>
+                <span>{readingTime(post.body ?? '')} 分钟</span>
+                {post.data.category && <span class="series-step-cat">{post.data.category}</span>}
+              </p>
+              <h2>
+                <a href={url(`/posts/${post.id}/`)}>{post.data.title}</a>
+              </h2>
+              {post.data.description && <p class="series-step-desc">{post.data.description}</p>}
+            </div>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</BaseLayout>

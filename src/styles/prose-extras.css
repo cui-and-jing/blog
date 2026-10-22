@@ -1,0 +1,353 @@
+/* ==========================================================================
+   prose-extras.css — 正文扩展：提示框、要点、步骤、折叠、图注、脚注、表格
+   顺序即层叠顺序，调整文件顺序会改变覆盖关系
+   ========================================================================== */
+/* ---------- 正文扩展：让长文有结构 ---------- */
+/* 提示框：左边一条语气色，底色是语气色与卡片色的混合，深浅色都跟着主题走 */
+.prose .callout {
+  --tone: var(--tone-note);
+  display: flex;
+  gap: 12px;
+  margin: 1.9em 0;
+  padding: 16px 18px 15px;
+  background: color-mix(in srgb, var(--tone) 8%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--tone) 22%, transparent);
+  border-left: 3px solid var(--tone);
+  border-radius: 4px 12px 12px 4px;
+  font-size: calc(15.6px * var(--prose-scale));
+  line-height: 1.85;
+  break-inside: avoid;
+}
+
+.prose .callout-note {
+  --tone: var(--tone-note);
+}
+
+.prose .callout-tip {
+  --tone: var(--tone-tip);
+}
+
+.prose .callout-warn {
+  --tone: var(--tone-warn);
+}
+
+.prose .callout-danger {
+  --tone: var(--tone-danger);
+}
+
+.prose .callout-icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--tone);
+}
+
+.prose .callout-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.prose .callout-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.prose .callout-title {
+  margin: 0 0 3px;
+  font-family: var(--font-sans);
+  font-size: calc(13px * var(--prose-scale));
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--tone);
+}
+
+.prose .callout-content > :last-child {
+  margin-bottom: 0;
+}
+
+.prose .callout-content p {
+  margin-bottom: 0.7em;
+}
+
+.prose .callout-content ul,
+.prose .callout-content ol {
+  margin-bottom: 0.6em;
+}
+
+/* 要点框：文首把结论先摆出来 */
+.prose .keypoints {
+  margin: 2em 0;
+  padding: 20px 22px 18px;
+  background: var(--card-flat);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  break-inside: avoid;
+}
+
+.prose .keypoints-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-family: var(--font-sans);
+  font-size: calc(12.5px * var(--prose-scale));
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
+}
+
+.prose .keypoints-title svg {
+  width: 15px;
+  height: 15px;
+  color: var(--accent);
+}
+
+.prose .keypoints-body > :last-child {
+  margin-bottom: 0;
+}
+
+.prose .keypoints-body ul,
+.prose .keypoints-body ol {
+  margin: 0;
+  padding-left: 1.15em;
+}
+
+.prose .keypoints-body li {
+  margin: 0.35em 0;
+}
+
+/* 步骤：用计数器画圈，不改原有的 ol 语义 */
+.prose .steps {
+  counter-reset: step var(--step-start, 0);
+  margin: 2em 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prose .step {
+  position: relative;
+  margin: 0 0 1.35em;
+  padding-left: 44px;
+}
+
+.prose .step:last-child {
+  margin-bottom: 0;
+}
+
+.prose .step::before {
+  counter-increment: step;
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 50%;
+}
+
+.prose .step-title {
+  margin: 0 0 0.3em;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.prose .step-body > :last-child {
+  margin-bottom: 0;
+}
+
+/* 折叠块：原生 details，键盘可达，不依赖脚本 */
+.prose .details {
+  margin: 1.9em 0;
+  padding: 0 18px;
+  background: var(--card-flat);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  break-inside: avoid;
+}
+
+.prose .details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+  list-style: none;
+}
+
+.prose .details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.prose .details > summary:hover .details-title {
+  color: var(--accent);
+}
+
+.prose .details-chevron {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: var(--text-mute);
+  transition: transform 0.2s var(--ease);
+}
+
+.prose .details[open] .details-chevron {
+  transform: rotate(180deg);
+}
+
+.prose .details-body {
+  padding: 2px 0 16px;
+}
+
+.prose .details-body > :last-child {
+  margin-bottom: 0;
+}
+
+/* 配图：图注与图片是一体，别被正文的 img 外边距推开 */
+.prose .fig {
+  margin: 2.1em 0;
+}
+
+.prose .fig img {
+  margin: 0 auto;
+  max-width: var(--fig-max, 100%);
+}
+
+.prose .fig figcaption {
+  margin-top: 10px;
+  padding: 0 8px;
+  font-size: calc(12.5px * var(--prose-scale));
+  color: var(--text-mute);
+  line-height: 1.7;
+  text-align: center;
+}
+
+/* 外链：默认在新标签页打开，加一个小箭头，避免读者以为还在站内 */
+.prose a.external-link::after {
+  content: '';
+  display: inline-block;
+  width: 0.58em;
+  height: 0.58em;
+  margin-left: 0.16em;
+  vertical-align: baseline;
+  background-color: currentColor;
+  opacity: 0.55;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='black' d='M4 1h7v7H9.4V3.7L2.5 10.6 1.4 9.5 8.3 2.6H4V1Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='black' d='M4 1h7v7H9.4V3.7L2.5 10.6 1.4 9.5 8.3 2.6H4V1Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* 脚注：默认样式太小太淡，长文里几乎看不见 */
+.prose .footnotes {
+  margin-top: 3em;
+  padding-top: 1.4em;
+  border-top: 1px solid var(--line);
+  font-size: calc(14px * var(--prose-scale));
+  color: var(--text-soft);
+}
+
+.prose .footnotes h2 {
+  margin: 0 0 0.6em;
+  padding: 0;
+  border: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-mute);
+}
+
+.prose .footnotes ol {
+  margin-bottom: 0;
+  padding-left: 1.25em;
+}
+
+.prose .footnotes li {
+  margin: 0.35em 0;
+}
+
+.prose sup a[data-footnote-ref] {
+  padding: 0 2px;
+  font-family: var(--font-mono);
+  font-size: 0.76em;
+  border-bottom: 0;
+}
+
+.prose a[data-footnote-backref] {
+  margin-left: 0.35em;
+  font-family: var(--font-mono);
+  text-decoration: none;
+  border-bottom: 0;
+}
+
+/* 行内语义元素 */
+.prose kbd {
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+.prose mark {
+  padding: 0 0.16em;
+  color: inherit;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 3px;
+}
+
+.prose abbr[title] {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+.prose .contains-task-list {
+  padding-left: 0.2em;
+  list-style: none;
+}
+
+.prose .task-list-item {
+  display: flex;
+  gap: 0.5em;
+  align-items: flex-start;
+}
+
+.prose .task-list-item input[type='checkbox'] {
+  margin-top: 0.62em;
+  accent-color: var(--accent);
+}
+
+@media (max-width: 620px) {
+  .prose .callout {
+    padding: 14px 15px 13px;
+    gap: 10px;
+  }
+
+  .prose .keypoints {
+    padding: 18px 18px 16px;
+  }
+
+  .prose .step {
+    padding-left: 38px;
+  }
+
+  .prose .step::before {
+    width: 25px;
+    height: 25px;
+    font-size: 11.5px;
+  }
+}
+

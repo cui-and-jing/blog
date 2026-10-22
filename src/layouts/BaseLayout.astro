@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import Analytics from '../components/Analytics.astro';
 import { SITE, NAV, url, mediaUrl } from '../lib/site';
 
 interface Props {
@@ -125,6 +126,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       })();
     </script>
     <slot name="head" />
+    <Analytics />
   </head>
 
   <body data-search-url={url('/search/')}>

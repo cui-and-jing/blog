@@ -1,0 +1,81 @@
+/* ==========================================================================
+   tokens.css — 设计变量：颜色、字号、间距、圆角、阴影、动效曲线
+   顺序即层叠顺序，调整文件顺序会改变覆盖关系
+   ========================================================================== */
+/* ---------- tokens ---------- */
+:root {
+  --bg: #f2f0e9;
+  --bg-soft: #eae6dc;
+  --card: #fffdf8;
+  --card-flat: #fbf9f3;
+  --text: #1b1916;
+  --text-soft: #55504a;
+  /* 次级文字必须在最亮的卡片底色上也达到 4.5:1，否则小字在廉价屏/户外几乎看不清 */
+  --text-mute: #696359;
+  --line: #e2dcd0;
+  --line-soft: #ece7dc;
+  --accent: #b4431f;
+  --accent-2: #2f6f66;
+  --accent-soft: #f7e7de;
+  --code-bg: #1d1c19;
+
+  /* 正文提示框的四种语气色，都按所在底色校验过 4.5:1 */
+  --tone-note: #3f5a6b;
+  --tone-tip: #2f6f66;
+  --tone-warn: #8a5a12;
+  --tone-danger: #a8331f;
+
+  --shadow-sm: 0 1px 2px rgba(27, 25, 22, 0.05), 0 2px 6px -2px rgba(27, 25, 22, 0.06);
+  --shadow-md: 0 1px 2px rgba(27, 25, 22, 0.04), 0 10px 28px -14px rgba(27, 25, 22, 0.16);
+  --shadow-lg: 0 2px 4px rgba(27, 25, 22, 0.05), 0 24px 48px -24px rgba(27, 25, 22, 0.26);
+
+  --font-serif: Georgia, 'Iowan Old Style', 'Songti SC', 'STSong', 'SimSun', serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', sans-serif;
+  --font-mono: 'SFMono-Regular', 'JetBrains Mono', Consolas, 'Liberation Mono', monospace;
+
+  --shell: 1180px;
+  --measure: 700px;
+  --radius: 18px;
+  --radius-lg: 24px;
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  /* 正文字号三档，只影响正文，不动导航与卡片 */
+  --prose-scale: 1;
+  --prose-leading: 1.95;
+}
+
+html[data-reading='small'] {
+  --prose-scale: 0.94;
+}
+
+html[data-reading='large'] {
+  --prose-scale: 1.12;
+  --prose-leading: 1.82;
+}
+
+html[data-theme='dark'] {
+  --bg: #131311;
+  --bg-soft: #1a1a17;
+  --card: #1c1c19;
+  --card-flat: #202020;
+  --text: #ede9e0;
+  --text-soft: #a9a49a;
+  --text-mute: #989186;
+  --line: #2b2a26;
+  --line-soft: #24241f;
+  --accent: #e2825c;
+  --accent-2: #74b8ab;
+  --accent-soft: #2c1f18;
+  --code-bg: #0d0d0c;
+
+  --tone-note: #a7c1d1;
+  --tone-tip: #74b8ab;
+  --tone-warn: #e0b070;
+  --tone-danger: #f0957c;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px -2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 48px -24px rgba(0, 0, 0, 0.9);
+}
+

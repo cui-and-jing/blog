@@ -1,7 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { url, formatDate } from '../lib/site';
+import { url, formatDate, readingTime } from '../lib/site';
 
 const all = await getCollection('posts', ({ data }) => !data.draft);
 const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
@@ -12,33 +12,74 @@ for (const post of posts) {
   if (!byYear.has(year)) byYear.set(year, []);
   byYear.get(year)!.push(post);
 }
-const years = [...byYear.keys()];
+const years = [...byYear.keys()].sort((a, b) => Number(b) - Number(a));
+const totalMinutes = posts.reduce((sum, post) => sum + readingTime(post.body ?? ''), 0);
+
+/* 每月一格：有文章的月份填实，用来一眼看出这一年的写作节奏 */
+function monthsOf(list: typeof posts) {
+  return Array.from({ length: 12 }, (_, month) => list.filter((post) => post.data.date.getMonth() === month).length);
+}
+
+function topCategories(list: typeof posts) {
+  const counts = new Map<string, number>();
+  for (const post of list) {
+    const cat = post.data.category;
+    if (cat) counts.set(cat, (counts.get(cat) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2);
+}
 ---
 
 <BaseLayout title="归档" description="按年份归档的全部文章">
   <div class="page-head">
     <div class="shell">
       <h1>归档</h1>
-      <p>{posts.length} 篇，{years.length} 年。</p>
+      <p>{posts.length} 篇，{years.length} 年，合计约 {totalMinutes} 分钟。</p>
     </div>
   </div>
 
-  <div class="shell" style="padding-bottom:40px">
-    {
-      years.map((year) => (
-        <section class="year-group">
-          <h2 class="year-label">{year}</h2>
-          <div class="archive-card">
-            {byYear.get(year)!.map((post) => (
-              <div class="archive-item">
-                <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
-                <a href={url(`/posts/${post.id}/`)}>{post.data.title}</a>
-                <span class="cat">{post.data.category ?? ''}</span>
+  {
+    posts.length === 0 ? (
+      <div class="shell" style="padding-bottom:40px">
+        <div class="empty-state">
+          <p>还没有文章。第一篇发出来以后，这里会按年份排好。</p>
+          <a href={url('/about/')}>先认识一下 →</a>
+        </div>
+      </div>
+    ) : (
+      <div class="shell" style="padding-bottom:40px">
+        {years.map((year) => {
+          const list = byYear.get(year)!;
+          const months = monthsOf(list);
+          return (
+            <section class="year-group">
+              <h2 class="year-label">
+                <span class="year-num">{year}</span>
+                <span class="year-count">{list.length} 篇</span>
+              </h2>
+              <div class="year-months" aria-hidden="true">
+                {months.map((count) => (
+                  <span class={`month-cell${count > 0 ? ' has' : ''}`} />
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
-      ))
-    }
-  </div>
+              <p class="year-cats">
+                {topCategories(list)
+                  .map(([cat, count]) => `${cat} ${count}`)
+                  .join(' · ')}
+              </p>
+              <div class="archive-card">
+                {list.map((post) => (
+                  <div class="archive-item">
+                    <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+                    <a href={url(`/posts/${post.id}/`)}>{post.data.title}</a>
+                    <span class="cat">{post.data.category ?? ''}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    )
+  }
 </BaseLayout>

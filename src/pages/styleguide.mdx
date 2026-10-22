@@ -11,6 +11,7 @@ import Steps from '../components/mdx/Steps.astro';
 import Step from '../components/mdx/Step.astro';
 import Details from '../components/mdx/Details.astro';
 import Figure from '../components/mdx/Figure.astro';
+import exampleHome from '../assets/example-home.png';
 
 这一页是给自己看的排版清单，不会出现在搜索和 RSS 里。
 
@@ -131,9 +132,15 @@ category: 技术
 ## 配图
 
 <Figure
+  src={exampleHome}
+  alt="博客首页的浅色界面，主推大卡、双列卡片与右侧作者栏"
+  caption="图片从 src/assets/ 导入，构建时自动生成 AVIF/WebP 和多档 srcset；点一下可以在灯箱里看大图。"
+/>
+
+<Figure
   src="/og.png"
   alt="站点分享封面"
-  caption="图片会自动懒加载，点一下可以在灯箱里看大图；宽高一定要写，避免正文跳动。"
+  caption="也可以直接传 public/ 下的路径（这种写法需要手写宽高）。"
   width={1200}
   height={630}
 />

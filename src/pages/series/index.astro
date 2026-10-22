@@ -1,0 +1,68 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { url, formatDate } from '../../lib/site';
+import { collectSeries } from '../../lib/series';
+
+const posts = await getCollection('posts', ({ data }) => !data.draft);
+const series = collectSeries(posts);
+---
+
+<BaseLayout title="系列" description="把零散的文章串成一条线，按顺序读下来">
+  <div class="page-head">
+    <div class="shell">
+      <p class="page-kicker">系 列</p>
+      <h1>系列</h1>
+      <p>{series.length} 条线，{series.reduce((sum, item) => sum + item.count, 0)} 篇。有些事一篇文章说不完。</p>
+    </div>
+  </div>
+
+  <div class="shell" style="padding-bottom:48px">
+    {
+      series.length === 0 ? (
+        <div class="empty-state">
+          <p>还没有成组的文章。等某一类写到第三篇，这里就会出现。</p>
+          <a href={url('/posts/')}>先看全部文章 →</a>
+        </div>
+      ) : (
+        <div class="series-list">
+          {series.map((item) => (
+            <article class="series-card">
+              <div class="series-card-head">
+                <p class="series-card-count" aria-hidden="true">
+                  {String(item.count).padStart(2, '0')}
+                  <span>篇</span>
+                </p>
+                <div class="series-card-main">
+                  <h2>
+                    <a href={item.href}>{item.title}</a>
+                  </h2>
+                  {item.description && <p class="series-card-desc">{item.description}</p>}
+                  <p class="series-card-meta">
+                    <time datetime={item.start.toISOString()}>{formatDate(item.start)}</time>
+                    <span aria-hidden="true">–</span>
+                    <time datetime={item.end.toISOString()}>{formatDate(item.end)}</time>
+                    {item.tags.length > 0 && <span class="series-card-tags">{item.tags.map((tag) => `#${tag}`).join(' ')}</span>}
+                  </p>
+                </div>
+              </div>
+              <ol class="series-card-items">
+                {item.posts.slice(0, 4).map((post, index) => (
+                  <li>
+                    <span class="series-card-num" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                    <a href={url(`/posts/${post.id}/`)}>{post.data.title}</a>
+                  </li>
+                ))}
+              </ol>
+              {item.count > 4 && (
+                <a class="series-card-more" href={item.href}>
+                  还有 {item.count - 4} 篇 →
+                </a>
+              )}
+            </article>
+          ))}
+        </div>
+      )
+    }
+  </div>
+</BaseLayout>

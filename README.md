@@ -47,6 +47,14 @@ draft: false
 | draft | 否 | `true` 时不出现在任何列表里 |
 | featured | 否 | 预留，用于首页精选 |
 | updated | 否 | 更新日期 |
+| series | 否 | 系列名，同名文章会串成一条阅读线 |
+| seriesOrder | 否 | 系列内顺序，从 1 开始；不填按日期排在后面 |
+
+### 系列
+
+同一个 `series` 的文章会自动出现在 `/series/` 与 `/series/<系列名>/`，文章顶部也会多一条
+「系列 · 第 n / N 篇」，带上一篇与下一篇。少于两篇的系列不会生成页面，免得只有一篇文章时到处是空壳。
+系列的一句话简介写在 `src/data/series.json`，不写就用系列名与篇数。
 
 ### 封面是怎么来的
 
@@ -70,25 +78,29 @@ draft: false
 | `KeyPoints` | 文首或文末的要点框 | `<KeyPoints>` 里写普通列表 |
 | `Steps` + `Step` | 有先后顺序的操作 | `<Steps><Step title="第一步">…</Step></Steps>` |
 | `Details` | 折叠的可选内容 | `<Details title="展开看配置">…</Details>` |
-| `Figure` | 带图注的配图 | `<Figure src="/x.png" alt="…" caption="…" width={1200} height={630} />` |
+| `Figure` | 带图注的配图 | `<Figure src={shot} alt="…" caption="…" />`（`shot` 从 `src/assets/` import） |
 
 几个约定：
 
 - 组件标签和里面的 Markdown 之间**要留空行**，否则 MDX 会当成普通文本。
 - `.md` 文件不能用组件；需要时把后缀改成 `.mdx`，URL 不变（`id` 不含扩展名）。
-- `Figure` 的宽高一定要写，浏览器才能先占位，避免图片加载时正文跳动；图片仍可点开灯箱。
+- `Figure` 有两种写法：从 `src/assets/` 导入的图片会自动生成 AVIF/WebP 与四档 `srcset`，宽高由文件决定；
+  直接传 `public/` 下的字符串路径则原样输出，这种写法必须自己写 `width` / `height`。
+- 图片仍可点开灯箱；`maxWidth` 可以把截图限制得比正文窄一些。
 - 实时效果和全部可用的正文元素都在 `/styleguide/`（`noindex`，不进 sitemap 与站内搜索）。
 
 ## 目录结构
 
 ```
 src/
-├── content.config.ts        内容集合 schema
+├── content.config.ts        内容集合 schema（含 series / seriesOrder）
 ├── content/posts/           文章（Markdown / MDX）
+├── assets/                  正文配图：import 进来才会做响应式与格式转换
 ├── layouts/BaseLayout.astro 全站外壳：head、导航、页脚、主题切换、正文增强脚本
 ├── layouts/ProsePageLayout.astro  单页正文版式（排版样例页使用）
 ├── components/
 │   ├── mdx/                 写作组件：Callout / KeyPoints / Steps / Step / Details / Figure
+│   ├── Analytics.astro      访问统计（配置为空时不输出任何脚本）
 │   ├── Cover.astro          封面：有图用图，无图生成渐变
 │   ├── PostCard.astro       文章卡片（整卡拉伸链接，分类可单独点）
 │   ├── Featured.astro       首页主推大卡
@@ -97,13 +109,17 @@ src/
 │   ├── Comments.astro       Giscus 评论区（懒加载 + 主题同步 + 失败兜底）
 │   └── Sidebar.astro        作者卡 + 标签 + 最近更新（首页可关掉作者卡）
 ├── data/comments.json       Giscus 的 repoId / categoryId
+├── data/series.json         系列简介（不填则用系列名与篇数自动生成）
+├── data/analytics.json      统计服务配置（默认 none）
 ├── lib/site.ts              站点信息、导航、URL 与日期工具
+├── lib/series.ts            系列归组、排序与「第 n / N 篇」
 ├── lib/cover.ts             封面色板与哈希
 ├── lib/comments.ts          评论配置读取（缺 ID 时整块不渲染）
 ├── pages/
 │   ├── index.astro          首页
 │   ├── posts/               文章列表 + 详情
-│   ├── archive.astro        归档
+│   ├── series/              系列总览 + 系列详情
+│   ├── archive.astro        归档（年度统计 + 月度节奏条）
 │   ├── tags/                标签总览 + 单标签
 │   ├── category/            分类页（每个分类一页）
 │   ├── games/               游戏：大厅 + 全屏试玩外壳
@@ -114,13 +130,28 @@ src/
 │   ├── styleguide.mdx       排版样例（noindex，给自己查的）
 │   ├── rss.xml.js           RSS
 │   └── 404.astro
-├── styles/global.css        全站样式（设计变量在文件顶部）
+├── styles/
+│   ├── global.css           样式入口，只按顺序 @import，不写规则
+│   ├── tokens.css           颜色 / 字号 / 间距 / 圆角 / 阴影
+│   ├── base.css             重置与焦点样式
+│   ├── layout.css           外壳、页头、首屏、分类块
+│   ├── components.css       封面、卡片、侧栏、作者卡
+│   ├── article.css          文章页与正文排版
+│   ├── pages.css            评论、归档、系列、标签、关于、页脚、404
+│   ├── responsive.css       断点覆盖（要排在它覆盖的规则之后）
+│   ├── games.css / motion.css / search.css
+│   ├── enhance.css          代码块附加件、灯箱、移动端目录
+│   ├── prose-extras.css     提示框、要点、步骤、图注、脚注、表格
+│   └── print.css            打印稿
 ├── scripts/og-cards.mjs     生成每篇文章的分享封面
 └── public/
     ├── og.png               默认分享图（1200×630）
-    ├── og/                  每篇文章的分享封面（npm run og 生成）
+    ├── og/                  每篇文章的分享封面 + manifest.json（供内容体检比对）
     └── games/               游戏单文件（构建时原样拷贝，不进打包）
 ```
+
+样式拆成了多个文件，但 `global.css` 只负责 `@import`，构建时 Vite 会把它们并回一个 CSS 文件，
+运行时不会多出请求。**顺序就是层叠顺序**，`responsive.css` 必须排在它要覆盖的规则之后。
 
 ## 游戏模块
 
@@ -153,6 +184,8 @@ src/
 - 宽度 ≤1080px 时出现左下角「目录」按钮，点开是底部抽屉（原生 `<dialog>`，Esc 可关）。
 - 代码块自动显示语言标签和复制按钮（触屏设备上按钮常显）。
 - 正文图片可点击放大，支持 `←` `→` 切换、`Esc` 关闭；图片统一 `loading="lazy"`。
+- 配图放在 `src/assets/` 并通过 `<Figure>` 导入时，会自动生成 AVIF/WebP 与四档 `srcset`，
+  图片实际只按正文宽度下载（一张 1200px 截图从 209 KB 降到 20 KB 左右）。
 - 文章页有阅读进度条，滚动超过 700px 出现「回到顶部」。
 - 打印或「存为 PDF」时自动摘掉导航、侧栏、目录、评论、分享条与推荐，封面不打印，
   代码块转浅色并允许换行，外链地址以括号形式印在正文后（`@media print`）。
@@ -234,15 +267,39 @@ CI 不生成（GitHub Actions 里没有中文字体，渲染会变成方框）�
 
 ## 质量检查
 
-两个脚本都是「先构建、再起 `npm run preview`，然后跑」：
-
 ```bash
-npm run a11y       # axe-core 扫全站 14 条路由 × 浅/深两套主题，有 serious 违规就返回非 0
-npm run a11y:keys  # 键盘可达性实测：Tab 顺序、焦点环、复制播报、主题标签、字号、Esc、移动端目录
+npm run lint:content  # 不需要构建：frontmatter、标题层级、图片、内链、分享封面
+npm run check         # astro check：类型与模板
+npm run a11y          # 需要先 build + preview：axe-core 扫全站 15 条路由 × 浅/深两套主题
+npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、字号、Esc、移动端目录
 ```
 
-`.github/workflows/quality.yml` 会在每次 push 与 PR 时跑构建 + `npm run a11y`，
-无障碍回退会直接让检查变红（它和部署工作流相互独立，不会拦住发布）。
+`lint:content` 检查的是「构建不会报错、但读者会看到」的问题：
+
+- 缺 `title` / `description`、摘要过长会被列表页截断、标题跳级、图片缺 `alt` 或宽高
+- 正文内链指向的文章不存在（包括指向草稿）
+- 代码块没写语言、链接文字是「点这里」
+- `public/og/<slug>.png` 缺失——**这一条是硬错误**，因为分享封面不会在 CI 里生成（runner 没有中文字体，
+  渲染出来是方框）。`npm run og` 会同时写一份 `public/og/manifest.json`，改了标题却没重画也会被提醒。
+
+`.github/workflows/quality.yml` 在每次 push 与 PR 时依次跑 `lint:content` → `check` → 构建 → `npm run a11y`，
+任一步失败都会变红（它和部署工作流相互独立，不会拦住发布）。
+
+## 访问统计
+
+默认不加载任何统计脚本。要用时改 `src/data/analytics.json`，**填完就生效，不用改代码**：
+
+```json
+// Umami Cloud 或自建
+{ "provider": "umami", "src": "https://cloud.umami.is/script.js", "websiteId": "xxxxxxxx" }
+
+// Plausible
+{ "provider": "plausible", "src": "https://plausible.io/js/script.js", "domain": "cui-and-jing.github.io" }
+```
+
+`src/components/Analytics.astro` 只在配置齐全时输出一个 `defer` 脚本，`provider` 保持 `none` 时
+连一个字节都不会多。两家都是无 cookie 统计，不需要同意横幅；换服务只改这一个文件。
+本地 `npm run preview` 也会被计入，看数据时留意一下。
 
 ## 部署
 
@@ -273,5 +330,9 @@ BLOG_SITE=https://blog.example.com BLOG_BASE=/ npm run build
 - [x] 阅读字号三档 + 打印样式 + 宽表格横向滚动
 - [x] 正文写作组件（提示框 / 要点 / 步骤 / 折叠 / 图注）与脚注样式
 - [x] 全站无障碍审计脚本 + CI 门禁
+- [x] 内容体检（frontmatter / 标题层级 / 图片 / 内链 / 分享封面）接入 CI
+- [x] 系列与合集（`series` + `/series/` + 文章顶部系列条）
+- [x] 正文图片响应式（`astro:assets`，AVIF/WebP + srcset）
+- [x] 可配置访问统计（默认关闭）
+- [x] 样式按层拆分（构建后仍是单个 CSS 文件）
 - [ ] 旧站文章迁移
-- [ ] 文章内图片压缩与响应式尺寸（`astro:assets`）

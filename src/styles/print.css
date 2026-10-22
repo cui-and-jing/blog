@@ -1,0 +1,246 @@
+/* ==========================================================================
+   print.css — 打印稿
+   顺序即层叠顺序，调整文件顺序会改变覆盖关系
+   ========================================================================== */
+/* ---------- 打印：把网页上的交互件都摘掉，留一份能直接读的稿子 ---------- */
+@media print {
+  @page {
+    margin: 16mm 14mm;
+  }
+
+  .site-header,
+  .site-footer,
+  .skip-link,
+  .read-progress,
+  .to-top,
+  .toc,
+  .toc-fab,
+  .sidebar,
+  .post-nav,
+  .related,
+  .share-bar,
+  .comments,
+  .lightbox,
+  .article-tools,
+  .notfound-actions,
+  .prose .code-block .copy-btn,
+  .prose .code-block .code-lang,
+  .prose .heading-anchor {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  body {
+    font-size: 11.5pt;
+  }
+
+  .shell {
+    max-width: none;
+    padding: 0;
+  }
+
+  .article-wrap {
+    display: block;
+    padding: 0;
+  }
+
+  .article-card {
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* 系列提示条印在纸上仍然有用（知道这是第几篇），但底色和强调边要收掉 */
+  .series-note {
+    margin-bottom: 16pt;
+    padding: 8pt 10pt;
+    background: none !important;
+    border: 1px solid #ddd;
+    border-left: 2px solid #999;
+    border-radius: 0;
+  }
+
+  .series-note-links {
+    margin-top: 6pt;
+    padding-top: 6pt;
+  }
+
+  /* 封面是装饰，打印出来是一整块深色，既费墨又压住标题 */
+  .post-hero {
+    margin: 0 0 16pt;
+    background: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .post-hero .cover,
+  .post-hero-veil {
+    display: none !important;
+  }
+
+  .post-hero-body {
+    position: static;
+    padding: 0;
+    color: #111;
+  }
+
+  .post-hero-body h1 {
+    margin: 6pt 0 0;
+    color: #111;
+    font-size: 22pt;
+    text-shadow: none;
+  }
+
+  .kicker,
+  .kicker time,
+  .kicker .chip {
+    color: #444;
+    background: none;
+    border-color: #bbb;
+    text-shadow: none;
+  }
+
+  .prose {
+    color: #111;
+    font-size: 11pt;
+    line-height: 1.75;
+  }
+
+  .prose h2,
+  .prose h3,
+  .prose h4 {
+    color: #111;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .prose h2 {
+    font-size: 15pt;
+  }
+
+  .prose h3 {
+    font-size: 12.5pt;
+  }
+
+  .prose h4 {
+    font-size: 11.5pt;
+  }
+
+  .prose a {
+    color: #111;
+    border-bottom: 1px solid #c9c4b8;
+  }
+
+  /* 纸上点不动链接，把地址印在括号里 */
+  .prose a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    font-size: 8.5pt;
+    color: #666;
+    word-break: break-all;
+  }
+
+  .prose pre {
+    padding: 10pt 12pt;
+    background: #f7f6f2 !important;
+    border: 1px solid #ddd8cc;
+    border-radius: 6px;
+    font-size: 8.5pt;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    break-inside: avoid;
+  }
+
+  .prose pre code,
+  .prose pre code span {
+    background: none !important;
+    color: #1f1f1f !important;
+  }
+
+  .prose blockquote {
+    padding: 8pt 12pt;
+    background: #faf9f5;
+    border-left: 2pt solid #c9c4b8;
+    color: #333;
+    break-inside: avoid;
+  }
+
+  .prose img {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  /* 提示框/要点框在纸上不烧墨，统一成浅底细线 */
+  .prose .callout {
+    padding: 8pt 11pt;
+    background: #faf9f5 !important;
+    border-color: #d8d3c7 !important;
+    border-left: 2pt solid #8c8579 !important;
+    color: #222;
+  }
+
+  .prose .callout-title,
+  .prose .callout-icon {
+    color: #333 !important;
+  }
+
+  .prose .keypoints,
+  .prose .details {
+    background: #faf9f5 !important;
+    border-color: #d8d3c7 !important;
+  }
+
+  .prose .step::before {
+    color: #333 !important;
+    background: #eee9dd !important;
+    border: 1px solid #d8d3c7;
+  }
+
+  .prose a.external-link::after {
+    display: none;
+  }
+
+  .prose table {
+    font-size: 9.5pt;
+    break-inside: avoid;
+  }
+
+  .prose .table-wrap,
+  .prose .table-wrap.is-scrollable {
+    overflow: visible;
+    background: none;
+  }
+
+  .prose .table-wrap table {
+    min-width: 0 !important;
+  }
+
+  .prose p,
+  .prose li {
+    orphans: 3;
+    widows: 3;
+  }
+
+  .post-foot,
+  .end-mark {
+    break-inside: avoid;
+  }
+
+  .end-mark .end-line {
+    background: #ddd;
+  }
+
+  .tag-pill {
+    background: none;
+    border: 1px solid #ccc;
+    color: #444;
+  }
+}

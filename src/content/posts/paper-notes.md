@@ -6,6 +6,8 @@ tags:
   - 随笔
   - 笔记
 category: 生活
+series: 从笔记到发布
+seriesOrder: 1
 ---
 
 ## 起点是一个很笨的问题

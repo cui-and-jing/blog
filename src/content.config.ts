@@ -13,6 +13,10 @@ const posts = defineCollection({
     cover: z.string().optional(),
     draft: z.boolean().default(false),
     featured: z.boolean().default(false),
+    /** 系列名；同名的文章会被串成一条阅读线 */
+    series: z.string().optional(),
+    /** 系列内的顺序，从 1 开始；不填则按日期排在后面 */
+    seriesOrder: z.number().int().positive().optional(),
   }),
 });
 

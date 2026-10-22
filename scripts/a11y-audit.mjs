@@ -32,6 +32,8 @@ const routes = only.length
       '/posts/paper-notes/',
       '/posts/writing-workflow/',
       '/archive/',
+      '/series/',
+      '/series/从笔记到发布/',
       '/tags/',
       '/tags/Astro/',
       '/category/技术/',

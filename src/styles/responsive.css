@@ -1,0 +1,259 @@
+/* ==========================================================================
+   responsive.css — 响应式断点（必须排在它所覆盖的规则之后）
+   顺序即层叠顺序，调整文件顺序会改变覆盖关系
+   ========================================================================== */
+/* ---------- responsive ---------- */
+@media (max-width: 1080px) {
+  .with-aside,
+  .article-wrap {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 34px;
+  }
+
+  /* 单列时限制阅读宽度，避免 1000px 宽的行长 */
+  .article-wrap > div:first-child,
+  .article-wrap > .sidebar,
+  .about-wrap > div:first-child,
+  .about-wrap > .sidebar {
+    width: 100%;
+    max-width: 780px;
+    margin-inline: auto;
+  }
+
+  .post-hero {
+    max-width: 780px;
+    margin: 26px auto 0;
+  }
+
+  .page-head--narrow .shell {
+    max-width: 836px;
+    margin-inline: auto;
+  }
+
+  .post-hero {
+    max-width: 780px;
+    margin: 26px auto 0;
+  }
+
+  .page-head--narrow .shell {
+    max-width: 836px;
+    margin-inline: auto;
+  }
+
+  /* 单列时限制阅读宽度，避免 1000px 宽的行长 */
+  .article-wrap > div:first-child,
+  .article-wrap > .sidebar,
+  .about-wrap > div:first-child,
+  .about-wrap > .sidebar {
+    width: 100%;
+    max-width: 780px;
+    margin-inline: auto;
+  }
+
+  .hero-inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 36px;
+  }
+
+  .hero-card {
+    max-width: 430px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .sidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .sidebar > .author,
+  .sidebar > .facts {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .card-grid--three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cat-tiles {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    padding-top: 36px;
+  }
+
+  .cat-tile {
+    padding: 16px 18px;
+  }
+
+  .footer-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .footer-brand {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell {
+    padding: 0 18px;
+  }
+
+  .header-inner {
+    height: 62px;
+    gap: 10px;
+  }
+
+  .wordmark {
+    font-size: 17px;
+  }
+
+  .wordmark .mark {
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+  }
+
+  .nav {
+    gap: 0;
+  }
+
+  .nav a {
+    padding: 6px 9px;
+    font-size: 13px;
+  }
+
+  .theme-toggle {
+    width: 30px;
+    height: 30px;
+    margin-left: 4px;
+  }
+
+  .hero {
+    padding: 44px 0 8px;
+  }
+
+  .hero-stats {
+    gap: 8px;
+    margin-top: 24px;
+  }
+
+  .stat {
+    padding: 7px 13px;
+  }
+
+  .card-grid,
+  .card-grid--three {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .featured .cover {
+    aspect-ratio: 4 / 3;
+  }
+
+  .featured-body {
+    padding: 24px 22px 22px;
+  }
+
+  .featured-body p {
+    display: none;
+  }
+
+  .sidebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .post-hero .cover {
+    aspect-ratio: 4 / 3;
+  }
+
+  .post-hero-body {
+    padding: 26px 22px 24px;
+  }
+
+  .article-card {
+    padding: 28px 22px 34px;
+    border-radius: var(--radius);
+  }
+
+  .prose {
+    font-size: 16px;
+    line-height: 1.9;
+  }
+
+  .post-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .post-nav .next {
+    text-align: left;
+  }
+
+  .archive-item {
+    grid-template-columns: 66px 1fr;
+  }
+
+  .archive-item .cat {
+    display: none;
+  }
+
+  .about-card {
+    padding: 28px 22px 32px;
+  }
+
+  .about-banner {
+    flex-wrap: wrap;
+  }
+
+  .about-banner-links {
+    margin-left: 0;
+  }
+
+  .footer-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .hero-card {
+    padding: 26px 20px 22px;
+  }
+}
+
+@media (max-width: 380px) {
+  .nav a {
+    padding: 5px 5px;
+    font-size: 12px;
+  }
+
+  .wordmark span:last-child {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+
+
+/* 320px 的老机型：导航塞得下，但只差几像素，这里再收一点 */
+@media (max-width: 340px) {
+  .nav a {
+    padding: 5px 4px;
+    font-size: 11.5px;
+  }
+}

@@ -6,6 +6,8 @@ tags:
   - 写作
   - 方法
 category: 学习
+series: 从笔记到发布
+seriesOrder: 2
 ---
 
 ## 先有观点，再有文章

@@ -6,6 +6,7 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
@@ -228,5 +229,18 @@ for (const item of cards) {
   const { size } = await fs.stat(item.file);
   console.log(`${path.relative(root, item.file).padEnd(28)} ${(size / 1024).toFixed(0)} KB`);
 }
+
+/* 记下每张图对应的内容指纹，lint 才能发现「改了标题忘了重画」 */
+const hashOf = (post) =>
+  crypto
+    .createHash('sha1')
+    .update(
+      [post.title, post.description, post.date.toISOString().slice(0, 10), post.category, post.tags.join(',')].join('|')
+    )
+    .digest('hex')
+    .slice(0, 12);
+const manifest = Object.fromEntries(posts.map((post) => [post.slug.replace(/\//g, '-'), hashOf(post)]));
+await fs.writeFile(path.join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+console.log(`public/og/manifest.json      ${posts.length} 条`);
 
 await browser.close();

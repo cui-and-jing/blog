@@ -1,0 +1,33 @@
+---
+/**
+ * 访问统计：默认关闭，配置齐了才会输出一个 defer 脚本，不会给页面增加任何请求。
+ *
+ * src/data/analytics.json：
+ *   umami      { "provider": "umami", "src": "https://cloud.umami.is/script.js", "websiteId": "xxxx" }
+ *   plausible  { "provider": "plausible", "src": "https://plausible.io/js/script.js", "domain": "cui-and-jing.github.io" }
+ *
+ * 两家都是无 cookie 的统计，不需要同意横幅；换服务只改这一个文件。
+ */
+import config from '../data/analytics.json';
+
+const { provider, src, websiteId, domain } = config as {
+  provider: string;
+  src: string;
+  websiteId: string;
+  domain: string;
+};
+
+const enabled =
+  (provider === 'umami' && src && websiteId) || (provider === 'plausible' && src && domain);
+---
+
+{
+  enabled && provider === 'umami' && (
+    <script is:inline defer src={src} data-website-id={websiteId} />
+  )
+}
+{
+  enabled && provider === 'plausible' && (
+    <script is:inline defer src={src} data-domain={domain} />
+  )
+}

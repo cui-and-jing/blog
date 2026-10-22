@@ -1,22 +1,49 @@
 ---
 /**
- * 带图注的配图。宽高一定要填，浏览器才能在图还没下载完时先占好位置，避免正文跳动。
+ * 带图注的配图。
+ *
+ * 两种用法：
+ *   1. 把图放进 src/assets/ 再 import 进来（推荐）——构建时生成 AVIF/WebP 与多档 srcset，
+ *      宽高直接从文件读取，不用手写。
+ *   2. 直接传 public/ 下的字符串路径——原样输出，行为与以前一致。
+ *
  * 图片仍然走正文的灯箱：点一下可以放大看原图。
  */
+import { Picture } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
 import { mediaUrl } from '../../lib/site';
 
 interface Props {
-  src: string;
+  src: string | ImageMetadata;
   alt: string;
   caption?: string;
+  /** 传字符串路径时必须给，避免加载时正文跳动 */
   width?: number;
   height?: number;
+  /** 截图比正文窄时用来限宽，单位 px */
+  maxWidth?: number;
 }
 
-const { src, alt, caption, width, height } = Astro.props;
+const { src, alt, caption, width, height, maxWidth } = Astro.props;
+const isAsset = typeof src !== 'string';
 ---
 
-<figure class="fig">
-  <img src={mediaUrl(src)} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
+<figure class="fig" style={maxWidth ? `--fig-max:${maxWidth}px` : undefined}>
+  {
+    isAsset ? (
+      <Picture
+        src={src}
+        alt={alt}
+        formats={['avif', 'webp']}
+        fallbackFormat="webp"
+        widths={[340, 520, 720, 1080]}
+        sizes="(max-width: 720px) 92vw, 682px"
+        loading="lazy"
+        decoding="async"
+      />
+    ) : (
+      <img src={mediaUrl(src)} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
+    )
+  }
   {caption && <figcaption>{caption}</figcaption>}
 </figure>
