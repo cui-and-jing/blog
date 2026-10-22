@@ -197,7 +197,10 @@
   font-size: calc(17px * var(--prose-scale));
 }
 
+/* 宋体正文里的强调改用黑体：一是中文排版的常规做法，二是子集只含 400 一档，
+   宋体加粗只能靠浏览器合成（笔画被横向撑开，衬线糊掉，看上去像劣质黑体） */
 .prose strong {
+  font-family: var(--font-sans);
   font-weight: 600;
   color: var(--text);
 }
