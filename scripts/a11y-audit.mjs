@@ -122,13 +122,16 @@ for (const route of routes) {
 }
 
 /* 设置面板和快捷键面板默认是关着的，路由循环扫不到。
-   它们承载主题、字体、字号三类偏好，出问题面最大，单独打开各扫一遍 */
+   它们承载主题、字体、字号三类偏好，出问题面最大，单独打开各扫一遍；
+   底部操作条与导航抽屉只在窄屏出现，所以这两项用 390px 视口 */
 for (const panel of [
-  { key: 'settings', label: '设置面板', open: (page) => page.click('#settings-toggle') },
-  { key: 'shortcuts', label: '快捷键面板', open: (page) => page.keyboard.type('?') },
+  { key: 'settings', label: '设置面板', width: 1280, open: (page) => page.click('#settings-toggle') },
+  { key: 'shortcuts', label: '快捷键面板', width: 1280, open: (page) => page.keyboard.type('?') },
+  { key: 'bar', label: '移动端操作条', width: 390, open: () => {} },
+  { key: 'drawer', label: '移动端导航抽屉', width: 390, open: (page) => page.click('#menu-toggle') },
 ]) {
   const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+  await page.setViewport({ width: panel.width ?? 1280, height: panel.width === 390 ? 844 : 900, deviceScaleFactor: 1 });
   try {
     await page.goto(`${base}/posts/hello-astro/`, { waitUntil: 'networkidle2', timeout: 30000 });
     await page.addScriptTag({ content: axeSource });

@@ -169,6 +169,14 @@
   height: 16px;
 }
 
+/* 单列布局下由底部操作条接管「回到顶部」，浮钮让位——
+   同一个动作放两个入口，只会让人怀疑哪个才是真的 */
+@media (max-width: 1080px) {
+  .to-top {
+    display: none;
+  }
+}
+
 /* 主题切换的圆形扩散（不支持时直接切换） */
 ::view-transition-old(root),
 ::view-transition-new(root) {

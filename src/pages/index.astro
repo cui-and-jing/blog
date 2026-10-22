@@ -7,15 +7,20 @@ import CategoryTiles from '../components/CategoryTiles.astro';
 import { SITE, url, formatDate, daysSince } from '../lib/site';
 import { getPosts } from '../lib/posts';
 import { getNotes, noteText } from '../lib/notes';
+import { collectTags } from '../lib/tags';
 
 const posts = await getPosts();
 /* featured 字段原来只是躺在 schema 里，首页永远取最新一篇——标了置顶也不生效 */
 const featured = posts.find((post) => post.data.featured) ?? posts[0];
 const rest = posts.filter((post) => post.id !== featured?.id);
 const recent = rest.slice(0, 6);
-const notes = (await getNotes()).slice(0, 3);
-const tagCount = new Set(posts.flatMap((p) => p.data.tags)).size;
-const latest = posts[0]?.data.date;
+const allNotes = await getNotes();
+const notes = allNotes.slice(0, 3);
+/* 标签与「最近更新」都横跨文章和笔记：只数文章会让首页在刚发过笔记时显示旧日期 */
+const tagCount = collectTags(posts, allNotes).length;
+const latest = [posts[0]?.data.date, allNotes[0]?.data.date]
+  .filter((date): date is Date => Boolean(date))
+  .sort((a, b) => b.valueOf() - a.valueOf())[0];
 const days = daysSince(SITE.since);
 
 const excerpt = (text: string, limit = 72) =>

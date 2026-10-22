@@ -72,7 +72,13 @@
   gap: 2px;
 }
 
-.nav a {
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.nav-links a {
   padding: 7px 13px;
   font-size: 14px;
   color: var(--text-soft);
@@ -80,15 +86,99 @@
   transition: color 0.18s var(--ease), background 0.18s var(--ease);
 }
 
-.nav a:hover {
+.nav-links a:hover {
   color: var(--text);
   background: var(--bg-soft);
 }
 
-.nav a[aria-current='page'] {
+.nav-links a[aria-current='page'] {
   color: var(--text);
   background: var(--card);
   box-shadow: var(--shadow-sm);
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+}
+
+/* 只在窄屏出现：导航链接收进抽屉后，由它把抽屉叫出来 */
+.menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: 8px;
+  padding: 0;
+  color: var(--text-soft);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: color 0.18s var(--ease), border-color 0.18s var(--ease);
+}
+
+.menu-toggle:hover {
+  color: var(--text);
+}
+
+.menu-toggle svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* 底部操作条：单列布局下的页面级动作都收在这里，
+   不再让「目录」「回到顶部」以浮钮的形式盖在正文上 */
+.mobile-bar {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 55;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+  /* 这里不能用半透明 + 毛玻璃：深色代码块滚到栏下面时，
+     透过来的暗色会把「目录 / 搜索 / 顶部」的灰字压到看不清 */
+  background: var(--card);
+  box-shadow: 0 -12px 28px -20px rgba(0, 0, 0, 0.45);
+  border-top: 1px solid var(--line);
+}
+
+.mb-btn {
+  flex: 1 1 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 44px;
+  padding: 4px 6px;
+  font-size: 11.5px;
+  line-height: 1.1;
+  color: var(--text-soft);
+  background: none;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: color 0.18s var(--ease), background 0.18s var(--ease);
+}
+
+.mb-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.mb-btn:hover {
+  color: var(--text);
+  background: var(--bg-soft);
+}
+
+.mb-btn[hidden] {
+  display: none;
 }
 
 .theme-toggle {

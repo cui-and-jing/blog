@@ -284,7 +284,9 @@ src/
   代码里，现在有一处地方能查到。
 - 宽表格在窄屏不再挤压正文，改为在 `.table-wrap` 里横向滚动，并在可滚动时补一道边缘阴影。
 - 文章页右侧目录跟随滚动高亮；侧栏内容超出一屏时，当前条目会自动滚进可视区。
-- 宽度 ≤1080px 时出现左下角「目录」按钮，点开是底部抽屉（原生 `<dialog>`，Esc 可关）。
+- 单列布局（≤1080px）下，页面级动作收进页脚上方的**底部操作条**：目录 / 搜索 / 顶部。
+  它是一整条实心底栏，不再像以前那样用浮钮盖住正文；`body` 会让出 56px，末尾内容不会被压住。
+  目录在原生 `<dialog>` 里，Esc 可关。
 - 代码块自动显示语言标签和复制按钮（触屏设备上按钮常显）；超过 24 行自动折叠，
   按钮写着总行数，打印时自动摊开。
 - 正文图片可点击放大：滚轮 / `+` `-` 缩放（1×–4×，以指针为中心）、放大后拖动平移、
@@ -457,6 +459,17 @@ puppeteer 直接截出来的 PNG 一张 270–300 KB，脚本会用 `sharp` 无�
 配色索引在 `--accent`（陶土 #b4431f）与 `--accent-2`（墨绿 #2f6f66），封面色板在 `src/lib/cover.ts`。
 深色模式跟随系统并可手动切换，切换无闪烁。
 
+### 移动端
+
+七项导航在 ≤720px 收进抽屉（`#nav-drawer`），顶栏只留「站名 + 搜索 + 阅读设置 + 菜单」。
+站名不再隐藏——导航让出空间后放得下，新访客在窄屏也能看见这是谁家的站。
+
+**顶栏与底部操作条上的每个控件都不小于 44×44**。这条不是审美偏好：改动前七个导航项挤在
+一行，靠 12px → 11.2px 缩字号硬撑，390px 下每个只有 32×31，手指经常点错。现在由
+`npm run a11y:keys` 在 320 / 360 / 390 三档逐个体检，破了就红。
+
+单列布局（≤1080px）下，页面级动作收到页脚上方的底部操作条里，见「阅读体验」一节。
+
 ## 动效
 
 - 滚动入场：`BaseLayout` 里的 IntersectionObserver 给常见块（卡片、侧栏、标题区等）自动加
@@ -481,8 +494,8 @@ npm run fonts:check   # 不需要构建：正文用字是否都在字体子集�
 npm run fonts         # 需要 .fonts/ 源字体：重新裁子集，产物要提交
 npm run check         # astro check：类型与模板
 npm run budget        # 需要 dist：CSS / JS / 单页 HTML / 图片 / 字体五类上限
-npm run a11y          # 需要先 build + preview：axe-core 扫全站 23 条路由 × 浅/深两套主题 + 两个面板
-npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、设置面板、快捷键表、移动端抽屉
+npm run a11y          # 需要先 build + preview：axe-core 扫全站 23 条路由 × 浅/深两套主题 + 四个面板
+npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、设置面板、快捷键表、移动端抽屉、触控目标 44px
 npm run visual        # 需要先 build + preview：21 条路由 × 浅/深 × 3 视口，和基线逐像素比
 npm run visual:update # 样式改动确认无误后重建基线
 npm run preflight     # 一条命令串起：og → lint → fonts:check → check → 构建 → budget → a11y → a11y:keys
@@ -583,5 +596,6 @@ BLOG_SITE=https://blog.example.com BLOG_BASE=/ npm run build
 - [x] 订阅落地页 `/subscribe/`、笔记独立页与分享卡
 - [x] 作者维度（`author` 必填、署名、`/authors/`、JSON-LD Person、feed 的 `dc:creator`）
 - [x] 站点标识（ico / apple-touch / 192 / 512 / webmanifest、RSS 自链接、分享图压缩、`/license/`）
+- [x] 移动端信息架构（导航收进抽屉、触控目标 44×44、站名保留、底部操作条替掉压正文的浮钮）
 - [ ] 旧站文章迁移
 - [ ] 访问统计（等提供 Umami / Plausible 账号后填 `src/data/analytics.json`）

@@ -4,6 +4,21 @@
    ========================================================================== */
 /* ---------- responsive ---------- */
 @media (max-width: 1080px) {
+  /* 单列布局下页面级动作收到页脚上方的一条操作栏里。
+     body 让出这段高度，页脚与正文末尾才不会被压在栏下面 */
+  .mobile-bar {
+    display: flex;
+  }
+
+  body {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 阅读位置浮条要浮在操作栏之上，否则会被压在栏下面 */
+  .resume-bar {
+    bottom: 72px;
+  }
+
   .with-aside,
   .article-wrap {
     grid-template-columns: minmax(0, 1fr);
@@ -111,12 +126,16 @@
   }
 
   .header-inner {
-    height: 62px;
+    height: 64px;
     gap: 10px;
   }
 
+  /* 站名不再整个藏起来：导航让位给抽屉后，这里放得下。
+     它也是个「回首页」的链接，所以同样按 44px 的可点高度算 */
   .wordmark {
     font-size: 17px;
+    gap: 8px;
+    min-height: 44px;
   }
 
   .wordmark .mark {
@@ -129,15 +148,13 @@
     gap: 0;
   }
 
-  .nav a {
-    padding: 6px 9px;
-    font-size: 13px;
+  /* 七项导航收进抽屉，顶栏只留搜索、设置、菜单 */
+  .nav-links {
+    display: none;
   }
 
-  .theme-toggle {
-    width: 30px;
-    height: 30px;
-    margin-left: 4px;
+  .menu-toggle {
+    display: inline-flex;
   }
 
   .hero {
@@ -352,23 +369,17 @@
   }
 }
 
-/* 导航到这一轮有 7 项，720px 那套字号在 560px 以下就贴边了。
-   先收字号，再收站名——站名去掉后 logo 还在，导航才是这个宽度下的主角 */
-@media (max-width: 560px) {
-  .nav a {
-    padding: 5px 6px;
-    font-size: 12px;
-  }
-}
-
+/* 导航收进抽屉后，顶栏只剩「站名 + 三个 44px 圆形按钮」，
+   560 / 420 / 340 这几档不再需要缩字号，只按宽度收站名与间距 */
 @media (max-width: 420px) {
-  .nav a {
-    padding: 5px 4px;
-    font-size: 11.8px;
+  .nav a.search-link,
+  .theme-toggle,
+  .menu-toggle {
+    margin-left: 4px;
   }
 
-  .wordmark span:last-child {
-    display: none;
+  .header-inner {
+    gap: 8px;
   }
 }
 
@@ -385,10 +396,21 @@
 
 
 
-/* 320px 的老机型：导航塞得下，但只差几像素，这里再收一点 */
+/* 320px 的老机型：站名与三个按钮刚好占满，只收站名，按钮不缩——
+   44×44 是这条线，破了就等于回到改动前 */
 @media (max-width: 340px) {
-  .nav a {
-    padding: 5px 3px;
-    font-size: 11.2px;
+  .wordmark {
+    font-size: 15.5px;
+  }
+
+  .wordmark .mark {
+    width: 20px;
+    height: 20px;
+  }
+
+  .nav a.search-link,
+  .theme-toggle,
+  .menu-toggle {
+    margin-left: 2px;
   }
 }

@@ -280,21 +280,6 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
   {
     toc.length > 0 && (
       <>
-        <button
-          class="toc-fab"
-          id="toc-fab"
-          type="button"
-          aria-haspopup="dialog"
-          aria-expanded="false"
-          aria-controls="toc-dialog"
-          hidden
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-            <path d="M4 6h16M4 12h11M4 18h7"></path>
-          </svg>
-          目录
-        </button>
-
         <dialog class="toc-dialog" id="toc-dialog" aria-label="文章目录" aria-modal="true">
           <div class="toc-dialog-head">
             <span>目录</span>
@@ -574,8 +559,8 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
 
     document.querySelectorAll('.prose h2, .prose h3').forEach((h) => observer.observe(h));
 
-    /* ---------- 移动端目录 ---------- */
-    const fab = document.getElementById('toc-fab') as HTMLButtonElement | null;
+    /* ---------- 移动端目录：入口在底部操作条上，不再是浮在正文上的独立按钮 ---------- */
+    const fab = document.getElementById('bar-toc') as HTMLButtonElement | null;
     const tocDialog = document.getElementById('toc-dialog') as HTMLDialogElement | null;
 
     if (fab && tocDialog) {
@@ -600,6 +585,12 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       });
       tocDialog.addEventListener('close', () => fab.setAttribute('aria-expanded', 'false'));
       tocDialog.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => tocDialog.close()));
+
+      /* 只有真生成了目录才把按钮放出来，也才声明它控制哪个 dialog——
+         其它页面没有这个 dialog，提前声明 aria-controls 会指向不存在的元素 */
+      fab.setAttribute('aria-haspopup', 'dialog');
+      fab.setAttribute('aria-controls', 'toc-dialog');
+      fab.setAttribute('aria-expanded', 'false');
       fab.hidden = false;
     }
   </script>

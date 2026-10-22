@@ -194,38 +194,56 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         </a>
 
         <nav class="nav" aria-label="主导航">
-          {
-            NAV.map((item) => {
-              const target = url(item.href).replace(/\/$/, '');
-              const isActive = current === target || (target !== url('/').replace(/\/$/, '') && current.startsWith(target));
-              return (
-                <a href={url(item.href)} aria-current={isActive ? 'page' : undefined}>
-                  {item.label}
-                </a>
-              );
-            })
-          }
-          <a class="nav-icon search-link" href={url('/search/')} aria-label="搜索文章" title="搜索（Ctrl / ⌘ + K）">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="6.4"></circle>
-              <path d="m16 16 4.2 4.2"></path>
-            </svg>
-          </a>
-          <button
-            class="theme-toggle"
-            id="settings-toggle"
-            type="button"
-            aria-label="阅读设置"
-            aria-expanded="false"
-            aria-controls="settings-panel"
-            title="阅读设置：主题 · 字体 · 字号 · 行距"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-              <path d="M4 7h9M18.5 7H20M4 17h4.5M13 17h7"></path>
-              <circle cx="15.2" cy="7" r="2.4"></circle>
-              <circle cx="10.8" cy="17" r="2.4"></circle>
-            </svg>
-          </button>
+          <div class="nav-links">
+            {
+              NAV.map((item) => {
+                const target = url(item.href).replace(/\/$/, '');
+                const isActive = current === target || (target !== url('/').replace(/\/$/, '') && current.startsWith(target));
+                return (
+                  <a href={url(item.href)} aria-current={isActive ? 'page' : undefined}>
+                    {item.label}
+                  </a>
+                );
+              })
+            }
+          </div>
+
+          {/* 导航链接在窄屏收进抽屉，这三个动作留在一级：搜索、阅读设置、菜单 */}
+          <div class="nav-actions">
+            <a class="nav-icon search-link" href={url('/search/')} aria-label="搜索文章" title="搜索（Ctrl / ⌘ + K）">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.4"></circle>
+                <path d="m16 16 4.2 4.2"></path>
+              </svg>
+            </a>
+            <button
+              class="theme-toggle"
+              id="settings-toggle"
+              type="button"
+              aria-label="阅读设置"
+              aria-expanded="false"
+              aria-controls="settings-panel"
+              title="阅读设置：主题 · 字体 · 字号 · 行距"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+                <path d="M4 7h9M18.5 7H20M4 17h4.5M13 17h7"></path>
+                <circle cx="15.2" cy="7" r="2.4"></circle>
+                <circle cx="10.8" cy="17" r="2.4"></circle>
+              </svg>
+            </button>
+            <button
+              class="nav-icon menu-toggle"
+              id="menu-toggle"
+              type="button"
+              aria-label="打开导航菜单"
+              aria-expanded="false"
+              aria-controls="nav-drawer"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h16"></path>
+              </svg>
+            </button>
+          </div>
         </nav>
       </div>
     </header>
@@ -332,6 +350,62 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         <button class="panel-link" id="settings-reset" type="button">恢复默认</button>
       </div>
     </dialog>
+
+    <dialog class="side-panel nav-drawer" id="nav-drawer" aria-labelledby="nav-drawer-title">
+      <div class="panel-head">
+        <h2 id="nav-drawer-title">导航</h2>
+        <button class="panel-close" type="button" data-close="nav-drawer" aria-label="关闭导航菜单">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18"></path>
+          </svg>
+        </button>
+      </div>
+
+      <nav class="drawer-nav" aria-label="主导航">
+        {
+          NAV.map((item) => {
+            const target = url(item.href).replace(/\/$/, '');
+            const isActive = current === target || (target !== url('/').replace(/\/$/, '') && current.startsWith(target));
+            return (
+              <a href={url(item.href)} aria-current={isActive ? 'page' : undefined}>
+                <span>{item.label}</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                  <path d="m9 6 6 6-6 6"></path>
+                </svg>
+              </a>
+            );
+          })
+        }
+      </nav>
+
+      <div class="panel-foot">
+        <a class="panel-link" href={url('/subscribe/')}>订阅</a>
+        <a class="panel-link" href={url('/authors/')}>作者</a>
+        <a class="panel-link" href={url('/license/')}>版权</a>
+      </div>
+    </dialog>
+
+    <nav class="mobile-bar" aria-label="页面操作">
+      <button class="mb-btn" id="bar-toc" type="button" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+          <path d="M4 6h16M4 12h11M4 18h7"></path>
+        </svg>
+        <span>目录</span>
+      </button>
+      <a class="mb-btn" href={url('/search/')}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.4"></circle>
+          <path d="m16 16 4.2 4.2"></path>
+        </svg>
+        <span>搜索</span>
+      </a>
+      <button class="mb-btn" id="bar-top" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 19V5M6 11l6-6 6 6"></path>
+        </svg>
+        <span>顶部</span>
+      </button>
+    </nav>
 
     <dialog class="side-panel shortcuts-panel" id="shortcuts-panel" aria-labelledby="shortcuts-title">
       <div class="panel-head">
@@ -923,10 +997,12 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 
       paintSettings();
 
-      /* ---------- 设置面板与快捷键面板 ---------- */
+      /* ---------- 设置面板、快捷键面板与导航抽屉 ---------- */
       const settingsPanel = document.getElementById('settings-panel') as HTMLDialogElement | null;
       const shortcutsPanel = document.getElementById('shortcuts-panel') as HTMLDialogElement | null;
+      const navDrawer = document.getElementById('nav-drawer') as HTMLDialogElement | null;
       const settingsToggle = document.getElementById('settings-toggle');
+      const menuToggle = document.getElementById('menu-toggle');
       const shortcutsOpen = document.getElementById('shortcuts-open');
       const settingsReset = document.getElementById('settings-reset');
 
@@ -942,6 +1018,16 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 
       settingsPanel?.addEventListener('close', () => {
         settingsToggle?.setAttribute('aria-expanded', 'false');
+      });
+
+      menuToggle?.addEventListener('click', () => {
+        openPanel(navDrawer);
+        menuToggle.setAttribute('aria-expanded', 'true');
+      });
+
+      /* dialog 关闭后焦点会回到打开它的元素，aria-expanded 要跟着复位 */
+      navDrawer?.addEventListener('close', () => {
+        menuToggle?.setAttribute('aria-expanded', 'false');
       });
 
       /* 从设置里点进快捷键，先收起当前面板，避免两个 dialog 叠在一起 */
@@ -964,7 +1050,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       });
 
       /* 点面板外的遮罩关闭。dialog 自己不留 padding，所以点到空白基本等于点到遮罩 */
-      [settingsPanel, shortcutsPanel].forEach((panel) => {
+      [settingsPanel, shortcutsPanel, navDrawer].forEach((panel) => {
         panel?.addEventListener('click', (event) => {
           if (event.target === panel) panel.close();
         });
@@ -1004,6 +1090,11 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       window.addEventListener('resize', onScroll);
 
       toTop?.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+      });
+
+      /* 底部操作条上的「顶部」与桌面浮钮同源，窄屏由 CSS 顶替浮钮的位置 */
+      document.getElementById('bar-top')?.addEventListener('click', () => {
         window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
       });
 

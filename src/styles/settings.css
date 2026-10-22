@@ -258,6 +258,44 @@ kbd {
   border-top: 1px solid var(--line-soft);
 }
 
+/* ---------- 导航抽屉 ---------- */
+.drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px 14px;
+}
+
+.drawer-nav a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  /* 52 是拇指友好的行高，不是随手定的：iOS / Material 的列表项都在 48–56 之间 */
+  min-height: 52px;
+  padding: 0 14px;
+  font-size: 16px;
+  color: var(--text);
+  border-radius: 14px;
+  transition: background 0.18s var(--ease), color 0.18s var(--ease);
+}
+
+.drawer-nav a:hover {
+  background: var(--bg-soft);
+}
+
+.drawer-nav a[aria-current='page'] {
+  background: var(--bg-soft);
+  font-weight: 600;
+}
+
+.drawer-nav a svg {
+  width: 15px;
+  height: 15px;
+  color: var(--text-mute);
+  flex: none;
+}
+
 /* ---------- 窄屏：变成底部抽屉 ---------- */
 @media (max-width: 560px) {
   .side-panel {

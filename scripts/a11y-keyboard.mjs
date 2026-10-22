@@ -181,7 +181,7 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
-/* ---------- 4. 移动端目录抽屉 ---------- */
+/* ---------- 4. 移动端目录抽屉与底部操作条 ---------- */
 {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
@@ -189,29 +189,107 @@ const check = (name, pass, detail = '') => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   check('390px 无横向溢出', overflow <= 0, `${overflow}px`);
 
-  const fab = await page.$('.toc-fab');
+  const fab = await page.$('#bar-toc');
   if (fab) {
-    await page.click('.toc-fab');
+    await page.click('#bar-toc');
     await new Promise((r) => setTimeout(r, 400));
     const open = await page.evaluate(() => ({
       dialog: document.getElementById('toc-dialog')?.hasAttribute('open'),
-      expanded: document.querySelector('.toc-fab')?.getAttribute('aria-expanded'),
+      expanded: document.getElementById('bar-toc')?.getAttribute('aria-expanded'),
     }));
     check('目录抽屉可打开且 aria-expanded 同步', Boolean(open.dialog) && open.expanded === 'true', JSON.stringify(open));
     await page.keyboard.press('Escape');
     await new Promise((r) => setTimeout(r, 400));
     const closed = await page.evaluate(() => ({
       dialog: document.getElementById('toc-dialog')?.hasAttribute('open'),
-      expanded: document.querySelector('.toc-fab')?.getAttribute('aria-expanded'),
+      expanded: document.getElementById('bar-toc')?.getAttribute('aria-expanded'),
     }));
     check('Esc 关闭目录抽屉且状态复位', !closed.dialog && closed.expanded === 'false', JSON.stringify(closed));
   } else {
-    check('移动端存在目录入口', false, '未找到 .toc-fab');
+    check('移动端存在目录入口', false, '未找到 #bar-toc');
   }
   await page.close();
 }
 
-/* ---------- 5. 深色模式 390px 首页 ---------- */
+/* ---------- 5. 触控目标与导航抽屉 ---------- */
+{
+  /* 44×44 是拇指能稳稳点中的下限。顶栏曾经靠缩字号把 7 项导航塞进一行，
+     每个只有 32×31；这一组断言就是防止再退回去 */
+  for (const width of [390, 360, 320]) {
+    const page = await browser.newPage();
+    await page.setViewport({ width, height: 844, isMobile: true, hasTouch: true });
+    await page.goto(`${base}/`, { waitUntil: 'load' });
+
+    const result = await page.evaluate(() => {
+      const visible = (el) => {
+        if (typeof el.checkVisibility === 'function' && !el.checkVisibility()) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      };
+      const targets = [...document.querySelectorAll('.site-header a, .site-header button, .mobile-bar a, .mobile-bar button')]
+        .filter(visible)
+        .map((el) => {
+          const rect = el.getBoundingClientRect();
+          return {
+            label: (el.textContent || el.getAttribute('aria-label') || el.id || el.tagName).trim().slice(0, 6),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          };
+        });
+      return {
+        targets,
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+        linksHidden: getComputedStyle(document.querySelector('.nav-links')).display === 'none',
+      };
+    });
+
+    const tiny = result.targets.filter((t) => t.width < 44 || t.height < 44);
+    check(
+      `${width}px 顶栏与操作条的控件都 ≥44×44`,
+      tiny.length === 0,
+      tiny.length ? JSON.stringify(tiny) : `${result.targets.length} 个控件`
+    );
+    check(`${width}px 横向不溢出`, result.overflow <= 0, `${result.overflow}px`);
+    check(`${width}px 导航链接收进抽屉`, result.linksHidden, `nav-links display=none: ${result.linksHidden}`);
+
+    if (width === 390) {
+      /* 抽屉：打开、焦点进入、Esc 关闭并归还焦点 */
+      await page.click('#menu-toggle');
+      await new Promise((r) => setTimeout(r, 400));
+      const drawer = await page.evaluate(() => {
+        const dialog = document.getElementById('nav-drawer');
+        return {
+          open: Boolean(dialog?.open),
+          expanded: document.getElementById('menu-toggle')?.getAttribute('aria-expanded'),
+          inside: Boolean(dialog?.contains(document.activeElement)),
+          rows: dialog?.querySelectorAll('.drawer-nav a').length ?? 0,
+        };
+      });
+      check(
+        '导航抽屉能打开、焦点进入、aria-expanded 同步',
+        drawer.open && drawer.expanded === 'true' && drawer.inside && drawer.rows === 7,
+        JSON.stringify(drawer)
+      );
+
+      await page.keyboard.press('Escape');
+      await new Promise((r) => setTimeout(r, 400));
+      const after = await page.evaluate(() => ({
+        open: Boolean(document.getElementById('nav-drawer')?.open),
+        expanded: document.getElementById('menu-toggle')?.getAttribute('aria-expanded'),
+        focus: document.activeElement?.id,
+      }));
+      check(
+        'Esc 关闭抽屉并把焦点还给菜单按钮',
+        !after.open && after.expanded === 'false' && after.focus === 'menu-toggle',
+        JSON.stringify(after)
+      );
+    }
+
+    await page.close();
+  }
+}
+
+/* ---------- 6. 深色模式 390px 首页 ---------- */
 {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
@@ -228,7 +306,7 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
-/* ---------- 6. 笔记页：复制链接能用键盘完成 ---------- */
+/* ---------- 7. 笔记页：复制链接能用键盘完成 ---------- */
 {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
