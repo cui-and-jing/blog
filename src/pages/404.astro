@@ -1,6 +1,12 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { url } from '../lib/site';
+import { url, tagHue } from '../lib/site';
+import { getPosts } from '../lib/posts';
+import { getNotes } from '../lib/notes';
+import { collectTags } from '../lib/tags';
+
+/* 走到 404 的人多半是跟着一条旧链接来的，给几个「有内容的地方」比给一个搜索框更直接 */
+const tags = collectTags(await getPosts(), await getNotes()).slice(0, 8);
 ---
 
 <BaseLayout title="页面不存在" description="没有找到这个页面">
@@ -16,5 +22,25 @@ import { url } from '../lib/site';
       <a class="btn" href={url('/')}>回到首页</a>
       <a class="btn" href={url('/search/')}>搜索文章</a>
     </div>
+
+    {
+      tags.length > 0 && (
+        <div class="notfound-tags">
+          <p>也可以从标签进：</p>
+          <div class="notfound-tag-row">
+            {tags.map((bucket) => (
+              <a
+                class="tag-pill"
+                style={`--h:${tagHue(bucket.tag)}`}
+                href={url(`/tags/${encodeURIComponent(bucket.tag)}/`)}
+              >
+                #{bucket.tag}
+                <span class="notfound-tag-count">{bucket.total}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )
+    }
   </div>
 </BaseLayout>

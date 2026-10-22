@@ -1,0 +1,129 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import AuthorAvatar from '../components/AuthorAvatar.astro';
+import { AUTHORS } from '../data/authors';
+import { SITE, url, formatDate, tagHue } from '../lib/site';
+import { getPosts } from '../lib/posts';
+import { getNotes, noteTitle, noteExcerpt } from '../lib/notes';
+
+const posts = await getPosts();
+const notes = await getNotes();
+
+/* 按作者分组。组内保持原来的时间倒序，不再排一次 */
+const people = AUTHORS.map((author) => ({
+  author,
+  posts: posts.filter((post) => post.data.author === author.id),
+  notes: notes.filter((note) => note.data.author === author.id),
+}));
+
+const siteRoot = (Astro.site ?? new URL(SITE.github)).toString().replace(/\/$/, '');
+const personSchema = people.map(({ author, posts: own, notes: ownNotes }) => ({
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  '@id': `${siteRoot}${url(`/authors/#${author.id}`)}`,
+  name: author.name,
+  description: author.tagline,
+  knowsAbout: author.topics,
+  url: `${siteRoot}${url('/authors/')}#${author.id}`,
+  worksFor: { '@type': 'Organization', name: SITE.title },
+  /* 把自己的作品挂在该实体下，搜索引擎不用猜页面之间的归属关系 */
+  ...(own.length + ownNotes.length
+    ? {
+        subjectOf: [
+          ...own.map((post) => ({
+            '@type': 'BlogPosting',
+            name: post.data.title,
+            url: `${siteRoot}${url(`/posts/${post.id}/`)}`,
+          })),
+          ...ownNotes.map((note) => ({
+            '@type': 'BlogPosting',
+            name: noteTitle(note, 60),
+            url: `${siteRoot}${url(`/notes/${note.id}/`)}`,
+          })),
+        ],
+      }
+    : {}),
+}));
+---
+
+<BaseLayout title="作者" description={`${SITE.title} 的两位作者各自写什么，以及他们写过的文章与笔记。`}>
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(personSchema)} is:inline />
+  </Fragment>
+
+  <div class="page-head page-head--narrow">
+    <div class="shell">
+      <h1>作者</h1>
+      <p>两个人，两种节奏，写在同一处。</p>
+    </div>
+  </div>
+
+  <div class="shell authors-wrap">
+    {
+      people.map(({ author, posts: own, notes: ownNotes }) => (
+        <section class="author-block" id={author.id} aria-labelledby={`author-${author.id}`}>
+          <header class="author-block-head">
+            <AuthorAvatar author={author} size={56} />
+            <div class="author-block-title">
+              <h2 id={`author-${author.id}`}>{author.name}</h2>
+              <p class="author-block-tagline">{author.tagline}</p>
+            </div>
+            <p class="author-block-count">
+              {own.length} 篇<span aria-hidden="true"> · </span>{ownNotes.length} 条
+            </p>
+          </header>
+
+          <div class="author-bio">
+            {author.bio.map((paragraph) => <p>{paragraph}</p>)}
+          </div>
+
+          <ul class="author-topics" aria-label={`${author.name} 关注的方向`}>
+            {author.topics.map((topic) => (
+              <li style={`--h:${tagHue(topic)}`}>#{topic}</li>
+            ))}
+          </ul>
+
+          {own.length > 0 && (
+            <div class="author-work">
+              <h3 class="author-work-title">文章</h3>
+              <ul class="author-post-list">
+                {own.map((post) => (
+                  <li>
+                    <a href={url(`/posts/${post.id}/`)}>
+                      <span class="author-post-title">{post.data.title}</span>
+                      <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {ownNotes.length > 0 && (
+            <div class="author-work">
+              <h3 class="author-work-title">笔记</h3>
+              <ul class="author-note-list">
+                {ownNotes.map((note) => (
+                  <li>
+                    <a href={url(`/notes/${note.id}/`)}>
+                      <time datetime={note.data.date.toISOString()}>{formatDate(note.data.date)}</time>
+                      <span class="author-note-text">{noteExcerpt(note, 78)}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {own.length + ownNotes.length === 0 && <p class="author-empty">还没写，先占个位置。</p>}
+        </section>
+      ))
+    }
+
+    <p class="authors-end">
+      署名只表示「谁写的」，不代表分工死板。想知道这个站怎么写出来的，看
+      <a href={url('/posts/writing-workflow/')}>写作流程</a>；想知道内容怎么用，看
+      <a href={url('/license/')}>版权说明</a>。
+    </p>
+  </div>
+</BaseLayout>

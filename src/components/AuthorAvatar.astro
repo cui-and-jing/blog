@@ -1,0 +1,22 @@
+---
+/**
+ * 字母头像。没有两张真实头像可用，也不该为两个人各造一张插画——
+ * 用首字母 + 各自的色相区分，深浅主题下都不用换图。
+ *
+ * 字母本身是装饰：外层 aria-hidden，名字永远由旁边的文本给出，
+ * 所以不存在「读屏念出一个孤立的 C」的问题。
+ */
+import { authorAvatarStyle, type Author } from '../data/authors';
+
+interface Props {
+  author: Author;
+  size?: number;
+  class?: string;
+}
+
+const { author, size = 34, class: className = '' } = Astro.props;
+---
+
+<span class={`author-avatar ${className}`} style={`--size:${size}px;${authorAvatarStyle(author)}`} aria-hidden="true">
+  {author.glyph}
+</span>

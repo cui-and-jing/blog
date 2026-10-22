@@ -34,8 +34,13 @@ const days = daysSince(SITE.since);
       </div>
 
       <p>
-        你好，我是 <strong>Cui</strong>，和 <strong>Jing</strong> 一起维护这个小小的角落。
+        这里是 <strong>Cui</strong> 和 <strong>Jing</strong> 两个人的角落，始于 {SITE.since} 年。
         我们都不是那种“一年写一百篇”的人，但遇到真正想明白的事，会认真写下来。
+      </p>
+
+      <p>
+        <strong>Cui</strong> 多写技术与工程里踩过的坑，<strong>Jing</strong> 多写读过的书和写作本身。
+        分得不严格，偶尔互相越界——谁写过什么，可以在 <a href={url('/authors/')}>作者页</a> 里按人翻。
       </p>
 
       <h2>这里写什么</h2>
@@ -61,11 +66,11 @@ const days = daysSince(SITE.since);
       <h2>联系</h2>
       <p>
         有想法欢迎在 <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a> 找我，
-        或者给文章留个评论（评论功能正在筹备中）。
+        或者直接在文章末尾留言——评论用 GitHub 账号登录，不需要另外注册。
       </p>
 
       <p style="color: var(--text-mute); font-size: 14px; margin-top: 2.4em;">
-        本站文字采用 CC BY-NC-SA 4.0 许可，转载请注明出处。
+        本站文字采用 <a href={url('/license/')}>CC BY-NC-SA 4.0</a> 许可，转载规则写在那一页。
       </p>
     </div>
 
@@ -76,8 +81,9 @@ const days = daysSince(SITE.since);
           <div><dt>名称</dt><dd>{SITE.title}</dd></div>
           <div><dt>始于</dt><dd>{SITE.since} 年 · 第 {days} 天</dd></div>
           <div><dt>技术栈</dt><dd>Astro · Markdown · GitHub Pages</dd></div>
-          <div><dt>订阅</dt><dd><a href={url('/rss.xml')} class="facts-link">RSS</a></dd></div>
-          <div><dt>许可</dt><dd>CC BY-NC-SA 4.0</dd></div>
+          <div><dt>作者</dt><dd><a href={url('/authors/')} class="facts-link">Cui 与 Jing</a></dd></div>
+          <div><dt>订阅</dt><dd><a href={url('/subscribe/')} class="facts-link">RSS</a></dd></div>
+          <div><dt>许可</dt><dd><a href={url('/license/')} class="facts-link">CC BY-NC-SA 4.0</a></dd></div>
         </dl>
       </section>
     </Sidebar>

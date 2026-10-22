@@ -22,6 +22,7 @@ npm run preview  # 预览构建结果
 
 ```bash
 npm run new -- "标题" --slug my-post --series 从笔记到发布 --category 技术 --tags Astro,写作
+npm run new -- "标题" --slug my-post --author jing   # Jing 写的加 --author，默认是 cui
 npm run new          # 什么都不给就交互式问
 ```
 
@@ -35,6 +36,7 @@ npm run new          # 什么都不给就交互式问
 ```yaml
 ---
 title: 文章标题
+author: cui                  # 必填：cui 或 jing
 date: 2026-10-19
 description: 一句话摘要，会显示在列表页和搜索结果里
 tags:
@@ -51,13 +53,14 @@ draft: false
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
 | title | 是 | 文章标题 |
+| author | 是 | `cui` 或 `jing`。**没有默认值**，忘了写构建会直接报错 |
 | date | 是 | 发布日期，`YYYY-MM-DD` |
 | description | 否 | 摘要，列表页与 RSS 使用 |
 | tags | 否 | 字符串数组 |
 | category | 否 | 单个分类，用于归档页 |
 | cover | 否 | 封面图路径（放 `public/` 下）。**不填会自动按文章名生成一张渐变封面**，不会出现空图 |
 | draft | 否 | `true` 时不出现在任何列表里 |
-| featured | 否 | 预留，用于首页精选 |
+| featured | 否 | 首页大卡优先取这一篇（多篇同时标时取最新的一篇） |
 | updated | 否 | 更新日期 |
 | series | 否 | 系列名，同名文章会串成一条阅读线 |
 | seriesOrder | 否 | 系列内顺序，从 1 开始；不填按日期排在后面 |
@@ -140,7 +143,7 @@ npm run note -- "先存着" --draft      # 草稿，构建不发布
 
 ```
 src/
-├── content.config.ts        内容集合 schema（posts / notes）
+├── content.config.ts        内容集合 schema（posts / notes，author 为必填枚举）
 ├── content/posts/           文章（Markdown / MDX）
 ├── content/notes/           短笔记：只有 date / tags / draft，正文一段话
 ├── assets/                  正文配图：import 进来才会做响应式与格式转换
@@ -154,9 +157,11 @@ src/
 │   ├── Featured.astro       首页主推大卡
 │   ├── CategoryTiles.astro  技术/学习/生活三块渐变分类卡
 │   ├── RelatedPosts.astro   文末「接着读」（同分类 +3、共同标签各 +2 打分）
+│   ├── AuthorAvatar.astro   字母头像（首字母 + 各自色相，不依赖图片）
 │   ├── NoteCopy.astro       笔记「复制链接」按钮（时间流与独立页共用，剪贴板失败会降级）
 │   ├── Comments.astro       Giscus 评论区（懒加载 + 主题同步 + 失败兜底）
 │   └── Sidebar.astro        作者卡 + 标签 + 最近更新（首页可关掉作者卡）
+├── data/authors.ts          作者档案：名字、简介、关注方向、头像色相（署名与 /authors/ 的唯一来源）
 ├── data/comments.json       Giscus 的 repoId / categoryId
 ├── data/series.json         系列简介（不填则用系列名与篇数自动生成）
 ├── data/analytics.json      统计服务配置（默认 none）
@@ -181,7 +186,10 @@ src/
 │   ├── search.astro         站内搜索
 │   ├── search-index.json.ts 构建时生成搜索索引
 │   ├── robots.txt.ts        robots（含 sitemap 地址）
+│   ├── site.webmanifest.ts  站点清单（start_url 跟着 base 走，不写死）
 │   ├── about.astro          关于
+│   ├── authors.astro        作者：两人的介绍 + 各自写过的文章与笔记
+│   ├── license.mdx          版权与转载（CC BY-NC-SA 4.0 + 代码 MIT）
 │   ├── styleguide.mdx       排版样例（noindex，给自己查的）
 │   ├── rss.xml.js           RSS（文章）
 │   ├── notes.xml.ts         笔记 RSS
@@ -198,6 +206,7 @@ src/
 │   ├── games.css / motion.css / search.css
 │   ├── notes.css            笔记时间流、独立页、标签/归档里的笔记行
 │   ├── subscribe.css        订阅落地页
+│   ├── authors.css          字母头像、/authors/ 页面
 │   ├── enhance.css          代码块附加件、灯箱、移动端目录
 │   ├── prose-extras.css     提示框、要点、步骤、图注、脚注、表格
 │   └── print.css            打印稿
@@ -205,7 +214,8 @@ src/
 │   ├── new-post.mjs         新建文章骨架（npm run new）
 │   ├── new-note.mjs         新建短笔记（npm run note）
 │   ├── image-inbox.mjs      配图归位 + 生成 Figure 片段（npm run image）
-│   ├── og-cards.mjs         生成文章与笔记的分享封面（npm run og）
+│   ├── og-cards.mjs         生成文章与笔记的分享封面并压缩（npm run og）
+│   ├── icons.mjs            从 favicon.svg 生成 ico / apple-touch / 192 / 512（npm run icons）
 │   ├── lint-content.mjs     内容体检（npm run lint:content）
 │   ├── budget.mjs           产物体积预算（npm run budget）
 │   ├── a11y-audit.mjs       axe 全站扫描（npm run a11y）
@@ -213,9 +223,13 @@ src/
 │   ├── visual-regression.mjs 视觉回归（npm run visual / visual:update）
 │   └── preflight.mjs        发布前一键跑完全部检查（npm run preflight）
 ├── tests/visual/
-│   ├── baseline/            视觉基线，114 张 JPEG，需随样式改动一起提交
+│   ├── baseline/            视觉基线，126 张 JPEG，需随样式改动一起提交
 │   └── meta.json            基线生成环境（platform + 浏览器版本）
 └── public/
+    ├── favicon.svg           矢量图标（浏览器标签页优先用这个）
+    ├── favicon.ico           16/32/48 三档（老浏览器与爬虫会直接请求）
+    ├── apple-touch-icon.png  180×180 直角满版，iOS 自己加圆角
+    ├── icon-192.png / icon-512.png  清单里的图标，同样直角满版
     ├── og.png               默认分享图（1200×630）
     ├── og/                  文章与笔记的分享封面 + manifest.json（供内容体检比对）
     └── games/               游戏单文件（构建时原样拷贝，不进打包）
@@ -299,6 +313,31 @@ npm run comments:setup -- --list  # 只列出仓库里的讨论分类
 > `preconnect`、骨架屏和 16 秒兜底。想让读者更快看到评论，可以自建 giscus 到 Vercel 绑自定义域名，
 > 再把 `Comments.astro` 里的 `script.src` 与 postMessage 的 origin 换掉即可。
 
+## 作者与署名
+
+站名就是两个人的名字，所以每篇文章和每条笔记都必须写 `author`：
+
+```yaml
+---
+title: 标题
+author: cui      # 或 jing
+---
+```
+
+- `author` 在 schema 里是**必填枚举**，故意不给默认值：忘了写会在 `astro check` 与
+  `lint:content` 同时报错，而不是默默把 Jing 的文章标成 Cui
+- 署名出现在三处：文章标题那行的 kicker、文末统计、`/authors/` 的清单
+- JSON-LD 的 `author` 是具体的人（`@type: Person` + `@id` 指向 `/authors/#cui`），
+  `/authors/` 页同时输出两个 `Person` 实体并挂上各自的作品，搜索引擎能把「谁写的」串起来
+- 两份 feed 用 `<dc:creator>` 带作者名（RSS 2.0 的 `<author>` 要求 `email (Name)` 格式，
+  我们没有公开邮箱）；分享封面右下角标「文 / Cui」
+- 名字、简介、关注方向、头像色相都在 `src/data/authors.ts`。
+  加第三个人要同步改 `src/content.config.ts` 的枚举与 `scripts/lint-content.mjs` 的 `AUTHOR_IDS`
+- `npm run new` / `npm run note` 默认写 `author: cui`，Jing 写的时候加 `--author jing`
+
+头像不是图片：首字母 + 各自的色相（Cui 陶土 18°、Jing 墨绿 168°），深浅主题共用一套，
+外层 `aria-hidden`，名字永远由旁边的文本给出。
+
 ## 订阅
 
 `/subscribe/` 是给人看的落地页，不是 feed 本身。页脚和笔记页的订阅入口都指向它，
@@ -326,6 +365,22 @@ npm run comments:setup -- --list  # 只列出仓库里的讨论分类
   取该页涉及文章里最新的一天。没有日期的静态页不写，不拿构建时间凑数。
 - 页头有「跳到正文」链接，键盘 Tab 第一下就能用。
 
+### 图标与站点清单
+
+`public/favicon.svg` 是唯一的设计源，其余尺寸都由 `npm run icons` 从它渲染：
+
+| 文件 | 尺寸 | 说明 |
+|---|---|---|
+| `favicon.svg` | 矢量 | 现代浏览器标签页优先用这个，**带圆角** |
+| `favicon.ico` | 16 / 32 / 48 | 老浏览器、阅读器与爬虫会无条件请求它 |
+| `apple-touch-icon.png` | 180 | iOS「添加到主屏幕」 |
+| `icon-192.png` / `icon-512.png` | 192 / 512 | `site.webmanifest` 里的安装图标 |
+
+后三个是**直角满版**：iOS 与 Android 会自己再套一层圆角遮罩，图标自带圆角就变成两层。
+
+`site.webmanifest` 由 `src/pages/site.webmanifest.ts` 输出而不是静态 JSON，
+这样 `start_url` 与图标地址会跟着 `astro.config.mjs` 的 `base` 走，换部署路径不会静默失效。
+
 ### 分享封面怎么生成
 
 ```bash
@@ -338,6 +393,10 @@ CI 不生成（GitHub Actions 里没有中文字体，渲染会变成方框）�
 
 配色复用了 `src/lib/cover.ts` 的色板，所以分享图和列表里的渐变封面是同一套颜色；
 背面两张卡固定用品牌色（陶土 / 墨绿）打底，正面撞色时会自动换成深蓝。
+卡片右下角标「文 / Cui」或「文 / Jing」，取自 frontmatter 的 `author`。
+
+puppeteer 直接截出来的 PNG 一张 270–300 KB，脚本会用 `sharp` 无损重编码一遍（80–90 KB），
+像素完全不变。社媒抓取卡片时少下 190 KB，比调色板量化更划算（量化会让渐变出 banding）。
 
 
 ## 设计
@@ -359,7 +418,8 @@ CI 不生成（GitHub Actions 里没有中文字体，渲染会变成方框）�
 ## 改站点信息
 
 编辑 `src/lib/site.ts`：站名、副标题、描述、导航项、GitHub 地址。
-改配色改 `src/styles/global.css` 顶部的 `:root` 与 `[data-theme='dark']` 变量。
+改配色改 `src/styles/tokens.css` 的 `:root` 与 `[data-theme='dark']` 变量。
+改作者资料改 `src/data/authors.ts`。
 
 ## 质量检查
 
@@ -367,9 +427,9 @@ CI 不生成（GitHub Actions 里没有中文字体，渲染会变成方框）�
 npm run lint:content  # 不需要构建：frontmatter、标题层级、图片、内链、中文排版、分享封面
 npm run check         # astro check：类型与模板
 npm run budget        # 需要 dist：CSS / JS / 单页 HTML / 图片四类上限
-npm run a11y          # 需要先 build + preview：axe-core 扫全站 21 条路由 × 浅/深两套主题
+npm run a11y          # 需要先 build + preview：axe-core 扫全站 23 条路由 × 浅/深两套主题
 npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、字号、Esc、移动端目录
-npm run visual        # 需要先 build + preview：16 条路由 × 浅/深 × 3 视口，和基线逐像素比
+npm run visual        # 需要先 build + preview：21 条路由 × 浅/深 × 3 视口，和基线逐像素比
 npm run visual:update # 样式改动确认无误后重建基线
 npm run preflight     # 一条命令串起：og → lint → check → 构建 → budget → a11y → a11y:keys
 ```
@@ -378,7 +438,7 @@ npm run preflight     # 一条命令串起：og → lint → check → 构建 �
 （CI 没有中文字体，渲染出来是方框），`--skip-build` 复用现有 `dist` 只跑检查，
 `--visual` 额外跑一遍视觉回归（比全站截图慢，改过样式时用）。
 
-`visual` 的基线在 `tests/visual/baseline/`（114 张 JPEG，约 5.0 MB），元信息记在
+`visual` 的基线在 `tests/visual/baseline/`（126 张 JPEG，约 5.6 MB），元信息记在
 `tests/visual/meta.json`，包含生成时的 `platform` 与浏览器版本。**换机器或换浏览器后会直接跳过比对**
 ——字体栅格化不同会让所有页面都"失败"，那种红叉没有信息量，在本机跑一次 `--update` 重建即可。
 3D 游戏页用 canvas 实时渲染，逐帧不同，不在比对范围内。
@@ -397,7 +457,7 @@ npm run preflight     # 一条命令串起：og → lint → check → 构建 �
 - `public/og/<slug>.png` 缺失——**这一条是硬错误**，因为分享封面不会在 CI 里生成（runner 没有中文字体，
   渲染出来是方框）。`npm run og` 会同时写一份 `public/og/manifest.json`，改了标题却没重画也会被提醒。
 
-`budget` 的上限写在 `scripts/budget.mjs` 顶部：CSS 96 KB / gzip 19.5 KB，JS 32 KB / gzip 12 KB，
+`budget` 的上限写在 `scripts/budget.mjs` 顶部：CSS 100 KB / gzip 20 KB，JS 32 KB / gzip 12 KB，
 单页 HTML 80 KB，主站图片 600 KB。游戏与分享封面不计入——它们不在首屏路径上。
 
 `.github/workflows/quality.yml` 在每次 push 与 PR 时依次跑
@@ -462,9 +522,12 @@ BLOG_SITE=https://blog.example.com BLOG_BASE=/ npm run build
 - [x] 体积预算、发布前 preflight、sitemap lastmod
 - [x] 搜索升级（正文覆盖率打分、命中上下文、搜索历史、空态建议）
 - [x] 阅读体验升级（灯箱缩放拖动、阅读位置记忆、代码块折叠、段落深链接）
-- [x] 视觉回归基线（19 路由 × 浅/深 × 3 视口）
+- [x] 视觉回归基线（21 路由 × 浅/深 × 3 视口）
 - [x] 短笔记流（`/notes/` + 独立 feed + 搜索接入 + `npm run note`）
 - [x] 首页置顶（`featured` 真正生效）、CI action 升级、Dependabot
 - [x] 内容入口统一（标签与归档同时认文章和笔记，导航补入口）
 - [x] 订阅落地页 `/subscribe/`、笔记独立页与分享卡
+- [x] 作者维度（`author` 必填、署名、`/authors/`、JSON-LD Person、feed 的 `dc:creator`）
+- [x] 站点标识（ico / apple-touch / 192 / 512 / webmanifest、RSS 自链接、分享图压缩、`/license/`）
 - [ ] 旧站文章迁移
+- [ ] 访问统计（等提供 Umami / Plausible 账号后填 `src/data/analytics.json`）

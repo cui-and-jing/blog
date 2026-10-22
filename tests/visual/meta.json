@@ -1,7 +1,7 @@
 {
   "platform": "win32",
   "browser": "Edg/153.0.4234.46",
-  "generatedAt": "2026-10-22T06:13:25.081Z",
+  "generatedAt": "2026-10-22T07:09:00.853Z",
   "routes": [
     "/",
     "/posts/",
@@ -17,6 +17,8 @@
     "/tags/Astro/",
     "/tags/CSS/",
     "/category/技术/",
+    "/authors/",
+    "/license/",
     "/about/",
     "/games/",
     "/search/",

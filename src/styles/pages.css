@@ -622,13 +622,20 @@ html[data-theme='dark'] .about-banner-avatar {
   gap: 16px;
 }
 
+/* 版权行里现在有链接（许可页），和周围小字同色，
+   必须有下划线才符合「不靠颜色区分」——border-bottom 不算 */
 .footer-bottom a {
   color: var(--text-soft);
-  transition: color 0.18s var(--ease);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--text-soft) 40%, transparent);
+  transition: color 0.18s var(--ease), text-decoration-color 0.18s var(--ease);
 }
 
 .footer-bottom a:hover {
   color: var(--accent);
+  text-decoration-color: var(--accent);
 }
 
 /* ---------- 404 ---------- */
@@ -684,6 +691,33 @@ html[data-theme='dark'] .about-banner-avatar {
   border-color: var(--accent);
   color: var(--accent);
   transform: translateY(-2px);
+}
+
+/* 404 页的标签直达：给跟着旧链接来的人一条能走的岔路 */
+.notfound-tags {
+  margin-top: 46px;
+  padding-top: 26px;
+  border-top: 1px dashed var(--line);
+}
+
+.notfound-tags p {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text-mute);
+}
+
+.notfound-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.notfound-tag-count {
+  margin-left: 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  opacity: 0.62;
 }
 
 

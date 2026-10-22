@@ -41,6 +41,8 @@ const routes = only.length
       /* 这条以前是 404：笔记的标签没进标签页就没生成页面 */
       '/tags/CSS/',
       '/category/技术/',
+      '/authors/',
+      '/license/',
       '/about/',
       '/games/',
       '/games/beanrush/',

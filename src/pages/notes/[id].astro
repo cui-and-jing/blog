@@ -1,8 +1,10 @@
 ---
 import { existsSync } from 'node:fs';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import AuthorAvatar from '../../components/AuthorAvatar.astro';
 import NoteCopy from '../../components/NoteCopy.astro';
 import { url, formatDate } from '../../lib/site';
+import { findAuthor } from '../../data/authors';
 import { getNotes, noteTitle, noteText } from '../../lib/notes';
 
 export async function getStaticPaths() {
@@ -16,6 +18,8 @@ export async function getStaticPaths() {
 }
 
 const { note, newer, older } = Astro.props;
+const author = findAuthor(note.data.author);
+const authorHref = url(`/authors/#${author.id}`);
 
 const title = noteTitle(note, 60);
 const text = noteText(note);
@@ -51,7 +55,14 @@ const link = url(`/notes/${note.id}/`);
 
     <article class="note-sheet" aria-labelledby="note-title">
       <header class="note-sheet-head">
-        <time datetime={note.data.date.toISOString()}>{formatDate(note.data.date)}</time>
+        <p class="note-sheet-meta">
+          <a class="note-sheet-author" href={authorHref}>
+            <AuthorAvatar author={author} size={20} />
+            <span>{author.name}</span>
+          </a>
+          <span class="note-sheet-sep" aria-hidden="true">/</span>
+          <time datetime={note.data.date.toISOString()}>{formatDate(note.data.date)}</time>
+        </p>
         <h1 id="note-title">{title}</h1>
       </header>
 

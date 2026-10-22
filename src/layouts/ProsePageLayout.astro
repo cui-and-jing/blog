@@ -11,6 +11,8 @@ interface Props {
     title: string;
     description?: string;
     lead?: string;
+    /** 只有给自己看的页面（排版样例）才需要置 true */
+    noindex?: boolean;
   };
 }
 
@@ -20,7 +22,7 @@ const { frontmatter } = Astro.props;
 <BaseLayout
   title={frontmatter.title}
   description={frontmatter.description ?? frontmatter.title}
-  noindex
+  noindex={frontmatter.noindex ?? false}
 >
   <div class="page-head page-head--narrow">
     <div class="shell">

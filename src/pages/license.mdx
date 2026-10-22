@@ -1,0 +1,82 @@
+---
+layout: ../layouts/ProsePageLayout.astro
+title: 版权与转载
+description: 本站文字采用 CC BY-NC-SA 4.0，代码采用 MIT。这里写清楚转载、引用、改编时哪些不用问、哪些要先说一声。
+lead: 文字是 CC BY-NC-SA 4.0，代码是 MIT。想转载、引用或者拿去改，大多数情况不用问，但有几条要说清楚。
+---
+
+import Callout from '../components/mdx/Callout.astro';
+
+## 文字：CC BY-NC-SA 4.0
+
+本站的文章与笔记，文字部分采用
+[知识共享 署名-非商业性使用-相同方式共享 4.0 国际许可协议](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans) 授权。
+
+这份协议允许你做四件事：
+
+- 转载全文，包括搬到自己的博客或公众号
+- 摘录段落，用在文章、书或课程里
+- 翻译成其他语言
+- 改编、重组，做成新的作品
+
+## 但有三个条件
+
+1. **署名**：写明作者（Cui 或 Jing，以文章页上的署名为准），并链回原文
+2. **非商业**：不能用于商业目的
+3. **相同方式共享**：如果你改过再发布，新作品也要用同样的协议
+
+<Callout type="warn" title="商业用途要先问一声">
+把文章收进付费专栏、用作付费课程的讲义、或者放进带广告的聚合站，都属于商业使用。
+这类情况请先在 [GitHub](https://github.com/cui-and-jing) 开个 issue 说明用途，一般都会同意。
+</Callout>
+
+## 署名怎么写
+
+最省事的方式是直接抄这一行：
+
+> Cui. (2026). 《[重新开始：把博客从 Hexo 搬到 Astro](https://cui-and-jing.github.io/blog/posts/hello-astro/)》. *Cui & Jing*.
+
+Markdown 版本：
+
+```markdown
+[Cui](https://cui-and-jing.github.io/blog/authors/#cui). (2026). 《[文章标题](原文链接)》. *Cui & Jing*.
+```
+
+如果做过删改，在后面补一句「本文在原作基础上有删改」就够了——协议要求的是「标明是否作出修改」，不是逐条列出改了什么。
+
+## 代码：MIT
+
+文章里的代码片段是另一套规则：**随便用，不用署名**。
+
+```text
+MIT License
+
+Copyright (c) 2026 Cui & Jing
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+```
+
+代码和文字分开授权是有意的：一段 CSS 或几行脚本被抄进项目里，再要求人家按 CC 协议署名，只会让两边都麻烦。
+
+## 封面与配图
+
+每篇文章的分享封面（`public/og/` 下的图）由本站自己生成，随文章一同授权，转载时不必单独处理。
+
+正文里如果用了第三方的图，会在图注里写明来源与授权。那些图不适用本页的条款，请按原作者的许可使用。
+
+## 本站的技术
+
+站点用 [Astro](https://astro.build) 构建，源码在
+[GitHub](https://github.com/cui-and-jing/blog)。这份源码本身也按 MIT 处理，想抄结构、抄样式都可以。
+
+## 拿不准的时候
+
+在 [GitHub 仓库](https://github.com/cui-and-jing/blog/issues) 开一个 issue，说明你想怎么用。问一句的成本很低，被找上门的成本不低。

@@ -48,10 +48,13 @@ const ogHash = (post) =>
   crypto
     .createHash('sha1')
     .update(
-      [post.title, post.description, post.date.toISOString().slice(0, 10), post.category, post.tags.join(',')].join('|')
+      [post.title, post.description, post.date.toISOString().slice(0, 10), post.category, post.author, post.tags.join(',')].join('|')
     )
     .digest('hex')
     .slice(0, 12);
+
+/** 与 src/data/authors.ts 的 AUTHORS 同源；schema 那边也是这两个值 */
+const AUTHOR_IDS = ['cui', 'jing'];
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -98,6 +101,7 @@ for (const file of walk(postsDir)) {
     body,
     title: String(data.title ?? ''),
     description: String(data.description ?? ''),
+    author: data.author ? String(data.author) : '',
     tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
     category: data.category ? String(data.category) : '',
     date: data.date instanceof Date ? data.date : new Date(String(data.date)),
@@ -115,6 +119,8 @@ const staticRoutes = [
   '/notes.xml',
   '/archive/',
   '/tags/',
+  '/authors/',
+  '/license/',
   '/about/',
   '/games/',
   '/games/beanrush/',
@@ -122,6 +128,7 @@ const staticRoutes = [
   '/subscribe/',
   '/styleguide/',
   '/rss.xml',
+  '/site.webmanifest',
 ];
 const routes = new Set(staticRoutes);
 const tagSet = new Set();
@@ -189,6 +196,10 @@ for (const post of posts) {
 
   /* frontmatter */
   if (!post.title.trim()) add('error', file, 1, '缺少 title');
+  if (!post.author) add('error', file, 1, `缺少 author（${AUTHOR_IDS.join(' / ')}），署名不能靠猜`);
+  else if (!AUTHOR_IDS.includes(post.author)) {
+    add('error', file, 1, `author 是「${post.author}」，只能是 ${AUTHOR_IDS.join(' / ')}`);
+  }
   if (post.title.length > 46) add('warn', file, 1, `标题 ${post.title.length} 字，分享封面上可能被截断（建议 ≤46）`);
   if (Number.isNaN(post.date.valueOf())) add('error', file, 1, 'date 缺失或不是合法日期');
   else if (post.date.valueOf() > Date.now()) add('warn', file, 1, `发布日期在未来（${post.date.toISOString().slice(0, 10)}）`);
@@ -437,6 +448,7 @@ for (const file of fs.existsSync(notesDir) ? walk(notesDir) : []) {
     file: rel,
     id: path.basename(file).replace(/\.mdx?$/, ''),
     body: raw.slice(match[0].length),
+    author: data.author ? String(data.author) : '',
     tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
     date: data.date instanceof Date ? data.date : new Date(String(data.date)),
     draft: data.draft === true,
@@ -449,6 +461,11 @@ for (const note of notes) {
   if (Number.isNaN(note.date.valueOf())) add('error', file, 1, 'date 缺失或不是合法日期');
   else if (note.date.valueOf() > Date.now() + 86400000) {
     add('warn', file, 1, `日期在未来（${note.date.toISOString().slice(0, 10)}）`);
+  }
+
+  if (!note.author) add('error', file, 1, `缺少 author（${AUTHOR_IDS.join(' / ')}），笔记也要署名`);
+  else if (!AUTHOR_IDS.includes(note.author)) {
+    add('error', file, 1, `author 是「${note.author}」，只能是 ${AUTHOR_IDS.join(' / ')}`);
   }
 
   const masked = maskCode(body);
@@ -476,7 +493,7 @@ for (const note of notes) {
     } else {
       const hash = crypto
         .createHash('sha1')
-        .update([titleFromText(plain, 40), note.date.toISOString().slice(0, 10), note.tags.join(',')].join('|'))
+        .update([titleFromText(plain, 40), note.date.toISOString().slice(0, 10), note.author, note.tags.join(',')].join('|'))
         .digest('hex')
         .slice(0, 12);
       if (hash !== manifest[ogName]) {

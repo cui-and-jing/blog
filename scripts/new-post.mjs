@@ -125,6 +125,13 @@ if (series && !seriesOrder) {
 }
 
 const category = value('category') ?? '';
+/* 署名是必填字段（schema 没有默认值），这里给 cui 只是省一次输入；
+   Jing 写的记得加 --author jing，否则文章会被标成另一个人写的 */
+const author = value('author') ?? 'cui';
+if (!['cui', 'jing'].includes(author)) {
+  console.error(`--author 只能是 cui 或 jing，当前是「${author}」`);
+  process.exit(1);
+}
 const tags = (value('tags') ?? '')
   .split(',')
   .map((tag) => tag.trim())
@@ -137,6 +144,7 @@ const yamlString = (text) => JSON.stringify(text);
 const frontmatter = [
   '---',
   `title: ${yamlString(title)}`,
+  `author: ${author}`,
   `date: ${today}`,
   'description: 一句话说清这篇要回答什么问题，会出现在列表页、搜索结果和分享卡片上',
   `tags:${tags.length ? '' : ' []'}`,
@@ -174,6 +182,7 @@ fs.writeFileSync(target, `${frontmatter}${body}`, 'utf8');
 /* ---------- 收尾提示 ---------- */
 
 console.log(`\n✔ 已创建 ${path.relative(root, target)}`);
+console.log(`  作者：${author}${author === 'cui' ? '（默认；Jing 写的加 --author jing）' : ''}`);
 if (series) console.log(`  系列「${series}」第 ${seriesOrder} 篇`);
 if (draft) console.log('  状态：草稿（本机 dev 可见，构建不会发布）');
 

@@ -45,6 +45,8 @@ const ROUTES = only.length
       '/tags/Astro/',
       '/tags/CSS/',
       '/category/技术/',
+      '/authors/',
+      '/license/',
       '/about/',
       '/games/',
       '/search/',

@@ -307,6 +307,17 @@
   margin-bottom: 0;
 }
 
+/* 引用块的底色比正文深，--accent 压在上面只有 4.47:1，差 0.03。
+   往文字色混 10% 刚好补上：浅色主题变深、深色主题变亮，两套都不用单独写 */
+.prose blockquote a {
+  color: color-mix(in srgb, var(--accent) 90%, var(--text));
+  border-bottom-color: color-mix(in srgb, currentColor 40%, transparent);
+}
+
+.prose blockquote a:hover {
+  border-bottom-color: currentColor;
+}
+
 .prose hr {
   margin: 3em 0;
   border: 0;
@@ -656,6 +667,32 @@ html[data-theme='dark'] .prose .table-wrap.is-scrollable {
 
 .post-stats .sep {
   opacity: 0.45;
+}
+
+/* 署名在 hero 上与日期同为白色，必须靠下划线而不是颜色区分 */
+.post-hero-author {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(255, 255, 255, 0.42);
+}
+
+.post-hero-author:hover {
+  text-decoration-color: currentColor;
+}
+
+.post-stats-author a {
+  color: var(--text-soft);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--text-soft) 38%, transparent);
+}
+
+.post-stats-author a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
 }
 
 /* ---------- share bar ---------- */

@@ -10,15 +10,20 @@ import crypto from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
+import sharp from 'sharp';
 import { parse as parseYaml } from 'yaml';
 import { coverStyle } from '../src/lib/cover.ts';
 import { plainNote, titleFromText } from '../src/lib/note-text.ts';
+import { AUTHORS } from '../src/data/authors.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const postsDir = path.join(root, 'src/content/posts');
 const outDir = path.join(root, 'public/og');
 /* 与 src/lib/site.ts 保持一致；那边用了 import.meta.env，在 Node 里跑不起来，所以在这里另抄一份 */
 const SITE = { title: 'Cui & Jing', tagline: '关于技术、阅读与生活的长期笔记', url: 'cui-and-jing.github.io/blog' };
+
+/** frontmatter 里存的是 id，卡片上要显示名字 */
+const authorName = (id) => AUTHORS.find((author) => author.id === id)?.name ?? SITE.title;
 
 /* ---------- 找浏览器 ---------- */
 const CANDIDATES = [
@@ -52,6 +57,7 @@ for (const file of files) {
     slug,
     title: String(data.title ?? slug),
     description: String(data.description ?? ''),
+    author: data.author ? String(data.author) : '',
     date: data.date instanceof Date ? data.date : new Date(String(data.date)),
     tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
     category: data.category ? String(data.category) : '',
@@ -117,6 +123,8 @@ function html({ title, description, kicker, tags, foot, stack }) {
   .pill{padding:6px 15px;border-radius:999px;font-size:15px;line-height:1.6;white-space:nowrap}
   .url{margin-left:18px;padding-left:18px;border-left:1px solid #ded7c9;
     font-family:'SFMono-Regular',Consolas,monospace;font-size:13px;letter-spacing:.05em;color:#9c9488}
+  .who{margin-left:auto;padding-right:16px;font-family:'SFMono-Regular',Consolas,monospace;
+    font-size:13px;letter-spacing:.06em;color:#8c8579;white-space:nowrap}
   .stack{position:absolute;right:-36px;top:44px;width:470px;height:560px;z-index:2}
   .card{position:absolute;width:330px;height:440px;border-radius:34px;overflow:hidden;
     padding:26px 28px;display:flex;flex-direction:column;
@@ -203,7 +211,7 @@ for (const post of posts) {
       title: post.title,
       description: post.description,
       kicker,
-      foot: `${tags}<span class="url">${SITE.url}</span>`,
+      foot: `${tags}<span class="who">文 / ${authorName(post.author)}</span><span class="url">${SITE.url}</span>`,
       stack:
         card(back1, 'TECH', style.glyph, 'c1') +
         card(back2, 'NOTE', style.glyph, 'c2') +
@@ -235,8 +243,9 @@ if (existsSync(notesDir)) {
     const description = rest.replace(/^[。！？!?，、\s]+/, '').slice(0, 76);
     const date = data.date instanceof Date ? data.date : new Date(String(data.date));
     const tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
+    const author = data.author ? String(data.author) : '';
     const style = coverStyle(`note-${id}`, title);
-    noteMeta.push({ id, title, date, tags });
+    noteMeta.push({ id, title, date, tags, author });
 
     cards.push({
       file: path.join(outDir, `note-${id}.png`),
@@ -244,7 +253,7 @@ if (existsSync(notesDir)) {
         title,
         description,
         kicker: `NOTE · ${fmtDate(date)}`,
-        foot: `${tags.slice(0, 3).map((t) => pill(t, hueOf(t))).join('')}<span class="url">${SITE.url}</span>`,
+        foot: `${tags.slice(0, 3).map((t) => pill(t, hueOf(t))).join('')}<span class="who">文 / ${authorName(author)}</span><span class="url">${SITE.url}</span>`,
         stack:
           card(backPalettes(style)[0], 'NOTE', '记', 'c1') +
           card(backPalettes(style)[1], 'NOTE', '记', 'c2') +
@@ -268,9 +277,13 @@ for (const item of cards) {
   await page.setContent(item.html, { waitUntil: 'load' });
   await page.evaluate(() => document.fonts.ready);
   await new Promise((r) => setTimeout(r, 120));
-  await page.screenshot({ path: item.file, type: 'png', captureBeyondViewport: false });
-  const { size } = await fs.stat(item.file);
-  console.log(`${path.relative(root, item.file).padEnd(28)} ${(size / 1024).toFixed(0)} KB`);
+
+  /* puppeteer 的默认 PNG 压缩很松（一张 270KB）。sharp 无损重编码能到 80KB 左右，
+     像素完全不变——社媒抓取卡片时少下 190KB，比调色板量化更划算 */
+  const shot = await page.screenshot({ type: 'png', captureBeyondViewport: false });
+  const optimized = await sharp(shot).png({ compressionLevel: 9, effort: 10 }).toBuffer();
+  await fs.writeFile(item.file, optimized);
+  console.log(`${path.relative(root, item.file).padEnd(28)} ${(optimized.length / 1024).toFixed(0)} KB`);
 }
 
 /* 记下每张图对应的内容指纹，lint 才能发现「改了标题忘了重画」 */
@@ -278,7 +291,7 @@ const hashOf = (post) =>
   crypto
     .createHash('sha1')
     .update(
-      [post.title, post.description, post.date.toISOString().slice(0, 10), post.category, post.tags.join(',')].join('|')
+      [post.title, post.description, post.date.toISOString().slice(0, 10), post.category, post.author, post.tags.join(',')].join('|')
     )
     .digest('hex')
     .slice(0, 12);
@@ -286,7 +299,7 @@ const hashOf = (post) =>
 const noteHashOf = (note) =>
   crypto
     .createHash('sha1')
-    .update([note.title, note.date.toISOString().slice(0, 10), note.tags.join(',')].join('|'))
+    .update([note.title, note.date.toISOString().slice(0, 10), note.author, note.tags.join(',')].join('|'))
     .digest('hex')
     .slice(0, 12);
 const manifest = {

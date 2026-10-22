@@ -51,6 +51,13 @@ const tags = (value('tags') ?? '')
   .map((tag) => tag.trim())
   .filter(Boolean);
 
+/* 署名必填；默认 cui 只是省一次输入，Jing 写的加 --author jing */
+const author = value('author') ?? 'cui';
+if (!['cui', 'jing'].includes(author)) {
+  console.error(`--author 只能是 cui 或 jing，当前是「${author}」`);
+  process.exit(1);
+}
+
 /* ---------- 落文件 ---------- */
 
 fs.mkdirSync(notesDir, { recursive: true });
@@ -66,6 +73,7 @@ while (fs.existsSync(target)) {
 
 const frontmatter = [
   '---',
+  `author: ${author}`,
   `date: ${day}`,
   `tags:${tags.length ? '' : ' []'}`,
   ...tags.map((tag) => `  - ${JSON.stringify(tag)}`),

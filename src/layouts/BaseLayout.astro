@@ -15,6 +15,8 @@ interface Props {
     tags: string[];
     category?: string;
     minutes?: number;
+    /** 具体作者；不传就退回站名 */
+    author?: { id: string; name: string };
   };
 }
 
@@ -51,7 +53,16 @@ const articleSchema = article
       dateModified: (article.updated ?? article.published).toISOString(),
       inLanguage: SITE.lang,
       image: ogImage,
-      author: { '@type': 'Person', name: SITE.author, url: SITE.github },
+      /* 署名给到具体的人，而不是把两个人绑成一个字符串。
+         @id 与 /authors/ 页里的 Person 实体同址，搜索引擎才能把「谁写的」串起来 */
+      author: article.author
+        ? {
+            '@type': 'Person',
+            '@id': `${siteRoot}${url(`/authors/#${article.author.id}`)}`,
+            name: article.author.name,
+            url: `${siteRoot}${url(`/authors/#${article.author.id}`)}`,
+          }
+        : { '@type': 'Person', name: SITE.author, url: SITE.github },
       publisher: { '@type': 'Organization', name: SITE.title },
       ...(article.category ? { articleSection: article.category } : {}),
       ...(article.tags.length ? { keywords: article.tags.join(', ') } : {}),
@@ -81,10 +92,13 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
-    <meta name="author" content={SITE.author} />
+    <meta name="author" content={article?.author?.name ?? SITE.author} />
     {noindex && <meta name="robots" content="noindex" />}
     <link rel="canonical" href={canonical} />
+    <link rel="icon" href={url('/favicon.ico')} sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />
+    <link rel="apple-touch-icon" href={url('/apple-touch-icon.png')} />
+    <link rel="manifest" href={url('/site.webmanifest')} />
     <link rel="alternate" type="application/rss+xml" title={SITE.title} href={url('/rss.xml')} />
     <link rel="alternate" type="application/rss+xml" title={`${SITE.title} · 笔记`} href={url('/notes.xml')} />
     <meta name="theme-color" content="#f2f0e9" media="(prefers-color-scheme: light)" />
@@ -189,16 +203,21 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           {NAV.map((item) => <a href={url(item.href)}>{item.label}</a>)}
         </nav>
         <div class="footer-col">
-          <h2>订阅与源码</h2>
+          <h2>订阅与本站</h2>
           <a href={url('/subscribe/')}>怎么订阅</a>
           <a href={url('/rss.xml')}>文章 RSS</a>
           <a href={url('/notes.xml')}>笔记 RSS</a>
-          <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>
           <a href={url('/about/')}>关于本站</a>
+          <a href={url('/authors/')}>作者</a>
+          <a href={url('/license/')}>版权与转载</a>
+          <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
       </div>
       <div class="shell footer-bottom">
-        <span>© {SITE.since === new Date().getFullYear() ? SITE.since : `${SITE.since}–${new Date().getFullYear()}`} {SITE.author} · 文字采用 CC BY-NC-SA 4.0</span>
+        <span>
+          © {SITE.since === new Date().getFullYear() ? SITE.since : `${SITE.since}–${new Date().getFullYear()}`}
+          {SITE.author} · 文字采用 <a href={url('/license/')}>CC BY-NC-SA 4.0</a>
+        </span>
         <span class="footer-links">
           <span>Powered by Astro</span>
           <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub Pages</a>

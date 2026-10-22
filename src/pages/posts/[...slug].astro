@@ -15,6 +15,7 @@ import Step from '../../components/mdx/Step.astro';
 import Details from '../../components/mdx/Details.astro';
 import Figure from '../../components/mdx/Figure.astro';
 import { SITE, url, formatDate, readingTime, tagHue } from '../../lib/site';
+import { findAuthor } from '../../data/authors';
 import { findSeries, positionIn } from '../../lib/series';
 import { getPosts } from '../../lib/posts';
 
@@ -39,6 +40,8 @@ interface Props {
 
 const { post, newer, older } = Astro.props;
 const { Content, headings } = await render(post);
+const author = findAuthor(post.data.author);
+const authorHref = url(`/authors/#${author.id}`);
 const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
 const minutes = readingTime(post.body ?? '');
 /* 与阅读时长同口径：去掉代码块再数字，避免把代码行算进正文 */
@@ -70,6 +73,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
     tags: post.data.tags,
     category: post.data.category,
     minutes,
+    author: { id: author.id, name: author.name },
   }}
 >
   <Fragment slot="head">
@@ -93,8 +97,10 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         <div class="post-hero-body">
           <div class="kicker">
             {post.data.category && <span class="chip">{post.data.category}</span>}
+            <a class="post-hero-author" href={authorHref}>{author.name}</a>
+            <span class="dot" aria-hidden="true"></span>
             <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
-            <span class="dot"></span>
+            <span class="dot" aria-hidden="true"></span>
             <span>约 {minutes} 分钟</span>
           </div>
           <h1>{post.data.title}</h1>
@@ -180,6 +186,8 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
                     </>
                   )
                 }
+                <span class="sep" aria-hidden="true">·</span>
+                <span class="post-stats-author">文 / <a href={authorHref}>{author.name}</a></span>
               </p>
             </footer>
 
