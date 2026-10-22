@@ -152,7 +152,10 @@
 
 /* ---------- prose ---------- */
 .prose {
-  font-size: calc(16.5px * var(--prose-scale));
+  font-family: var(--font-serif);
+  /* 宋体的字面比黑体矮一档，同样 16.5px 看上去会小半号，
+     所以正文比原来抬 0.5px；字号偏好仍然按比例缩放 */
+  font-size: calc(17px * var(--prose-scale));
   line-height: var(--prose-leading);
   color: var(--text);
   overflow-wrap: break-word;
@@ -300,7 +303,7 @@
   border-radius: 0 10px 10px 0;
   color: var(--text-soft);
   font-family: var(--font-serif);
-  font-size: calc(16.5px * var(--prose-scale));
+  font-size: calc(17px * var(--prose-scale));
 }
 
 .prose blockquote p:last-child {

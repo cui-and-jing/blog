@@ -29,9 +29,13 @@
   --shadow-md: 0 1px 2px rgba(27, 25, 22, 0.04), 0 10px 28px -14px rgba(27, 25, 22, 0.16);
   --shadow-lg: 0 2px 4px rgba(27, 25, 22, 0.05), 0 24px 48px -24px rgba(27, 25, 22, 0.26);
 
-  --font-serif: Georgia, 'Iowan Old Style', 'Songti SC', 'STSong', 'SimSun', serif;
+  /* 正文衬线栈的首位是自托管的思源宋体子集（fonts.css，由 npm run fonts 生成）。
+     子集外的字、或者字体还没下载完的那一瞬间，会按后面的顺序落到系统宋体，
+     因此这里必须保留完整的系统回退，不能只写自托管那一个名字。 */
+  --font-serif: var(--font-prose-serif, Georgia, 'Iowan Old Style', 'Songti SC', 'STSong', 'SimSun', serif);
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei', sans-serif;
+  --font-kai: 'Kaiti SC', 'STKaiti', 'KaiTi', '楷体', 'Songti SC', serif;
   --font-mono: 'SFMono-Regular', 'JetBrains Mono', Consolas, 'Liberation Mono', monospace;
 
   --shell: 1180px;
@@ -52,6 +56,11 @@ html[data-reading='small'] {
 html[data-reading='large'] {
   --prose-scale: 1.12;
   --prose-leading: 1.82;
+}
+
+/* 行距是独立偏好，放在字号之后：两者同时设置时，行距以这里的显式选择为准 */
+html[data-leading='loose'] {
+  --prose-leading: 2.15;
 }
 
 html[data-theme='dark'] {
@@ -77,5 +86,17 @@ html[data-theme='dark'] {
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px -2px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.7);
   --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 48px -24px rgba(0, 0, 0, 0.9);
+}
+
+/* ---------- 字体偏好 ---------- */
+/* 只有「宋」是自托管子集（约 284KB，按 unicode-range 分三片），另外两档直接用系统字体，
+   不额外增加下载量。覆盖 --font-serif 而不是引入新变量，是为了让标题、引用、图注
+   跟着正文一起变——只换正文不换标题，观感会比不换更怪。 */
+html[data-font='sans'] {
+  --font-serif: var(--font-sans);
+}
+
+html[data-font='kai'] {
+  --font-serif: var(--font-kai);
 }
 

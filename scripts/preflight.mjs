@@ -63,6 +63,8 @@ async function main() {
   }
 
   run('内容体检', 'node', ['scripts/lint-content.mjs']);
+  /* 正文用了子集外的字，线上会悄悄回退成系统宋体，只有字形不一致这一条线索，容易漏 */
+  run('字体子集校验', 'node', ['scripts/fonts.mjs', '--check']);
   run('类型检查', 'npx', ['astro', 'check']);
 
   if (!skipBuild) {

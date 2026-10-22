@@ -121,6 +121,47 @@ for (const route of routes) {
   console.log(`✓ ${route}`);
 }
 
+/* 设置面板和快捷键面板默认是关着的，路由循环扫不到。
+   它们承载主题、字体、字号三类偏好，出问题面最大，单独打开各扫一遍 */
+for (const panel of [
+  { key: 'settings', label: '设置面板', open: (page) => page.click('#settings-toggle') },
+  { key: 'shortcuts', label: '快捷键面板', open: (page) => page.keyboard.type('?') },
+]) {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+  try {
+    await page.goto(`${base}/posts/hello-astro/`, { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.addScriptTag({ content: axeSource });
+    await panel.open(page);
+    await new Promise((r) => setTimeout(r, 450));
+    const report = await page.evaluate(async () => {
+      return await window.axe.run(document, {
+        runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] },
+        resultTypes: ['violations'],
+      });
+    });
+    const violations = report.violations.map((v) => ({
+      id: v.id,
+      impact: v.impact,
+      help: v.help,
+      nodes: v.nodes.slice(0, 6).map((n) => ({
+        target: n.target.join(' '),
+        summary: (n.failureSummary ?? '').split('\n').slice(0, 2).join(' ').slice(0, 220),
+      })),
+      count: v.nodes.length,
+    }));
+    for (const v of violations) {
+      if (v.impact === 'critical' || v.impact === 'serious') serious += 1;
+    }
+    results.push({ route: `(${panel.label})`, theme: 'light', status: 200, violations });
+    console.log(`✓ ${panel.label}`);
+  } catch (err) {
+    results.push({ route: `(${panel.label})`, theme: 'light', status: 0, error: String(err).slice(0, 200), violations: [] });
+    console.log(`ERR ${panel.label}`);
+  }
+  await page.close();
+}
+
 await browser.close();
 
 fs.mkdirSync('.shots', { recursive: true });

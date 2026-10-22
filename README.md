@@ -147,7 +147,7 @@ src/
 ├── content/posts/           文章（Markdown / MDX）
 ├── content/notes/           短笔记：只有 date / tags / draft，正文一段话
 ├── assets/                  正文配图：import 进来才会做响应式与格式转换
-├── layouts/BaseLayout.astro 全站外壳：head、导航、页脚、主题切换、正文增强脚本
+├── layouts/BaseLayout.astro 全站外壳：head、导航、页脚、阅读设置与快捷键面板、正文增强脚本
 ├── layouts/ProsePageLayout.astro  单页正文版式（排版样例页使用）
 ├── components/
 │   ├── mdx/                 写作组件：Callout / KeyPoints / Steps / Step / Details / Figure
@@ -165,6 +165,8 @@ src/
 ├── data/comments.json       Giscus 的 repoId / categoryId
 ├── data/series.json         系列简介（不填则用系列名与篇数自动生成）
 ├── data/analytics.json      统计服务配置（默认 none）
+├── data/font-charset.json   字体子集覆盖的字符（npm run fonts 生成，fonts:check 比对用）
+├── data/font-files.json     带指纹的字体文件名（npm run fonts 生成，head 里的 preload 用）
 ├── lib/site.ts              站点信息、导航、URL 与日期工具
 ├── lib/series.ts            系列归组、排序与「第 n / N 篇」
 ├── lib/cover.ts             封面色板与哈希
@@ -196,10 +198,13 @@ src/
 │   └── 404.astro
 ├── styles/
 │   ├── global.css           样式入口，只按顺序 @import，不写规则
-│   ├── tokens.css           颜色 / 字号 / 间距 / 圆角 / 阴影
+│   ├── fonts.css            自托管字体的 @font-face（npm run fonts 生成，不要手改）
+│   ├── tokens.css           颜色 / 字号 / 间距 / 圆角 / 阴影 / 字体栈
 │   ├── base.css             重置与焦点样式
+│   ├── typography.css       中文排版细节：标点挤压、避头尾、数字等宽
 │   ├── layout.css           外壳、页头、首屏、分类块
 │   ├── components.css       封面、卡片、侧栏、作者卡
+│   ├── settings.css         阅读设置面板与快捷键表
 │   ├── article.css          文章页与正文排版
 │   ├── pages.css            评论、归档、系列、标签、关于、页脚、404
 │   ├── responsive.css       断点覆盖（要排在它覆盖的规则之后）
@@ -214,6 +219,7 @@ src/
 │   ├── new-post.mjs         新建文章骨架（npm run new）
 │   ├── new-note.mjs         新建短笔记（npm run note）
 │   ├── image-inbox.mjs      配图归位 + 生成 Figure 片段（npm run image）
+│   ├── fonts.mjs            按站内用字裁中文字体子集（npm run fonts / fonts:check）
 │   ├── og-cards.mjs         生成文章与笔记的分享封面并压缩（npm run og）
 │   ├── icons.mjs            从 favicon.svg 生成 ico / apple-touch / 192 / 512（npm run icons）
 │   ├── lint-content.mjs     内容体检（npm run lint:content）
@@ -231,6 +237,7 @@ src/
     ├── apple-touch-icon.png  180×180 直角满版，iOS 自己加圆角
     ├── icon-192.png / icon-512.png  清单里的图标，同样直角满版
     ├── og.png               默认分享图（1200×630）
+    ├── fonts/               自托管字体子集，文件名带内容指纹（npm run fonts 生成，需提交）
     ├── og/                  文章与笔记的分享封面 + manifest.json（供内容体检比对）
     └── games/               游戏单文件（构建时原样拷贝，不进打包）
 ```
@@ -267,8 +274,14 @@ src/
 
 ## 阅读体验
 
-- 文章标题下方有「字号」三档（`A−` / `A` / `A+`），选中后写进 `localStorage`，全站文章通用。
-  首帧之前就在 `<head>` 内联脚本里落好 `data-reading`，不会先按标准字号闪一下再变。
+- 顶栏右侧的设置按钮打开「阅读设置」面板：**主题**（跟随系统 / 浅色 / 深色）、**正文字体**（宋 / 黑 / 楷）、
+  **字号**、**行距**四项。偏好统一存在 `localStorage.settings`，全站生效；首帧之前就在 `<head>`
+  内联脚本里落好 `data-theme` / `data-font` / `data-reading`，不会先按默认值闪一下再变。
+  选「跟随系统」时，用户改系统深浅色，站点会实时跟着变。
+- 文章标题下方还留了一组 `A−` / `A` / `A+`，它和面板里的「字号」是同一份状态——两边都能改，
+  改完另一边立刻同步。
+- 按 `?` 打开快捷键总览。`Ctrl/⌘ + K`、`/`、灯箱里的 `+` `-` `0` `←` `→`、`Esc` 这些以前只存在于
+  代码里，现在有一处地方能查到。
 - 宽表格在窄屏不再挤压正文，改为在 `.table-wrap` 里横向滚动，并在可滚动时补一道边缘阴影。
 - 文章页右侧目录跟随滚动高亮；侧栏内容超出一屏时，当前条目会自动滚进可视区。
 - 宽度 ≤1080px 时出现左下角「目录」按钮，点开是底部抽屉（原生 `<dialog>`，Esc 可关）。
@@ -284,6 +297,45 @@ src/
 - 文章页有阅读进度条，滚动超过 700px 出现「回到顶部」。
 - 打印或「存为 PDF」时自动摘掉导航、侧栏、目录、评论、分享条与推荐，封面不打印，
   代码块转浅色并允许换行，外链地址以括号形式印在正文后（`@media print`）。
+
+## 字体与中文排版
+
+正文用自托管的**思源宋体**（[Noto Serif SC](https://github.com/notofonts/noto-cjk)，SIL OFL）。
+系统字体在 Windows 上会落到宋体（点阵感强、小字发虚），macOS 落到宋体 SC，两端观感差很远；
+把字体打包进来，这套「纸感」设计在两台上才是同一个东西。
+
+字体不是整包引入，而是按**站内真正出现过的字**裁成子集：
+
+```bash
+# 源字体 11 MB，只放本地，不进仓库
+curl -sL --create-dirs \
+  https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Serif/SubsetOTF/SC/NotoSerifSC-Regular.otf \
+  -o .fonts/NotoSerifSC-Regular.otf
+
+npm run fonts     # → public/fonts/*.woff2 + src/styles/fonts.css + src/data/font-*.json
+```
+
+- 按 unicode 区间切三片：`latin`（ASCII + Latin-1，约 52 KB）、`punct`（中日韩标点与全角，约 5 KB）、
+  `han`（汉字，约 230 KB）。浏览器只下载页面真正用到的那几片，所以列表页往往只需要前两片。
+- 文件名与 `@font-face` 家族名都带内容指纹（`prose-serif-han.ddcc2927.woff2` / `Prose Serif ddcc2927`）。
+  子集一变就是新 URL，不会被 GitHub Pages 的缓存按旧文件返回。
+- `han` 片在 `<head>` 里 `preload`；另外两片交给 CSS 自然加载——太小了，提前抢带宽不划算。
+- `font-display: swap`。汉字全角等宽、行高按倍数算，所以字体到达前后的替换**不产生位移**
+  （实测 CLS < 0.001，LCP 不受影响——文字先用系统宋体就渲染完了）。
+- 字体没加载完、或者某个字刚好不在子集里，会沿 `--font-serif` 的栈落到系统宋体，不会出现空白或豆腐块。
+
+**每加一篇新文章都要重跑 `npm run fonts`**，否则新出现的字会悄悄回退成系统宋体。
+`npm run fonts:check`（CI 与 `preflight` 都会跑）会比对 `src/data/font-charset.json`，
+把缺的字列出来。已有的字不受影响，重跑只会让三个分片按新字符集重新打包。
+
+中文排版另外补了几条渐进增强规则（`src/styles/typography.css`），浏览器不支持就回到原样：
+
+- `text-spacing-trim: trim-start`——行首全角标点压到半宽，中文段落的左边缘才是一条直线
+- `line-break: strict`——避头尾，句读与后括号不出现在行首
+- `hanging-punctuation: allow-end`——行末标点悬到版心之外（目前只有 Safari 实现）
+- `font-variant-numeric: tabular-nums`——数字等宽，日期、评分与表格列才对得齐
+
+设置面板里的「黑 / 楷」两档直接用系统字体，不增加任何下载量；只有「宋」是自托管的那份。
 
 ## 评论
 
@@ -425,13 +477,15 @@ puppeteer 直接截出来的 PNG 一张 270–300 KB，脚本会用 `sharp` 无�
 
 ```bash
 npm run lint:content  # 不需要构建：frontmatter、标题层级、图片、内链、中文排版、分享封面
+npm run fonts:check   # 不需要构建：正文用字是否都在字体子集里（缺字会静默回退）
+npm run fonts         # 需要 .fonts/ 源字体：重新裁子集，产物要提交
 npm run check         # astro check：类型与模板
-npm run budget        # 需要 dist：CSS / JS / 单页 HTML / 图片四类上限
-npm run a11y          # 需要先 build + preview：axe-core 扫全站 23 条路由 × 浅/深两套主题
-npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、字号、Esc、移动端目录
+npm run budget        # 需要 dist：CSS / JS / 单页 HTML / 图片 / 字体五类上限
+npm run a11y          # 需要先 build + preview：axe-core 扫全站 23 条路由 × 浅/深两套主题 + 两个面板
+npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、设置面板、快捷键表、移动端抽屉
 npm run visual        # 需要先 build + preview：21 条路由 × 浅/深 × 3 视口，和基线逐像素比
 npm run visual:update # 样式改动确认无误后重建基线
-npm run preflight     # 一条命令串起：og → lint → check → 构建 → budget → a11y → a11y:keys
+npm run preflight     # 一条命令串起：og → lint → fonts:check → check → 构建 → budget → a11y → a11y:keys
 ```
 
 `preflight` 会自己起 `astro preview` 并在结束时收掉，任何一步失败就停；`--ci` 跳过分享封面
@@ -457,11 +511,11 @@ npm run preflight     # 一条命令串起：og → lint → check → 构建 �
 - `public/og/<slug>.png` 缺失——**这一条是硬错误**，因为分享封面不会在 CI 里生成（runner 没有中文字体，
   渲染出来是方框）。`npm run og` 会同时写一份 `public/og/manifest.json`，改了标题却没重画也会被提醒。
 
-`budget` 的上限写在 `scripts/budget.mjs` 顶部：CSS 100 KB / gzip 20 KB，JS 32 KB / gzip 12 KB，
-单页 HTML 80 KB，主站图片 600 KB。游戏与分享封面不计入——它们不在首屏路径上。
+`budget` 的上限写在 `scripts/budget.mjs` 顶部：CSS 104 KB / gzip 21 KB，JS 32 KB / gzip 12 KB，
+单页 HTML 80 KB，主站图片 600 KB，字体 320 KB。游戏与分享封面不计入——它们不在首屏路径上。
 
 `.github/workflows/quality.yml` 在每次 push 与 PR 时依次跑
-`lint:content` → `check` → 构建 → `budget` → `a11y` → `a11y:keys`，任一步失败都会变红
+`lint:content` → `fonts:check` → `check` → 构建 → `budget` → `a11y` → `a11y:keys`，任一步失败都会变红
 （它和部署工作流相互独立，不会拦住发布）。
 
 工作流里的 action 都是用大版本号（`checkout@v7`、`setup-node@v7`、`deploy-pages@v5`、

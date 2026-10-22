@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import Analytics from '../components/Analytics.astro';
+import fontFiles from '../data/font-files.json';
 import { SITE, NAV, url, mediaUrl } from '../lib/site';
 
 interface Props {
@@ -86,7 +87,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 ---
 
 <!doctype html>
-<html lang={SITE.lang} data-theme="light">
+<html lang={SITE.lang} data-theme="light" data-theme-choice="auto">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -99,10 +100,24 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
     <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />
     <link rel="apple-touch-icon" href={url('/apple-touch-icon.png')} />
     <link rel="manifest" href={url('/site.webmanifest')} />
+    {/* 汉字片占字体总量的八成，是首屏字形的主要来源，提前拉能少一段 fallback 的时间；
+        拉丁与标点片很小，等 CSS 解析时自然加载就够，多 preload 反而是抢带宽 */}
+    {
+      fontFiles.han && (
+        <link
+          rel="preload"
+          as="font"
+          type="font/woff2"
+          href={url(`/${fontFiles.han}`)}
+          crossorigin="anonymous"
+        />
+      )
+    }
     <link rel="alternate" type="application/rss+xml" title={SITE.title} href={url('/rss.xml')} />
     <link rel="alternate" type="application/rss+xml" title={`${SITE.title} · 笔记`} href={url('/notes.xml')} />
-    <meta name="theme-color" content="#f2f0e9" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#131311" media="(prefers-color-scheme: dark)" />
+    {/* 主题色跟随用户的选择，而不是只看系统偏好：
+        选了「深色」但系统是浅色时，地址栏也应该跟着暗下来 */}
+    <meta name="theme-color" content="#f2f0e9" id="theme-color" />
 
     <meta property="og:type" content={article ? 'article' : 'website'} />
     <meta property="og:title" content={pageTitle} />
@@ -124,20 +139,43 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
     <script type="application/ld+json" set:html={JSON.stringify(schema)} is:inline />
 
     <script is:inline>
+      /* 首帧之前把主题、字体、字号落到 html 上。
+         这些值直接决定 CSS 变量，晚一帧就会看到明显的跳变，所以必须内联、必须在 head 里。 */
       (function () {
+        var d = document.documentElement;
+        var s = {};
         try {
-          var stored = localStorage.getItem('theme');
-          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          document.documentElement.dataset.theme = stored || (prefersDark ? 'dark' : 'light');
-          if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            document.documentElement.dataset.motion = 'on';
+          s = JSON.parse(localStorage.getItem('settings') || '{}') || {};
+          /* 旧版本把主题与字号分开存（theme / reading），这里迁移到统一的 settings，
+             迁完立刻删旧键，避免两套偏好互相打架 */
+          var legacyTheme = localStorage.getItem('theme');
+          var legacySize = localStorage.getItem('reading');
+          if (legacyTheme && !s.theme) s.theme = legacyTheme;
+          if (legacySize && !s.size) s.size = legacySize;
+          if (legacyTheme || legacySize) {
+            localStorage.setItem('settings', JSON.stringify(s));
+            localStorage.removeItem('theme');
+            localStorage.removeItem('reading');
           }
-          /* 字号偏好要在首帧之前落上，否则文章会先按标准字号闪一下再变大 */
-          var reading = localStorage.getItem('reading');
-          if (reading === 'small' || reading === 'large') {
-            document.documentElement.dataset.reading = reading;
-          }
-        } catch (e) {}
+        } catch (e) {
+          s = {};
+        }
+
+        var choice = s.theme === 'light' || s.theme === 'dark' ? s.theme : 'auto';
+        var dark = window.matchMedia('(prefers-color-scheme: dark)');
+        d.dataset.themeChoice = choice;
+        d.dataset.theme = choice === 'auto' ? (dark.matches ? 'dark' : 'light') : choice;
+
+        if (s.font && s.font !== 'serif') d.dataset.font = s.font;
+        if (s.size && s.size !== 'normal') d.dataset.reading = s.size;
+        if (s.leading === 'loose') d.dataset.leading = 'loose';
+
+        var metaColor = document.getElementById('theme-color');
+        if (metaColor) metaColor.setAttribute('content', d.dataset.theme === 'dark' ? '#131311' : '#f2f0e9');
+
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          d.dataset.motion = 'on';
+        }
       })();
     </script>
     <slot name="head" />
@@ -173,13 +211,19 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
               <path d="m16 16 4.2 4.2"></path>
             </svg>
           </a>
-          <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换到深色主题" title="切换到深色主题">
-            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-              <circle cx="12" cy="12" r="4.2"></circle>
-              <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"></path>
-            </svg>
-            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-              <path d="M20.5 14.3A8.5 8.5 0 1 1 9.7 3.5a6.8 6.8 0 0 0 10.8 10.8Z"></path>
+          <button
+            class="theme-toggle"
+            id="settings-toggle"
+            type="button"
+            aria-label="阅读设置"
+            aria-expanded="false"
+            aria-controls="settings-panel"
+            title="阅读设置：主题 · 字体 · 字号 · 行距"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+              <path d="M4 7h9M18.5 7H20M4 17h4.5M13 17h7"></path>
+              <circle cx="15.2" cy="7" r="2.4"></circle>
+              <circle cx="10.8" cy="17" r="2.4"></circle>
             </svg>
           </button>
         </nav>
@@ -230,6 +274,111 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         <path d="M12 19V5M6 11l6-6 6 6"></path>
       </svg>
     </button>
+
+    <dialog class="side-panel settings-panel" id="settings-panel" aria-labelledby="settings-title">
+      <div class="panel-head">
+        <h2 id="settings-title">阅读设置</h2>
+        <button class="panel-close" type="button" data-close="settings-panel" aria-label="关闭阅读设置">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="panel-body">
+        <div class="panel-row">
+          <span class="panel-label" id="label-theme">主题</span>
+          <div class="seg" role="group" aria-labelledby="label-theme">
+            <button type="button" data-setting="theme" data-value="auto" aria-pressed="true">跟随系统</button>
+            <button type="button" data-setting="theme" data-value="light" aria-pressed="false">浅色</button>
+            <button type="button" data-setting="theme" data-value="dark" aria-pressed="false">深色</button>
+          </div>
+        </div>
+
+        <div class="panel-row">
+          <span class="panel-label" id="label-font">正文字体</span>
+          <div class="seg" role="group" aria-labelledby="label-font">
+            <button type="button" data-setting="font" data-value="serif" aria-pressed="true" style="font-family: var(--font-prose-serif, serif)">宋</button>
+            <button type="button" data-setting="font" data-value="sans" aria-pressed="false" style="font-family: var(--font-sans)">黑</button>
+            <button type="button" data-setting="font" data-value="kai" aria-pressed="false" style="font-family: var(--font-kai)">楷</button>
+          </div>
+        </div>
+
+        <div class="panel-row">
+          <span class="panel-label" id="label-size">字号</span>
+          <div class="seg" role="group" aria-labelledby="label-size">
+            <button type="button" data-setting="size" data-value="small" aria-pressed="false">小</button>
+            <button type="button" data-setting="size" data-value="normal" aria-pressed="true">标准</button>
+            <button type="button" data-setting="size" data-value="large" aria-pressed="false">大</button>
+          </div>
+        </div>
+
+        <div class="panel-row">
+          <span class="panel-label" id="label-leading">行距</span>
+          <div class="seg" role="group" aria-labelledby="label-leading">
+            <button type="button" data-setting="leading" data-value="normal" aria-pressed="true">标准</button>
+            <button type="button" data-setting="leading" data-value="loose" aria-pressed="false">宽松</button>
+          </div>
+        </div>
+
+        <p class="panel-hint">偏好只存在这台设备的浏览器里，换设备要重选一次。</p>
+      </div>
+
+      <div class="panel-foot">
+        <button class="panel-link" id="shortcuts-open" type="button">
+          <kbd>?</kbd>
+          <span>键盘快捷键</span>
+        </button>
+        <button class="panel-link" id="settings-reset" type="button">恢复默认</button>
+      </div>
+    </dialog>
+
+    <dialog class="side-panel shortcuts-panel" id="shortcuts-panel" aria-labelledby="shortcuts-title">
+      <div class="panel-head">
+        <h2 id="shortcuts-title">键盘快捷键</h2>
+        <button class="panel-close" type="button" data-close="shortcuts-panel" aria-label="关闭快捷键说明">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18"></path>
+          </svg>
+        </button>
+      </div>
+
+      <table class="shortcut-table">
+        <caption class="sr-only">本站支持的键盘快捷键</caption>
+        <tbody>
+          <tr>
+            <th scope="row"><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>K</kbd></th>
+            <td>打开搜索</td>
+          </tr>
+          <tr>
+            <th scope="row"><kbd>/</kbd></th>
+            <td>跳到搜索页并聚焦输入框</td>
+          </tr>
+          <tr>
+            <th scope="row"><kbd>?</kbd></th>
+            <td>打开这张表</td>
+          </tr>
+          <tr>
+            <th scope="row"><kbd>Esc</kbd></th>
+            <td>关闭弹层或退出搜索</td>
+          </tr>
+          <tr>
+            <th scope="row"><kbd>←</kbd> <kbd>→</kbd></th>
+            <td>预览里翻上一张 / 下一张</td>
+          </tr>
+          <tr>
+            <th scope="row"><kbd>+</kbd> <kbd>−</kbd></th>
+            <td>预览里放大 / 缩小</td>
+          </tr>
+          <tr>
+            <th scope="row"><kbd>0</kbd></th>
+            <td>预览里恢复原始缩放</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="panel-hint">在输入框里打字时，除 Esc 外的单键快捷键会让给输入，不会误触。</p>
+    </dialog>
 
     <dialog class="lightbox" id="lightbox" aria-label="图片预览" aria-modal="true">
       <div class="lightbox-tools">
@@ -638,40 +787,82 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         }
       });
 
-      /* 主题切换：支持 View Transition 时用圆形扩散过渡 */
-      const toggle = document.getElementById('theme-toggle');
-      const syncThemeLabel = () => {
-        const dark = root.dataset.theme === 'dark';
-        const label = dark ? '切换到浅色主题' : '切换到深色主题';
-        toggle?.setAttribute('aria-label', label);
-        toggle?.setAttribute('title', label);
-      };
-      syncThemeLabel();
+      /* ---------- 阅读设置：主题 / 字体 / 字号 / 行距 ---------- */
+      /* 四项偏好存在同一个 settings 对象里，首帧脚本读同一份数据，
+         所以无论从顶栏面板改、还是从文章页的 A− A A+ 改，刷新后都是同一套结果 */
+      type Settings = { theme: string; font: string; size: string; leading: string };
+      const STORE = 'settings';
+      const DEFAULTS: Settings = { theme: 'auto', font: 'serif', size: 'normal', leading: 'normal' };
 
-      const applyTheme = (next: string) => {
-        root.dataset.theme = next;
-        syncThemeLabel();
+      const readSettings = (): Settings => {
         try {
-          localStorage.setItem('theme', next);
+          const raw = JSON.parse(localStorage.getItem(STORE) ?? '{}');
+          return { ...DEFAULTS, ...(raw && typeof raw === 'object' ? raw : {}) };
+        } catch {
+          return { ...DEFAULTS };
+        }
+      };
+
+      let settings = readSettings();
+      const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+      const announce = (message: string) => {
+        const status = document.getElementById('a11y-status');
+        if (status) status.textContent = message;
+      };
+
+      const resolveTheme = (choice: string) =>
+        choice === 'light' || choice === 'dark' ? choice : darkQuery.matches ? 'dark' : 'light';
+
+      /* 移动端地址栏的颜色也要跟着主题走，否则深色页面顶着一条浅色栏 */
+      const applyThemeColor = () => {
+        const meta = document.getElementById('theme-color');
+        if (meta) meta.setAttribute('content', root.dataset.theme === 'dark' ? '#131311' : '#f2f0e9');
+      };
+
+      const paintSettings = () => {
+        root.dataset.themeChoice = settings.theme;
+        root.dataset.theme = resolveTheme(settings.theme);
+
+        /* 属性不存在就是默认值，这样 CSS 里不用为「默认」再单独写一套规则 */
+        if (settings.font === 'serif') delete root.dataset.font;
+        else root.dataset.font = settings.font;
+
+        if (settings.size === 'normal') delete root.dataset.reading;
+        else root.dataset.reading = settings.size;
+
+        if (settings.leading === 'loose') root.dataset.leading = 'loose';
+        else delete root.dataset.leading;
+
+        document.querySelectorAll<HTMLElement>('[data-setting]').forEach((btn) => {
+          const key = btn.dataset.setting as keyof Settings;
+          btn.setAttribute('aria-pressed', String(settings[key] === btn.dataset.value));
+        });
+
+        applyThemeColor();
+      };
+
+      const saveSettings = () => {
+        try {
+          localStorage.setItem(STORE, JSON.stringify(settings));
         } catch (e) {}
       };
 
-      toggle?.addEventListener('click', (event) => {
-        const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+      /* 主题切换用 View Transition 的圆形扩散，以点击的按钮为圆心铺开。
+         面板本身在 top layer，会一起被拍进快照，所以看起来是整屏同步变色 */
+      const withTransition = (apply: () => void, origin?: { x: number; y: number }) => {
         const startViewTransition = (document as any).startViewTransition as
           | ((cb: () => void) => { ready: Promise<void> })
           | undefined;
 
-        if (reduceMotion.matches || !startViewTransition) {
-          applyTheme(next);
+        if (reduceMotion.matches || !startViewTransition || !origin) {
+          apply();
           return;
         }
 
-        const x = (event as MouseEvent).clientX || window.innerWidth / 2;
-        const y = (event as MouseEvent).clientY || 40;
+        const { x, y } = origin;
         const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
-
-        const transition = startViewTransition.call(document, () => applyTheme(next));
+        const transition = startViewTransition.call(document, apply);
         transition.ready
           .then(() => {
             root.animate(
@@ -680,6 +871,112 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
             );
           })
           .catch(() => {});
+      };
+
+      /* 面板和文章页的字号按钮用的是同一套标记，一个委托就够了 */
+      document.addEventListener('click', (event) => {
+        const btn = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-setting]');
+        if (!btn) return;
+
+        const key = btn.dataset.setting as keyof Settings | undefined;
+        const value = btn.dataset.value;
+        if (!key || !value || settings[key] === value) return;
+
+        const rect = btn.getBoundingClientRect();
+        const origin = key === 'theme' ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : undefined;
+
+        withTransition(() => {
+          settings = { ...settings, [key]: value };
+          paintSettings();
+        }, origin);
+        saveSettings();
+
+        const labels: Record<string, string> = {
+          auto: '跟随系统',
+          light: '浅色',
+          dark: '深色',
+          serif: '宋体',
+          sans: '黑体',
+          kai: '楷体',
+          small: '小',
+          normal: '标准',
+          large: '大',
+          loose: '宽松',
+        };
+        const names: Record<string, string> = { theme: '主题', font: '字体', size: '字号', leading: '行距' };
+        announce(`${names[key]}：${labels[value] ?? value}`);
+      });
+
+      /* 选了「跟随系统」之后，用户在系统里切深浅色，这里要跟着变 */
+      darkQuery.addEventListener('change', () => {
+        if (settings.theme !== 'auto') return;
+        root.dataset.theme = darkQuery.matches ? 'dark' : 'light';
+        applyThemeColor();
+      });
+
+      /* 同一个浏览器开着两个标签页时，一边改了另一边也要跟上 */
+      window.addEventListener('storage', (event) => {
+        if (event.key !== STORE) return;
+        settings = readSettings();
+        paintSettings();
+      });
+
+      paintSettings();
+
+      /* ---------- 设置面板与快捷键面板 ---------- */
+      const settingsPanel = document.getElementById('settings-panel') as HTMLDialogElement | null;
+      const shortcutsPanel = document.getElementById('shortcuts-panel') as HTMLDialogElement | null;
+      const settingsToggle = document.getElementById('settings-toggle');
+      const shortcutsOpen = document.getElementById('shortcuts-open');
+      const settingsReset = document.getElementById('settings-reset');
+
+      const openPanel = (panel: HTMLDialogElement | null) => {
+        if (!panel) return;
+        if (!panel.open) panel.showModal();
+      };
+
+      settingsToggle?.addEventListener('click', () => {
+        openPanel(settingsPanel);
+        settingsToggle.setAttribute('aria-expanded', 'true');
+      });
+
+      settingsPanel?.addEventListener('close', () => {
+        settingsToggle?.setAttribute('aria-expanded', 'false');
+      });
+
+      /* 从设置里点进快捷键，先收起当前面板，避免两个 dialog 叠在一起 */
+      shortcutsOpen?.addEventListener('click', () => {
+        settingsPanel?.close();
+        openPanel(shortcutsPanel);
+      });
+
+      settingsReset?.addEventListener('click', () => {
+        settings = { ...DEFAULTS };
+        paintSettings();
+        saveSettings();
+        announce('已恢复默认外观');
+      });
+
+      document.querySelectorAll<HTMLButtonElement>('[data-close]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          (document.getElementById(btn.dataset.close ?? '') as HTMLDialogElement | null)?.close();
+        });
+      });
+
+      /* 点面板外的遮罩关闭。dialog 自己不留 padding，所以点到空白基本等于点到遮罩 */
+      [settingsPanel, shortcutsPanel].forEach((panel) => {
+        panel?.addEventListener('click', (event) => {
+          if (event.target === panel) panel.close();
+        });
+      });
+
+      /* ? 打开快捷键表。Shift + / 才打得出来，直接判键值最省事 */
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== '?' || event.metaKey || event.ctrlKey || event.altKey) return;
+        if (isTyping(event.target)) return;
+        event.preventDefault();
+        if (settingsPanel?.open) settingsPanel.close();
+        openPanel(shortcutsPanel);
       });
 
       /* 滚动状态 */

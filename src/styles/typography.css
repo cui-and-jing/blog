@@ -1,0 +1,38 @@
+/* ==========================================================================
+   typography.css — 中文排版的细节
+   全部是渐进增强：浏览器支持就更整齐，不支持也只是回到原来的样子，
+   不会影响可读性，也不会改变字号与行高（那两项归 tokens.css 与设置面板管）
+   ========================================================================== */
+
+.prose {
+  /* 行首的全角标点默认占满一格，右半边是空的，左边缘看上去就有一排锯齿。
+     trim-start 把行首标点压到半角宽，中文段落的左边才是一条直线。 */
+  text-spacing-trim: trim-start;
+
+  /* 避头尾：句读、后括号、后引号不出现在行首；
+     配合已有的 overflow-wrap，长英文串仍然能断，不会撑破版心 */
+  line-break: strict;
+
+  /* 行末标点悬挂到版心之外（目前只有 Safari 实现）。
+     和上面的 trim-start 是一对：一个管左边缘，一个管右边缘 */
+  hanging-punctuation: allow-end;
+
+  /* 数字等宽：日期、评分、表格里的列才能竖直对齐；
+     正文里的 2026 与 1 宽度一致，不会让行尾忽长忽短 */
+  font-variant-numeric: tabular-nums;
+}
+
+/* 代码与行内代码不参与中文排版调整：等宽字体的标点挤压会破坏对齐 */
+.prose code,
+.prose pre,
+.prose kbd,
+.prose samp {
+  text-spacing-trim: space-all;
+  hanging-punctuation: none;
+}
+
+/* 表格里数字右对齐时尤其需要等宽，单独再声明一次，
+   因为 table 的字体会被浏览器重置 */
+.prose table {
+  font-variant-numeric: tabular-nums;
+}

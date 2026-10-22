@@ -1,0 +1,33 @@
+/* 由 scripts/fonts.mjs 生成，不要手改。重新生成：npm run fonts */
+/* 子集版本 132673 · 1059 个字符 */
+@font-face {
+  font-family: 'Prose Serif 132673';
+  src: url('/blog/fonts/prose-serif-latin.5306b33e.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-00FF;
+}
+
+@font-face {
+  font-family: 'Prose Serif 132673';
+  src: url('/blog/fonts/prose-serif-punct.5cb8dc38.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+2000-206F, U+3000-303F, U+FF00-FFEF;
+}
+
+@font-face {
+  font-family: 'Prose Serif 132673';
+  src: url('/blog/fonts/prose-serif-han.cbf1d908.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3400-4DBF, U+4E00-9FFF;
+}
+
+/* 兜底栈里同一款字体的系统版本排后面，字体没加载完时先顶上来，不会出现空白 */
+:root {
+  --font-prose-serif: 'Prose Serif 132673', Georgia, 'Songti SC', 'STSong', 'SimSun', serif;
+}

@@ -90,26 +90,70 @@ const check = (name, pass, detail = '') => {
   check('复制后读屏状态区有播报', /复制/.test(announced), announced);
 
   /* 字号先测：主题切换有圆形扩散过渡（View Transitions），过渡期间点击会被遮罩吃掉 */
-  await page.click('[data-size="large"]');
+  await page.click('[data-setting="size"][data-value="large"]');
   const large = await page.evaluate(() => {
     const prose = document.querySelector('.prose');
     return {
       reading: document.documentElement.dataset.reading,
-      pressed: document.querySelector('[data-size="large"]')?.getAttribute('aria-pressed'),
+      pressed: document.querySelector('[data-setting="size"][data-value="large"]')?.getAttribute('aria-pressed'),
       size: prose ? getComputedStyle(prose).fontSize : null,
     };
   });
   check('字号切换生效且有 aria-pressed', large.reading === 'large' && large.pressed === 'true', JSON.stringify(large));
-  await page.click('[data-size="normal"]');
+  await page.click('[data-setting="size"][data-value="normal"]');
 
-  const themeBefore = await page.$eval('#theme-toggle', (b) => b.getAttribute('aria-label'));
-  await page.click('#theme-toggle');
-  await new Promise((r) => setTimeout(r, 700));
-  const themeAfter = await page.$eval('#theme-toggle', (b) => b.getAttribute('aria-label'));
-  const themeValue = await page.evaluate(() => document.documentElement.dataset.theme);
-  check('主题按钮标签随状态变化', themeBefore !== themeAfter, `${themeBefore} → ${themeAfter} (${themeValue})`);
-  await page.click('#theme-toggle');
+  /* 外观设置收在面板里：打开 → 切深色 → 切回浅色 → Esc 关闭，顺带验焦点归还 */
+  await page.click('#settings-toggle');
+  await new Promise((r) => setTimeout(r, 450));
+  const panelOpen = await page.evaluate(() => ({
+    open: document.getElementById('settings-panel')?.hasAttribute('open'),
+    expanded: document.getElementById('settings-toggle')?.getAttribute('aria-expanded'),
+    inside: Boolean(document.getElementById('settings-panel')?.contains(document.activeElement)),
+  }));
+  check(
+    '设置面板能打开、焦点进入、aria-expanded 同步',
+    panelOpen.open && panelOpen.expanded === 'true' && panelOpen.inside,
+    JSON.stringify(panelOpen)
+  );
+
+  await page.evaluate(() => document.querySelector('[data-setting="theme"][data-value="dark"]')?.click());
   await new Promise((r) => setTimeout(r, 900));
+  const themed = await page.evaluate(() => ({
+    theme: document.documentElement.dataset.theme,
+    choice: document.documentElement.dataset.themeChoice,
+    pressed: document.querySelector('[data-setting="theme"][data-value="dark"]')?.getAttribute('aria-pressed'),
+  }));
+  check(
+    '面板里切深色生效且三档状态正确',
+    themed.theme === 'dark' && themed.choice === 'dark' && themed.pressed === 'true',
+    JSON.stringify(themed)
+  );
+
+  await page.evaluate(() => document.querySelector('[data-setting="theme"][data-value="light"]')?.click());
+  await new Promise((r) => setTimeout(r, 900));
+  await page.keyboard.press('Escape');
+  await new Promise((r) => setTimeout(r, 400));
+  const back = await page.evaluate(() => ({
+    open: document.getElementById('settings-panel')?.hasAttribute('open'),
+    expanded: document.getElementById('settings-toggle')?.getAttribute('aria-expanded'),
+    focus: document.activeElement?.id,
+  }));
+  check(
+    'Esc 关闭面板并把焦点还给设置按钮',
+    !back.open && back.expanded === 'false' && back.focus === 'settings-toggle',
+    JSON.stringify(back)
+  );
+
+  /* 快捷键表：全靠键盘打开，也要能 Esc 关掉 */
+  await page.keyboard.type('?');
+  await new Promise((r) => setTimeout(r, 450));
+  const shortcuts = await page.evaluate(() => ({
+    open: document.getElementById('shortcuts-panel')?.hasAttribute('open'),
+    rows: document.querySelectorAll('#shortcuts-panel tbody tr').length,
+  }));
+  check('按 ? 打开快捷键表', shortcuts.open && shortcuts.rows >= 6, JSON.stringify(shortcuts));
+  await page.keyboard.press('Escape');
+  await new Promise((r) => setTimeout(r, 350));
 
   await page.screenshot({ path: '.shots/kb-article-focus.png' });
   await page.close();
@@ -174,7 +218,7 @@ const check = (name, pass, detail = '') => {
   await page.goto(`${base}/`, { waitUntil: 'load' });
   await page.evaluate(() => {
     document.documentElement.dataset.theme = 'dark';
-    localStorage.setItem('theme', 'dark');
+    localStorage.setItem('settings', JSON.stringify({ theme: 'dark' }));
   });
   await new Promise((r) => setTimeout(r, 300));
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

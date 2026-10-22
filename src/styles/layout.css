@@ -110,17 +110,12 @@
 
 .theme-toggle:hover {
   color: var(--text);
-  transform: rotate(-12deg);
+  transform: scale(1.06);
 }
 
 .theme-toggle svg {
   width: 15px;
   height: 15px;
-}
-
-html[data-theme='dark'] .icon-sun,
-html[data-theme='light'] .icon-moon {
-  display: none;
 }
 
 /* ---------- hero ---------- */

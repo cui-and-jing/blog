@@ -2,10 +2,13 @@
    实际规则按层叠顺序拆在同目录的多个文件里，这里只负责按序引入——
    构建时 Vite 会把它们内联成一个文件，运行时不产生额外请求。
    新增样式请放进对应文件，不要在这里写规则。 */
+@import './fonts.css';
 @import './tokens.css';
 @import './base.css';
+@import './typography.css';
 @import './layout.css';
 @import './components.css';
+@import './settings.css';
 @import './article.css';
 @import './pages.css';
 @import './notes.css';

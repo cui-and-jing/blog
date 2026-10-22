@@ -11,6 +11,8 @@
     "new": "node scripts/new-post.mjs",
     "note": "node scripts/new-note.mjs",
     "image": "node scripts/image-inbox.mjs",
+    "fonts": "node scripts/fonts.mjs",
+    "fonts:check": "node scripts/fonts.mjs --check",
     "lint:content": "node scripts/lint-content.mjs",
     "comments:setup": "node scripts/giscus-setup.mjs",
     "og": "node scripts/og-cards.mjs",
@@ -33,6 +35,7 @@
     "axe-core": "^4.14.0",
     "puppeteer-core": "^25.14.0",
     "sharp": "^0.35.5",
+    "subset-font": "^2.9.0",
     "typescript": "^6.0.3",
     "yaml": "^2.9.1"
   }

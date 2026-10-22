@@ -111,10 +111,10 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         <div>
           <div class="article-tools">
             <span class="article-tools-label">字号</span>
-            <div class="size-switch" role="group" aria-label="正文字号" data-read-size>
-              <button type="button" data-size="small" aria-pressed="false" title="小一号">A−</button>
-              <button type="button" data-size="normal" aria-pressed="true" title="标准字号">A</button>
-              <button type="button" data-size="large" aria-pressed="false" title="大一号">A+</button>
+            <div class="size-switch" role="group" aria-label="正文字号">
+              <button type="button" data-setting="size" data-value="small" aria-pressed="false" title="小一号">A−</button>
+              <button type="button" data-setting="size" data-value="normal" aria-pressed="true" title="标准字号">A</button>
+              <button type="button" data-setting="size" data-value="large" aria-pressed="false" title="大一号">A+</button>
             </div>
           </div>
 
@@ -317,36 +317,8 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       if (status) status.textContent = message;
     };
 
-    /* ---------- 正文字号 ---------- */
-    const sizeSwitch = document.querySelector<HTMLElement>('[data-read-size]');
-    if (sizeSwitch) {
-      const buttons = Array.from(sizeSwitch.querySelectorAll<HTMLButtonElement>('button'));
-
-      const apply = (value: string, notify = false) => {
-        if (value === 'normal') delete document.documentElement.dataset.reading;
-        else document.documentElement.dataset.reading = value;
-        try {
-          localStorage.setItem('reading', value);
-        } catch {}
-        buttons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn.dataset.size === value)));
-        if (notify) {
-          const label = value === 'small' ? '小' : value === 'large' ? '大' : '标准';
-          announce(`字号：${label}`);
-        }
-      };
-
-      buttons.forEach((btn) =>
-        btn.addEventListener('click', () => apply(btn.dataset.size ?? 'normal', true))
-      );
-
-      apply(document.documentElement.dataset.reading ?? 'normal');
-
-      /* 在另一个标签页改过字号，切回来时跟上 */
-      window.addEventListener('storage', (event) => {
-        if (event.key !== 'reading') return;
-        apply(event.newValue ?? 'normal');
-      });
-    }
+    /* 字号按钮的逻辑在 BaseLayout：它和其他外观设置共用同一份 localStorage，
+       同一套标记（data-setting / data-value），这里不再各写一遍 */
 
     /* ---------- 阅读位置记忆 ---------- */
     const resumeBar = document.getElementById('resume-bar');

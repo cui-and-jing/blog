@@ -49,6 +49,9 @@ const html = files.filter((f) => f.ext === '.html' && !isGame(f));
 const images = files.filter(
   (f) => /\.(avif|webp|png|jpe?g|gif|svg)$/.test(f.ext) && !isGame(f) && !isOg(f)
 );
+/* 字体按 unicode-range 切片，浏览器只会下页面真正用到的片；
+   但总量仍然是首屏成本，得单独盯着 */
+const fonts = files.filter((f) => f.ext === '.woff2');
 
 const sum = (list, key) => list.reduce((total, file) => total + file[key], 0);
 
@@ -58,12 +61,13 @@ const rows = [
   {
     name: 'CSS',
     current: sum(css, 'size'),
-    /* 90 → 96（第六轮：订阅页 + 笔记独立页）→ 100（第七轮：作者页 + 许可页 + 署名）。
-       门槛是防失控的，不是压到极限——93.4 已经贴住 96，留 6KB 余量比为了 2KB
+    /* 90 → 96（第六轮：订阅页 + 笔记独立页）→ 100（第七轮：作者页 + 许可页 + 署名）
+       → 104（第八轮：设置面板 + 中文排版规则）。
+       门槛是防失控的，不是压到极限——98.5 已经贴住 100，留 5KB 余量比为了 2KB
        把规则拆成更省字节但更难读的写法划算 */
-    max: 100 * KB,
+    max: 104 * KB,
     gzip: sum(css, 'gzip'),
-    gzipMax: 20 * KB,
+    gzipMax: 21 * KB,
   },
   {
     name: 'JS',
@@ -83,6 +87,15 @@ const rows = [
     name: '图片（主站）',
     current: sum(images, 'size'),
     max: 600 * KB,
+    gzip: null,
+    gzipMax: null,
+  },
+  {
+    name: '字体（主站）',
+    current: sum(fonts, 'size'),
+    /* 思源宋体按站内实际用到的 1000 字裁出来约 284KB，会随文章缓慢增长。
+       320 是红线：再往上就该按字频砍低频字，而不是继续放大 */
+    max: 320 * KB,
     gzip: null,
     gzipMax: null,
   },

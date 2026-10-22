@@ -30,6 +30,10 @@ jobs:
       - name: Content lint (frontmatter, links, images, typography, share cards)
         run: npm run lint:content
 
+      # 子集缺字不会报错，只会在线上悄悄回退成系统字体，必须显式比对
+      - name: Font subset coverage
+        run: npm run fonts:check
+
       - name: Type check
         run: npm run check
 

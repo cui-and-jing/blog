@@ -1,0 +1,298 @@
+/* ==========================================================================
+   settings.css — 阅读设置面板与快捷键表
+   两个面板共用 .side-panel 这套外壳：桌面贴在顶栏右下方，窄屏变成底部抽屉
+   ========================================================================== */
+
+.side-panel {
+  position: fixed;
+  inset: 74px 22px auto auto;
+  margin: 0;
+  width: min(356px, calc(100vw - 28px));
+  max-width: none;
+  max-height: calc(100vh - 100px);
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  color: var(--text);
+  font-family: var(--font-sans);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 遮罩要很淡：设置面板是用来边看边调的，压暗太多会挡住正在读的正文 */
+.side-panel::backdrop {
+  background: rgba(18, 16, 13, 0.22);
+  backdrop-filter: blur(1.5px);
+}
+
+html[data-theme='dark'] .side-panel::backdrop {
+  background: rgba(0, 0, 0, 0.48);
+}
+
+html[data-motion='on'] .side-panel[open] {
+  animation: panel-in 0.2s var(--ease);
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- 头部 ---------- */
+.panel-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 18px 12px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-mute);
+}
+
+.panel-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px -4px -4px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-mute);
+  cursor: pointer;
+  transition: background 0.16s var(--ease), color 0.16s var(--ease);
+}
+
+.panel-close:hover {
+  background: var(--bg-soft);
+  color: var(--text);
+}
+
+.panel-close svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ---------- 设置项 ---------- */
+.panel-body {
+  padding: 8px 18px 2px;
+}
+
+.panel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+}
+
+.panel-row + .panel-row {
+  border-top: 1px solid var(--line-soft);
+}
+
+.panel-label {
+  flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-soft);
+  letter-spacing: 0.01em;
+}
+
+/* 分段控件：选中的那一档浮起来，跟正文卡片的材质保持一致 */
+.seg {
+  display: inline-flex;
+  flex: 0 1 auto;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-soft);
+  border-radius: 999px;
+}
+
+.seg button {
+  min-width: 34px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-mute);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.18s var(--ease), color 0.18s var(--ease);
+}
+
+.seg button:hover {
+  color: var(--text);
+}
+
+.seg button[aria-pressed='true'] {
+  background: var(--card);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* 字体那三个按钮直接用各自的字体渲染，选之前就能看出差别 */
+.seg button[data-setting='font'] {
+  min-width: 32px;
+  padding: 0 9px;
+  font-size: 14px;
+}
+
+.panel-hint {
+  margin: 6px 0 14px;
+  font-size: 11.5px;
+  line-height: 1.75;
+  color: var(--text-mute);
+}
+
+/* ---------- 底部操作 ---------- */
+.panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 18px 13px;
+  background: var(--card-flat);
+  border-top: 1px solid var(--line-soft);
+}
+
+.panel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  color: var(--text-soft);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  /* 页脚那种文字链接必须真下划线，否则对比度只有 1.x，axe 会判 link-in-text-block */
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--text-soft) 40%, transparent);
+  text-underline-offset: 3px;
+}
+
+.panel-link:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+
+/* ---------- 键帽 ---------- */
+kbd {
+  display: inline-block;
+  min-width: 19px;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--card);
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* ---------- 快捷键表 ---------- */
+.shortcut-table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.shortcut-table th,
+.shortcut-table td {
+  padding: 9px 18px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.shortcut-table th {
+  width: 43%;
+  font-weight: 400;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.shortcut-table td {
+  color: var(--text-mute);
+}
+
+.shortcut-table tr:last-child th,
+.shortcut-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.shortcuts-panel .panel-hint {
+  margin: 0;
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* ---------- 窄屏：变成底部抽屉 ---------- */
+@media (max-width: 560px) {
+  .side-panel {
+    inset: auto 0 0 0;
+    width: 100%;
+    max-height: 84vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  html[data-motion='on'] .side-panel[open] {
+    animation-name: panel-up;
+  }
+
+  .panel-head {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .panel-row {
+    padding: 11px 0;
+  }
+
+  .seg button {
+    height: 30px;
+  }
+}
+
+@keyframes panel-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
