@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# 连续推送时只保留最新一次：旧提交的检查结果已经没人看，
+# 十几条流水线并跑还会互相抢 runner（曾出现过瞬时失败的重跑）。
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     name: Lint, build, budget & a11y
