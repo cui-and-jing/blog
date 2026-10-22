@@ -462,9 +462,21 @@ html[data-theme='dark'] .prose .table-wrap.is-scrollable {
   background: rgba(255, 255, 255, 0.16);
 }
 
-/* 长代码块折叠：按行隐藏，切口落在行边界上，不会切断半行字。
-   阈值 24 与 BaseLayout 里的 lineCount > 24 对应。
-   不用 mask 做渐隐——半透明遮罩会让对比度工具把亮色文字算到浅色背景上。 */
+/* 长代码块折叠：按行隐藏。
+   前提是把 shiki 的 .line 变成块级元素——它每行后面跟着一个换行文本节点，
+   行内状态下隐藏 span 后空行还在，等于没折。code 层改成 normal 折叠掉这些换行，
+   每行内部再用 pre-wrap 保证缩进与折行不变。
+   不用 mask 或 overflow 裁切——裁切区外的元素仍会被对比度检查算到页面背景上。 */
+.prose pre code {
+  display: block;
+  white-space: normal;
+}
+
+.prose pre .line {
+  display: block;
+  white-space: pre-wrap;
+}
+
 .code-block.is-long:not(.is-open) pre .line:nth-child(n + 25) {
   display: none;
 }

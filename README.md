@@ -329,10 +329,14 @@ npm run preflight     # 一条命令串起：og → lint → check → 构建 �
 （CI 没有中文字体，渲染出来是方框），`--skip-build` 复用现有 `dist` 只跑检查，
 `--visual` 额外跑一遍视觉回归（比全站截图慢，改过样式时用）。
 
-`visual` 的基线在 `tests/visual/baseline/`（90 张 JPEG，约 3.8 MB），元信息记在
+`visual` 的基线在 `tests/visual/baseline/`（90 张 JPEG，约 5.3 MB），元信息记在
 `tests/visual/meta.json`，包含生成时的 `platform` 与浏览器版本。**换机器或换浏览器后会直接跳过比对**
 ——字体栅格化不同会让所有页面都"失败"，那种红叉没有信息量，在本机跑一次 `--update` 重建即可。
 3D 游戏页用 canvas 实时渲染，逐帧不同，不在比对范围内。
+
+截图只覆盖视口首屏，不拍整页：整页截图受懒加载与 `position: fixed` 元素影响，同一份代码能差出
+几个百分点，假阳性比覆盖不到正文更麻烦。所以它盯的是导航、hero、卡片、页头这类首屏结构的意外改动，
+正文排版的回归靠 `styleguide` 那一页兜底。
 
 `lint:content` 检查的是「构建不会报错、但读者会看到」的问题：
 

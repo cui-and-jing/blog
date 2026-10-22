@@ -70,7 +70,7 @@ export function readingTime(text: string): number {
 ```ts
 const cache = new Map<string, Post>();
 
-/** 单篇取数：命中缓存直接返回，避免同一次请求里反复过滤整张表 */
+/** 命中缓存直接返回，避免重复过滤整张表 */
 export async function getPost(slug: string): Promise<Post | null> {
   const hit = cache.get(slug);
   if (hit) return hit;
@@ -81,14 +81,12 @@ export async function getPost(slug: string): Promise<Post | null> {
   return found;
 }
 
-/** 时间上的前后篇。系列内的顺序另算，见 series.ts */
+/** 时间上的前后篇，系列内的顺序另算 */
 export async function getNeighbours(slug: string) {
   const posts = await getPosts();
   const index = posts.findIndex((post) => post.id === slug);
 
-  if (index < 0) {
-    return { prev: null, next: null };
-  }
+  if (index < 0) return { prev: null, next: null };
 
   return {
     prev: posts[index - 1] ?? null,
@@ -96,7 +94,7 @@ export async function getNeighbours(slug: string) {
   };
 }
 
-/** 标签频次，侧栏与搜索页的「热门标签」都取自这里 */
+/** 标签频次，侧栏与搜索页的热门标签都取自这里 */
 export function countTags(posts: Post[]): Array<[string, number]> {
   const counts = new Map<string, number>();
   for (const post of posts) {

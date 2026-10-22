@@ -436,6 +436,11 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         const show = (i: number) => {
           index = (i + lightboxImages.length) % lightboxImages.length;
           const image = lightboxImages[index];
+          /* 先把固有尺寸占上：图没到之前舞台高度是 0，滚轮和拖动都无处可落 */
+          if (image.naturalWidth && image.naturalHeight) {
+            view.width = image.naturalWidth;
+            view.height = image.naturalHeight;
+          }
           view.src = image.currentSrc || image.src;
           view.alt = image.alt;
           /* 「原图」指向 img 的 src 而不是 currentSrc：后者是 srcset 选中的档位，放大后会糊 */

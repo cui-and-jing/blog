@@ -127,10 +127,14 @@ const shoot = async (route, theme, viewport) => {
       frozen.textContent = '你好，我们是 Cui & Jing。';
       typed.replaceWith(frozen);
     }
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   });
   await sleep(700);
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
 
+  /* 只拍视口。整页截图看着更全面，但懒加载与 position:fixed 元素会让同一份代码
+     每次差出几个百分点，那种假阳性比覆盖不到正文更糟。 */
   const buffer = await page.screenshot({ type: 'jpeg', quality: 70, fullPage: false });
   await page.close();
   return buffer;

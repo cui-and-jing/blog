@@ -33,7 +33,7 @@
 
   /* 纸上没有「展开」可点，折叠的代码要全部摊开 */
   .code-block.is-long:not(.is-open) pre .line {
-    display: inline !important;
+    display: block !important;
   }
 
   html,
