@@ -137,6 +137,18 @@
   backdrop-filter: blur(6px);
 }
 
+/* 置顶标记压在封面上，底色必须自己带，不能靠半透明白 */
+.chip-pin {
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* 深色主题的 accent 是浅橙，白字压上去只有 2.76:1，反过来用深色字 */
+html[data-theme='dark'] .chip-pin {
+  color: #1b1916;
+}
+
 /* ---------- card grid ---------- */
 .card-grid {
   display: grid;

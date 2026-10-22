@@ -1,0 +1,172 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { render } from 'astro:content';
+import { url, formatDate } from '../../lib/site';
+import { getNotes, noteAnchor } from '../../lib/notes';
+
+const notes = await getNotes();
+
+/* 每条笔记都要单独渲染成 HTML，模板里不能 await，先一次性算好 */
+const rendered = await Promise.all(
+  notes.map(async (note) => ({ note, Content: (await render(note)).Content }))
+);
+
+/* 按年月分组，组内保持时间倒序 */
+const groups: { key: string; label: string; items: typeof rendered }[] = [];
+for (const item of rendered) {
+  const date = item.note.data.date;
+  const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+  let group = groups.find((entry) => entry.key === key);
+  if (!group) {
+    group = { key, label: `${date.getFullYear()} 年 ${date.getMonth() + 1} 月`, items: [] };
+    groups.push(group);
+  }
+  group.items.push(item);
+}
+
+const latest = notes[0]?.data.date;
+const shortDate = (date: Date) =>
+  `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+---
+
+<BaseLayout
+  title="笔记"
+  description="短句、碎片和还没长成文章的想法。按时间倒序，最新的在最上面。"
+>
+  <div class="page-head">
+    <div class="shell">
+      <h1>笔记</h1>
+      <p>{notes.length} 条笔记。想到就写，不成篇，也不编号。</p>
+    </div>
+  </div>
+
+  <div class="shell notes-shell">
+    <div class="notes-bar">
+      <p>
+        长一点的东西写在<a href={url('/posts/')}>文章</a>里，这里只放还没长成文章的碎片。
+        {latest && <span class="notes-latest">最近一条 {formatDate(latest)}</span>}
+      </p>
+      <a class="notes-feed" href={url('/notes.xml')}>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4.5A15.5 15.5 0 0 1 19.5 20h-3A12.5 12.5 0 0 0 4 7.5v-3Zm0 6a9.5 9.5 0 0 1 9.5 9.5h-3A6.5 6.5 0 0 0 4 13.5v-3ZM6 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z" /></svg>
+        订阅笔记
+      </a>
+    </div>
+
+    {
+      notes.length === 0 && (
+        <div class="notes-empty">
+          <p>还没有笔记。往 <code>src/content/notes/</code> 里丢一个 Markdown 文件就会出现。</p>
+        </div>
+      )
+    }
+
+    {
+      groups.map((group) => (
+        <section class="note-group" aria-labelledby={`group-${group.key}`}>
+          <h2 class="note-month" id={`group-${group.key}`}>{group.label}</h2>
+          <ol class="note-items">
+            {group.items.map(({ note, Content }) => {
+              const anchor = noteAnchor(note);
+              const date = note.data.date;
+              return (
+                <li class="note-item" id={anchor}>
+                  <div class="note-rail" aria-hidden="true">
+                    <span class="note-dot" />
+                  </div>
+                  <div class="note-card">
+                    <div class="note-date">
+                      <time datetime={date.toISOString()}>{shortDate(date)}</time>
+                    </div>
+                    <div class="prose note-body">
+                      <Content />
+                    </div>
+                    <div class="note-foot">
+                      <div class="note-tags">
+                        {note.data.tags.map((tag: string) => (
+                          <a href={url(`/tags/${encodeURIComponent(tag)}/`)}>#{tag}</a>
+                        ))}
+                      </div>
+                      <button class="note-copy" type="button" data-note-copy data-anchor={anchor}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M10 13.5a4 4 0 0 0 5.7 0l3-3a4 4 0 1 0-5.7-5.7l-1.3 1.3" />
+                          <path d="M14 10.5a4 4 0 0 0-5.7 0l-3 3a4 4 0 1 0 5.7 5.7l1.3-1.3" />
+                        </svg>
+                        <span>复制链接</span>
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ))
+    }
+
+    {
+      notes.length > 0 && (
+        <p class="notes-end">
+          再往前就没有了。<a href={url('/posts/')}>去看长文章 →</a>
+        </p>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<script>
+  const status = document.getElementById('a11y-status');
+
+  /**
+   * 剪贴板 API 在文档未聚焦、权限被拒或非安全上下文时都会抛错。
+   * 退回 execCommand 能覆盖其中大部分情况（正文区的复制按钮也是这么做的），
+   * 两条路都走不通才让地址栏承担「至少能手动复制」。
+   */
+  const copyText = async (text: string): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      /* 选中临时 textarea 会把焦点从按钮上抢走，结束后要还回去，
+         否则键盘用户按完 Enter 就不知道自己在哪了 */
+      const previous = document.activeElement as HTMLElement | null;
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.top = '-1000px';
+      document.body.append(area);
+      area.select();
+      let ok = false;
+      try {
+        ok = document.execCommand('copy');
+      } catch {
+        ok = false;
+      }
+      area.remove();
+      previous?.focus({ preventScroll: true });
+      return ok;
+    }
+  };
+
+  document.addEventListener('click', async (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-note-copy]');
+    if (!button) return;
+
+    const anchor = button.dataset.anchor ?? '';
+    const link = `${location.origin}${location.pathname}#${anchor}`;
+    const label = button.querySelector('span');
+    const ok = await copyText(link);
+
+    if (ok) {
+      if (label) label.textContent = '已复制';
+      if (status) status.textContent = '笔记链接已复制';
+    } else {
+      location.hash = anchor;
+      if (status) status.textContent = `复制失败，地址栏已跳到 #${anchor}`;
+    }
+
+    window.setTimeout(() => {
+      if (label) label.textContent = '复制链接';
+    }, 1600);
+  });
+</script>

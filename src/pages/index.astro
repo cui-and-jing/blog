@@ -6,13 +6,20 @@ import Sidebar from '../components/Sidebar.astro';
 import CategoryTiles from '../components/CategoryTiles.astro';
 import { SITE, url, formatDate, daysSince } from '../lib/site';
 import { getPosts } from '../lib/posts';
+import { getNotes, noteAnchor, noteText } from '../lib/notes';
 
 const posts = await getPosts();
-const [featured, ...rest] = posts;
+/* featured 字段原来只是躺在 schema 里，首页永远取最新一篇——标了置顶也不生效 */
+const featured = posts.find((post) => post.data.featured) ?? posts[0];
+const rest = posts.filter((post) => post.id !== featured?.id);
 const recent = rest.slice(0, 6);
+const notes = (await getNotes()).slice(0, 3);
 const tagCount = new Set(posts.flatMap((p) => p.data.tags)).size;
 const latest = posts[0]?.data.date;
 const days = daysSince(SITE.since);
+
+const excerpt = (text: string, limit = 72) =>
+  text.length > limit ? `${text.slice(0, limit)}…` : text;
 ---
 
 <BaseLayout>
@@ -64,6 +71,33 @@ const days = daysSince(SITE.since);
   <div class="shell with-aside">
     <div>
       {featured && <Featured post={featured} />}
+
+      {
+        notes.length > 0 && (
+          <>
+            <div class="section-head" style="margin-top:34px">
+              <h2>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5 4.5h9.5L19 9v10.5A1.5 1.5 0 0 1 17.5 21h-12A1.5 1.5 0 0 1 4 19.5v-13A1.5 1.5 0 0 1 5.5 5Z" />
+                  <path d="M14 4.5V9h4.5M8 13h8M8 16.5h5" />
+                </svg>
+                最近想法
+              </h2>
+              <a href={url('/notes/')}>全部笔记 →</a>
+            </div>
+            <ul class="notes-strip">
+              {notes.map((note) => (
+                <li>
+                  <a href={url(`/notes/#${noteAnchor(note)}`)}>
+                    <time datetime={note.data.date.toISOString()}>{formatDate(note.data.date)}</time>
+                    <span>{excerpt(noteText(note))}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </>
+        )
+      }
 
       {
         recent.length > 0 && (

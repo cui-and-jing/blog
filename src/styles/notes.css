@@ -1,0 +1,331 @@
+/* ==========================================================================
+   notes.css — 短笔记时间流（/notes/）
+   与文章页共用 .prose 的排版，只压紧间距、收窄行宽
+   ========================================================================== */
+
+.notes-shell {
+  max-width: 860px;
+  padding-bottom: 40px;
+}
+
+.notes-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 34px;
+  padding: 14px 18px;
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: var(--card-flat);
+}
+
+.notes-bar p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-soft);
+}
+
+.notes-bar p a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.notes-bar p a:hover {
+  border-bottom-color: var(--accent);
+}
+
+.notes-latest {
+  margin-left: 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-mute);
+  white-space: nowrap;
+}
+
+.notes-feed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-soft);
+  font-size: 12.5px;
+  text-decoration: none;
+  transition: color 0.18s var(--ease), border-color 0.18s var(--ease), background 0.18s var(--ease);
+}
+
+.notes-feed svg {
+  width: 13px;
+  height: 13px;
+}
+
+.notes-feed:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: var(--card);
+}
+
+/* ---------- 分组 ---------- */
+
+.note-group {
+  margin: 0 0 12px;
+}
+
+.note-month {
+  margin: 0 0 16px;
+  padding-left: 52px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--text-mute);
+  text-transform: uppercase;
+}
+
+.note-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.note-item {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  scroll-margin-top: 110px;
+}
+
+/* 时间轴：一条竖线串起所有笔记，最后一条收到卡片中部 */
+.note-rail {
+  position: relative;
+}
+
+.note-rail::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+}
+
+.note-item:last-child .note-rail::before {
+  bottom: 44px;
+}
+
+/* 第一条的竖线从圆点开始，不要往上多出一截 */
+.note-item:first-child .note-rail::before {
+  top: 30px;
+}
+
+.note-dot {
+  position: absolute;
+  left: 11px;
+  top: 25px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--bg);
+}
+
+/* ---------- 每条笔记 ---------- */
+
+.note-card {
+  position: relative;
+  margin-bottom: 18px;
+  padding: 18px 24px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.note-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.note-item:target .note-card {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-sm);
+}
+
+.note-date {
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-mute);
+}
+
+.note-body {
+  font-size: calc(16px * var(--prose-scale));
+  line-height: 1.82;
+}
+
+.note-body > :first-child {
+  margin-top: 0;
+}
+
+.note-body > :last-child {
+  margin-bottom: 0;
+}
+
+.note-body p {
+  margin: 0 0 0.9em;
+}
+
+.note-body p:last-child {
+  margin-bottom: 0;
+}
+
+.note-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line-soft);
+}
+
+.note-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.note-tags a {
+  font-size: 12px;
+  color: var(--text-mute);
+  text-decoration: none;
+  transition: color 0.18s var(--ease);
+}
+
+.note-tags a:hover {
+  color: var(--accent);
+}
+
+.note-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-mute);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.18s var(--ease), background 0.18s var(--ease);
+}
+
+.note-copy svg {
+  width: 13px;
+  height: 13px;
+}
+
+.note-copy:hover,
+.note-copy:focus-visible {
+  color: var(--accent);
+  background: var(--bg-soft);
+}
+
+.notes-end {
+  margin: 34px 0 0;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--text-mute);
+}
+
+.notes-end a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* 正文里的行内链接必须有下划线：颜色与周围文字的对比度到不了 3:1 时，
+   axe（link-in-text-block）只认非颜色的差异。放在文件末尾，覆盖上面的 none */
+.notes-bar p a,
+.notes-end a,
+.note-body a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.notes-bar p a:hover,
+.notes-end a:hover,
+.note-body a:hover {
+  text-decoration-color: var(--accent);
+}
+
+.notes-empty {
+  padding: 40px 24px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  text-align: center;
+  color: var(--text-soft);
+}
+
+.notes-empty code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--bg-soft);
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+
+/* ---------- 首页的「最近想法」条 ---------- */
+
+.notes-strip {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.notes-strip li {
+  background: var(--card);
+}
+
+.notes-strip a {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 16px;
+  padding: 13px 18px;
+  text-decoration: none;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.notes-strip time {
+  padding-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-mute);
+  transition: color 0.18s var(--ease);
+}
+
+.notes-strip a:hover span {
+  color: var(--text);
+}
+
+.notes-strip a:hover time {
+  color: var(--accent);
+}

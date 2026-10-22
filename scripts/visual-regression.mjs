@@ -36,6 +36,7 @@ const ROUTES = only.length
       '/posts/hello-astro/',
       '/posts/paper-notes/',
       '/posts/writing-workflow/',
+      '/notes/',
       '/archive/',
       '/series/',
       '/series/从笔记到发布/',

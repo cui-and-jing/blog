@@ -2,8 +2,10 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { url, formatDate, readingTime, base } from '../lib/site';
 import { getPosts } from '../lib/posts';
+import { getNotes } from '../lib/notes';
 
 const posts = await getPosts();
+const notes = await getNotes();
 
 /* 无结果时的兜底：给几篇最近的文章和几个高频标签，比干巴巴一句「换个词」有用 */
 const recent = posts.slice(0, 3);
@@ -21,7 +23,7 @@ const topTags = [...tagCounts.entries()]
   <div class="page-head">
     <div class="shell">
       <h1>搜索</h1>
-      <p>{posts.length} 篇文章，慢慢找。</p>
+      <p>{posts.length} 篇文章{notes.length > 0 ? `、${notes.length} 条笔记` : ''}，慢慢找。</p>
     </div>
   </div>
 
@@ -281,6 +283,12 @@ const topTags = [...tagCounts.entries()]
 
           const meta = document.createElement('div');
           meta.className = 'search-item-meta';
+          if (post.type === 'note') {
+            const badge = document.createElement('span');
+            badge.className = 'search-type';
+            badge.textContent = '笔记';
+            meta.append(badge);
+          }
           const time = document.createElement('time');
           time.textContent = post.date;
           meta.append(time);
@@ -290,9 +298,11 @@ const topTags = [...tagCounts.entries()]
             cat.textContent = post.category;
             meta.append(cat);
           }
-          const mins = document.createElement('span');
-          mins.textContent = `约 ${post.minutes} 分钟`;
-          meta.append(mins);
+          if (post.type !== 'note') {
+            const mins = document.createElement('span');
+            mins.textContent = `约 ${post.minutes} 分钟`;
+            meta.append(mins);
+          }
           (post.tags ?? []).slice(0, 3).forEach((tag: string) => {
             const span = document.createElement('span');
             span.className = 'tag';
@@ -314,7 +324,8 @@ const topTags = [...tagCounts.entries()]
         });
 
         const hasQuery = querying;
-        countEl.textContent = hasQuery ? `找到 ${items.length} 篇` : `共 ${items.length} 篇`;
+        /* 空查询时只列文章：笔记是碎片，混在「全部内容」里会喧宾夺主 */
+        countEl.textContent = hasQuery ? `找到 ${items.length} 条` : `共 ${items.length} 篇`;
         empty.hidden = items.length > 0;
         list.hidden = items.length === 0;
       };
@@ -390,7 +401,10 @@ const topTags = [...tagCounts.entries()]
         history.replaceState(null, '', url);
 
         if (!terms.length) {
-          render(posts.map((post) => ({ post, terms: [] })), false);
+          render(
+            posts.filter((post) => post.type !== 'note').map((post) => ({ post, terms: [] })),
+            false
+          );
           renderHistory();
           return;
         }

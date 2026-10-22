@@ -16,6 +16,7 @@ const minutes = readingTime(post.body ?? '');
   <span class="featured-veil"></span>
   <div class="featured-body">
     <div class="kicker">
+      {post.data.featured && <span class="chip chip-pin">置顶</span>}
       {post.data.category && <span class="chip">{post.data.category}</span>}
       <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
       <span class="dot"></span>

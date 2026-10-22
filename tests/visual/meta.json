@@ -1,13 +1,14 @@
 {
   "platform": "win32",
   "browser": "Edg/153.0.4234.46",
-  "generatedAt": "2026-10-22T04:33:52.490Z",
+  "generatedAt": "2026-10-22T05:22:47.173Z",
   "routes": [
     "/",
     "/posts/",
     "/posts/hello-astro/",
     "/posts/paper-notes/",
     "/posts/writing-workflow/",
+    "/notes/",
     "/archive/",
     "/series/",
     "/series/从笔记到发布/",

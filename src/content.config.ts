@@ -20,4 +20,17 @@ const posts = defineCollection({
   }),
 });
 
-export const collections = { posts };
+/**
+ * 短笔记：没有标题、没有摘要，一条就是一段话。
+ * 标题与摘要都由正文推导（见 src/lib/notes.ts），所以这里只留必要的字段。
+ */
+const notes = defineCollection({
+  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/notes' }),
+  schema: z.object({
+    date: z.coerce.date(),
+    tags: z.array(z.string()).default([]),
+    draft: z.boolean().default(false),
+  }),
+});
+
+export const collections = { posts, notes };

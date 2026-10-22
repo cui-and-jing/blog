@@ -9,6 +9,7 @@
     "preview": "astro preview",
     "check": "astro check",
     "new": "node scripts/new-post.mjs",
+    "note": "node scripts/new-note.mjs",
     "image": "node scripts/image-inbox.mjs",
     "lint:content": "node scripts/lint-content.mjs",
     "comments:setup": "node scripts/giscus-setup.mjs",

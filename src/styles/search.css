@@ -230,6 +230,14 @@
   border-radius: 999px;
 }
 
+/* 笔记混在文章结果里，需要一个不显眼但能分辨的标记 */
+.search-item-meta .search-type {
+  padding: 2px 8px;
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 12%, transparent);
+  border-radius: 999px;
+}
+
 .search-arrow {
   display: grid;
   flex: none;

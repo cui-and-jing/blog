@@ -90,6 +90,26 @@ npm run image -- ~/Desktop/截图.png --post hello-astro
 脚本不预转格式，免得做两遍。重名会自动加序号，不会覆盖旧图。
 缩边与尺寸读取用的是 Astro 自带的 `sharp`，缺失时会退化成原样复制。
 
+## 写一条笔记
+
+文章之外还有一条更轻的通道：`/notes/`。一条笔记就是一段话，没有标题、没有摘要，
+不发列表页，只按时间排在时间流里。
+
+```bash
+npm run note -- "想到的一句话"
+npm run note -- "带标签的一条" --tags 写作,方法
+npm run note -- "先存着" --draft      # 草稿，构建不发布
+```
+
+命令会写一个 `src/content/notes/2026-10-22-1015.md`（文件名带时分，同一天写多条也不撞车），
+并打印这条笔记的锚点 `/notes/#n-2026-10-22-1015`。
+
+- 标题与摘要都由正文推导（第一句话截到 40 字），所以**不需要写 frontmatter 里的 title**
+- 首页有一块「最近想法」显示最新 3 条；页脚与笔记页都有入口
+- 搜索里与文章一起参与打分，结果带「笔记」徽标；**空查询时只列文章**，不让碎片淹没长文
+- 订阅走单独的 `notes.xml`：主 feed 只放文章，订「文章」的人不该被短句刷屏
+- 超过 900 字会被 `lint:content` 提醒「该写成文章了」
+
 ## 正文组件（MDX）
 
 把文章后缀改成 `.mdx` 就能用下面这些组件，**不需要 import**：`src/pages/posts/[...slug].astro`
@@ -116,8 +136,9 @@ npm run image -- ~/Desktop/截图.png --post hello-astro
 
 ```
 src/
-├── content.config.ts        内容集合 schema（含 series / seriesOrder）
+├── content.config.ts        内容集合 schema（posts / notes）
 ├── content/posts/           文章（Markdown / MDX）
+├── content/notes/           短笔记：只有 date / tags / draft，正文一段话
 ├── assets/                  正文配图：import 进来才会做响应式与格式转换
 ├── layouts/BaseLayout.astro 全站外壳：head、导航、页脚、主题切换、正文增强脚本
 ├── layouts/ProsePageLayout.astro  单页正文版式（排版样例页使用）
@@ -139,9 +160,11 @@ src/
 ├── lib/cover.ts             封面色板与哈希
 ├── lib/comments.ts          评论配置读取（缺 ID 时整块不渲染）
 ├── lib/posts.ts             取文章：dev 含草稿，构建只取已发布
+├── lib/notes.ts             取笔记：标题/摘要从正文推导，锚点名统一在这里生成
 ├── pages/
 │   ├── index.astro          首页
 │   ├── posts/               文章列表 + 详情
+│   ├── notes/               笔记时间流（按年月分组，每条带锚点）
 │   ├── series/              系列总览 + 系列详情
 │   ├── archive.astro        归档（年度统计 + 月度节奏条）
 │   ├── tags/                标签总览 + 单标签
@@ -152,7 +175,8 @@ src/
 │   ├── robots.txt.ts        robots（含 sitemap 地址）
 │   ├── about.astro          关于
 │   ├── styleguide.mdx       排版样例（noindex，给自己查的）
-│   ├── rss.xml.js           RSS
+│   ├── rss.xml.js           RSS（文章）
+│   ├── notes.xml.ts         笔记 RSS
 │   └── 404.astro
 ├── styles/
 │   ├── global.css           样式入口，只按顺序 @import，不写规则
@@ -164,11 +188,13 @@ src/
 │   ├── pages.css            评论、归档、系列、标签、关于、页脚、404
 │   ├── responsive.css       断点覆盖（要排在它覆盖的规则之后）
 │   ├── games.css / motion.css / search.css
+│   ├── notes.css            笔记时间流与首页「最近想法」条
 │   ├── enhance.css          代码块附加件、灯箱、移动端目录
 │   ├── prose-extras.css     提示框、要点、步骤、图注、脚注、表格
 │   └── print.css            打印稿
 ├── scripts/
 │   ├── new-post.mjs         新建文章骨架（npm run new）
+│   ├── new-note.mjs         新建短笔记（npm run note）
 │   ├── image-inbox.mjs      配图归位 + 生成 Figure 片段（npm run image）
 │   ├── og-cards.mjs         生成每篇文章的分享封面（npm run og）
 │   ├── lint-content.mjs     内容体检（npm run lint:content）
@@ -178,7 +204,7 @@ src/
 │   ├── visual-regression.mjs 视觉回归（npm run visual / visual:update）
 │   └── preflight.mjs        发布前一键跑完全部检查（npm run preflight）
 ├── tests/visual/
-│   ├── baseline/            视觉基线，90 张 JPEG，需随样式改动一起提交
+│   ├── baseline/            视觉基线，96 张 JPEG，需随样式改动一起提交
 │   └── meta.json            基线生成环境（platform + 浏览器版本）
 └── public/
     ├── og.png               默认分享图（1200×630）
@@ -207,6 +233,7 @@ src/
 
 - 构建时 `src/pages/search-index.json.ts` 把每篇文章压成纯文本，输出 `/search-index.json`（含标题、
   摘要、标签、分类、日期、链接与正文）。
+- 短笔记也在索引里（`type: "note"`），结果带「笔记」徽标、不显示阅读时长；空查询时列表只列文章。
 - 页面按 标题 > 标签 > 分类 > 摘要 > 正文 加权打分，命中处高亮，并显示命中那句话的上下文。
 - 多个关键词按**覆盖率**打分而不是 AND：`Astro 图片` 里只提了 Astro 的文章仍会出现，只是排在
   两个词都命中的后面。全是「的」「了」这类虚词时按空查询处理，不会返回零结果。
@@ -318,9 +345,9 @@ CI 不生成（GitHub Actions 里没有中文字体，渲染会变成方框）�
 npm run lint:content  # 不需要构建：frontmatter、标题层级、图片、内链、中文排版、分享封面
 npm run check         # astro check：类型与模板
 npm run budget        # 需要 dist：CSS / JS / 单页 HTML / 图片四类上限
-npm run a11y          # 需要先 build + preview：axe-core 扫全站 17 条路由 × 浅/深两套主题
+npm run a11y          # 需要先 build + preview：axe-core 扫全站 18 条路由 × 浅/深两套主题
 npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、字号、Esc、移动端目录
-npm run visual        # 需要先 build + preview：15 条路由 × 浅/深 × 3 视口，和基线逐像素比
+npm run visual        # 需要先 build + preview：16 条路由 × 浅/深 × 3 视口，和基线逐像素比
 npm run visual:update # 样式改动确认无误后重建基线
 npm run preflight     # 一条命令串起：og → lint → check → 构建 → budget → a11y → a11y:keys
 ```
@@ -329,7 +356,7 @@ npm run preflight     # 一条命令串起：og → lint → check → 构建 �
 （CI 没有中文字体，渲染出来是方框），`--skip-build` 复用现有 `dist` 只跑检查，
 `--visual` 额外跑一遍视觉回归（比全站截图慢，改过样式时用）。
 
-`visual` 的基线在 `tests/visual/baseline/`（90 张 JPEG，约 5.3 MB），元信息记在
+`visual` 的基线在 `tests/visual/baseline/`（96 张 JPEG，约 4.2 MB），元信息记在
 `tests/visual/meta.json`，包含生成时的 `platform` 与浏览器版本。**换机器或换浏览器后会直接跳过比对**
 ——字体栅格化不同会让所有页面都"失败"，那种红叉没有信息量，在本机跑一次 `--update` 重建即可。
 3D 游戏页用 canvas 实时渲染，逐帧不同，不在比对范围内。
@@ -354,6 +381,10 @@ npm run preflight     # 一条命令串起：og → lint → check → 构建 �
 `.github/workflows/quality.yml` 在每次 push 与 PR 时依次跑
 `lint:content` → `check` → 构建 → `budget` → `a11y` → `a11y:keys`，任一步失败都会变红
 （它和部署工作流相互独立，不会拦住发布）。
+
+工作流里的 action 都是用大版本号（`checkout@v7`、`setup-node@v7`、`deploy-pages@v5`、
+`withastro/action@v6`）。`.github/dependabot.yml` 每周一查 npm：补丁与小版本合成一个 PR，
+大版本单独提；GitHub Actions 本身每月查一次。
 
 ## 访问统计
 
@@ -409,5 +440,7 @@ BLOG_SITE=https://blog.example.com BLOG_BASE=/ npm run build
 - [x] 体积预算、发布前 preflight、sitemap lastmod
 - [x] 搜索升级（正文覆盖率打分、命中上下文、搜索历史、空态建议）
 - [x] 阅读体验升级（灯箱缩放拖动、阅读位置记忆、代码块折叠、段落深链接）
-- [x] 视觉回归基线（15 路由 × 浅/深 × 3 视口）
+- [x] 视觉回归基线（16 路由 × 浅/深 × 3 视口）
+- [x] 短笔记流（`/notes/` + 独立 feed + 搜索接入 + `npm run note`）
+- [x] 首页置顶（`featured` 真正生效）、CI action 升级、Dependabot
 - [ ] 旧站文章迁移

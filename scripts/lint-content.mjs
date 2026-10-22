@@ -14,6 +14,7 @@ import { parse as parseYaml } from 'yaml';
 
 const root = process.cwd();
 const postsDir = path.join(root, 'src/content/posts');
+const notesDir = path.join(root, 'src/content/notes');
 const publicDir = path.join(root, 'public');
 const ogDir = path.join(publicDir, 'og');
 const manifestFile = path.join(ogDir, 'manifest.json');
@@ -109,6 +110,8 @@ for (const file of walk(postsDir)) {
 const staticRoutes = [
   '/',
   '/posts/',
+  '/notes/',
+  '/notes.xml',
   '/archive/',
   '/tags/',
   '/about/',
@@ -392,6 +395,80 @@ function checkAsset(src, file, line) {
   }
 }
 
+/* ---------- 短笔记 ---------- */
+
+const notes = [];
+for (const file of fs.existsSync(notesDir) ? walk(notesDir) : []) {
+  const raw = fs.readFileSync(file, 'utf8');
+  const rel = path.relative(root, file);
+  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!match) {
+    add('error', rel, 1, '缺少 frontmatter（文件必须以 --- 开头）');
+    continue;
+  }
+  let data = {};
+  try {
+    data = parseYaml(match[1]) ?? {};
+  } catch (err) {
+    add('error', rel, 1, `frontmatter 不是合法 YAML：${err.message}`);
+    continue;
+  }
+  notes.push({
+    file: rel,
+    body: raw.slice(match[0].length),
+    tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
+    date: data.date instanceof Date ? data.date : new Date(String(data.date)),
+    draft: data.draft === true,
+  });
+}
+
+for (const note of notes) {
+  const { file, body } = note;
+
+  if (Number.isNaN(note.date.valueOf())) add('error', file, 1, 'date 缺失或不是合法日期');
+  else if (note.date.valueOf() > Date.now() + 86400000) {
+    add('warn', file, 1, `日期在未来（${note.date.toISOString().slice(0, 10)}）`);
+  }
+
+  const masked = maskCode(body);
+  const plain = masked
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[#>*_~`|=\-]+/g, ' ')
+    .replace(/\s+/g, '')
+    .trim();
+
+  if (!plain) {
+    add('error', file, 1, '正文是空的');
+    continue;
+  }
+
+  /* 笔记可以长一点，但超过这个量级就该拆成文章了，别让时间流变成杂文集 */
+  if (plain.length > 900) {
+    add('warn', file, 1, `这条 ${plain.length} 字，已经是一篇短文的体量；考虑改成 /posts/ 里的文章`);
+  }
+
+  const markdownImage = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+  let m;
+  while ((m = markdownImage.exec(masked))) {
+    const [, alt, src] = m;
+    const where = masked.slice(0, m.index).split('\n').length;
+    if (!alt.trim()) add('error', file, where, `图片缺少替代文字：${src}`);
+    checkAsset(src, file, where);
+  }
+
+  const markdownLink = /(?<!!)\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+  while ((m = markdownLink.exec(masked))) {
+    const [, text, href] = m;
+    const where = masked.slice(0, m.index).split('\n').length;
+    if (!text.trim()) add('error', file, where, `链接没有文字：${href}`);
+    if (href.startsWith('/') && !isRoute(href)) {
+      add('error', file, where, `内链指向的页面不存在：${href}`);
+    }
+  }
+}
+
 /* ---------- 全局检查 ---------- */
 
 const seenTitle = new Map();
@@ -434,7 +511,7 @@ for (const [file, list] of [...byFile.entries()].sort()) {
   }
 }
 
-const summary = `${posts.length} 篇文章，${errors.length} 个错误，${warns.length} 个提醒`;
+const summary = `${posts.length} 篇文章、${notes.length} 条笔记，${errors.length} 个错误，${warns.length} 个提醒`;
 console.log(`\n${errors.length ? 'FAIL' : 'OK'}  ${summary}`);
 
 if (errors.length || (strict && warns.length)) process.exit(1);

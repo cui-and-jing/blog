@@ -1,0 +1,34 @@
+version: 2
+# 依赖自己不会变旧，但也不会自己变新。每周看一眼，补丁和小版本合成一个 PR，
+# 大版本单独提——Astro 这种跨大版本改动需要人读 changelog，不该自动合。
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 4
+    commit-message:
+      prefix: 'chore(deps)'
+    labels:
+      - dependencies
+    groups:
+      astro:
+        patterns:
+          - astro
+          - '@astrojs/*'
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: 'chore(ci)'
+    labels:
+      - ci

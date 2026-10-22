@@ -7,6 +7,8 @@
  * 搜索键盘操作、移动端目录抽屉、横向溢出。
  */
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import puppeteer from 'puppeteer-core';
 
 const base = (process.argv.includes('--base')
@@ -177,7 +179,47 @@ const check = (name, pass, detail = '') => {
   await new Promise((r) => setTimeout(r, 300));
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   check('深色 390px 无横向溢出', overflow <= 0, `${overflow}px`);
-  await page.screenshot({ path: '.shots/kb-mobile-dark.png', fullPage: false });
+  /* 截图只是留证，放系统临时目录，不往仓库里丢文件 */
+  await page.screenshot({ path: path.join(os.tmpdir(), 'cui-jing-kb-mobile-dark.png'), fullPage: false });
+  await page.close();
+}
+
+/* ---------- 6. 笔记页：复制链接能用键盘完成 ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  try {
+    await browser
+      .defaultBrowserContext()
+      .overridePermissions(new URL(base).origin, ['clipboard-read', 'clipboard-write']);
+  } catch {
+    /* 无头环境下个别版本不支持该权限，下面读剪贴板会退回空串 */
+  }
+
+  await page.goto(`${base}/notes/`, { waitUntil: 'load' });
+  await page.waitForSelector('.note-copy');
+  /* 无头窗口默认不在前台，clipboard API 会以「文档未聚焦」拒绝写入 */
+  await page.bringToFront();
+
+  await page.evaluate(() => document.querySelector('.note-copy')?.focus());
+  await page.keyboard.press('Enter');
+  await new Promise((r) => setTimeout(r, 300));
+
+  const state = await page.evaluate(() => {
+    const btn = document.querySelector('.note-copy');
+    const style = btn ? getComputedStyle(btn) : null;
+    return {
+      focused: document.activeElement === btn,
+      outline: style ? `${style.outlineStyle} ${style.outlineWidth}` : '',
+      label: btn?.querySelector('span')?.textContent ?? '',
+      status: document.getElementById('a11y-status')?.textContent ?? '',
+    };
+  });
+  check('笔记复制按钮可聚焦、有焦点环', state.focused && state.outline.includes('solid'), JSON.stringify(state));
+  check('回车后按钮改文案并有读屏播报', state.label === '已复制' && state.status.length > 0, JSON.stringify(state));
+
+  const copied = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
+  check('剪贴板里是带锚点的链接', /#n-\d/.test(copied), copied);
   await page.close();
 }
 
