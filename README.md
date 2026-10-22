@@ -18,7 +18,19 @@ npm run preview  # 预览构建结果
 
 ## 写一篇新文章
 
-在 `src/content/posts/` 下新建 `.md`（或 `.mdx`）文件，文件名即 URL（`hello-astro.md` → `/posts/hello-astro/`）。
+一条命令生成骨架和 frontmatter：
+
+```bash
+npm run new -- "标题" --slug my-post --series 从笔记到发布 --category 技术 --tags Astro,写作
+npm run new          # 什么都不给就交互式问
+```
+
+默认写成草稿（`draft: true`）：`npm run dev` 里能正常看排版，文章顶部有一条「草稿预览」提示，
+列表卡片带「草稿」徽标；`npm run build`、RSS、sitemap、搜索索引都会把它排除。
+发布时把 frontmatter 里的 `draft` 改成 `false`（建的时候加 `--publish` 也可以）。
+判断只写在 `src/lib/posts.ts` 一处：dev 环境放行草稿，构建环境一律过滤。
+
+也可以直接在 `src/content/posts/` 下新建 `.md`（或 `.mdx`）文件，文件名即 URL（`hello-astro.md` → `/posts/hello-astro/`）。
 
 ```yaml
 ---
@@ -66,6 +78,17 @@ draft: false
 卡片和文章页会自动改用图片并保留遮罩，保证标题可读。
 
 写完跑一次 `npm run og` 生成分享封面（详见「分享与 SEO」），然后提交推送，GitHub Actions 会自动构建部署。
+
+### 配图
+
+```bash
+npm run image -- ~/Desktop/截图.png --post hello-astro
+```
+
+图片会收进 `src/assets/posts/<slug>/`，宽度超过 1600px 的自动缩到 1600（`--max` 可改），
+然后打印一段能直接粘贴的 `import` + `<Figure>`。构建时由 `<Picture>` 生成 AVIF/WebP 与四档 srcset，
+脚本不预转格式，免得做两遍。重名会自动加序号，不会覆盖旧图。
+缩边与尺寸读取用的是 Astro 自带的 `sharp`，缺失时会退化成原样复制。
 
 ## 正文组件（MDX）
 
@@ -115,6 +138,7 @@ src/
 ├── lib/series.ts            系列归组、排序与「第 n / N 篇」
 ├── lib/cover.ts             封面色板与哈希
 ├── lib/comments.ts          评论配置读取（缺 ID 时整块不渲染）
+├── lib/posts.ts             取文章：dev 含草稿，构建只取已发布
 ├── pages/
 │   ├── index.astro          首页
 │   ├── posts/               文章列表 + 详情
@@ -143,7 +167,13 @@ src/
 │   ├── enhance.css          代码块附加件、灯箱、移动端目录
 │   ├── prose-extras.css     提示框、要点、步骤、图注、脚注、表格
 │   └── print.css            打印稿
-├── scripts/og-cards.mjs     生成每篇文章的分享封面
+├── scripts/
+│   ├── new-post.mjs         新建文章骨架（npm run new）
+│   ├── image-inbox.mjs      配图归位 + 生成 Figure 片段（npm run image）
+│   ├── og-cards.mjs         生成每篇文章的分享封面（npm run og）
+│   ├── lint-content.mjs     内容体检（npm run lint:content）
+│   ├── budget.mjs           产物体积预算（npm run budget）
+│   └── preflight.mjs        发布前一键跑完全部检查（npm run preflight）
 └── public/
     ├── og.png               默认分享图（1200×630）
     ├── og/                  每篇文章的分享封面 + manifest.json（供内容体检比对）
@@ -228,6 +258,8 @@ npm run comments:setup -- --list  # 只列出仓库里的讨论分类
   正文里的 `/blog/...` 与 `#锚点` 会补成绝对地址，避免在阅读器里点不开。
 - `robots.txt` 由 `src/pages/robots.txt.ts` 生成，自动带上 sitemap 地址；
   404 页带 `noindex`，搜索页不进 sitemap（纯客户端工具，没有独立内容）。
+- sitemap 带 `lastmod`：文章取 `updated`（没写就取 `date`），首页 / 归档 / 标签页 / 分类页 / 系列页
+  取该页涉及文章里最新的一天。没有日期的静态页不写，不拿构建时间凑数。
 - 页头有「跳到正文」链接，键盘 Tab 第一下就能用。
 
 ### 分享封面怎么生成
@@ -268,22 +300,33 @@ CI 不生成（GitHub Actions 里没有中文字体，渲染会变成方框）�
 ## 质量检查
 
 ```bash
-npm run lint:content  # 不需要构建：frontmatter、标题层级、图片、内链、分享封面
+npm run lint:content  # 不需要构建：frontmatter、标题层级、图片、内链、中文排版、分享封面
 npm run check         # astro check：类型与模板
+npm run budget        # 需要 dist：CSS / JS / 单页 HTML / 图片四类上限
 npm run a11y          # 需要先 build + preview：axe-core 扫全站 15 条路由 × 浅/深两套主题
 npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、字号、Esc、移动端目录
+npm run preflight     # 一条命令串起：og → lint → check → 构建 → budget → a11y → a11y:keys
 ```
+
+`preflight` 会自己起 `astro preview` 并在结束时收掉，任何一步失败就停；`--ci` 跳过分享封面
+（CI 没有中文字体，渲染出来是方框），`--skip-build` 复用现有 `dist` 只跑检查。
 
 `lint:content` 检查的是「构建不会报错、但读者会看到」的问题：
 
 - 缺 `title` / `description`、摘要过长会被列表页截断、标题跳级、图片缺 `alt` 或宽高
 - 正文内链指向的文章不存在（包括指向草稿）
 - 代码块没写语言、链接文字是「点这里」
+- 中文排版：中英文之间缺空格、半角标点混进中文、重复标点、一段超过 420 字、行尾空格、
+  连续三行空行、标题末尾带句号——**都是提醒不拦构建**，觉得是有意为之就忽略
 - `public/og/<slug>.png` 缺失——**这一条是硬错误**，因为分享封面不会在 CI 里生成（runner 没有中文字体，
   渲染出来是方框）。`npm run og` 会同时写一份 `public/og/manifest.json`，改了标题却没重画也会被提醒。
 
-`.github/workflows/quality.yml` 在每次 push 与 PR 时依次跑 `lint:content` → `check` → 构建 → `npm run a11y`，
-任一步失败都会变红（它和部署工作流相互独立，不会拦住发布）。
+`budget` 的上限写在 `scripts/budget.mjs` 顶部：CSS 90 KB / gzip 18 KB，JS 32 KB / gzip 12 KB，
+单页 HTML 80 KB，主站图片 600 KB。游戏与分享封面不计入——它们不在首屏路径上。
+
+`.github/workflows/quality.yml` 在每次 push 与 PR 时依次跑
+`lint:content` → `check` → 构建 → `budget` → `a11y` → `a11y:keys`，任一步失败都会变红
+（它和部署工作流相互独立，不会拦住发布）。
 
 ## 访问统计
 
@@ -335,4 +378,6 @@ BLOG_SITE=https://blog.example.com BLOG_BASE=/ npm run build
 - [x] 正文图片响应式（`astro:assets`，AVIF/WebP + srcset）
 - [x] 可配置访问统计（默认关闭）
 - [x] 样式按层拆分（构建后仍是单个 CSS 文件）
+- [x] 写作脚手架 + 草稿本地预览 + 图片收件箱
+- [x] 体积预算、发布前 preflight、sitemap lastmod
 - [ ] 旧站文章迁移

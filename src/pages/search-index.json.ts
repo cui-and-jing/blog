@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
-import { getCollection } from 'astro:content';
 import { url, formatDate, readingTime } from '../lib/site';
+import { getPosts } from '../lib/posts';
 
 /** 把 Markdown 粗略压成可检索的纯文本，保留中文与英文词 */
 function plain(markdown: string): string {
@@ -15,10 +15,7 @@ function plain(markdown: string): string {
 }
 
 export const GET: APIRoute = async () => {
-  const all = await getCollection('posts', ({ data }) => !data.draft);
-  const posts = all
-    .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
-    .map((post) => ({
+  const posts = (await getPosts()).map((post) => ({
       title: post.data.title,
       description: post.data.description,
       date: formatDate(post.data.date),

@@ -1,11 +1,10 @@
 ---
-import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Sidebar from '../components/Sidebar.astro';
 import { SITE, url, daysSince } from '../lib/site';
+import { getPosts } from '../lib/posts';
 
-const all = await getCollection('posts', ({ data }) => !data.draft);
-const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const posts = await getPosts();
 const days = daysSince(SITE.since);
 ---
 

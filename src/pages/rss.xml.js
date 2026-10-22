@@ -1,13 +1,12 @@
 import rss from '@astrojs/rss';
-import { getCollection } from 'astro:content';
 import { SITE, base } from '../lib/site';
+import { getPosts } from '../lib/posts';
 
 const FALLBACK_ORIGIN = 'https://cui-and-jing.github.io';
 
 export async function GET(context) {
   const origin = new URL(context.site ?? FALLBACK_ORIGIN).origin;
-  const posts = await getCollection('posts', ({ data }) => !data.draft);
-  const sorted = posts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+  const sorted = await getPosts();
 
   /* 阅读器里没有站点上下文：正文中的 /blog/... 与 #锚点 都得补成绝对地址 */
   const absolutize = (html, pageLink) =>

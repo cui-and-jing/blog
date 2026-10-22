@@ -1,9 +1,83 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parse as parseYaml } from 'yaml';
 import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 
 const site = process.env.BLOG_SITE ?? 'https://cui-and-jing.github.io';
 const base = process.env.BLOG_BASE ?? '/blog';
+
+/* 配置文件比内容层加载得早，这里直接读 frontmatter，不引 astro:content */
+const postsDir = fileURLToPath(new URL('./src/content/posts', import.meta.url));
+
+/**
+ * 给 sitemap 补 lastmod：文章取 updated（没有就取 date），
+ * 聚合页取该页涉及文章里最新的一天。没有日期的静态页就不写，不拿构建时间凑数。
+ */
+function collectLastmod() {
+  const map = new Map();
+  if (!fs.existsSync(postsDir)) return map;
+
+  const walk = (dir) =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return walk(full);
+      return /\.mdx?$/.test(entry.name) ? [full] : [];
+    });
+
+  const posts = [];
+  for (const file of walk(postsDir)) {
+    const raw = fs.readFileSync(file, 'utf8');
+    const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!match) continue;
+
+    let data;
+    try {
+      data = parseYaml(match[1]) ?? {};
+    } catch {
+      continue;
+    }
+    if (data.draft) continue;
+
+    const value = data.updated ?? data.date;
+    const date = value instanceof Date ? value : new Date(String(value));
+    if (Number.isNaN(date.valueOf())) continue;
+
+    posts.push({
+      slug: path.relative(postsDir, file).replace(/\.mdx?$/, '').split(path.sep).join('/'),
+      date,
+      tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
+      category: data.category ? String(data.category) : '',
+      series: data.series ? String(data.series) : '',
+    });
+  }
+
+  const bump = (route, date) => {
+    const prev = map.get(route);
+    if (!prev || date > prev) map.set(route, date);
+  };
+
+  let latest = null;
+  for (const post of posts) {
+    if (!latest || post.date > latest) latest = post.date;
+    bump(`/posts/${post.slug}/`, post.date);
+    if (post.series) bump(`/series/${post.series}/`, post.date);
+    for (const tag of post.tags) bump(`/tags/${tag}/`, post.date);
+    if (post.category) bump(`/category/${post.category}/`, post.date);
+  }
+  if (latest) {
+    for (const route of ['/', '/posts/', '/archive/', '/tags/', '/series/']) bump(route, latest);
+  }
+
+  /* 索引键带上 base；sitemap 给的 URL 是编码过的，比较前会先解码 */
+  const keyed = new Map();
+  for (const [route, date] of map) keyed.set(`${base}${route}`, date);
+  return keyed;
+}
+
+const lastmod = collectLastmod();
 
 export default defineConfig({
   site,
@@ -14,6 +88,16 @@ export default defineConfig({
     sitemap({
       /* 搜索页是纯客户端工具，排版样例页是给作者自己查的，都不该进搜索结果 */
       filter: (page) => !/\/(search|styleguide)$/.test(page.replace(/\/$/, '')),
+      serialize: (item) => {
+        let pathname;
+        try {
+          pathname = decodeURIComponent(new URL(item.url).pathname);
+        } catch {
+          return item;
+        }
+        const date = lastmod.get(pathname);
+        return date ? { ...item, lastmod: date.toISOString() } : item;
+      },
     }),
   ],
   prefetch: {

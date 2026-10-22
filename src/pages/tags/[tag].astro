@@ -1,10 +1,10 @@
 ---
-import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostCard from '../../components/PostCard.astro';
+import { getPosts } from '../../lib/posts';
 
 export async function getStaticPaths() {
-  const all = await getCollection('posts', ({ data }) => !data.draft);
+  const all = await getPosts();
   const tags = [...new Set(all.flatMap((post) => post.data.tags))];
 
   return tags.map((tag) => ({

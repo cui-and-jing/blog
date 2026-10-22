@@ -1,7 +1,7 @@
 ---
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { getCollection, render } from 'astro:content';
+import { render } from 'astro:content';
 import type { CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Cover from '../../components/Cover.astro';
@@ -16,10 +16,10 @@ import Details from '../../components/mdx/Details.astro';
 import Figure from '../../components/mdx/Figure.astro';
 import { SITE, url, formatDate, readingTime, tagHue } from '../../lib/site';
 import { findSeries, positionIn } from '../../lib/series';
+import { getPosts } from '../../lib/posts';
 
 export async function getStaticPaths() {
-  const posts = await getCollection('posts', ({ data }) => !data.draft);
-  const sorted = posts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+  const sorted = await getPosts();
 
   return sorted.map((post, index) => ({
     params: { slug: post.id },
@@ -44,8 +44,7 @@ const minutes = readingTime(post.body ?? '');
 /* 与阅读时长同口径：去掉代码块再数字，避免把代码行算进正文 */
 const wordCount = (post.body ?? '').replace(/```[\s\S]*?```/g, ' ').replace(/\s+/g, '').length;
 
-const all = await getCollection('posts', ({ data }) => !data.draft);
-const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const posts = await getPosts();
 
 /* 每篇文章的分享封面由 npm run og 生成；没生成过就退回站点默认图 */
 const ogSlug = post.id.replace(/\//g, '-');
@@ -79,6 +78,14 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
     <link rel="dns-prefetch" href="https://giscus.app" />
   </Fragment>
   <div class="shell">
+    {
+      import.meta.env.DEV && post.data.draft && (
+        <p class="draft-banner" role="note">
+          <strong>草稿预览</strong>
+          这篇只在本机可见，构建时不会生成页面，也不会进 RSS 与搜索。
+        </p>
+      )
+    }
     <article>
       <header class="post-hero">
         <Cover seed={post.id} title={post.data.title} image={post.data.cover} showGlyph={false} />

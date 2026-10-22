@@ -121,6 +121,27 @@
   font-weight: 600;
 }
 
+/* dev 专用：草稿页顶部的提示条，构建产物里不会出现 */
+.draft-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--tone-warn) 52%, transparent);
+  background: color-mix(in srgb, var(--tone-warn) 9%, var(--card));
+  color: var(--tone-warn);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.draft-banner strong {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
 .article-card {
   padding: 46px 48px 52px;
   background: var(--card);

@@ -232,6 +232,19 @@ html[data-theme='dark'] .card-meta .cat {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
+/* 草稿徽标只在 dev 出现，但样式常驻，避免 dev/build 两套 CSS 差异 */
+.draft-pill {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--tone-warn);
+  background: color-mix(in srgb, var(--tone-warn) 12%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--tone-warn) 50%, transparent);
+}
+
 .card :is(h2, h3) {
   margin: 9px 0 7px;
   font-family: var(--font-serif);

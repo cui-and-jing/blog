@@ -1,12 +1,11 @@
 ---
-import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import CategoryTiles from '../../components/CategoryTiles.astro';
 import { url, tagHue } from '../../lib/site';
 import { collectSeries } from '../../lib/series';
+import { getPosts } from '../../lib/posts';
 
-const all = await getCollection('posts', ({ data }) => !data.draft);
-const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const posts = await getPosts();
 const counts = new Map<string, number>();
 for (const post of posts) {
   for (const tag of post.data.tags) {

@@ -1,10 +1,9 @@
 ---
-import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostCard from '../../components/PostCard.astro';
+import { getPosts } from '../../lib/posts';
 
-const all = await getCollection('posts', ({ data }) => !data.draft);
-const posts = all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const posts = await getPosts();
 ---
 
 <BaseLayout title="文章" description="全部文章列表">

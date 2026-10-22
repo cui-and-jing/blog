@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   quality:
-    name: Lint, build & axe audit
+    name: Lint, build, budget & a11y
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -27,7 +27,7 @@ jobs:
         run: npm ci
 
       # 先查内容，再查类型，最后才构建——前两步失败时没必要等整站构建
-      - name: Content lint (frontmatter, links, images, share cards)
+      - name: Content lint (frontmatter, links, images, typography, share cards)
         run: npm run lint:content
 
       - name: Type check
@@ -36,7 +36,11 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Accessibility audit (axe, light + dark)
+      # 体积一旦涨上去就很难降回来，放在构建之后、浏览器测试之前
+      - name: Size budget (CSS / JS / HTML / images)
+        run: npm run budget
+
+      - name: Accessibility & keyboard audit (axe + real interactions)
         run: |
           npx astro preview --port 4321 > /tmp/preview.log 2>&1 &
           for _ in $(seq 1 30); do
@@ -47,3 +51,4 @@ jobs:
             sleep 1
           done
           npm run a11y
+          npm run a11y:keys

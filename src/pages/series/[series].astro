@@ -1,11 +1,11 @@
 ---
-import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { url, formatDate, readingTime } from '../../lib/site';
 import { collectSeries } from '../../lib/series';
+import { getPosts } from '../../lib/posts';
 
 export async function getStaticPaths() {
-  const posts = await getCollection('posts', ({ data }) => !data.draft);
+  const posts = await getPosts();
   return collectSeries(posts).map((item) => ({
     params: { series: item.name },
     props: { series: item },

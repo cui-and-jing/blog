@@ -286,6 +286,89 @@ for (const post of posts) {
     }
   }
 
+  /* ---------- 中文排版 ---------- */
+  /* 只提醒、不拦构建：排版偏好因人而异，但混排不一致通常是手滑 */
+  {
+    const proseLines = [];
+    let insideFence = false;
+    body.split('\n').forEach((line, index) => {
+      if (/^\s*```/.test(line)) {
+        insideFence = !insideFence;
+        return;
+      }
+      if (insideFence) return;
+      /* 行内代码、链接地址、HTML 标签、裸链接都不参与排版检查 */
+      const text = line
+        .replace(/`[^`]*`/g, ' ')
+        .replace(/\]\([^)]*\)/g, '] ')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/https?:\/\/\S+/g, ' ');
+      proseLines.push({ text, raw: line, no: index + 1 });
+    });
+
+    const emit = (hits, describe, limit = 3) => {
+      for (const hit of hits.slice(0, limit)) add('warn', file, hit.no, describe(hit));
+      if (hits.length > limit) {
+        add('warn', file, hits[limit].no, `…另外还有 ${hits.length - limit} 处同类问题`);
+      }
+    };
+
+    /* 中英文之间没空格 */
+    const spacing = [];
+    for (const line of proseLines) {
+      if (/^\s*[|>]/.test(line.raw)) continue;
+      const hit = line.text.match(/[\u4e00-\u9fa5][A-Za-z0-9]|[A-Za-z0-9][\u4e00-\u9fa5]/);
+      if (hit) spacing.push({ no: line.no, sample: hit[0] });
+    }
+    emit(spacing, (hit) => `中文与英文/数字之间缺空格：「${hit.sample}」`);
+
+    /* 中文句子里混了半角标点 */
+    const punct = [];
+    for (const line of proseLines) {
+      const hit = line.text.match(/[\u4e00-\u9fa5][,.:;?!]|[,.:;?!][\u4e00-\u9fa5]/);
+      if (hit) punct.push({ no: line.no, sample: hit[0] });
+    }
+    emit(punct, (hit) => `半角标点混在中文里：「${hit.sample}」，中文用全角`);
+
+    /* 重复标点 */
+    const repeated = [];
+    for (const line of proseLines) {
+      const hit = line.text.match(/[，。！？；：、]{2,}/);
+      if (hit) repeated.push({ no: line.no, sample: hit[0] });
+    }
+    emit(repeated, (hit) => `重复标点：「${hit.sample}」`);
+
+    /* 超长段落 */
+    const longLines = proseLines
+      .filter((line) => line.text.trim().length > 420 && !/^\s*[|<\-#>]/.test(line.raw))
+      .map((line) => ({ no: line.no, sample: line.text.trim().length }));
+    emit(longLines, (hit) => `这一段 ${hit.sample} 字，读起来会喘不过气，建议拆成两三段`, 2);
+
+    /* 行尾空格（\r 不算：Windows 换行会误伤整篇） */
+    const trailing = proseLines
+      .filter((line) => /[ \t]+$/.test(line.raw) && line.raw.trim())
+      .map((line) => ({ no: line.no }));
+    emit(trailing, () => '行尾有多余空格');
+
+    /* 连续三个以上空行 */
+    let blanks = 0;
+    body.split('\n').forEach((line, index) => {
+      if (!line.trim()) {
+        blanks += 1;
+        if (blanks === 3) add('warn', file, index + 1, '连续空了 3 行以上，正文会被拉出很大的空洞');
+      } else {
+        blanks = 0;
+      }
+    });
+
+    /* 标题末尾带标点 */
+    maskedLines.forEach((line, index) => {
+      if (/^#{2,6}\s+.*[。，、；：]$/.test(line)) {
+        add('warn', file, index + 1, '标题末尾不用句号或逗号');
+      }
+    });
+  }
+
   /* 篇幅 */
   const plain = masked
     .replace(/<[^>]+>/g, ' ')

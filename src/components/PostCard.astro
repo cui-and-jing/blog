@@ -19,6 +19,7 @@ const minutes = readingTime(post.body ?? '');
   <Cover seed={post.id} title={post.data.title} image={post.data.cover} />
   <div class="card-body">
     <div class="card-meta">
+      {post.data.draft && <span class="draft-pill">草稿</span>}
       {post.data.category && <a class="cat" href={url(`/category/${encodeURIComponent(post.data.category)}/`)}>{post.data.category}</a>}
       <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
       <span>· 约 {minutes} 分钟</span>
