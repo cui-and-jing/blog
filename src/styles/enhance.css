@@ -51,7 +51,109 @@
   margin: 0 auto;
   border-radius: 10px;
   box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.85);
+  transform-origin: center center;
+  transition: transform 0.16s var(--ease);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* 舞台裁切放大后的图片，图注与缩放比例留在外面 */
+.lightbox-stage {
+  position: relative;
+  width: fit-content;
+  max-width: min(94vw, 1240px);
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 10px;
+  cursor: zoom-in;
+  touch-action: none;
   animation: lightbox-in 0.24s var(--ease);
+}
+
+.lightbox-stage.is-zoomed {
+  cursor: grab;
+}
+
+.lightbox-stage.is-dragging {
+  cursor: grabbing;
+}
+
+.lightbox-stage.is-dragging img {
+  transition: none;
+}
+
+.lightbox-tools {
+  position: fixed;
+  top: 22px;
+  right: 22px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lightbox-origin {
+  display: grid;
+  place-items: center;
+  height: 38px;
+  padding: 0 15px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  transition: background 0.18s var(--ease), color 0.18s var(--ease);
+}
+
+.lightbox-origin:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.lightbox-zoom {
+  position: fixed;
+  bottom: 22px;
+  left: 22px;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(14, 13, 11, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+.lightbox-zoom[hidden] {
+  display: none;
+}
+
+.lightbox-hint {
+  position: fixed;
+  bottom: 26px;
+  left: 50%;
+  margin: 0;
+  padding: 7px 15px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(14, 13, 11, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s var(--ease);
+}
+
+.lightbox-hint.is-on {
+  opacity: 1;
+}
+
+/* 触屏没有滚轮，提示会误导，直接不显示 */
+@media (hover: none) {
+  .lightbox-hint {
+    display: none;
+  }
 }
 
 .lightbox-caption {
@@ -63,7 +165,6 @@
 
 .lightbox-close,
 .lightbox-nav {
-  position: fixed;
   display: grid;
   place-items: center;
   padding: 0;
@@ -82,8 +183,6 @@
 }
 
 .lightbox-close {
-  top: 22px;
-  right: 22px;
   width: 38px;
   height: 38px;
 }
@@ -94,6 +193,7 @@
 }
 
 .lightbox-nav {
+  position: fixed;
   top: 50%;
   width: 44px;
   height: 44px;

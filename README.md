@@ -173,7 +173,13 @@ src/
 │   ├── og-cards.mjs         生成每篇文章的分享封面（npm run og）
 │   ├── lint-content.mjs     内容体检（npm run lint:content）
 │   ├── budget.mjs           产物体积预算（npm run budget）
+│   ├── a11y-audit.mjs       axe 全站扫描（npm run a11y）
+│   ├── a11y-keyboard.mjs    键盘与读屏实测（npm run a11y:keys）
+│   ├── visual-regression.mjs 视觉回归（npm run visual / visual:update）
 │   └── preflight.mjs        发布前一键跑完全部检查（npm run preflight）
+├── tests/visual/
+│   ├── baseline/            视觉基线，90 张 JPEG，需随样式改动一起提交
+│   └── meta.json            基线生成环境（platform + 浏览器版本）
 └── public/
     ├── og.png               默认分享图（1200×630）
     ├── og/                  每篇文章的分享封面 + manifest.json（供内容体检比对）
@@ -201,8 +207,12 @@ src/
 
 - 构建时 `src/pages/search-index.json.ts` 把每篇文章压成纯文本，输出 `/search-index.json`（含标题、
   摘要、标签、分类、日期、链接与正文）。
-- 页面按 标题 > 标签 > 分类 > 摘要 > 正文 加权打分，多个关键词按 AND 组合，命中处高亮。
-- 支持 `↑` `↓` 选择、`Enter` 打开、`Esc` 清空；顶栏搜索图标、`Ctrl / ⌘ + K`、`/` 都能进入搜索。
+- 页面按 标题 > 标签 > 分类 > 摘要 > 正文 加权打分，命中处高亮，并显示命中那句话的上下文。
+- 多个关键词按**覆盖率**打分而不是 AND：`Astro 图片` 里只提了 Astro 的文章仍会出现，只是排在
+  两个词都命中的后面。全是「的」「了」这类虚词时按空查询处理，不会返回零结果。
+- 支持 `↑` `↓` 选择、`Enter` 打开（没选时直接开第一条）、`Esc` 清空；顶栏搜索图标、
+  `Ctrl / ⌘ + K`、`/` 都能进入搜索。
+- 最近 6 条搜索记在 `localStorage`，回车或点结果时写入，可一键清空；无结果时给出最近文章与热门标签。
 - 索引很小（当前 3 篇文章约 3 KB），文章多了以后仍然是一次请求；如果将来上千篇，可以换 Pagefind。
 
 ## 阅读体验
@@ -212,8 +222,13 @@ src/
 - 宽表格在窄屏不再挤压正文，改为在 `.table-wrap` 里横向滚动，并在可滚动时补一道边缘阴影。
 - 文章页右侧目录跟随滚动高亮；侧栏内容超出一屏时，当前条目会自动滚进可视区。
 - 宽度 ≤1080px 时出现左下角「目录」按钮，点开是底部抽屉（原生 `<dialog>`，Esc 可关）。
-- 代码块自动显示语言标签和复制按钮（触屏设备上按钮常显）。
-- 正文图片可点击放大，支持 `←` `→` 切换、`Esc` 关闭；图片统一 `loading="lazy"`。
+- 代码块自动显示语言标签和复制按钮（触屏设备上按钮常显）；超过 24 行自动折叠，
+  按钮写着总行数，打印时自动摊开。
+- 正文图片可点击放大：滚轮 / `+` `-` 缩放（1×–4×，以指针为中心）、放大后拖动平移、
+  双击或 `0` 复位、右上角可开原图；图片统一 `loading="lazy"`。
+- 鼠标停在段落上，左侧出现 `#`，点击复制「引用文字 + 文章标题 + 锚点链接」；
+  选中半句就只引半句。窄屏没有左侧余量，这个入口会隐藏。
+- 读到一半关掉，下次回来会看到「上次读到 xx% · 继续」浮条；滚到底自动清记录。
 - 配图放在 `src/assets/` 并通过 `<Figure>` 导入时，会自动生成 AVIF/WebP 与四档 `srcset`，
   图片实际只按正文宽度下载（一张 1200px 截图从 209 KB 降到 20 KB 左右）。
 - 文章页有阅读进度条，滚动超过 700px 出现「回到顶部」。
@@ -303,13 +318,21 @@ CI 不生成（GitHub Actions 里没有中文字体，渲染会变成方框）�
 npm run lint:content  # 不需要构建：frontmatter、标题层级、图片、内链、中文排版、分享封面
 npm run check         # astro check：类型与模板
 npm run budget        # 需要 dist：CSS / JS / 单页 HTML / 图片四类上限
-npm run a11y          # 需要先 build + preview：axe-core 扫全站 15 条路由 × 浅/深两套主题
+npm run a11y          # 需要先 build + preview：axe-core 扫全站 17 条路由 × 浅/深两套主题
 npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、字号、Esc、移动端目录
+npm run visual        # 需要先 build + preview：15 条路由 × 浅/深 × 3 视口，和基线逐像素比
+npm run visual:update # 样式改动确认无误后重建基线
 npm run preflight     # 一条命令串起：og → lint → check → 构建 → budget → a11y → a11y:keys
 ```
 
 `preflight` 会自己起 `astro preview` 并在结束时收掉，任何一步失败就停；`--ci` 跳过分享封面
-（CI 没有中文字体，渲染出来是方框），`--skip-build` 复用现有 `dist` 只跑检查。
+（CI 没有中文字体，渲染出来是方框），`--skip-build` 复用现有 `dist` 只跑检查，
+`--visual` 额外跑一遍视觉回归（比全站截图慢，改过样式时用）。
+
+`visual` 的基线在 `tests/visual/baseline/`（90 张 JPEG，约 3.8 MB），元信息记在
+`tests/visual/meta.json`，包含生成时的 `platform` 与浏览器版本。**换机器或换浏览器后会直接跳过比对**
+——字体栅格化不同会让所有页面都"失败"，那种红叉没有信息量，在本机跑一次 `--update` 重建即可。
+3D 游戏页用 canvas 实时渲染，逐帧不同，不在比对范围内。
 
 `lint:content` 检查的是「构建不会报错、但读者会看到」的问题：
 
@@ -380,4 +403,7 @@ BLOG_SITE=https://blog.example.com BLOG_BASE=/ npm run build
 - [x] 样式按层拆分（构建后仍是单个 CSS 文件）
 - [x] 写作脚手架 + 草稿本地预览 + 图片收件箱
 - [x] 体积预算、发布前 preflight、sitemap lastmod
+- [x] 搜索升级（正文覆盖率打分、命中上下文、搜索历史、空态建议）
+- [x] 阅读体验升级（灯箱缩放拖动、阅读位置记忆、代码块折叠、段落深链接）
+- [x] 视觉回归基线（15 路由 × 浅/深 × 3 视口）
 - [ ] 旧站文章迁移

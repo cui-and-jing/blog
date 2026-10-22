@@ -4,6 +4,7 @@
  *   npm run preflight                  全套：封面 → 内容 → 类型 → 构建 → 预算 → 无障碍 → 键盘
  *   npm run preflight -- --ci          跳过封面（CI 没有中文字体，渲染出来是方框）
  *   npm run preflight -- --skip-build  复用已有 dist，只跑检查
+ *   npm run preflight -- --visual      额外跑视觉回归（改过样式时用，比全站截图慢）
  *
  * 任何一步失败就停，并且保证预览进程被收掉。
  */
@@ -16,6 +17,7 @@ const argv = process.argv.slice(2);
 const ci = argv.includes('--ci');
 const skipOg = ci || argv.includes('--skip-og');
 const skipBuild = argv.includes('--skip-build');
+const withVisual = argv.includes('--visual');
 const win = process.platform === 'win32';
 const PORT = 4321;
 const BASE = `http://localhost:${PORT}/blog/`;
@@ -104,6 +106,12 @@ async function main() {
 
   run('无障碍扫描（axe，浅色 + 深色）', 'node', ['scripts/a11y-audit.mjs']);
   run('键盘与读屏实测', 'node', ['scripts/a11y-keyboard.mjs']);
+
+  if (withVisual) {
+    run('视觉回归（对比 tests/visual/baseline）', 'node', ['scripts/visual-regression.mjs']);
+  } else {
+    console.log('· 跳过视觉回归（加 --visual 开启）');
+  }
 }
 
 try {

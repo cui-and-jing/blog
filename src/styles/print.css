@@ -21,12 +21,19 @@
   .share-bar,
   .comments,
   .lightbox,
+  .resume-bar,
   .article-tools,
   .notfound-actions,
   .prose .code-block .copy-btn,
   .prose .code-block .code-lang,
+  .prose .code-block .code-toggle,
   .prose .heading-anchor {
     display: none !important;
+  }
+
+  /* 纸上没有「展开」可点，折叠的代码要全部摊开 */
+  .code-block.is-long:not(.is-open) pre .line {
+    display: inline !important;
   }
 
   html,

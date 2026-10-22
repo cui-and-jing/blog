@@ -1,0 +1,28 @@
+{
+  "platform": "win32",
+  "browser": "Edg/153.0.4234.46",
+  "generatedAt": "2026-10-22T03:58:24.090Z",
+  "routes": [
+    "/",
+    "/posts/",
+    "/posts/hello-astro/",
+    "/posts/paper-notes/",
+    "/posts/writing-workflow/",
+    "/archive/",
+    "/series/",
+    "/series/从笔记到发布/",
+    "/tags/",
+    "/tags/Astro/",
+    "/category/技术/",
+    "/about/",
+    "/games/",
+    "/search/",
+    "/styleguide/"
+  ],
+  "viewports": [
+    "mobile 390×844",
+    "tablet 768×1024",
+    "desktop 1280×900"
+  ],
+  "quality": 70
+}

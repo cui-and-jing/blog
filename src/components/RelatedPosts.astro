@@ -10,18 +10,31 @@ interface Props {
 
 const { current, posts } = Astro.props;
 
-/* 同分类 +3，每个共同标签 +2；都不沾边就按时间补位，至少让读者有下一站 */
+/* 同系列 +5，同分类 +3，每个共同标签 +2；都不沾边就按时间补位，至少让读者有下一站。
+   分数相同按发布时间倒序，理由只取最有说服力的那一条。 */
 const scored = posts
   .filter((post) => post.id !== current.id)
   .map((post) => {
     let score = 0;
+    const reasons: string[] = [];
+
+    if (post.data.series && post.data.series === current.data.series) {
+      score += 5;
+      reasons.push('同一系列');
+    }
     if (post.data.category && post.data.category === current.data.category) score += 3;
-    score += post.data.tags.filter((tag) => current.data.tags.includes(tag)).length * 2;
-    return { post, score };
+
+    const shared = post.data.tags.filter((tag) => current.data.tags.includes(tag));
+    if (shared.length) {
+      score += shared.length * 2;
+      reasons.push(shared.slice(0, 2).map((tag) => `#${tag}`).join(' '));
+    }
+
+    return { post, score, reason: reasons[0] ?? '' };
   })
   .sort((a, b) => b.score - a.score || b.post.data.date.valueOf() - a.post.data.date.valueOf());
 
-const related = scored.slice(0, 3).map((item) => item.post);
+const related = scored.slice(0, 3);
 ---
 
 {
@@ -32,7 +45,7 @@ const related = scored.slice(0, 3).map((item) => item.post);
         <a href={url('/posts/')}>全部文章 →</a>
       </div>
       <ul class="related-grid" style={`--cols:${Math.min(related.length, 3)}`}>
-        {related.map((post) => (
+        {related.map(({ post, reason }) => (
           <li class="related-card">
             <a class="related-hit" href={url(`/posts/${post.id}/`)} aria-label={post.data.title}></a>
             <Cover
@@ -44,6 +57,7 @@ const related = scored.slice(0, 3).map((item) => item.post);
             <div class="related-body">
               <div class="related-meta">
                 {post.data.category && <span>{post.data.category}</span>}
+                {reason && <span class="related-why">{reason}</span>}
                 <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
               </div>
               <h3>{post.data.title}</h3>

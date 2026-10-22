@@ -16,7 +16,9 @@
     "budget": "node scripts/budget.mjs",
     "preflight": "node scripts/preflight.mjs",
     "a11y": "node scripts/a11y-audit.mjs",
-    "a11y:keys": "node scripts/a11y-keyboard.mjs"
+    "a11y:keys": "node scripts/a11y-keyboard.mjs",
+    "visual": "node scripts/visual-regression.mjs",
+    "visual:update": "node scripts/visual-regression.mjs --update"
   },
   "dependencies": {
     "@astrojs/mdx": "^8.1.0",

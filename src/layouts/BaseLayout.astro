@@ -209,6 +209,35 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       </svg>
     </button>
 
+    <dialog class="lightbox" id="lightbox" aria-label="图片预览" aria-modal="true">
+      <div class="lightbox-tools">
+        <a class="lightbox-origin" id="lightbox-origin" href="#" target="_blank" rel="noopener noreferrer" aria-label="在新标签页打开原图">
+          原图
+        </a>
+        <button class="lightbox-close" type="button" aria-label="关闭预览">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="lightbox-stage" id="lightbox-stage" title="滚轮缩放 · 拖动平移 · 双击复位">
+        <img id="lightbox-img" alt="" />
+      </div>
+      <p class="lightbox-caption" id="lightbox-caption"></p>
+      <span class="lightbox-zoom" id="lightbox-zoom" aria-hidden="true" hidden>100%</span>
+      <p class="lightbox-hint" id="lightbox-hint" aria-hidden="true">滚轮缩放 · 拖动平移 · 双击复位</p>
+      <button class="lightbox-nav prev" type="button" aria-label="上一张">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 5l-7 7 7 7"></path>
+        </svg>
+      </button>
+      <button class="lightbox-nav next" type="button" aria-label="下一张">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 5l7 7-7 7"></path>
+        </svg>
+      </button>
+    </dialog>
+
     <script>
       const root = document.documentElement;
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -299,7 +328,247 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           }, 1600);
         });
         wrap.appendChild(btn);
+
+        /* 长代码块默认收起：一屏全是代码时，读者往往直接跳过整段 */
+        const lineCount = pre.querySelectorAll('.line').length;
+        if (lineCount > 24) {
+          wrap.classList.add('is-long');
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.className = 'code-toggle';
+          toggle.setAttribute('aria-expanded', 'false');
+          toggle.textContent = `展开全部 ${lineCount} 行`;
+          toggle.addEventListener('click', () => {
+            const opened = wrap.classList.toggle('is-open');
+            toggle.setAttribute('aria-expanded', String(opened));
+            toggle.textContent = opened ? '收起代码' : `展开全部 ${lineCount} 行`;
+            /* 收起后如果代码块已经滚出视口，拉回来，别让人对着空白 */
+            if (!opened && wrap.getBoundingClientRect().top < 0) {
+              wrap.scrollIntoView({ block: 'start' });
+            }
+          });
+          wrap.appendChild(toggle);
+        }
       });
+
+      /* ---------- 图片灯箱：缩放 / 拖动 / 原图 ---------- */
+      const lightboxImages = Array.from(document.querySelectorAll<HTMLImageElement>('.prose img'));
+      const lightbox = document.getElementById('lightbox') as HTMLDialogElement | null;
+
+      if (lightbox && lightboxImages.length > 0) {
+        const view = document.getElementById('lightbox-img') as HTMLImageElement;
+        const stage = document.getElementById('lightbox-stage') as HTMLElement;
+        const caption = document.getElementById('lightbox-caption');
+        const zoomLabel = document.getElementById('lightbox-zoom');
+        const origin = document.getElementById('lightbox-origin') as HTMLAnchorElement | null;
+        const hint = document.getElementById('lightbox-hint');
+        const prev = lightbox.querySelector<HTMLButtonElement>('.lightbox-nav.prev');
+        const next = lightbox.querySelector<HTMLButtonElement>('.lightbox-nav.next');
+        let index = 0;
+
+        /* zoom 是倍率，tx / ty 是相对舞台中心的平移量 */
+        let zoom = 1;
+        let tx = 0;
+        let ty = 0;
+        let hintTimer = 0;
+
+        const clamp = () => {
+          const w = view.offsetWidth;
+          const h = view.offsetHeight;
+          const maxX = Math.max(0, (w * (zoom - 1)) / 2);
+          const maxY = Math.max(0, (h * (zoom - 1)) / 2);
+          tx = Math.max(-maxX, Math.min(maxX, tx));
+          ty = Math.max(-maxY, Math.min(maxY, ty));
+        };
+
+        const paint = () => {
+          view.style.transform = `translate(${tx}px, ${ty}px) scale(${zoom})`;
+          stage.classList.toggle('is-zoomed', zoom > 1);
+          if (zoomLabel) {
+            zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+            zoomLabel.hidden = zoom <= 1;
+          }
+        };
+
+        const reset = () => {
+          zoom = 1;
+          tx = 0;
+          ty = 0;
+          paint();
+        };
+
+        /* 让指针下的那一点在缩放前后保持不动，而不是永远从中心放大 */
+        const zoomAt = (target: number, px: number, py: number) => {
+          const nextZoom = Math.max(1, Math.min(4, target));
+          if (nextZoom === zoom) return;
+          const ratio = nextZoom / zoom;
+          tx = px - (px - tx) * ratio;
+          ty = py - (py - ty) * ratio;
+          zoom = nextZoom;
+          if (zoom === 1) {
+            tx = 0;
+            ty = 0;
+          }
+          clamp();
+          paint();
+        };
+
+        const pointerAt = (event: MouseEvent) => {
+          const rect = stage.getBoundingClientRect();
+          return {
+            x: event.clientX - (rect.left + rect.width / 2),
+            y: event.clientY - (rect.top + rect.height / 2),
+          };
+        };
+
+        const flashHint = () => {
+          if (!hint) return;
+          window.clearTimeout(hintTimer);
+          hint.classList.add('is-on');
+          hintTimer = window.setTimeout(() => hint.classList.remove('is-on'), 2600);
+        };
+
+        if (lightboxImages.length < 2) {
+          prev?.setAttribute('hidden', '');
+          next?.setAttribute('hidden', '');
+        }
+
+        const show = (i: number) => {
+          index = (i + lightboxImages.length) % lightboxImages.length;
+          const image = lightboxImages[index];
+          view.src = image.currentSrc || image.src;
+          view.alt = image.alt;
+          /* 「原图」指向 img 的 src 而不是 currentSrc：后者是 srcset 选中的档位，放大后会糊 */
+          if (origin) origin.href = image.src;
+          if (caption) {
+            /* 有图注就显示图注，没有才退回 alt */
+            const figCaption = image.closest('figure')?.querySelector('figcaption')?.textContent?.trim();
+            const text = figCaption || image.alt || '';
+            caption.textContent = text;
+            caption.hidden = !text;
+          }
+          reset();
+        };
+
+        const openLightbox = (i: number) => {
+          show(i);
+          lightbox.showModal();
+          document.documentElement.style.overflow = 'hidden';
+          flashHint();
+        };
+
+        lightboxImages.forEach((image, i) => {
+          /* 正文图片统一懒加载，长文首屏不必拉完全部配图 */
+          image.loading = 'lazy';
+          image.decoding = 'async';
+          image.tabIndex = 0;
+          image.setAttribute('role', 'button');
+          image.setAttribute('aria-label', `放大图片：${image.alt || '正文图片'}`);
+          image.addEventListener('click', () => openLightbox(i));
+          image.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              openLightbox(i);
+            }
+          });
+        });
+
+        /* 缩放：滚轮以指针为中心，双击在 1× 与 2.4× 之间切换 */
+        stage.addEventListener(
+          'wheel',
+          (event) => {
+            event.preventDefault();
+            const at = pointerAt(event);
+            zoomAt(zoom * Math.exp(-event.deltaY * 0.0022), at.x, at.y);
+          },
+          { passive: false }
+        );
+
+        stage.addEventListener('dblclick', (event) => {
+          const at = pointerAt(event);
+          if (zoom > 1) reset();
+          else zoomAt(2.4, at.x, at.y);
+        });
+
+        /* 拖动只在放大后生效，否则会和双击、切换图片抢事件 */
+        let dragging = false;
+        let startX = 0;
+        let startY = 0;
+        let fromX = 0;
+        let fromY = 0;
+
+        stage.addEventListener('pointerdown', (event) => {
+          if (zoom <= 1) return;
+          dragging = true;
+          startX = event.clientX;
+          startY = event.clientY;
+          fromX = tx;
+          fromY = ty;
+          stage.setPointerCapture(event.pointerId);
+          stage.classList.add('is-dragging');
+        });
+
+        stage.addEventListener('pointermove', (event) => {
+          if (!dragging) return;
+          tx = fromX + (event.clientX - startX);
+          ty = fromY + (event.clientY - startY);
+          clamp();
+          paint();
+        });
+
+        const endDrag = (event: PointerEvent) => {
+          if (!dragging) return;
+          dragging = false;
+          stage.classList.remove('is-dragging');
+          if (stage.hasPointerCapture(event.pointerId)) stage.releasePointerCapture(event.pointerId);
+        };
+
+        stage.addEventListener('pointerup', endDrag);
+        stage.addEventListener('pointercancel', endDrag);
+
+        /* 换图后尺寸变了，按新尺寸重新收边界 */
+        view.addEventListener('load', () => {
+          if (zoom > 1) {
+            clamp();
+            paint();
+          }
+        });
+
+        lightbox.querySelector('.lightbox-close')?.addEventListener('click', () => lightbox.close());
+        prev?.addEventListener('click', () => show(index - 1));
+        next?.addEventListener('click', () => show(index + 1));
+        lightbox.addEventListener('click', (event) => {
+          if (event.target === lightbox) lightbox.close();
+        });
+        lightbox.addEventListener('keydown', (event) => {
+          if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            show(index - 1);
+          }
+          if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            show(index + 1);
+          }
+          if (event.key === '+' || event.key === '=') {
+            event.preventDefault();
+            zoomAt(zoom * 1.25, 0, 0);
+          }
+          if (event.key === '-' || event.key === '_') {
+            event.preventDefault();
+            zoomAt(zoom / 1.25, 0, 0);
+          }
+          if (event.key === '0') {
+            event.preventDefault();
+            reset();
+          }
+        });
+        lightbox.addEventListener('close', () => {
+          document.documentElement.style.overflow = '';
+          reset();
+          hint?.classList.remove('is-on');
+          window.clearTimeout(hintTimer);
+        });
+      }
 
       /* 搜索：⌘/Ctrl+K 或 / 直接聚焦，其他页面跳到搜索页 */
       const searchUrl = document.body.dataset.searchUrl || '/search/';

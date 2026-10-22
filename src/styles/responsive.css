@@ -98,6 +98,11 @@
   .footer-brand {
     grid-column: 1 / -1;
   }
+
+  /* 单列后左侧没有余量，锚点会顶出视口 */
+  .prose .para-anchor {
+    display: none;
+  }
 }
 
 @media (max-width: 720px) {
@@ -152,6 +157,21 @@
   .card-grid--three {
     grid-template-columns: minmax(0, 1fr);
     gap: 18px;
+  }
+
+  .search-suggest {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+
+  .search-empty {
+    padding: 46px 6px 54px;
+  }
+
+  /* 让开右下角的回到顶部按钮 */
+  .resume-bar {
+    bottom: 78px;
+    max-width: calc(100vw - 36px);
   }
 
   .featured .cover {
