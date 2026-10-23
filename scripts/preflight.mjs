@@ -78,6 +78,8 @@ async function main() {
   }
 
   run('体积预算', 'node', ['scripts/budget.mjs']);
+  /* 字体按页分片后，每页只带自己的增量片；新增页面没进映射时这句会失败 */
+  run('字体按页覆盖', 'node', ['scripts/fonts.mjs', '--check-pages']);
 
   /* 2. 起预览，跑浏览器实测 */
   console.log('\n▶ 启动本地预览');
@@ -108,6 +110,8 @@ async function main() {
 
   run('无障碍扫描（axe，浅色 + 深色）', 'node', ['scripts/a11y-audit.mjs']);
   run('键盘与读屏实测', 'node', ['scripts/a11y-keyboard.mjs']);
+  /* 文件体积不等于传输量：这一条量的才是「第一次访问要下多少字节」 */
+  run('首屏传输预算', 'node', ['scripts/budget-wire.mjs']);
 
   if (withVisual) {
     run('视觉回归（对比 tests/visual/baseline）', 'node', ['scripts/visual-regression.mjs']);

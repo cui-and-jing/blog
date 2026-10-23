@@ -49,9 +49,22 @@ const html = files.filter((f) => f.ext === '.html' && !isGame(f));
 const images = files.filter(
   (f) => /\.(avif|webp|png|jpe?g|gif|svg)$/.test(f.ext) && !isGame(f) && !isOg(f)
 );
-/* 字体按 unicode-range 切片，浏览器只会下页面真正用到的片；
-   但总量仍然是首屏成本，得单独盯着 */
-const fonts = files.filter((f) => f.ext === '.woff2');
+/* 字体的口径见下面的「单页最坏」——目录总量已经不是任何一次访问的成本了 */
+
+/* 字体分片后，「目录里所有 woff2 加起来」不再等于任何一次访问的成本：
+   每页只下 公共片 + 自己那一小片。要盯的是「最坏的那一页」。
+   游戏页自成一档，和图片、HTML 预算一样不计入。 */
+const charset = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'src/data/font-charset.json'), 'utf8'));
+const pageMap = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'src/data/font-pages.json'), 'utf8'));
+const fontPath = (name) => (name.startsWith('fonts/') ? name : `fonts/${name}`);
+const sizeOf = (rel) => files.find((file) => file.rel === rel)?.size ?? 0;
+const fixedFont =
+  sizeOf(fontPath(charset.slices.latin.file)) + sizeOf(fontPath(charset.slices.punct.file)) + sizeOf(pageMap.shared.file);
+const pageFonts = Object.entries(pageMap.pages)
+  .filter(([route]) => !route.startsWith('/games/'))
+  .map(([route, entry]) => ({ route, bytes: fixedFont + (entry.file ? sizeOf(fontPath(entry.file)) : 0) }))
+  .sort((a, b) => b.bytes - a.bytes);
+const worstFont = pageFonts[0] ?? { route: '—', bytes: fixedFont };
 
 const sum = (list, key) => list.reduce((total, file) => total + file[key], 0);
 
@@ -91,11 +104,12 @@ const rows = [
     gzipMax: null,
   },
   {
-    name: '字体（主站）',
-    current: sum(fonts, 'size'),
-    /* 思源宋体按站内实际用到的 1000 字裁出来约 284KB，会随文章缓慢增长。
-       320 是红线：再往上就该按字频砍低频字，而不是继续放大 */
-    max: 320 * KB,
+    name: '字体（单页最坏）',
+    current: worstFont.bytes,
+    /* 分片前是「整片汉字 232KB + 拉丁 52KB + 标点 5KB」，每页都付这个数。
+       现在每页 = 公共片 105KB + 拉丁 + 标点 + 自己的增量片（20–80 字）。
+       220 是红线：真涨上去说明公共片没起作用（阈值调低了），或者某篇在大量生造字。 */
+    max: 220 * KB,
     gzip: null,
     gzipMax: null,
   },
@@ -131,6 +145,14 @@ if (html.length) {
   for (const file of html.sort((a, b) => b.size - a.size).slice(0, 3)) {
     console.log(`    ${kb(file.size).padStart(6)} KB  ${file.rel}`);
   }
+}
+
+if (pageFonts.length) {
+  console.log('\n  字体最坏的三页（固定成本 + 该页增量片）：');
+  for (const page of pageFonts.slice(0, 3)) {
+    console.log(`    ${kb(page.bytes).padStart(6)} KB  ${page.route}`);
+  }
+  console.log(`      固定成本 ${kb(fixedFont)} KB：拉丁 + 标点 + 公共片，每页都付`);
 }
 
 const game = sum(files.filter(isGame), 'size');

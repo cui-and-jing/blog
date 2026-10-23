@@ -2,7 +2,8 @@
 import '../styles/global.css';
 import Analytics from '../components/Analytics.astro';
 import fontFiles from '../data/font-files.json';
-import { SITE, NAV, url, mediaUrl } from '../lib/site';
+import fontPages from '../data/font-pages.json';
+import { SITE, NAV, url, mediaUrl, base } from '../lib/site';
 
 interface Props {
   title?: string;
@@ -26,6 +27,10 @@ const pageTitle = title ? `${title} · ${SITE.title}` : `${SITE.title} · ${SITE
 const siteRoot = (Astro.site ?? new URL(SITE.github)).toString().replace(/\/$/, '');
 const canonical = new URL(Astro.url.pathname, Astro.site ?? SITE.github).toString();
 const current = Astro.url.pathname.replace(/\/$/, '') || '/';
+/* 字体映射用「去掉 base、保留结尾斜杠」的路径做键，和 scripts/fonts.mjs 生成的键对齐 */
+const fontPath = Astro.url.pathname.slice(base.length) || '/';
+type FontFaceEntry = { file: string | null; range: string; chars: string; count?: number };
+const fontPage = (fontPages.pages as Record<string, FontFaceEntry>)[fontPath] ?? null;
 const ogImage = image ? new URL(mediaUrl(image), siteRoot).toString() : `${siteRoot}${url('/og.png')}`;
 
 const websiteSchema = {
@@ -110,6 +115,24 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           type="font/woff2"
           href={url(`/${fontFiles.han}`)}
           crossorigin="anonymous"
+        />
+      )
+    }
+    {/* 汉字公共片（出现在多数页面里的字）在 fonts.css 里，是每页都要下的固定成本；
+        各页独有的字由下面这段按路径注入，unicode-range 精确到码点，
+        浏览器才不会因为「页面有中文」就把整段 CJK 都算成命中 */}
+    {
+      fontPage?.file ? (
+        <style
+          is:inline
+          set:html={`@font-face{font-family:'${fontPages.family}';src:url('${url(`/${fontPage.file}`)}') format('woff2');font-weight:400;font-style:normal;font-display:swap;unicode-range:${fontPage.range}}`}
+        />
+      ) : fontPage ? null : (
+        /* 没进映射的页面（新增但还没跑 npm run fonts）：整套换成一个「全量家族」，
+           宁可多下 260KB，也不能让正文掉回系统宋体 */
+        <style
+          is:inline
+          set:html={`@font-face{font-family:'${fontPages.family} F';src:url('${url(`/${fontPages.full.file}`)}') format('woff2');font-weight:400;font-style:normal;font-display:swap;unicode-range:${fontPages.full.range}}:root{--font-prose-serif:'${fontPages.family} F',Georgia,'Songti SC','STSong','SimSun',serif}`}
         />
       )
     }

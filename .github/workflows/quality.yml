@@ -50,6 +50,10 @@ jobs:
       - name: Size budget (CSS / JS / HTML / images)
         run: npm run budget
 
+      # 字体按页分片：哪一页用到子集外的字，线上会悄悄回退成系统宋体
+      - name: Per-page font coverage
+        run: npm run fonts:check:pages
+
       - name: Accessibility & keyboard audit (axe + real interactions)
         run: |
           npx astro preview --port 4321 > /tmp/preview.log 2>&1 &
@@ -62,3 +66,5 @@ jobs:
           done
           npm run a11y
           npm run a11y:keys
+          # 实测第一次访问要下多少字节，防止「文件没变大但每页多请求了字体」
+          npm run budget:wire

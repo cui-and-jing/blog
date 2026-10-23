@@ -167,6 +167,7 @@ src/
 ├── data/analytics.json      统计服务配置（默认 none）
 ├── data/font-charset.json   字体子集覆盖的字符（npm run fonts 生成，fonts:check 比对用）
 ├── data/font-files.json     带指纹的字体文件名（npm run fonts 生成，head 里的 preload 用）
+├── data/font-pages.json     每页用哪一片增量字体（npm run fonts 生成，布局按路径取用）
 ├── lib/site.ts              站点信息、导航、URL 与日期工具
 ├── lib/series.ts            系列归组、排序与「第 n / N 篇」
 ├── lib/cover.ts             封面色板与哈希
@@ -219,11 +220,12 @@ src/
 │   ├── new-post.mjs         新建文章骨架（npm run new）
 │   ├── new-note.mjs         新建短笔记（npm run note）
 │   ├── image-inbox.mjs      配图归位 + 生成 Figure 片段（npm run image）
-│   ├── fonts.mjs            按站内用字裁中文字体子集（npm run fonts / fonts:check）
+│   ├── fonts.mjs            按站内用字裁字体子集，再按页切增量片（npm run fonts / fonts:check / fonts:check:pages）
 │   ├── og-cards.mjs         生成文章与笔记的分享封面并压缩（npm run og）
 │   ├── icons.mjs            从 favicon.svg 生成 ico / apple-touch / 192 / 512（npm run icons）
 │   ├── lint-content.mjs     内容体检（npm run lint:content）
 │   ├── budget.mjs           产物体积预算（npm run budget）
+│   ├── budget-wire.mjs      首屏传输预算，用浏览器实测字节（npm run budget:wire）
 │   ├── a11y-audit.mjs       axe 全站扫描（npm run a11y）
 │   ├── a11y-keyboard.mjs    键盘与读屏实测（npm run a11y:keys）
 │   ├── visual-regression.mjs 视觉回归（npm run visual / visual:update）
@@ -317,18 +319,28 @@ curl -sL --create-dirs \
 npm run fonts     # → public/fonts/*.woff2 + src/styles/fonts.css + src/data/font-*.json
 ```
 
-- 按 unicode 区间切三片：`latin`（ASCII + Latin-1，约 52 KB）、`punct`（中日韩标点与全角，约 5 KB）、
-  `han`（汉字，约 230 KB）。浏览器只下载页面真正用到的那几片，所以列表页往往只需要前两片。
-- 文件名与 `@font-face` 家族名都带内容指纹（`prose-serif-han.ddcc2927.woff2` / `Prose Serif ddcc2927`）。
+- **汉字分两层**，因为整片汉字是首屏最大的一块（232 KB），而单个页面实际只用到 200–420 字：
+  - **公共片**：出现在 ≥4 个页面里的字（421 字 / 105 KB），写进全局 `fonts.css`，每页都要下
+  - **每页增量片**：这一页剩下的独有字（20–80 字 / 7–25 KB），由布局按当前路径注入一段 `@font-face`
+- `unicode-range` 必须**精确到码点**。写成 `U+4E00-9FFF` 这种宽区间，浏览器会因为「页面有汉字」
+  把整片都算作命中，分片等于没分。
+- `latin`（ASCII + Latin-1，101 字 / 52 KB）与 `punct`（中日韩标点与全角，28 字 / 5 KB）不分片，给宽区间就够。
+- 文件名与 `@font-face` 家族名都带内容指纹（`prose-serif-han.0966ae97.woff2` / `Prose Serif 69dd61`）。
   子集一变就是新 URL，不会被 GitHub Pages 的缓存按旧文件返回。
-- `han` 片在 `<head>` 里 `preload`；另外两片交给 CSS 自然加载——太小了，提前抢带宽不划算。
+- 公共片在 `<head>` 里 `preload`；增量片与另外两片交给 CSS 自然加载——太小了，提前抢带宽不划算。
 - `font-display: swap`。汉字全角等宽、行高按倍数算，所以字体到达前后的替换**不产生位移**
   （实测 CLS < 0.001，LCP 不受影响——文字先用系统宋体就渲染完了）。
 - 字体没加载完、或者某个字刚好不在子集里，会沿 `--font-serif` 的栈落到系统宋体，不会出现空白或豆腐块。
+- 实测（390px、冷缓存、首次访问）：首页 **336 KB → 211 KB**，文章页 **→ 241 KB**，
+  字体总量 290 KB → 163–189 KB。`npm run budget:wire` 把这条线钉在 CI 里。
 
 **每加一篇新文章都要重跑 `npm run fonts`**，否则新出现的字会悄悄回退成系统宋体。
-`npm run fonts:check`（CI 与 `preflight` 都会跑）会比对 `src/data/font-charset.json`，
-把缺的字列出来。已有的字不受影响，重跑只会让三个分片按新字符集重新打包。
+`npm run fonts` 要读 `dist`（按真实渲染结果算每页用字），所以先 `npm run build`。
+两道校验都会在 CI 与 `preflight` 里跑：
+
+- `npm run fonts:check`：`src/` 里有没有子集外的字（不需要构建，跑得早）
+- `npm run fonts:check:pages`：构建后逐页比对「公共片 + 该页增量片」是否覆盖了该页所有字，
+  新增页面漏进映射时直接失败
 
 中文排版另外补了几条渐进增强规则（`src/styles/typography.css`），浏览器不支持就回到原样：
 
@@ -491,14 +503,16 @@ puppeteer 直接截出来的 PNG 一张 270–300 KB，脚本会用 `sharp` 无�
 ```bash
 npm run lint:content  # 不需要构建：frontmatter、标题层级、图片、内链、中文排版、分享封面
 npm run fonts:check   # 不需要构建：正文用字是否都在字体子集里（缺字会静默回退）
-npm run fonts         # 需要 .fonts/ 源字体：重新裁子集，产物要提交
+npm run fonts:check:pages # 需要 dist：逐页核对「公共片 + 该页增量片」是否覆盖了该页所有字
+npm run fonts         # 需要 .fonts/ 源字体与 dist：重新裁子集，产物要提交
 npm run check         # astro check：类型与模板
 npm run budget        # 需要 dist：CSS / JS / 单页 HTML / 图片 / 字体五类上限
+npm run budget:wire   # 需要先 build + preview：实测每条路由首次访问的传输字节与字体字节
 npm run a11y          # 需要先 build + preview：axe-core 扫全站 23 条路由 × 浅/深两套主题 + 四个面板
 npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、设置面板、快捷键表、移动端抽屉、触控目标 44px
 npm run visual        # 需要先 build + preview：21 条路由 × 浅/深 × 3 视口，和基线逐像素比
 npm run visual:update # 样式改动确认无误后重建基线
-npm run preflight     # 一条命令串起：og → lint → fonts:check → check → 构建 → budget → a11y → a11y:keys
+npm run preflight     # 一条命令串起：og → lint → fonts:check → check → 构建 → budget → fonts:check:pages → a11y → a11y:keys → budget:wire
 ```
 
 `preflight` 会自己起 `astro preview` 并在结束时收掉，任何一步失败就停；`--ci` 跳过分享封面
@@ -527,9 +541,15 @@ npm run preflight     # 一条命令串起：og → lint → fonts:check → che
 `budget` 的上限写在 `scripts/budget.mjs` 顶部：CSS 104 KB / gzip 21 KB，JS 32 KB / gzip 12 KB，
 单页 HTML 80 KB，主站图片 600 KB，字体 320 KB。游戏与分享封面不计入——它们不在首屏路径上。
 
+`budget:wire` 量的是另一件事：**第一次访问实际传输了多少字节**。`budget` 看磁盘文件大小，
+看不见 gzip、也看不见某页到底请求了哪几个字体分片。它用禁用缓存的浏览器逐路由统计
+`encodedDataLength`，只算同源请求（评论 iframe 这类第三方不掺进来），
+上限写在 `scripts/budget-wire.mjs` 顶部：首页 230 KB、文章页 265 KB、笔记页 230 KB，
+字体单独一条 200 KB 的线——它占首屏七成以上，回退成整片汉字时总量未必超，代价却回去了。
+
 `.github/workflows/quality.yml` 在每次 push 与 PR 时依次跑
-`lint:content` → `fonts:check` → `check` → 构建 → `budget` → `a11y` → `a11y:keys`，任一步失败都会变红
-（它和部署工作流相互独立，不会拦住发布）。
+`lint:content` → `fonts:check` → `check` → 构建 → `budget` → `fonts:check:pages` → `a11y` → `a11y:keys` → `budget:wire`，
+任一步失败都会变红（它和部署工作流相互独立，不会拦住发布）。
 
 工作流里的 action 都是用大版本号（`checkout@v7`、`setup-node@v7`、`deploy-pages@v5`、
 `withastro/action@v6`）。`.github/dependabot.yml` 每周一查 npm：补丁与小版本合成一个 PR，
@@ -597,5 +617,6 @@ BLOG_SITE=https://blog.example.com BLOG_BASE=/ npm run build
 - [x] 作者维度（`author` 必填、署名、`/authors/`、JSON-LD Person、feed 的 `dc:creator`）
 - [x] 站点标识（ico / apple-touch / 192 / 512 / webmanifest、RSS 自链接、分享图压缩、`/license/`）
 - [x] 移动端信息架构（导航收进抽屉、触控目标 44×44、站名保留、底部操作条替掉压正文的浮钮）
+- [x] 首屏瘦身（字体按页切增量片、实测传输预算门禁）
 - [ ] 旧站文章迁移
 - [ ] 访问统计（等提供 Umami / Plausible 账号后填 `src/data/analytics.json`）
