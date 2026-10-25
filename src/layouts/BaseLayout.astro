@@ -540,7 +540,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       });
 
       /* 表格滚动容器与代码复制按钮都是在原文上补交互外壳：不影响首屏可读性，
-         却会在加载时和字体换字抢同一段主线程。挪到空闲期再补，首屏先按原生样式读。 */
+         但会和字体换字抢同一段主线程。先让首屏按原生样式读，交互随后再补。 */
       const enhanceProse = () => {
         document.querySelectorAll<HTMLTableElement>('.prose table').forEach((table) => {
           if (table.closest('.table-wrap')) return;
@@ -1104,7 +1104,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const progressFill = progress?.firstElementChild as HTMLElement | null;
       const hasArticle = Boolean(document.querySelector('.article-card'));
 
-      /* 滚动时不要读 scrollHeight：那是一次强制同步布局，滚得越频繁越卡，
+      /* 滚动时不要读 scrollHeight：那是一次强制同步布局，滚得越快越卡，
          长文在低端机上会直接掉帧。高度只在真的变了的时候重量（窗口缩放、
          字体换完、评论挂载），滚动回调只做纯计算 + 写样式。 */
       let maxScroll = 0;
@@ -1124,8 +1124,8 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       };
 
       if (progress && hasArticle) progress.classList.add('active');
-      /* 初始化时先不量高度：读取 scrollHeight 会强制同步布局，而这时字体还没到，
-         等于是把最贵的一次排版提前到主线程上做。第一帧结束后再量，
+      /* 开头先不量高度：读取 scrollHeight 会强制同步布局，而这时字体还没到，
+         等于是把成本最高的一次排版提前到主线程上做。第一帧结束后再量，
          ResizeObserver 与 fonts.ready 会把字体换字造成的高度变化补上。 */
       onScroll();
       window.addEventListener('load', measureScroll, { once: true });
