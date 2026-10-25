@@ -50,6 +50,34 @@ const DEFAULT_ARGS = [
 ];
 
 /**
+ * 清掉以前留下来的配置目录。
+ *
+ * close() 里会删自己的目录，但脚本被 Ctrl-C、超时或 CI 取消时走不到那里，
+ * 一个 profile 动辄上百 MB，攒上几十个能把系统盘塞满（本项目真实踩过：
+ * 临时目录里躺了一百多个，占掉几 GB，最后 ENOSPC 连 shell 都起不来）。
+ * 只清一小时前的，正在跑的兄弟进程不受影响。
+ */
+function sweepStaleProfiles() {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  let entries;
+  try {
+    entries = fs.readdirSync(os.tmpdir(), { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith('blog-browser-')) continue;
+    const full = path.join(os.tmpdir(), entry.name);
+    try {
+      if (fs.statSync(full).mtimeMs > cutoff) continue;
+      fs.rmSync(full, { recursive: true, force: true });
+    } catch {
+      /* 还被占着就下次再说 */
+    }
+  }
+}
+
+/**
  * @param {object} [options]
  * @param {string[]} [options.args] 追加的启动参数
  * @param {number} [options.protocolTimeout] 单条 CDP 命令的超时，默认 60s
@@ -63,6 +91,7 @@ export async function launchBrowser({ args = [], protocolTimeout = 60_000, launc
     process.exit(2);
   }
 
+  sweepStaleProfiles();
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'blog-browser-'));
   const child = spawn(
     executablePath,
