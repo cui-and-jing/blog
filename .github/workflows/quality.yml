@@ -78,6 +78,11 @@ jobs:
             tail -n 40 /tmp/games-smoke.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ $status -ne 0 ]; then
+            grep -E '✗|失败|跑不起来' /tmp/games-smoke.log | head -6 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+          fi
           exit $status
 
       - name: Accessibility audit (axe, light + dark)
@@ -95,6 +100,11 @@ jobs:
             tail -n 60 .shots/a11y.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ $status -ne 0 ]; then
+            grep -E '✗|严重|违规' .shots/a11y.log | head -6 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+          fi
           exit $status
 
       - name: Upload accessibility report
@@ -108,9 +118,30 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      # 失败时把关键行做成注解：注解在运行页上公开可见，step summary 与日志都要另找入口
       - name: Keyboard & screen reader checks
-        run: npm run a11y:keys
+        shell: bash
+        run: |
+          set -o pipefail
+          status=0
+          npm run a11y:keys 2>&1 | tee /tmp/keys.log || status=$?
+          if [ $status -ne 0 ]; then
+            grep -E '✗|失败|异常' /tmp/keys.log | head -5 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+          fi
+          exit $status
 
       # 实测第一次访问要下多少字节，防止「文件没变大但每页多请求了字体」
       - name: First-visit transfer budget
-        run: npm run budget:wire
+        shell: bash
+        run: |
+          set -o pipefail
+          status=0
+          npm run budget:wire 2>&1 | tee /tmp/wire.log || status=$?
+          if [ $status -ne 0 ]; then
+            grep -E '✗|超预算|打不开' /tmp/wire.log | head -8 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+          fi
+          exit $status
