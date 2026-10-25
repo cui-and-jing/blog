@@ -95,6 +95,23 @@ function hasWebgl2(page) {
 }
 
 /**
+ * 冷启动的 runner 上 Chrome 有时 20 秒还没写出调试端口（launchBrowser 的默认上限），
+ * 直接判死太脆——Quality #45 就是这么红的：整轮 1 分钟，失败点在冒烟开头几秒。
+ * 所以这里把等待放宽到 60 秒，并且起不来再试一次。
+ */
+async function launchWithRetry() {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await launchBrowser({ args: WEBGL_ARGS, launchTimeout: 60_000, protocolTimeout: 120_000 });
+    } catch (error) {
+      if (attempt >= 2) throw error;
+      console.log(`  … 浏览器没起来（${error.message}），重试一次`);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+}
+
+/**
  * 跑一个游戏，返回结果行与问题清单。
  *
  * 页面级的异常全在这里接住、不外抛——一个游戏起不来不该让后面四个失去结果，
@@ -219,7 +236,7 @@ async function main() {
     .filter((file) => file.endsWith('.html'))
     .sort();
 
-  const browser = await launchBrowser({ args: WEBGL_ARGS });
+  const browser = await launchWithRetry();
   const rows = [];
   const failures = [];
 
