@@ -79,7 +79,9 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           if [ $status -ne 0 ]; then
-            grep -E '✗|失败|跑不起来' /tmp/games-smoke.log | head -6 | while IFS= read -r line; do
+            # 失败可能发生在打印表格之前（比如浏览器起不来），所以整段都吐成注解，
+            # 别只挑关键字——挑不到的时候就什么都没留下
+            tail -n 30 /tmp/games-smoke.log | while IFS= read -r line; do
               echo "::error::${line}"
             done
           fi
