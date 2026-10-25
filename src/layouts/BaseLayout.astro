@@ -539,85 +539,94 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         box.setAttribute('aria-label', box.checked ? '已完成' : '未完成');
       });
 
-      document.querySelectorAll<HTMLTableElement>('.prose table').forEach((table) => {
-        if (table.closest('.table-wrap')) return;
-        const box = document.createElement('div');
-        box.className = 'table-wrap';
-        box.tabIndex = 0;
-        box.setAttribute('role', 'region');
-        box.setAttribute('aria-label', '表格，可横向滚动查看');
-        table.replaceWith(box);
-        box.append(table);
+      /* 表格滚动容器与代码复制按钮都是在原文上补交互外壳：不影响首屏可读性，
+         却会在加载时和字体换字抢同一段主线程。挪到空闲期再补，首屏先按原生样式读。 */
+      const enhanceProse = () => {
+        document.querySelectorAll<HTMLTableElement>('.prose table').forEach((table) => {
+          if (table.closest('.table-wrap')) return;
+          const box = document.createElement('div');
+          box.className = 'table-wrap';
+          box.tabIndex = 0;
+          box.setAttribute('role', 'region');
+          box.setAttribute('aria-label', '表格，可横向滚动查看');
+          table.replaceWith(box);
+          box.append(table);
 
-        /* 只有真能滚动时才加边缘阴影，否则会误伤放得下的表格 */
-        const sync = () => {
-          box.classList.toggle('is-scrollable', box.scrollWidth - box.clientWidth > 2);
-        };
-        box.addEventListener('scroll', sync, { passive: true });
-        if ('ResizeObserver' in window) new ResizeObserver(sync).observe(box);
-        sync();
-      });
-
-      document.querySelectorAll<HTMLElement>('.prose pre').forEach((pre) => {
-        if (pre.parentElement?.classList.contains('code-block')) return;
-        const wrap = document.createElement('div');
-        wrap.className = 'code-block';
-        pre.parentNode?.insertBefore(wrap, pre);
-        wrap.appendChild(pre);
-
-        const lang = pre.getAttribute('data-language');
-        if (lang) {
-          wrap.classList.add('has-lang');
-          const label = document.createElement('span');
-          label.className = 'code-lang';
-          label.textContent = lang;
-          wrap.appendChild(label);
-        }
-
-        const btn = document.createElement('button');
-        btn.className = 'copy-btn';
-        btn.type = 'button';
-        btn.textContent = '复制';
-        btn.setAttribute('aria-label', '复制代码');
-        btn.addEventListener('click', async () => {
-          const text = pre.querySelector('code')?.textContent ?? '';
-          try {
-            await navigator.clipboard.writeText(text);
-            btn.textContent = '已复制';
-            btn.classList.add('copied');
-            announceStatus('代码已复制');
-          } catch {
-            btn.textContent = '复制失败';
-            announceStatus('复制失败，请手动选择代码');
-          }
-          setTimeout(() => {
-            btn.textContent = '复制';
-            btn.classList.remove('copied');
-          }, 1600);
+          /* 只有真能滚动时才加边缘阴影，否则会误伤放得下的表格 */
+          const sync = () => {
+            box.classList.toggle('is-scrollable', box.scrollWidth - box.clientWidth > 2);
+          };
+          box.addEventListener('scroll', sync, { passive: true });
+          if ('ResizeObserver' in window) new ResizeObserver(sync).observe(box);
+          sync();
         });
-        wrap.appendChild(btn);
 
-        /* 长代码块默认收起：一屏全是代码时，读者往往直接跳过整段 */
-        const lineCount = pre.querySelectorAll('.line').length;
-        if (lineCount > 24) {
-          wrap.classList.add('is-long');
-          const toggle = document.createElement('button');
-          toggle.type = 'button';
-          toggle.className = 'code-toggle';
-          toggle.setAttribute('aria-expanded', 'false');
-          toggle.textContent = `展开全部 ${lineCount} 行`;
-          toggle.addEventListener('click', () => {
-            const opened = wrap.classList.toggle('is-open');
-            toggle.setAttribute('aria-expanded', String(opened));
-            toggle.textContent = opened ? '收起代码' : `展开全部 ${lineCount} 行`;
-            /* 收起后如果代码块已经滚出视口，拉回来，别让人对着空白 */
-            if (!opened && wrap.getBoundingClientRect().top < 0) {
-              wrap.scrollIntoView({ block: 'start' });
+        document.querySelectorAll<HTMLElement>('.prose pre').forEach((pre) => {
+          if (pre.parentElement?.classList.contains('code-block')) return;
+          const wrap = document.createElement('div');
+          wrap.className = 'code-block';
+          pre.parentNode?.insertBefore(wrap, pre);
+          wrap.appendChild(pre);
+
+          const lang = pre.getAttribute('data-language');
+          if (lang) {
+            wrap.classList.add('has-lang');
+            const label = document.createElement('span');
+            label.className = 'code-lang';
+            label.textContent = lang;
+            wrap.appendChild(label);
+          }
+
+          const btn = document.createElement('button');
+          btn.className = 'copy-btn';
+          btn.type = 'button';
+          btn.textContent = '复制';
+          btn.setAttribute('aria-label', '复制代码');
+          btn.addEventListener('click', async () => {
+            const text = pre.querySelector('code')?.textContent ?? '';
+            try {
+              await navigator.clipboard.writeText(text);
+              btn.textContent = '已复制';
+              btn.classList.add('copied');
+              announceStatus('代码已复制');
+            } catch {
+              btn.textContent = '复制失败';
+              announceStatus('复制失败，请手动选择代码');
             }
+            setTimeout(() => {
+              btn.textContent = '复制';
+              btn.classList.remove('copied');
+            }, 1600);
           });
-          wrap.appendChild(toggle);
-        }
-      });
+          wrap.appendChild(btn);
+
+          /* 长代码块默认收起：一屏全是代码时，读者往往直接跳过整段 */
+          const lineCount = pre.querySelectorAll('.line').length;
+          if (lineCount > 24) {
+            wrap.classList.add('is-long');
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'code-toggle';
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.textContent = `展开全部 ${lineCount} 行`;
+            toggle.addEventListener('click', () => {
+              const opened = wrap.classList.toggle('is-open');
+              toggle.setAttribute('aria-expanded', String(opened));
+              toggle.textContent = opened ? '收起代码' : `展开全部 ${lineCount} 行`;
+              /* 收起后如果代码块已经滚出视口，拉回来，别让人对着空白 */
+              if (!opened && wrap.getBoundingClientRect().top < 0) {
+                wrap.scrollIntoView({ block: 'start' });
+              }
+            });
+            wrap.appendChild(toggle);
+          }
+        });
+      };
+
+      /* Safari 还没有 requestIdleCallback，退化成一次短延时 */
+      window.requestIdleCallback
+        ? window.requestIdleCallback(enhanceProse, { timeout: 1500 })
+        : window.setTimeout(enhanceProse, 200);
 
       /* ---------- 图片灯箱：缩放 / 拖动 / 原图 ---------- */
       const lightboxImages = Array.from(document.querySelectorAll<HTMLImageElement>('.prose img'));
@@ -1095,22 +1104,38 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const progressFill = progress?.firstElementChild as HTMLElement | null;
       const hasArticle = Boolean(document.querySelector('.article-card'));
 
+      /* 滚动时不要读 scrollHeight：那是一次强制同步布局，滚得越频繁越卡，
+         长文在低端机上会直接掉帧。高度只在真的变了的时候重量（窗口缩放、
+         字体换完、评论挂载），滚动回调只做纯计算 + 写样式。 */
+      let maxScroll = 0;
+      const measureScroll = () => {
+        maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      };
+
       const onScroll = () => {
         const y = window.scrollY;
         header?.setAttribute('data-scrolled', String(y > 8));
         toTop?.classList.toggle('show', y > 700);
 
         if (progressFill) {
-          const max = document.documentElement.scrollHeight - window.innerHeight;
-          const ratio = max > 0 ? Math.min(1, Math.max(0, y / max)) : 0;
+          const ratio = maxScroll > 0 ? Math.min(1, Math.max(0, y / maxScroll)) : 0;
           progressFill.style.transform = `scaleX(${ratio})`;
         }
       };
 
       if (progress && hasArticle) progress.classList.add('active');
+      /* 初始化时先不量高度：读取 scrollHeight 会强制同步布局，而这时字体还没到，
+         等于是把最贵的一次排版提前到主线程上做。第一帧结束后再量，
+         ResizeObserver 与 fonts.ready 会把字体换字造成的高度变化补上。 */
       onScroll();
+      window.addEventListener('load', measureScroll, { once: true });
+      document.fonts?.ready.then(measureScroll).catch(() => {});
       window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('resize', onScroll);
+      window.addEventListener('resize', () => {
+        measureScroll();
+        onScroll();
+      });
+      if ('ResizeObserver' in window) new ResizeObserver(measureScroll).observe(document.body);
 
       toTop?.addEventListener('click', () => {
         window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
@@ -1154,7 +1179,19 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
             '.game-note',
           ].join(',');
 
-          document.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+          /* 首屏里的元素直接算「已入场」：把它们先藏起来再淡入，
+             等于把第一眼的内容推后一整段动画，首访还会看到一次闪动。
+             动效留给需要滚动才看见的区块，那里才是它真正有用的地方。 */
+          const targets = Array.from(document.querySelectorAll<HTMLElement>(selector));
+          /* 位置一次读完再动 DOM：读一次写一次会让每次读都触发一次强制布局 */
+          const fold = window.innerHeight * 0.92;
+          const aboveFold = new Set(targets.filter((el) => el.getBoundingClientRect().top < fold));
+
+          targets.forEach((el) => {
+            if (aboveFold.has(el)) {
+              el.classList.add('is-in');
+              return;
+            }
             nodes.push(el);
             el.setAttribute('data-reveal', '');
             const parent = el.parentElement;

@@ -226,6 +226,7 @@ src/
 │   ├── lint-content.mjs     内容体检（npm run lint:content）
 │   ├── budget.mjs           产物体积预算（npm run budget）
 │   ├── budget-wire.mjs      首屏传输预算，用浏览器实测字节（npm run budget:wire）
+│   ├── perf.mjs             渲染指标：LCP / CLS / TBT / 长任务（npm run perf）
 │   ├── a11y-audit.mjs       axe 全站扫描（npm run a11y）
 │   ├── a11y-keyboard.mjs    键盘与读屏实测（npm run a11y:keys）
 │   ├── visual-regression.mjs 视觉回归（npm run visual / visual:update）
@@ -528,6 +529,7 @@ npm run fonts         # 需要 .fonts/ 源字体与 dist：重新裁子集，产
 npm run check         # astro check：类型与模板
 npm run budget        # 需要 dist：CSS / JS / 单页 HTML / 图片 / 字体五类上限
 npm run budget:wire   # 需要先 build + preview：实测每条路由首次访问的传输字节与字体字节
+npm run perf          # 需要先 build + preview：Slow 4G + 4× CPU 下实测 LCP / CLS / TBT 与首屏字节
 npm run a11y          # 需要先 build + preview：axe-core 扫全站 27 条路由 × 浅/深两套主题 + 4 个游戏直连页 + 四个面板
 npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、设置面板、快捷键表、移动端抽屉、触控目标 44px
 npm run visual        # 需要先 build + preview：21 条路由 × 浅/深 × 3 视口，和基线逐像素比
@@ -537,7 +539,8 @@ npm run preflight     # 一条命令串起：og → lint → fonts:check → che
 
 `preflight` 会自己起 `astro preview` 并在结束时收掉，任何一步失败就停；`--ci` 跳过分享封面
 （CI 没有中文字体，渲染出来是方框），`--skip-build` 复用现有 `dist` 只跑检查，
-`--visual` 额外跑一遍视觉回归（比全站截图慢，改过样式时用）。
+`--visual` 额外跑一遍视觉回归（比全站截图慢，改过样式时用），`--perf` 额外跑渲染指标
+（改过首屏、字体、布局脚本时用）。
 
 `visual` 的基线在 `tests/visual/baseline/`（126 张 JPEG，约 5.6 MB），元信息记在
 `tests/visual/meta.json`，包含生成时的 `platform` 与浏览器版本。**换机器或换浏览器后会直接跳过比对**

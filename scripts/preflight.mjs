@@ -5,6 +5,7 @@
  *   npm run preflight -- --ci          跳过封面（CI 没有中文字体，渲染出来是方框）
  *   npm run preflight -- --skip-build  复用已有 dist，只跑检查
  *   npm run preflight -- --visual      额外跑视觉回归（改过样式时用，比全站截图慢）
+ *   npm run preflight -- --perf        额外跑渲染指标（改过首屏、字体、布局脚本时用）
  *
  * 任何一步失败就停，并且保证预览进程被收掉。
  */
@@ -18,6 +19,7 @@ const ci = argv.includes('--ci');
 const skipOg = ci || argv.includes('--skip-og');
 const skipBuild = argv.includes('--skip-build');
 const withVisual = argv.includes('--visual');
+const withPerf = argv.includes('--perf');
 const win = process.platform === 'win32';
 const PORT = 4321;
 const BASE = `http://localhost:${PORT}/blog/`;
@@ -112,6 +114,14 @@ async function main() {
   run('键盘与读屏实测', 'node', ['scripts/a11y-keyboard.mjs']);
   /* 文件体积不等于传输量：这一条量的才是「第一次访问要下多少字节」 */
   run('首屏传输预算', 'node', ['scripts/budget-wire.mjs']);
+
+  /* 渲染指标（LCP / CLS / TBT）默认不跑：限速 + 降频下本机抖动就有 ±40%，
+     多跑四十秒换一条经常假红的检查不划算。改过布局、字体、首屏脚本时用 --perf 单独看。 */
+  if (withPerf) {
+    run('渲染指标（Slow 4G + 4× CPU）', 'node', ['scripts/perf.mjs']);
+  } else {
+    console.log('· 跳过渲染指标（加 --perf 开启）');
+  }
 
   if (withVisual) {
     run('视觉回归（对比 tests/visual/baseline）', 'node', ['scripts/visual-regression.mjs']);

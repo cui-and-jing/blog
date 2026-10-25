@@ -20,6 +20,7 @@
     "icons": "node scripts/icons.mjs",
     "budget": "node scripts/budget.mjs",
     "budget:wire": "node scripts/budget-wire.mjs",
+    "perf": "node scripts/perf.mjs",
     "preflight": "node scripts/preflight.mjs",
     "a11y": "node scripts/a11y-audit.mjs",
     "a11y:keys": "node scripts/a11y-keyboard.mjs",
