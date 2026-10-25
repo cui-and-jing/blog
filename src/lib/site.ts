@@ -30,7 +30,7 @@ export interface Game {
   accent: [string, string];
   /** 封面角标，写体量或特性，别写营销词 */
   badge: string;
-  /** 加载遮罩里提示的首屏体量 */
+  /** 加载遮罩里提示的首屏体量：写 gzip 后的真实传输量，不是磁盘上那一份 */
   weight: string;
 }
 
@@ -51,7 +51,7 @@ export const GAMES: Game[] = [
     file: '/games/beanrush.html',
     accent: ['#ff5f9e', '#ff7a6b'],
     badge: '可离线游玩',
-    weight: '首次打开约 2MB，之后会走浏览器缓存',
+    weight: '首次打开约 350KB，之后走浏览器缓存',
   },
   {
     slug: '2048',
@@ -67,8 +67,8 @@ export const GAMES: Game[] = [
     ],
     file: '/games/2048.html',
     accent: ['#c05a24', '#9c3a1b'],
-    badge: '约 22 KB',
-    weight: '约 22KB，一次加载后走缓存',
+    badge: '约 6 KB',
+    weight: '约 6KB，一次加载后走缓存',
   },
   {
     slug: 'snake',
@@ -84,8 +84,8 @@ export const GAMES: Game[] = [
     ],
     file: '/games/snake.html',
     accent: ['#3f7a52', '#2f6f66'],
-    badge: '约 19 KB',
-    weight: '约 19KB，一次加载后走缓存',
+    badge: '约 5 KB',
+    weight: '约 5KB，一次加载后走缓存',
   },
   {
     slug: 'breakout',
@@ -101,8 +101,8 @@ export const GAMES: Game[] = [
     ],
     file: '/games/breakout.html',
     accent: ['#b04a2c', '#8f3b63'],
-    badge: '约 23 KB',
-    weight: '约 23KB，一次加载后走缓存',
+    badge: '约 6 KB',
+    weight: '约 6KB，一次加载后走缓存',
   },
   {
     slug: 'minesweeper',
@@ -118,8 +118,8 @@ export const GAMES: Game[] = [
     ],
     file: '/games/minesweeper.html',
     accent: ['#4a5b6e', '#2b3a4a'],
-    badge: '约 24 KB',
-    weight: '约 24KB，一次加载后走缓存',
+    badge: '约 6 KB',
+    weight: '约 6KB，一次加载后走缓存',
   },
 ];
 

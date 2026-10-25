@@ -35,6 +35,17 @@ const routes = [
   { path: '/notes/2026-10-22-1015/', label: '笔记', limit: 230 },
   { path: '/about/', label: '关于', limit: 250 },
   { path: '/archive/', label: '归档', limit: 240 },
+
+  /* 游戏页单独一组。beanrush 把 three.js 内联在单文件里，是站内最重的单页；
+     量的是外层试玩页，iframe 的字节也算在总数里——那才是真实首访代价。
+     2026-10-25 实测：大厅 200.2、BEAN RUSH 351.6（0 字体）、其余 9.1–9.9。
+     大厅重是因为它是普通站点页，要吃 150KB 字体 + 全站 CSS，不是游戏本体的问题。 */
+  { path: '/games/', label: '游戏大厅', limit: 220 },
+  { path: '/games/beanrush/', label: 'BEAN RUSH', limit: 385 },
+  { path: '/games/2048/', label: '2048', limit: 25 },
+  { path: '/games/snake/', label: '贪吃蛇', limit: 25 },
+  { path: '/games/breakout/', label: '打砖块', limit: 25 },
+  { path: '/games/minesweeper/', label: '扫雷', limit: 25 },
 ];
 
 /** 字体单独设一条线：它是首屏最大的一块，回退成「一整片汉字」时总量未必超，但代价回归了 */
@@ -111,7 +122,7 @@ for (const row of rows) {
 }
 
 const heaviest = rows.reduce((max, row) => (row.total > (max?.total ?? 0) ? row : max), null);
-if (heaviest) console.log(`\n  最重的是「${heaviest.label}」：字体 ${heaviest.fonts.join(' + ')}`);
+if (heaviest?.fonts.length) console.log(`\n  最重的是「${heaviest.label}」：字体 ${heaviest.fonts.join(' + ')}`);
 
 if (failures.length) {
   console.error('\n✗ 首屏传输超预算：');

@@ -3,8 +3,9 @@
  *
  *   npm run budget
  *
- * 只约束「主站」——独立游戏页（dist/games）与分享封面（dist/og）是单独的内容，
- * 进不了首屏，算进来只会让预算失去意义。
+ * 主站（CSS / JS / HTML / 图片 / 字体）与游戏页分开卡：游戏页是单文件、内联全部资源
+ * 的另一类东西，混进主站表格只会让两边的数字都失去意义。但「分开」不等于「不管」——
+ * 早先游戏整类被排除在所有预算之外，beanrush 一路涨到 2MB 也没人拦，这一轮补上了。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,11 +42,15 @@ const files = walk(dist).map((file) => {
 const KB = 1024;
 const kb = (bytes) => (bytes / KB).toFixed(1);
 const isGame = (file) => file.rel.startsWith('games/');
+/* 真正的「单文件游戏」是 games/*.html 这一层；games/index.html 是游戏大厅、
+   games/<slug>/index.html 是外层试玩页，两者都是普通站点页面，走主站预算 */
+const isGameBundle = (file) =>
+  isGame(file) && file.rel.split('/').length === 2 && file.ext === '.html' && file.rel !== 'games/index.html';
 const isOg = (file) => file.rel.startsWith('og/');
 
 const css = files.filter((f) => f.ext === '.css');
 const js = files.filter((f) => f.ext === '.js');
-const html = files.filter((f) => f.ext === '.html' && !isGame(f));
+const html = files.filter((f) => f.ext === '.html' && !isGameBundle(f));
 const images = files.filter(
   (f) => /\.(avif|webp|png|jpe?g|gif|svg)$/.test(f.ext) && !isGame(f) && !isOg(f)
 );
@@ -155,9 +160,34 @@ if (pageFonts.length) {
   console.log(`      固定成本 ${kb(fixedFont)} KB：拉丁 + 标点 + 公共片，每页都付`);
 }
 
-const game = sum(files.filter(isGame), 'size');
+/* ---------- 游戏页 ---------- */
+
+/* 每个游戏是单文件、内联全部资源，所以逐页卡 gzip 上限，而不是算目录总量。
+   新加游戏必须在这张表里登记——漏登记按失败处理，否则下一个 beanrush 还是没人拦。 */
+const GAME_LIMITS = {
+  'games/beanrush.html': 380,
+  'games/2048.html': 30,
+  'games/snake.html': 30,
+  'games/breakout.html': 30,
+  'games/minesweeper.html': 30,
+};
+
+const gameFiles = files.filter(isGameBundle);
+
+if (gameFiles.length) {
+  console.log('\n  游戏页（gzip，逐页上限）：');
+  for (const file of gameFiles.sort((a, b) => b.gzip - a.gzip)) {
+    const limit = GAME_LIMITS[file.rel];
+    const over = limit === undefined || file.gzip > limit * KB;
+    if (over) failed = true;
+    console.log(
+      `    ${over ? '✗' : '✓'} ${kb(file.gzip).padStart(7)} / ${String(limit ?? '未登记').padStart(4)} KB  ${file.rel}`
+    );
+  }
+}
+
 const og = sum(files.filter(isOg), 'size');
-console.log(`\n  不计入预算：游戏 ${kb(game)} KB、分享封面 ${kb(og)} KB`);
+console.log(`\n  不计入预算：分享封面 ${kb(og)} KB`);
 
 console.log(`\n${failed ? 'FAIL' : 'OK'}  体积预算${failed ? '被突破，先看看上面哪一项涨了' : '内'}\n`);
 if (failed) process.exit(1);
