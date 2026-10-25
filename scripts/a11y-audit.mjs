@@ -69,62 +69,83 @@ const browser = await launchBrowser({
 const results = [];
 let serious = 0;
 
+/** 扫一条路由的一个主题；扫不成直接抛，由外层决定重不重试 */
+async function auditPage(browserInstance, route, theme) {
+  const page = await browserInstance.newPage();
+  try {
+    await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+    const res = await page.goto(base + route, { waitUntil: 'networkidle2', timeout: 30000 });
+    const status = res?.status() ?? 0;
+    await page.evaluate((t) => {
+      document.documentElement.dataset.theme = t;
+    }, theme);
+    /* 等字体真的就位再扫。CI 的机器比本机慢一截，250ms 时中文字体可能还在换，
+       axe 量到的是换字中间的排版，报出来的问题在本机永远复现不了。 */
+    await page.evaluate(() => document.fonts.ready.then(() => true));
+    /* 再等交互外壳补完（表格滚动容器、代码复制按钮、入场动效）。
+       不等的话会扫到「半成品」页面——CI 上 rAF 的调度比本机保守，
+       多等一个明确信号，比多等几百毫秒可靠。超时就算了，不能卡死在这里。 */
+    await page
+      .waitForFunction(() => document.documentElement.dataset.booted === 'on', { timeout: 2500 })
+      .catch(() => {});
+    await new Promise((r) => setTimeout(r, 120));
+    /* 冻结过渡：主题切换会触发 0.18s 的颜色过渡，axe 跑到一半就量到中间色。
+       2048 的「重开」按钮曾因此报出一条假的不合格对比度（2.5:1，真实值 5.3:1） */
+    await page.addStyleTag({
+      content: '*,*::before,*::after{transition:none!important;animation:none!important}',
+    });
+    await page.addScriptTag({ content: axeSource });
+    const report = await page.evaluate(async (skipFrames) => {
+      /* 试玩页里的 iframe 是游戏本体，这里不进去——游戏自己的界面由
+         gamePages 的直连页单独扫，避免同一游戏被扫两遍 */
+      const context = skipFrames ? { exclude: [['iframe']] } : document;
+      return await window.axe.run(context, {
+        runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] },
+        resultTypes: ['violations'],
+      });
+    }, /^\/games\/.+\/$/.test(route));
+    const violations = report.violations.map((v) => ({
+      id: v.id,
+      impact: v.impact,
+      help: v.help,
+      nodes: v.nodes.slice(0, 6).map((n) => ({
+        target: n.target.join(' '),
+        summary: (n.failureSummary ?? '').split('\n').slice(0, 2).join(' ').slice(0, 220),
+      })),
+      count: v.nodes.length,
+    }));
+    return { status, violations };
+  } finally {
+    /* 渲染进程崩掉时 close() 自己也会抛，吞掉即可——反正这个标签页已经不在了 */
+    await page.close().catch(() => {});
+  }
+}
+
 async function scanRoutes(routeList, browserInstance) {
   for (const route of routeList) {
     for (const theme of ['light', 'dark']) {
-      const page = await browserInstance.newPage();
-      await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
-      const url = base + route;
-      let status = 0;
-      try {
-        const res = await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-        status = res?.status() ?? 0;
-        await page.evaluate((t) => {
-          document.documentElement.dataset.theme = t;
-        }, theme);
-        /* 等字体真的就位再扫。CI 的机器比本机慢一截，250ms 时中文字体可能还在换，
-           axe 量到的是换字中间的排版，报出来的问题在本机永远复现不了。 */
-        await page.evaluate(() => document.fonts.ready.then(() => true));
-        /* 再等交互外壳补完（表格滚动容器、代码复制按钮、入场动效）。
-           不等的话会扫到「半成品」页面——CI 上 rAF 的调度比本机保守，
-           多等一个明确信号，比多等几百毫秒可靠。超时就算了，不能卡死在这里。 */
-        await page
-          .waitForFunction(() => document.documentElement.dataset.booted === 'on', { timeout: 2500 })
-          .catch(() => {});
-        await new Promise((r) => setTimeout(r, 120));
-        /* 冻结过渡：主题切换会触发 0.18s 的颜色过渡，axe 跑到一半就量到中间色。
-           2048 的「重开」按钮曾因此报出一条假的不合格对比度（2.5:1，真实值 5.3:1） */
-        await page.addStyleTag({
-          content: '*,*::before,*::after{transition:none!important;animation:none!important}',
-        });
-        await page.addScriptTag({ content: axeSource });
-        const report = await page.evaluate(async (skipFrames) => {
-          /* 试玩页里的 iframe 是游戏本体，这里不进去——游戏自己的界面由
-             gamePages 的直连页单独扫，避免同一游戏被扫两遍 */
-          const context = skipFrames ? { exclude: [['iframe']] } : document;
-          return await window.axe.run(context, {
-            runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] },
-            resultTypes: ['violations'],
-          });
-        }, /^\/games\/.+\/$/.test(route));
-        const violations = report.violations.map((v) => ({
-          id: v.id,
-          impact: v.impact,
-          help: v.help,
-          nodes: v.nodes.slice(0, 6).map((n) => ({
-            target: n.target.join(' '),
-            summary: (n.failureSummary ?? '').split('\n').slice(0, 2).join(' ').slice(0, 220),
-          })),
-          count: v.nodes.length,
-        }));
-        for (const v of violations) {
-          if (v.impact === 'critical' || v.impact === 'serious') serious += 1;
+      let entry = null;
+      /* 一条路由重来一次。失败一次没扫成（networkidle2 等不到、渲染进程被回收）
+         在 CI 上偶发，重试能自愈；真有 aria 问题的话重试也是同样的结论 */
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          const { status, violations } = await auditPage(browserInstance, route, theme);
+          for (const v of violations) {
+            if (v.impact === 'critical' || v.impact === 'serious') serious += 1;
+          }
+          entry = { route, theme, status, violations };
+          break;
+        } catch (err) {
+          if (attempt < 2) {
+            const why = String(err?.message ?? err).slice(0, 80);
+            console.log(`  ↻ ${route} [${theme}] 没扫成（${why}），重试一次`);
+            await new Promise((r) => setTimeout(r, 800));
+            continue;
+          }
+          entry = { route, theme, status: 0, error: String(err).slice(0, 200), violations: [] };
         }
-        results.push({ route, theme, status, violations });
-      } catch (err) {
-        results.push({ route, theme, status, error: String(err).slice(0, 200), violations: [] });
       }
-      await page.close();
+      results.push(entry);
     }
     console.log(`✓ ${route}`);
   }
@@ -189,7 +210,7 @@ for (const panel of [
     results.push({ route: `(${panel.label})`, theme: 'light', status: 0, error: String(err).slice(0, 200), violations: [] });
     console.log(`ERR ${panel.label}`);
   }
-  await page.close();
+  await page.close().catch(() => {});
 }
 
 await browser.close();

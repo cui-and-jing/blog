@@ -103,7 +103,11 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           if [ $status -ne 0 ]; then
-            grep -E '✗|严重|违规' .shots/a11y.log | head -6 | while IFS= read -r line; do
+            # 只认 ✗ 会一条都抓不到：a11y 的行首标记是 ERR / FAIL（Quality #47 就只抓到了汇总行）。
+            # 抓不到关键行时退回整段末尾——宁可多吐几行，也别留下一个没有线索的红灯。
+            hits=$(grep -E '^(ERR|FAIL)|^ {6}·|无法完成扫描' .shots/a11y.log | head -10 || true)
+            if [ -z "$hits" ]; then hits=$(tail -n 15 .shots/a11y.log); fi
+            printf '%s\n' "$hits" | while IFS= read -r line; do
               echo "::error::${line}"
             done
           fi
@@ -128,7 +132,9 @@ jobs:
           status=0
           npm run a11y:keys 2>&1 | tee /tmp/keys.log || status=$?
           if [ $status -ne 0 ]; then
-            grep -E '✗|失败|异常' /tmp/keys.log | head -5 | while IFS= read -r line; do
+            hits=$(grep -E '✗|失败|异常' /tmp/keys.log | head -6 || true)
+            if [ -z "$hits" ]; then hits=$(tail -n 15 /tmp/keys.log); fi
+            printf '%s\n' "$hits" | while IFS= read -r line; do
               echo "::error::${line}"
             done
           fi
@@ -142,7 +148,9 @@ jobs:
           status=0
           npm run budget:wire 2>&1 | tee /tmp/wire.log || status=$?
           if [ $status -ne 0 ]; then
-            grep -E '✗|超预算|打不开' /tmp/wire.log | head -8 | while IFS= read -r line; do
+            hits=$(grep -E '✗|超预算|打不开' /tmp/wire.log | head -8 || true)
+            if [ -z "$hits" ]; then hits=$(tail -n 15 /tmp/wire.log); fi
+            printf '%s\n' "$hits" | while IFS= read -r line; do
               echo "::error::${line}"
             done
           fi
