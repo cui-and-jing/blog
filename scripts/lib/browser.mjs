@@ -103,8 +103,15 @@ export async function launchBrowser({ args = [], protocolTimeout = 60_000, launc
   const deadline = Date.now() + launchTimeout;
   let port = '';
   let exitedAt = 0;
+  /* 路径写错时 spawn 会发 'error'；没有监听器就是未捕获异常，整个进程带着
+     node 的内部栈崩掉，连调用方自己的兜底都轮不上。先接下来，下面统一报。 */
+  let spawnError = null;
+  child.on('error', (error) => {
+    spawnError = error;
+  });
   const debug = process.env.BROWSER_DEBUG === '1';
   while (Date.now() < deadline) {
+    if (spawnError) break;
     if (fs.existsSync(portFile)) {
       port = fs.readFileSync(portFile, 'utf8').split('\n')[0].trim();
       if (port) break;
@@ -117,7 +124,16 @@ export async function launchBrowser({ args = [], protocolTimeout = 60_000, launc
   }
   if (!port) {
     child.kill();
-    throw new Error(`浏览器没有写出调试端口（${launchTimeout}ms），检查 ${executablePath}`);
+    try {
+      fs.rmSync(userDataDir, { recursive: true, force: true });
+    } catch {
+      /* 配置目录残留不影响结果 */
+    }
+    throw new Error(
+      spawnError
+        ? `浏览器启动失败（${executablePath}）：${spawnError.message}`
+        : `浏览器没有写出调试端口（${launchTimeout}ms），检查 ${executablePath}`
+    );
   }
 
   const browser = await puppeteer.connect({

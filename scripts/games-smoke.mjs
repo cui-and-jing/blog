@@ -34,6 +34,24 @@ const SRC_DIR = path.join(process.cwd(), 'public', 'games');
 const THREE_GAMES = new Set(['beanrush.html']);
 
 /**
+ * `--enable-unsafe-swiftshader` 是必须的。
+ *
+ * 浏览器统一以 `--disable-gpu --headless=new` 启动（截图要跨机一致），此时 WebGL 只能走
+ * 软件渲染；较新的 Chrome 不再默认允许，没有这个开关就创建不出 WebGL 上下文。
+ * 本机装的是旧一些的 Edge，会静默回退，所以本地跑得好好的、CI 上 beanrush 直接起不来。
+ */
+const WEBGL_ARGS = ['--enable-unsafe-swiftshader'];
+
+/**
+ * 哪些错误值得整页重来一次。
+ *
+ * 只认「浏览器/渲染进程自己断了」这一类：软件渲染下 swiftshader 偶发把渲染进程搞崩，
+ * CI 上同一个提交时而红时而绿，就是这么来的（Quality #44 红、#46 绿，代码没差）。
+ * 超时不在此列——重试只会把 2 分钟变成 4 分钟，那是脚本或游戏真的慢，得看数据。
+ */
+const RETRYABLE = /Target closed|Session closed|detached|disconnected|Protocol error/i;
+
+/**
  * 套在 window.THREE 上的守卫。
  *
  * 用 defineProperty 而不是在加载后改属性：游戏里是 `window.THREE=api` 赋值的，
@@ -58,15 +76,6 @@ const GUARD = () => {
   });
 };
 
-/**
- * `--enable-unsafe-swiftshader` 是必须的。
- *
- * 浏览器统一以 `--disable-gpu --headless=new` 启动（截图要跨机一致），此时 WebGL 只能走
- * 软件渲染；较新的 Chrome 不再默认允许，没有这个开关就创建不出 WebGL 上下文。
- * 本机装的是旧一些的 Edge，会静默回退，所以本地跑得好好的、CI 上 beanrush 直接起不来。
- */
-const WEBGL_ARGS = ['--enable-unsafe-swiftshader'];
-
 /** 整屏几乎同色说明白屏了。stdev 比肉眼判断可靠，也不受主题深浅影响 */
 async function looksBlank(page) {
   const shot = await page.screenshot({ type: 'png' });
@@ -85,45 +94,48 @@ function hasWebgl2(page) {
   });
 }
 
-const browser = await launchBrowser({ args: WEBGL_ARGS });
-const rows = [];
-const failures = [];
-
-const games = fs
-  .readdirSync(SRC_DIR)
-  .filter((file) => file.endsWith('.html'))
-  .sort();
-
-for (const file of games) {
-  const page = await browser.newPage();
-  const errors = [];
-  const missing = [];
-
-  page.on('pageerror', (error) => errors.push(`页面异常：${error.message}`));
-  page.on('console', (message) => {
-    /* 资源 404 会以「Failed to load resource」形式进控制台，但拿不到 URL。
-       这类交给下面的 response 监听判断，免得把 favicon 的噪音算成失败。 */
-    if (message.type() === 'error' && !/Failed to load resource/.test(message.text())) {
-      errors.push(`控制台错误：${message.text().slice(0, 200)}`);
-    }
-  });
-  page.on('response', (response) => {
-    /* 游戏页没有声明图标，浏览器会去根目录要 /favicon.ico，返回 404 属于常态 */
-    if (response.status() >= 400 && !response.url().endsWith('/favicon.ico')) {
-      errors.push(`资源 ${response.status()}：${response.url()}`);
-    }
-  });
-
-  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
-  await page.evaluateOnNewDocument(GUARD);
-
+/**
+ * 跑一个游戏，返回结果行与问题清单。
+ *
+ * 页面级的异常全在这里接住、不外抛——一个游戏起不来不该让后面四个失去结果，
+ * 上一次 CI 就是整轮崩在半路，日志里连表格都没印出来，什么线索都没有。
+ */
+async function checkGame(browser, file) {
   const started = Date.now();
+  const errors = [];
+  const problems = [];
+  const missing = [];
   let webgl2 = null;
+  let page = null;
+  let retryable = false;
+  let reason = '';
+
   try {
+    page = await browser.newPage();
+
+    page.on('pageerror', (error) => errors.push(`页面异常：${error.message}`));
+    page.on('console', (message) => {
+      /* 资源 404 会以「Failed to load resource」形式进控制台，但拿不到 URL。
+         这类交给下面的 response 监听判断，免得把 favicon 的噪音算成失败。 */
+      if (message.type() === 'error' && !/Failed to load resource/.test(message.text())) {
+        errors.push(`控制台错误：${message.text().slice(0, 200)}`);
+      }
+    });
+    page.on('response', (response) => {
+      /* 游戏页没有声明图标，浏览器会去根目录要 /favicon.ico，返回 404 属于常态 */
+      if (response.status() >= 400 && !response.url().endsWith('/favicon.ico')) {
+        errors.push(`资源 ${response.status()}：${response.url()}`);
+      }
+    });
+
+    await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+    await page.evaluateOnNewDocument(GUARD);
+
     await page.goto(`${base}/games/${file}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
 
     if (THREE_GAMES.has(file)) {
-      await page.waitForFunction(() => window.__beanReady === true, { timeout: 60_000 });
+      /* 软件渲染（CI 没有 GPU）建场景比本机慢得多，60s 会偶发不够 */
+      await page.waitForFunction(() => window.__beanReady === true, { timeout: 120_000 });
 
       const revision = await page.evaluate(() => window.THREE?.REVISION ?? null);
       /* OrthographicCamera 是踩过的坑：它只被别名访问，静态扫描漏过它，这里钉住 */
@@ -132,8 +144,8 @@ for (const file of games) {
           (name) => typeof window.THREE?.[name] !== 'function'
         )
       );
-      if (revision !== '185') failures.push(`${file} 里 three 的版本是 r${revision}，期望 r185`);
-      if (required.length) failures.push(`${file} 的 THREE 缺少：${required.join(', ')}`);
+      if (revision !== '185') problems.push(`${file} 里 three 的版本是 r${revision}，期望 r185`);
+      if (required.length) problems.push(`${file} 的 THREE 缺少：${required.join(', ')}`);
 
       /* 走一遍：竞技场列表 → 第一张卡片 → 开始游玩。3D 场景是在这一步才建的 */
       await page.evaluate(() => document.querySelector('[data-page="library"]')?.click());
@@ -146,7 +158,7 @@ for (const file of games) {
         button.click();
         return true;
       });
-      if (!played) failures.push(`${file} 找不到「开始游玩」按钮`);
+      if (!played) problems.push(`${file} 找不到「开始游玩」按钮`);
       await new Promise((resolve) => setTimeout(resolve, 3000));
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -155,61 +167,110 @@ for (const file of games) {
     webgl2 = await hasWebgl2(page);
 
     if (await looksBlank(page)) {
-      failures.push(`${file} 画面几乎全空，像是脚本没跑起来（WebGL2：${webgl2 ? '有' : '无'}）`);
+      problems.push(`${file} 画面几乎全空，像是脚本没跑起来（WebGL2：${webgl2 ? '有' : '无'}）`);
     }
 
     const text = await page.evaluate(() => (document.body.innerText || '').trim().length);
-    if (text < 30) failures.push(`${file} 页面上几乎没有可见文字（${text} 字）`);
+    if (text < 30) problems.push(`${file} 页面上几乎没有可见文字（${text} 字）`);
 
     missing.push(...(await page.evaluate(() => [...(window.__missingThree ?? [])])));
   } catch (error) {
+    retryable = RETRYABLE.test(error.message);
+    reason = error.message.slice(0, 160);
+
     /* 超时的时候把游戏自己的失败提示带出来——卡在「正在布置派对赛道…」和
        提示「请用支持 WebGL 2 的浏览器打开」是两回事：前者是脚本问题，后者是环境问题 */
-    const note = await page
-      .evaluate(() => (document.getElementById('load-text')?.textContent ?? '').trim().slice(0, 80))
-      .catch(() => '');
-    webgl2 = await hasWebgl2(page).catch(() => null);
-    failures.push(
+    const note = page
+      ? await page
+          .evaluate(() => (document.getElementById('load-text')?.textContent ?? '').trim().slice(0, 80))
+          .catch(() => '')
+      : '';
+    webgl2 = page ? await hasWebgl2(page).catch(() => null) : null;
+    problems.push(
       `${file} 跑不起来：${error.message}` +
         `${note ? `（页面提示：${note}）` : ''}（WebGL2：${webgl2 === null ? '未知' : webgl2 ? '有' : '无'}）`
     );
+  } finally {
+    /* 渲染进程崩掉时 close() 自己也会抛，吞掉即可——反正这个标签页已经不在了 */
+    if (page) await page.close().catch(() => {});
   }
 
-  for (const message of errors) failures.push(`${file} ${message}`);
+  for (const message of errors) problems.push(`${file} ${message}`);
 
-  rows.push({
-    file,
-    seconds: (Date.now() - started) / 1000,
-    errors: errors.length,
-    missing: missing.length,
-    missingList: missing,
-    webgl2,
-  });
-
-  await page.close();
+  return {
+    retryable,
+    problems,
+    /* 重试成功后就看不到这次的报错了，至少把原因留在一行日志里 */
+    reason,
+    row: {
+      file,
+      seconds: (Date.now() - started) / 1000,
+      errors: errors.length,
+      missing: missing.length,
+      missingList: missing,
+      webgl2,
+    },
+  };
 }
 
-await browser.close();
+async function main() {
+  const games = fs
+    .readdirSync(SRC_DIR)
+    .filter((file) => file.endsWith('.html'))
+    .sort();
 
-console.log('\n  游戏              耗时   WebGL2  报错  未导出的成员');
-for (const row of rows) {
-  const flag = row.errors || row.missing.length ? '✗' : ' ';
-  const webgl = row.webgl2 === null ? ' ? ' : row.webgl2 ? ' 有 ' : ' 无 ';
-  console.log(
-    `  ${flag} ${row.file.padEnd(18)}${row.seconds.toFixed(1).padStart(4)}s${webgl.padStart(6)}` +
-      `${String(row.errors).padStart(5)}` +
-      `${String(row.missing).padStart(10)}   ${row.missingList.slice(0, 6).join(', ')}`
-  );
+  const browser = await launchBrowser({ args: WEBGL_ARGS });
+  const rows = [];
+  const failures = [];
+
+  try {
+    for (const file of games) {
+      let result = await checkGame(browser, file);
+
+      if (result.retryable) {
+        /* 一个游戏重来一次就够——连续两次崩说明不是抖动 */
+        console.log(`  … ${file} 的浏览器会话中途断了（${result.reason}），重来一次`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        result = await checkGame(browser, file);
+      }
+
+      rows.push(result.row);
+      failures.push(...result.problems);
+    }
+  } finally {
+    await browser.close().catch(() => {});
+  }
+
+  console.log('\n  游戏              耗时   WebGL2  报错  未导出的成员');
+  for (const row of rows) {
+    const flag = row.errors || row.missing.length ? '✗' : ' ';
+    const webgl = row.webgl2 === null ? ' ? ' : row.webgl2 ? ' 有 ' : ' 无 ';
+    console.log(
+      `  ${flag} ${row.file.padEnd(18)}${row.seconds.toFixed(1).padStart(4)}s${webgl.padStart(6)}` +
+        `${String(row.errors).padStart(5)}` +
+        `${String(row.missing).padStart(10)}   ${row.missingList.slice(0, 6).join(', ')}`
+    );
+  }
+
+  if (failures.length) {
+    console.error('\n✗ 游戏冒烟失败：');
+    for (const failure of failures) console.error(`  ${failure}`);
+    console.error(
+      '\n  如果报的是「缺少 THREE.xxx」，把 xxx 补进 scripts/lib/three-vendor.mjs 的扫描结果即可：\n' +
+        '  裁掉的导出是静态扫描推断出来的，运行时守卫负责把漏网的抓出来。'
+    );
+    process.exit(1);
+  }
+
+  console.log(`\n✓ ${rows.length} 个游戏都能正常启动`);
 }
 
-if (failures.length) {
-  console.error('\n✗ 游戏冒烟失败：');
-  for (const failure of failures) console.error(`  ${failure}`);
-  console.error(
-    '\n  如果报的是「缺少 THREE.xxx」，把 xxx 补进 scripts/lib/three-vendor.mjs 的扫描结果即可：\n' +
-      '  裁掉的导出是静态扫描推断出来的，运行时守卫负责把漏网的抓出来。'
-  );
+/* 兜底：任何没接住的异常都要先说话再退出。CI 里只看到一个红灯、日志空白，
+   排查成本远高于多写这十行（Quality #44 就是这么红过一次）。 */
+main().catch((error) => {
+  const detail = error?.stack ? error.stack.split('\n').slice(0, 8).join('\n  ') : String(error);
+  console.error('\n✗ 游戏冒烟自己没跑起来（不是某个游戏的锅）：');
+  console.error(`  ${detail}`);
+  console.error('\n  常见原因：浏览器起不来（见 scripts/lib/browser.mjs）、预览服务没起、端口不是 4321。');
   process.exit(1);
-}
-
-console.log(`\n✓ ${rows.length} 个游戏都能正常启动`);
+});
