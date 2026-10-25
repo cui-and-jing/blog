@@ -85,6 +85,12 @@ async function scanRoutes(routeList, browserInstance) {
         /* 等字体真的就位再扫。CI 的机器比本机慢一截，250ms 时中文字体可能还在换，
            axe 量到的是换字中间的排版，报出来的问题在本机永远复现不了。 */
         await page.evaluate(() => document.fonts.ready.then(() => true));
+        /* 再等交互外壳补完（表格滚动容器、代码复制按钮、入场动效）。
+           不等的话会扫到「半成品」页面——CI 上 rAF 的调度比本机保守，
+           多等一个明确信号，比多等几百毫秒可靠。超时就算了，不能卡死在这里。 */
+        await page
+          .waitForFunction(() => document.documentElement.dataset.booted === 'on', { timeout: 4000 })
+          .catch(() => {});
         await new Promise((r) => setTimeout(r, 120));
         /* 冻结过渡：主题切换会触发 0.18s 的颜色过渡，axe 跑到一半就量到中间色。
            2048 的「重开」按钮曾因此报出一条假的不合格对比度（2.5:1，真实值 5.3:1） */
@@ -151,6 +157,10 @@ for (const panel of [
   await page.setViewport({ width: panel.width ?? 1280, height: panel.width === 390 ? 844 : 900, deviceScaleFactor: 1 });
   try {
     await page.goto(`${base}/posts/hello-astro/`, { waitUntil: 'networkidle2', timeout: 30000 });
+    /* 面板靠点击打开，得先确认脚本已经接管，否则点了个空 */
+    await page
+      .waitForFunction(() => document.documentElement.dataset.booted === 'on', { timeout: 4000 })
+      .catch(() => {});
     await page.addScriptTag({ content: axeSource });
     await panel.open(page);
     await new Promise((r) => setTimeout(r, 450));

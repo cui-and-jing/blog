@@ -1249,6 +1249,10 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           });
         }
       }
+
+      /* 给外部脚本一个「已经增强完」的信号：无障碍扫描、性能测量都要判断
+         表格外框、代码复制按钮这些外壳是否补上了，靠猜时间迟早会飘 */
+      root.dataset.booted = 'on';
       };
 
       /* 两帧：第一帧完成首次布局与绘制，第二帧才轮到接管。
