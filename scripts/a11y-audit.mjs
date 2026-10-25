@@ -9,7 +9,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import puppeteer from 'puppeteer-core';
+import { launchBrowser } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -46,6 +46,12 @@ const routes = only.length
       '/about/',
       '/games/',
       '/games/beanrush/',
+      /* 四个小游戏的外壳页。游戏本体（直连 *.html）单独放在 gamePages，
+         用新开的浏览器扫——见下方注释 */
+      '/games/2048/',
+      '/games/snake/',
+      '/games/breakout/',
+      '/games/minesweeper/',
       '/search/',
       '/subscribe/',
       '/styleguide/',
@@ -54,71 +60,79 @@ const routes = only.length
 
 const axeSource = fs.readFileSync(path.join(process.cwd(), 'node_modules/axe-core/axe.min.js'), 'utf8');
 
-const edgeCandidates = [
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  /* CI（ubuntu-latest）与 Linux 桌面 */
-  '/usr/bin/google-chrome',
-  '/usr/bin/google-chrome-stable',
-  '/usr/bin/chromium',
-  '/usr/bin/chromium-browser',
-];
-const executablePath = process.env.CHROME_PATH ?? edgeCandidates.find((p) => fs.existsSync(p));
-if (!executablePath) {
-  console.error('找不到浏览器，请设置 CHROME_PATH');
-  process.exit(2);
-}
-
-const browser = await puppeteer.launch({
-  executablePath,
-  headless: true,
-  args: ['--no-sandbox', '--disable-gpu', '--font-render-hinting=none'],
+const browser = await launchBrowser({
+  /* 单条 CDP 命令的超时。默认 180s 太长：一个页面的渲染进程卡死会让每条路由
+     干等 3 分钟，60s 足够任何正常页面加载 + axe 全量跑完 */
+  protocolTimeout: 60_000,
 });
 
 const results = [];
 let serious = 0;
 
-for (const route of routes) {
-  for (const theme of ['light', 'dark']) {
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
-    const url = base + route;
-    let status = 0;
-    try {
-      const res = await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-      status = res?.status() ?? 0;
-      await page.evaluate((t) => {
-        document.documentElement.dataset.theme = t;
-      }, theme);
-      await new Promise((r) => setTimeout(r, 250));
-      await page.addScriptTag({ content: axeSource });
-      const report = await page.evaluate(async () => {
-        return await window.axe.run(document, {
-          runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] },
-          resultTypes: ['violations'],
+async function scanRoutes(routeList, browserInstance) {
+  for (const route of routeList) {
+    for (const theme of ['light', 'dark']) {
+      const page = await browserInstance.newPage();
+      await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+      const url = base + route;
+      let status = 0;
+      try {
+        const res = await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+        status = res?.status() ?? 0;
+        await page.evaluate((t) => {
+          document.documentElement.dataset.theme = t;
+        }, theme);
+        await new Promise((r) => setTimeout(r, 250));
+        /* 冻结过渡：主题切换会触发 0.18s 的颜色过渡，axe 跑到一半就量到中间色。
+           2048 的「重开」按钮曾因此报出一条假的不合格对比度（2.5:1，真实值 5.3:1） */
+        await page.addStyleTag({
+          content: '*,*::before,*::after{transition:none!important;animation:none!important}',
         });
-      });
-      const violations = report.violations.map((v) => ({
-        id: v.id,
-        impact: v.impact,
-        help: v.help,
-        nodes: v.nodes.slice(0, 6).map((n) => ({
-          target: n.target.join(' '),
-          summary: (n.failureSummary ?? '').split('\n').slice(0, 2).join(' ').slice(0, 220),
-        })),
-        count: v.nodes.length,
-      }));
-      for (const v of violations) {
-        if (v.impact === 'critical' || v.impact === 'serious') serious += 1;
+        await page.addScriptTag({ content: axeSource });
+        const report = await page.evaluate(async (skipFrames) => {
+          /* 试玩页里的 iframe 是游戏本体，这里不进去——游戏自己的界面由
+             gamePages 的直连页单独扫，避免同一游戏被扫两遍 */
+          const context = skipFrames ? { exclude: [['iframe']] } : document;
+          return await window.axe.run(context, {
+            runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] },
+            resultTypes: ['violations'],
+          });
+        }, /^\/games\/.+\/$/.test(route));
+        const violations = report.violations.map((v) => ({
+          id: v.id,
+          impact: v.impact,
+          help: v.help,
+          nodes: v.nodes.slice(0, 6).map((n) => ({
+            target: n.target.join(' '),
+            summary: (n.failureSummary ?? '').split('\n').slice(0, 2).join(' ').slice(0, 220),
+          })),
+          count: v.nodes.length,
+        }));
+        for (const v of violations) {
+          if (v.impact === 'critical' || v.impact === 'serious') serious += 1;
+        }
+        results.push({ route, theme, status, violations });
+      } catch (err) {
+        results.push({ route, theme, status, error: String(err).slice(0, 200), violations: [] });
       }
-      results.push({ route, theme, status, violations });
-    } catch (err) {
-      results.push({ route, theme, status, error: String(err).slice(0, 200), violations: [] });
+      await page.close();
     }
-    await page.close();
+    console.log(`✓ ${route}`);
   }
-  console.log(`✓ ${route}`);
+}
+
+/* 游戏直连页（*.html）单独用一个新开的浏览器扫。
+   在跑过几十个站内路由的同一个浏览器实例里访问它们，页面的 JS 执行会卡死
+   （Runtime.callFunctionOn 超时；单独开浏览器、或只访问这几页时都复现不了），
+   疑似与同源渲染进程复用 + 站内页积累的状态有关。新浏览器 8 次扫描只要十几秒 */
+const gamePages = ['/games/2048.html', '/games/snake.html', '/games/breakout.html', '/games/minesweeper.html'];
+
+await scanRoutes(routes, browser);
+
+if (!only.length) {
+  const gameBrowser = await launchBrowser({ protocolTimeout: 60_000 });
+  await scanRoutes(gamePages, gameBrowser);
+  await gameBrowser.close();
 }
 
 /* 设置面板和快捷键面板默认是关着的，路由循环扫不到。
@@ -191,4 +205,7 @@ for (const r of results) {
 }
 
 console.log(`\n严重/重要违规总数：${serious}`);
-process.exit(serious > 0 ? 1 : 0);
+/* 打不开或扫不了的页面按失败算：门禁不能放过「没测到」的页面 */
+const errors = results.filter((r) => r.error);
+if (errors.length) console.log(`无法完成扫描的路由：${errors.length} 条`);
+process.exit(serious > 0 || errors.length > 0 ? 1 : 0);

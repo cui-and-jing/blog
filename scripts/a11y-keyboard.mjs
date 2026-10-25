@@ -9,26 +9,13 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import puppeteer from 'puppeteer-core';
+import { launchBrowser } from './lib/browser.mjs';
 
 const base = (process.argv.includes('--base')
   ? process.argv[process.argv.indexOf('--base') + 1]
   : 'http://localhost:4321/blog').replace(/\/$/, '');
 
-const edgeCandidates = [
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-];
-const executablePath = process.env.CHROME_PATH ?? edgeCandidates.find((p) => fs.existsSync(p));
-
-const browser = await puppeteer.launch({
-  executablePath,
-  headless: true,
-  args: ['--no-sandbox', '--disable-gpu'],
-});
+const browser = await launchBrowser();
 
 const results = [];
 const check = (name, pass, detail = '') => {

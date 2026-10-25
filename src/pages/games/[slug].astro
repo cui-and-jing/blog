@@ -1,17 +1,28 @@
 ---
 import { GAMES, url } from '../../lib/site';
 
-const game = GAMES[0];
+/**
+ * 通用试玩页：一个外壳 + 一个 iframe，游戏本体是 public/games/ 下的单文件。
+ * 所有游戏共用同一套外壳，加新游戏只要往 GAMES 里加一条，不必再写页面。
+ */
+export function getStaticPaths() {
+  return GAMES.map((game) => ({ params: { slug: game.slug }, props: { game } }));
+}
+
+const { game } = Astro.props;
 const src = url(game.file);
 const origin = (Astro.site ?? new URL('https://cui-and-jing.github.io')).origin;
 const canonical = new URL(Astro.url.pathname, origin).toString();
 const ogImage = new URL(url('/og.png'), origin).toString();
 const pageTitle = `${game.title} · ${game.subtitle}`;
 const pageDesc = `${game.title} ${game.subtitle}：${game.description}`;
+const [accentA, accentB] = game.accent;
 ---
 
 <!doctype html>
-<html lang="zh-CN">
+<!-- 两种主色放 html 的 style 属性上：<style> 里不支持 {expr} 插值，
+     写进去就是字面量，变量会是无效值被丢掉 -->
+<html lang="zh-CN" style={`--accent-a:${accentA};--accent-b:${accentB}`}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -87,6 +98,12 @@ const pageDesc = `${game.title} ${game.subtitle}：${game.description}`;
       .back:hover {
         background: rgba(255, 255, 255, 0.08);
         border-color: rgba(255, 255, 255, 0.22);
+      }
+
+      .back:focus-visible,
+      .fs:focus-visible {
+        outline: 2px solid var(--accent-b);
+        outline-offset: 3px;
       }
 
       .title {
@@ -174,7 +191,7 @@ const pageDesc = `${game.title} ${game.subtitle}：${game.description}`;
         width: 26px;
         height: 26px;
         border: 2px solid rgba(255, 255, 255, 0.14);
-        border-top-color: #ff5f9e;
+        border-top-color: var(--accent-a);
         border-radius: 50%;
         animation: spin 0.9s linear infinite;
       }
@@ -216,7 +233,7 @@ const pageDesc = `${game.title} ${game.subtitle}：${game.description}`;
     <header class="bar">
       <a class="back" href={url('/games/')}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M15 6l-6 6 6 6"></path>
+          <path d="M15 6l-6 6 6 6" />
         </svg>
         游戏列表
       </a>
@@ -224,7 +241,7 @@ const pageDesc = `${game.title} ${game.subtitle}：${game.description}`;
       <span class="spacer"></span>
       <button class="fs" id="fs" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path>
+          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
         </svg>
         全屏
       </button>
@@ -234,7 +251,7 @@ const pageDesc = `${game.title} ${game.subtitle}：${game.description}`;
       <div class="loader" id="loader">
         <span class="spinner"></span>
         <span>正在加载游戏…</span>
-        <small>首次打开约 2MB，之后会走浏览器缓存</small>
+        <small>{game.weight}</small>
       </div>
       <iframe id="game" src={src} title={pageTitle} allow="fullscreen; autoplay; gamepad"></iframe>
     </main>

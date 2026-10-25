@@ -5,16 +5,16 @@
  * 依赖本机 Chrome / Edge；字体走系统字体，所以换个系统渲染结果会有差异。
  */
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer-core';
 import sharp from 'sharp';
 import { parse as parseYaml } from 'yaml';
 import { coverStyle } from '../src/lib/cover.ts';
 import { plainNote, titleFromText } from '../src/lib/note-text.ts';
 import { AUTHORS } from '../src/data/authors.ts';
+import { launchBrowser } from './lib/browser.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const postsDir = path.join(root, 'src/content/posts');
@@ -24,22 +24,6 @@ const SITE = { title: 'Cui & Jing', tagline: '关于技术、阅读与生活的�
 
 /** frontmatter 里存的是 id，卡片上要显示名字 */
 const authorName = (id) => AUTHORS.find((author) => author.id === id)?.name ?? SITE.title;
-
-/* ---------- 找浏览器 ---------- */
-const CANDIDATES = [
-  process.env.CHROME_PATH,
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-].filter(Boolean);
-const executablePath = CANDIDATES.find((p) => existsSync(p));
-if (!executablePath) {
-  console.error('没找到 Chrome / Edge，用 CHROME_PATH 指一个再跑。');
-  process.exit(1);
-}
 
 /* ---------- 读文章 ---------- */
 const files = (await fs.readdir(postsDir)).filter((f) => /\.mdx?$/.test(f));
@@ -265,11 +249,7 @@ if (existsSync(notesDir)) {
 
 /* ---------- 渲染 ---------- */
 await fs.mkdir(outDir, { recursive: true });
-const browser = await puppeteer.launch({
-  executablePath,
-  headless: true,
-  args: ['--no-sandbox', '--disable-gpu', '--font-render-hinting=none', '--force-color-profile=srgb'],
-});
+const browser = await launchBrowser();
 const page = await browser.newPage();
 await page.setViewport({ width: 1200, height: 630, deviceScaleFactor: 1 });
 

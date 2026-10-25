@@ -184,7 +184,7 @@ src/
 │   ├── archive.astro        归档（年度统计 + 月度节奏条）
 │   ├── tags/                标签总览 + 单标签
 │   ├── category/            分类页（每个分类一页）
-│   ├── games/               游戏：大厅 + 全屏试玩外壳
+│   ├── games/               游戏：大厅（index）+ 全屏试玩外壳（[slug]）
 │   ├── subscribe.astro      订阅落地页（两个 feed 的说明与复制）
 │   ├── search.astro         站内搜索
 │   ├── search-index.json.ts 构建时生成搜索索引
@@ -229,7 +229,8 @@ src/
 │   ├── a11y-audit.mjs       axe 全站扫描（npm run a11y）
 │   ├── a11y-keyboard.mjs    键盘与读屏实测（npm run a11y:keys）
 │   ├── visual-regression.mjs 视觉回归（npm run visual / visual:update）
-│   └── preflight.mjs        发布前一键跑完全部检查（npm run preflight）
+│   ├── preflight.mjs        发布前一键跑完全部检查（npm run preflight）
+│   └── lib/browser.mjs      无头浏览器统一入口（spawn + CDP，绕开 Edge 引导程序的假失败）
 ├── tests/visual/
 │   ├── baseline/            视觉基线，126 张 JPEG，需随样式改动一起提交
 │   └── meta.json            基线生成环境（platform + 浏览器版本）
@@ -249,15 +250,29 @@ src/
 
 ## 游戏模块
 
-游戏大厅在 `/games/`，试玩在 `/games/beanrush/`（细栏 + iframe 铺满视口，支持全屏）。
-游戏本体是一个自包含 HTML（Three.js 内联，无 CDN、无后端），放在 `public/games/beanrush.html`，
-构建时原样拷进 `dist/games/`。
+游戏大厅在 `/games/`：上面是旗舰大卡，下面是四张小卡的网格。
+试玩页是**通用路由** `/games/<slug>/`（细栏 + iframe 铺满视口，支持全屏），加游戏不用再写页面。
+
+| 游戏 | 路由 | 体积 | 玩法 |
+| --- | --- | --- | --- |
+| BEAN RUSH 7 | `/games/beanrush/` | 2.0 MB | 3D 派对，单人闯关或双人同屏（Three.js 内联） |
+| 2048 | `/games/2048/` | 22 KB | 方向键合并同数，留了一步撤销 |
+| SNAKE | `/games/snake/` | 19 KB | 吃一颗长一节，越吃越快 |
+| BREAKOUT | `/games/breakout/` | 23 KB | 挡板接球，击球点决定反弹角度 |
+| MINESWEEPER | `/games/minesweeper/` | 24 KB | 三档难度，首次点击必安全 |
+
+四款小游戏都是**单文件、零依赖**：不引 CDN、不发请求，深色外壳跟随 `prefers-color-scheme`，
+键盘与触屏都能玩（方向键 / WASD / 滑动转向 / 长按插旗），尊重 `prefers-reduced-motion`，
+最高分写 localStorage（键名 `game.<slug>.best`，和博客的 `settings` 单键不冲突）。
 
 要加新游戏：把单文件丢进 `public/games/`，在 `src/lib/site.ts` 的 `GAMES` 里加一条
-（标题、描述、标签、`file` 路径），大厅页会自动渲染。试玩页目前按 `beanrush` 单独一个路由，
-新游戏可以复用同样的外壳或直接链接到 HTML。
+（`slug` / `title` / `subtitle` / `description` / `tags` / `facts` / `file` / `accent` /
+`badge` / `weight` / `keys`），大厅网格与试玩路由会自动出现。
 
-游戏用 `bean-rush.*` 前缀写 localStorage，和博客的 `theme` 键不冲突。
+两个注意点：
+- `scripts/fonts.mjs` 扫 `dist` 统计字符集时**跳过 `dist/games/`**——这些页面用系统字体，
+  混进来会把公共片撑大
+- 游戏不进 `budget.mjs`（不在首屏路径上），但 `/games/<slug>/` 与 `/games/*.html` 都在 axe 扫描列表里
 
 ## 搜索
 
@@ -454,6 +469,11 @@ npm run og
 ```
 
 需要本机装 Chrome 或 Edge（脚本用 `puppeteer-core`，可用 `CHROME_PATH` 指定路径）。
+所有要真渲染的脚本（分享封面、图标、axe、键盘实测、传输预算、视觉基线）都从
+`scripts/lib/browser.mjs` 拿浏览器——**不要直接 `puppeteer.launch`**：新版 Edge 的
+`msedge.exe` 是个引导程序，拉起真正的浏览器进程后自己立刻以 0 退出，puppeteer 会误判成启动失败
+（`Failed to launch the browser process: Code: 0`）。统一入口改成自己 spawn、等
+`DevToolsActivePort` 落盘后再走 CDP 连接，顺带把临时配置目录也收拾干净。
 **新文章写完、改了标题后跑一次**，把 `public/og/*.png` 一起提交——图是构建产物之外的静态文件，
 CI 不生成（GitHub Actions 里没有中文字体，渲染会变成方框）。
 
@@ -508,7 +528,7 @@ npm run fonts         # 需要 .fonts/ 源字体与 dist：重新裁子集，产
 npm run check         # astro check：类型与模板
 npm run budget        # 需要 dist：CSS / JS / 单页 HTML / 图片 / 字体五类上限
 npm run budget:wire   # 需要先 build + preview：实测每条路由首次访问的传输字节与字体字节
-npm run a11y          # 需要先 build + preview：axe-core 扫全站 23 条路由 × 浅/深两套主题 + 四个面板
+npm run a11y          # 需要先 build + preview：axe-core 扫全站 27 条路由 × 浅/深两套主题 + 4 个游戏直连页 + 四个面板
 npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、设置面板、快捷键表、移动端抽屉、触控目标 44px
 npm run visual        # 需要先 build + preview：21 条路由 × 浅/深 × 3 视口，和基线逐像素比
 npm run visual:update # 样式改动确认无误后重建基线

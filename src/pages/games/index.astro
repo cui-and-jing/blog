@@ -1,8 +1,9 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import GameCover from '../../components/GameCover.astro';
 import { GAMES, url, SITE } from '../../lib/site';
 
-const game = GAMES[0];
+const [featured, ...rest] = GAMES;
 ---
 
 <BaseLayout title="游戏" description="自己做的小游戏，打开就能玩，不用登录也不用下载。">
@@ -14,70 +15,27 @@ const game = GAMES[0];
   </div>
 
   <div class="shell">
-    <article class="game-card">
+    {/* 旗舰作品保留横向大卡：它有 3D 场景和双人模式，值得占两栏 */}
+    <article
+      class="game-card"
+      style={`--game-a:${featured.accent[0]};--game-b:${featured.accent[1]}`}
+    >
       <div class="game-art">
-        <svg viewBox="0 0 720 460" role="img" aria-label="糖河上的豆人插画" preserveAspectRatio="xMidYMid slice">
-          <defs>
-            <linearGradient id="ga-sky" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#ff5f9e" />
-              <stop offset="0.55" stop-color="#ff7f92" />
-              <stop offset="1" stop-color="#ffa878" />
-            </linearGradient>
-            <linearGradient id="ga-bean" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#fffdf7" />
-              <stop offset="1" stop-color="#ffe8d6" />
-            </linearGradient>
-            <radialGradient id="ga-sun" cx="0.5" cy="0.5" r="0.5">
-              <stop offset="0" stop-color="#ffe98f" stop-opacity="0.95" />
-              <stop offset="1" stop-color="#ffde5a" stop-opacity="0.1" />
-            </radialGradient>
-          </defs>
-
-          <rect width="720" height="460" fill="url(#ga-sky)" />
-          <circle cx="566" cy="96" r="96" fill="url(#ga-sun)" />
-          <circle cx="566" cy="96" r="42" fill="#ffe98f" opacity="0.9" />
-
-          <path d="M0 322c118-30 214 30 336 2s252-34 384 6v130H0Z" fill="#ffffff" opacity="0.16" />
-          <path d="M0 366c126-28 226 34 372 6s236-26 348 10v78H0Z" fill="#203653" opacity="0.14" />
-          <path d="M0 402c140-22 240 26 386 4s222-18 334 8v46H0Z" fill="#203653" opacity="0.18" />
-
-          <g opacity="0.5" fill="#fff7ef">
-            <rect x="96" y="126" width="34" height="44" rx="17" transform="rotate(-18 113 148)" />
-            <rect x="612" y="238" width="28" height="36" rx="14" transform="rotate(16 626 256)" />
-            <rect x="486" y="300" width="22" height="28" rx="11" transform="rotate(-10 497 314)" />
-          </g>
-
-          <g fill="#fff7ef" opacity="0.75">
-            <path d="M150 226l6 16 16 6-16 6-6 16-6-16-16-6 16-6Z" />
-            <path d="M636 150l4 11 11 4-11 4-4 11-4-11-11-4 11-4Z" />
-          </g>
-
-          <ellipse cx="356" cy="380" rx="92" ry="18" fill="#203653" opacity="0.18" />
-
-          <g transform="rotate(-11 356 300)">
-            <rect x="262" y="196" width="188" height="196" rx="94" fill="url(#ga-bean)" />
-            <ellipse cx="356" cy="330" rx="58" ry="48" fill="#ffd0e0" opacity="0.85" />
-            <rect x="322" y="268" width="9" height="26" rx="4.5" fill="#203653" />
-            <rect x="381" y="268" width="9" height="26" rx="4.5" fill="#203653" />
-            <path d="M344 316q12 12 24 0" stroke="#203653" stroke-width="5" stroke-linecap="round" fill="none" />
-            <rect x="236" y="286" width="40" height="18" rx="9" fill="#fffdf7" transform="rotate(-16 256 295)" />
-            <rect x="440" y="272" width="40" height="18" rx="9" fill="#fffdf7" transform="rotate(14 460 281)" />
-          </g>
-        </svg>
-        <span class="game-art-badge">可离线游玩</span>
+        <GameCover slug={featured.slug} />
+        <span class="game-art-badge">{featured.badge}</span>
       </div>
 
       <div class="game-body">
         <div class="game-kicker">
-          {game.tags.map((tag) => <span class="game-tag">{tag}</span>)}
+          {featured.tags.map((tag) => <span class="game-tag">{tag}</span>)}
         </div>
         <h2>
-          {game.title}<span>{game.subtitle}</span>
+          {featured.title}<span>{featured.subtitle}</span>
         </h2>
-        <p>{game.description}</p>
+        <p>{featured.description}</p>
 
         <ul class="game-facts">
-          {game.facts.map((fact) => (
+          {featured.facts.map((fact) => (
             <li>
               <b>{fact.value}</b>
               <span>{fact.label}</span>
@@ -86,50 +44,91 @@ const game = GAMES[0];
         </ul>
 
         <div class="game-actions">
-          <a class="game-play" href={url('/games/beanrush/')}>
+          <a class="game-play" href={url(`/games/${featured.slug}/`)}>
             开始游戏
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M5 12h13M13 6l6 6-6 6"></path>
+              <path d="M5 12h13M13 6l6 6-6 6" />
             </svg>
           </a>
-          <a class="btn" href={url(game.file)} target="_blank" rel="noopener">新窗口打开</a>
+          <a class="game-link" href={url(featured.file)} target="_blank" rel="noopener">新窗口打开</a>
         </div>
       </div>
     </article>
+
+    <ul class="game-grid">
+      {rest.map((game) => (
+        <li
+          class="game-card game-card--mini"
+          style={`--game-a:${game.accent[0]};--game-b:${game.accent[1]}`}
+        >
+          <div class="game-art">
+            <GameCover slug={game.slug} />
+            <span class="game-art-badge">{game.badge}</span>
+          </div>
+
+          <div class="game-body">
+            <div class="game-kicker">
+              {game.tags.map((tag) => <span class="game-tag">{tag}</span>)}
+            </div>
+            <h2>
+              {game.title}<span>{game.subtitle}</span>
+            </h2>
+            <p>{game.description}</p>
+
+            <ul class="game-facts">
+              {game.facts.map((fact) => (
+                <li>
+                  <b>{fact.value}</b>
+                  <span>{fact.label}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div class="game-actions">
+              <a class="game-play" href={url(`/games/${game.slug}/`)}>
+                开始游戏
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5 12h13M13 6l6 6-6 6" />
+                </svg>
+              </a>
+              <a class="game-link" href={url(game.file)} target="_blank" rel="noopener">新窗口</a>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
 
     <section class="game-notes">
       <div class="game-note">
         <h3>怎么玩</h3>
         <p>
-          先选模式：一键派对随机开一局，或者进玩法库挑地图。九种竞技场支持一至两人本地对战，
-          四岛竞速则是和 AI 比。想认真打就进「挑战之旅」，十二关一关一关过。
+          点「开始游戏」进试玩页，右上角可以全屏，Esc 退出。每个游戏页底部都有它自己的操作提示，
+          不用先看说明书，打开就能上手。
         </p>
       </div>
 
       <div class="game-note">
         <h3>操作</h3>
         <dl class="keys">
-          <div><dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>移动</dd></div>
-          <div><dt><kbd>空格</kbd></dt><dd>跳跃</dd></div>
-          <div><dt><kbd>Shift</kbd></dt><dd>飞扑</dd></div>
-          <div><dt><kbd>Q</kbd></dt><dd>推击 / 拦截</dd></div>
-          <div><dt><kbd>Esc</kbd></dt><dd>暂停</dd></div>
-          <div><dt><kbd>方向键</kbd>+<kbd>Enter</kbd></dt><dd>P2</dd></div>
+          <div><dt><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></dt><dd>移动 / 转向</dd></div>
+          <div><dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>同上</dd></div>
+          <div><dt><kbd>空格</kbd></dt><dd>发球 / 暂停</dd></div>
+          <div><dt><kbd>R</kbd></dt><dd>重开</dd></div>
+          <div><dt>滑动 / 点按</dt><dd>触屏</dd></div>
         </dl>
       </div>
 
       <div class="game-note">
         <h3>说明</h3>
         <p>
-          单文件离线运行，Three.js 已内置，没有 CDN、没有后端，进度存在浏览器本地。
-          需要支持 WebGL2 的浏览器，桌面端体验最好；手机上可以打开，
-          但没有触屏按键，建议用键盘操作。
+          全部单文件离线运行，没有 CDN、没有后端、也没有统计脚本。最高分和进度只存在你自己的浏览器里，
+          清掉缓存就归零。除了 3D 那款需要 WebGL2，其余都是纯 2D，手机也能跑。
         </p>
       </div>
     </section>
 
     <p class="game-tail">
-      游戏是独立写的，和博客文章分开维护。源码在
+      游戏和博客文章分开维护。源码在
       <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>
       上，欢迎提问题。
     </p>

@@ -3,6 +3,8 @@
    顺序即层叠顺序，调整文件顺序会改变覆盖关系
    ========================================================================== */
 /* ---------- games ---------- */
+/* 每张卡片在页面里用内联变量声明自己的两种主色，封面底色与按钮渐变都跟着它走，
+   这样加新游戏只需要在 GAMES 里填 accent，不用回来改样式 */
 .game-card {
   display: grid;
   grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
@@ -16,7 +18,7 @@
 .game-art {
   position: relative;
   min-height: 360px;
-  background: linear-gradient(140deg, #ff5f9e, #ffa878);
+  background: linear-gradient(140deg, var(--game-a, #ff5f9e), var(--game-b, #ffa878));
   overflow: hidden;
 }
 
@@ -136,11 +138,11 @@ html[data-theme='dark'] .game-tag {
   gap: 8px;
   padding: 12px 26px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #ff5f9e, #ff7a6b);
+  background: linear-gradient(135deg, var(--game-a, #ff5f9e), var(--game-b, #ff7a6b));
   color: #fff;
   font-size: 14px;
   letter-spacing: 0.02em;
-  box-shadow: 0 14px 26px -16px rgba(255, 78, 149, 0.9);
+  box-shadow: 0 14px 26px -16px color-mix(in srgb, var(--game-a, #ff4e95) 90%, transparent);
   transition: transform 0.22s var(--ease), box-shadow 0.22s var(--ease), filter 0.22s var(--ease);
 }
 
@@ -153,11 +155,115 @@ html[data-theme='dark'] .game-tag {
 .game-play:hover {
   transform: translateY(-2px);
   filter: saturate(1.08);
-  box-shadow: 0 18px 30px -16px rgba(255, 78, 149, 0.95);
+  box-shadow: 0 18px 30px -16px color-mix(in srgb, var(--game-a, #ff4e95) 95%, transparent);
 }
 
 .game-play:hover svg {
   transform: translateX(3px);
+}
+
+/* 文字链不做成主按钮：同一张卡上两个同权重按钮会让人犹豫点哪个 */
+.game-link {
+  font-size: 13px;
+  color: var(--text-soft);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: color-mix(in srgb, var(--text-soft) 40%, transparent);
+  transition: color 0.2s var(--ease), text-decoration-color 0.2s var(--ease);
+}
+
+.game-link:hover {
+  color: var(--accent);
+  text-decoration-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+/* ---------- 小游戏网格 ----------
+   四款游戏，四列排满一行：auto-fill 在 1080 宽度下会切成 3 列，
+   第四张孤零零掉到下一行，看着像漏了一个。断点写在文件末尾。 */
+.game-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 卡片整体可点：主链接（开始游戏）拉一层透明遮罩盖住整张卡，
+   这样读屏只遇到一个指向游戏的链接，鼠标点哪儿都进得去。
+   卡内其他链接要抬到遮罩之上（.game-link 的 position/z-index）。 */
+.game-card--mini {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.24s var(--ease), box-shadow 0.24s var(--ease);
+}
+
+.game-card--mini:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.game-card--mini:focus-within {
+  box-shadow: var(--shadow-lg);
+}
+
+.game-card--mini .game-art {
+  min-height: 0;
+  aspect-ratio: 16 / 10;
+}
+
+.game-card--mini .game-body {
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 22px 24px 24px;
+}
+
+.game-card--mini .game-body h2 {
+  font-size: clamp(21px, 1.9vw, 25px);
+}
+
+.game-card--mini .game-body > p {
+  font-size: 13.5px;
+  line-height: 1.75;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.game-card--mini .game-facts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.game-card--mini .game-facts b {
+  font-size: 15px;
+}
+
+.game-card--mini .game-actions {
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.game-card--mini .game-play {
+  padding: 10px 20px;
+  font-size: 13px;
+}
+
+.game-card--mini .game-play::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.game-card--mini .game-link {
+  position: relative;
+  z-index: 1;
 }
 
 .game-notes {
@@ -216,7 +322,9 @@ html[data-theme='dark'] .game-tag {
   color: var(--text-soft);
 }
 
-kbd {
+/* 键帽全局样式在 settings.css 里已有，这里只把游戏说明里的稍微放大一点。
+   注意要限定作用域：写成裸 `kbd` 会连带改掉设置面板与快捷键表的键帽 */
+.game-note kbd {
   display: inline-block;
   min-width: 22px;
   padding: 3px 7px;
@@ -224,10 +332,6 @@ kbd {
   font-size: 11px;
   line-height: 1.3;
   text-align: center;
-  color: var(--text-soft);
-  background: var(--card-flat);
-  border: 1px solid var(--line);
-  border-bottom-width: 2px;
   border-radius: 6px;
 }
 
@@ -240,5 +344,66 @@ kbd {
 .game-tail a {
   color: var(--accent);
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* ---------- 游戏页的断点 ----------
+   这几个媒体查询特意留在这个文件里而不是 responsive.css：
+   后者先于本文件被引入，写在那边会被这里的基础规则盖掉。 */
+
+/* 平板：两张一行 */
+@media (min-width: 600px) {
+  .game-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 桌面：四款游戏一行排满，不留下孤零零的第四张 */
+@media (min-width: 1000px) {
+  .game-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .game-card--mini .game-body {
+    padding: 18px 18px 20px;
+  }
+
+  .game-card--mini .game-body h2 {
+    font-size: 21px;
+  }
+}
+
+@media (max-width: 900px) {
+  .game-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .game-art {
+    min-height: 250px;
+    aspect-ratio: 16 / 9;
+  }
+
+  .game-body {
+    padding: 30px 26px 34px;
+  }
+
+  .game-notes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .game-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 14px;
+  }
+}
+
+@media (max-width: 560px) {
+  .game-body {
+    padding: 24px 20px 26px;
+  }
+
+  .game-play {
+    padding: 11px 22px;
+  }
 }
 

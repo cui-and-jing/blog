@@ -12,7 +12,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import puppeteer from 'puppeteer-core';
+import { launchBrowser } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -65,33 +65,13 @@ const ROOT = path.join(process.cwd(), 'tests/visual');
 const DIR = path.join(ROOT, 'baseline');
 const META = path.join(ROOT, 'meta.json');
 
-const edgeCandidates = [
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  '/usr/bin/google-chrome',
-  '/usr/bin/google-chrome-stable',
-  '/usr/bin/chromium',
-  '/usr/bin/chromium-browser',
-];
-const executablePath = process.env.CHROME_PATH ?? edgeCandidates.find((p) => fs.existsSync(p));
-if (!executablePath) {
-  console.error('找不到浏览器，请设置 CHROME_PATH');
-  process.exit(2);
-}
-
 const slug = (route) =>
   route === '/' ? 'home' : route.replace(/^\/|\/$/g, '').replace(/[/]/g, '-') || 'home';
-const fileOf = (route, theme, viewport) =>
-  path.join(DIR, `${slug(route)}--${theme}--${viewport.name}.jpg`);
+const fileOf = (route, theme, viewport) => path.join(DIR, `${slug(route)}--${theme}--${viewport.name}.jpg`);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const browser = await puppeteer.launch({
-  executablePath,
-  headless: true,
-  args: ['--no-sandbox', '--disable-gpu', '--font-render-hinting=none'],
-});
+const browser = await launchBrowser();
 const version = await browser.version();
 
 if (!update && fs.existsSync(META)) {

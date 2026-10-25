@@ -42,22 +42,6 @@
   text-shadow: 0 2px 24px rgba(0, 0, 0, 0.34);
 }
 
-.post-hero-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 9px;
-  margin-top: 16px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  letter-spacing: 0.03em;
-  color: rgba(255, 255, 255, 0.82);
-}
-
-.post-hero-meta .sep {
-  opacity: 0.45;
-}
-
 /* ---------- article ---------- */
 .article-wrap {
   display: grid;
@@ -610,13 +594,6 @@ html[data-theme='dark'] .prose .table-wrap.is-scrollable {
 .toc {
   font-size: 13px;
   line-height: 1.7;
-}
-
-.toc-title {
-  margin: 0 0 12px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
 }
 
 .toc ul {

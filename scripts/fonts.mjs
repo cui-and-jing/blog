@@ -151,17 +151,23 @@ function analyzePages() {
   };
   walk(DIST);
 
-  const pages = files.map((file) => {
-    const html = fs
-      .readFileSync(file, 'utf8')
-      .replace(/<script[\s\S]*?<\/script>/g, ' ')
-      .replace(/<style[\s\S]*?<\/style>/g, ' ')
-      .replace(/<[^>]+>/g, ' ');
-    const rel = `/${path.relative(DIST, file).split(path.sep).join('/')}`
-      .replace(/\/index\.html$/, '/')
-      .replace(/^\/(index\.html|)$/, '/');
-    return { path: rel, chars: new Set([...html].filter(isHan)) };
-  });
+  /* 游戏是独立单文件，用系统字体栈，不参与正文子集 —— 让它们进统计会把
+     界面文字推进「公共片」，而公共片是每页都要付的固定成本 */
+  const isGame = (file) => path.relative(DIST, file).split(path.sep)[0] === 'games';
+
+  const pages = files
+    .filter((file) => !isGame(file))
+    .map((file) => {
+      const html = fs
+        .readFileSync(file, 'utf8')
+        .replace(/<script[\s\S]*?<\/script>/g, ' ')
+        .replace(/<style[\s\S]*?<\/style>/g, ' ')
+        .replace(/<[^>]+>/g, ' ');
+      const rel = `/${path.relative(DIST, file).split(path.sep).join('/')}`
+        .replace(/\/index\.html$/, '/')
+        .replace(/^\/(index\.html|)$/, '/');
+      return { path: rel, chars: new Set([...html].filter(isHan)) };
+    });
 
   return pages.sort((a, b) => a.path.localeCompare(b.path));
 }

@@ -11,28 +11,11 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer-core';
+import { launchBrowser } from './lib/browser.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const publicDir = path.join(root, 'public');
-
-/* 与 scripts/og-cards.mjs 同源；那边改浏览器候选时这里一起改 */
-const CANDIDATES = [
-  process.env.CHROME_PATH,
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-].filter(Boolean);
-const executablePath = CANDIDATES.find((p) => existsSync(p));
-if (!executablePath) {
-  console.error('没找到 Chrome / Edge，用 CHROME_PATH 指一个再跑。');
-  process.exit(1);
-}
 
 const svgSource = await fs.readFile(path.join(publicDir, 'favicon.svg'), 'utf8');
 
@@ -45,11 +28,7 @@ const iconSvg = (rounded) =>
     .replace(/rx="[\d.]+"/, `rx="${rounded ? 14 : 0}"`)
     .replace('<svg ', '<svg width="100%" height="100%" ');
 
-const browser = await puppeteer.launch({
-  executablePath,
-  headless: true,
-  args: ['--no-sandbox', '--disable-gpu', '--force-color-profile=srgb'],
-});
+const browser = await launchBrowser();
 const page = await browser.newPage();
 
 /** 渲染成等宽高的 PNG，背景透明——图标自己带底色 */

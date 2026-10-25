@@ -28,6 +28,10 @@ export interface Game {
   /** public/ 下的单文件游戏路径 */
   file: string;
   accent: [string, string];
+  /** 封面角标，写体量或特性，别写营销词 */
+  badge: string;
+  /** 加载遮罩里提示的首屏体量 */
+  weight: string;
 }
 
 export const GAMES: Game[] = [
@@ -45,7 +49,77 @@ export const GAMES: Game[] = [
       { value: '双人', label: '同屏对战' },
     ],
     file: '/games/beanrush.html',
-    accent: ['#ff4e95', '#ff9c6b'],
+    accent: ['#ff5f9e', '#ff7a6b'],
+    badge: '可离线游玩',
+    weight: '首次打开约 2MB，之后会走浏览器缓存',
+  },
+  {
+    slug: '2048',
+    title: '2048',
+    subtitle: '数字合并',
+    description:
+      '四乘四的格子，相同的数字撞在一起就翻倍。规则一句话说完，难的是别把自己堵死。留了一步撤销，手滑了还能退回来。',
+    tags: ['数字', '策略', '离线单机'],
+    facts: [
+      { value: '4×4', label: '棋盘' },
+      { value: '2048', label: '目标' },
+      { value: '1', label: '步撤销' },
+    ],
+    file: '/games/2048.html',
+    accent: ['#c05a24', '#9c3a1b'],
+    badge: '约 22 KB',
+    weight: '约 22KB，一次加载后走缓存',
+  },
+  {
+    slug: 'snake',
+    title: 'SNAKE',
+    subtitle: '贪吃蛇',
+    description:
+      '一条越吃越长的线。撞墙、咬到自己都算结束，唯一的难点是它越吃越快。手机横竖滑动都行，电脑用方向键。',
+    tags: ['动作', '手速', '离线单机'],
+    facts: [
+      { value: '21×21', label: '格棋盘' },
+      { value: '10', label: '分一颗' },
+      { value: '本地', label: '存最高分' },
+    ],
+    file: '/games/snake.html',
+    accent: ['#3f7a52', '#2f6f66'],
+    badge: '约 19 KB',
+    weight: '约 19KB，一次加载后走缓存',
+  },
+  {
+    slug: 'breakout',
+    title: 'BREAKOUT',
+    subtitle: '打砖块',
+    description:
+      '一块板、一颗球、五排砖。板子接球的位置决定反弹角度，所以角度是能自己控的。三条命，清完一屏换下一关。',
+    tags: ['街机', '反应', '离线单机'],
+    facts: [
+      { value: '3', label: '条命' },
+      { value: '2', label: '击砖' },
+      { value: '∞', label: '关' },
+    ],
+    file: '/games/breakout.html',
+    accent: ['#b04a2c', '#8f3b63'],
+    badge: '约 23 KB',
+    weight: '约 23KB，一次加载后走缓存',
+  },
+  {
+    slug: 'minesweeper',
+    title: 'MINESWEEPER',
+    subtitle: '扫雷',
+    description:
+      '数字是周围八格里地雷的数量。靠推理一格一格排干净，不靠猜。三档难度，第一次点开的那格永远安全。',
+    tags: ['推理', '益智', '离线单机'],
+    facts: [
+      { value: '3', label: '档难度' },
+      { value: '99', label: '颗雷' },
+      { value: '首次', label: '必安全' },
+    ],
+    file: '/games/minesweeper.html',
+    accent: ['#4a5b6e', '#2b3a4a'],
+    badge: '约 24 KB',
+    weight: '约 24KB，一次加载后走缓存',
   },
 ];
 

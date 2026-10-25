@@ -13,7 +13,7 @@
  * 全新页面，量的就是第一次访问的代价。
  */
 import fs from 'node:fs';
-import puppeteer from 'puppeteer-core';
+import { launchBrowser } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -40,28 +40,9 @@ const routes = [
 /** 字体单独设一条线：它是首屏最大的一块，回退成「一整片汉字」时总量未必超，但代价回归了 */
 const FONT_LIMIT = 200;
 
-const browserCandidates = [
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  '/usr/bin/google-chrome',
-  '/usr/bin/google-chrome-stable',
-  '/usr/bin/chromium',
-  '/usr/bin/chromium-browser',
-];
-const executablePath = process.env.CHROME_PATH ?? browserCandidates.find((p) => fs.existsSync(p));
-if (!executablePath) {
-  console.error('找不到浏览器，请设置 CHROME_PATH');
-  process.exit(2);
-}
-
 const kb = (n) => n / 1024;
 
-const browser = await puppeteer.launch({
-  executablePath,
-  headless: true,
-  args: ['--no-sandbox', '--disable-gpu', '--font-render-hinting=none', '--no-proxy-server', '--proxy-bypass-list=*'],
-});
+const browser = await launchBrowser();
 
 const rows = [];
 const failures = [];

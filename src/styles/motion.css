@@ -185,27 +185,8 @@
 }
 
 @media (max-width: 900px) {
-  .game-card {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .game-art {
-    min-height: 250px;
-  }
-
-  .game-body {
-    padding: 30px 26px 34px;
-  }
-
-  .game-notes {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .game-facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    row-gap: 14px;
-  }
-
+  /* 游戏页的断点已经挪回 games.css —— 跟着对应组件走，
+     免得改一个断点要翻两个文件才能确认谁生效 */
   .to-top {
     right: 16px;
     bottom: 16px;
