@@ -230,8 +230,11 @@ src/
 │   ├── a11y-audit.mjs       axe 全站扫描（npm run a11y）
 │   ├── a11y-keyboard.mjs    键盘与读屏实测（npm run a11y:keys）
 │   ├── visual-regression.mjs 视觉回归（npm run visual / visual:update）
+│   ├── games.mjs            构建后压缩游戏页：换成裁剪过的 three，其余脚本压到最小（npm run games / vendor:three）
+│   ├── games-smoke.mjs      游戏冒烟：能否启动、画面是否空白、裁剪的 three 有没有缺导出（npm run games:smoke）
 │   ├── preflight.mjs        发布前一键跑完全部检查（npm run preflight）
-│   └── lib/browser.mjs      无头浏览器统一入口（spawn + CDP，绕开 Edge 引导程序的假失败）
+│   ├── lib/browser.mjs      无头浏览器统一入口（spawn + CDP，绕开 Edge 引导程序的假失败）
+│   └── lib/three-vendor.mjs 推断游戏用到哪些 three 导出，打成 IIFE 全局（被 games.mjs 调用）
 ├── tests/visual/
 │   ├── baseline/            视觉基线，126 张 JPEG，需随样式改动一起提交
 │   └── meta.json            基线生成环境（platform + 浏览器版本）
@@ -254,26 +257,54 @@ src/
 游戏大厅在 `/games/`：上面是旗舰大卡，下面是四张小卡的网格。
 试玩页是**通用路由** `/games/<slug>/`（细栏 + iframe 铺满视口，支持全屏），加游戏不用再写页面。
 
-| 游戏 | 路由 | 体积 | 玩法 |
+| 游戏 | 路由 | 传输（gzip） | 玩法 |
 | --- | --- | --- | --- |
-| BEAN RUSH 7 | `/games/beanrush/` | 2.0 MB | 3D 派对，单人闯关或双人同屏（Three.js 内联） |
-| 2048 | `/games/2048/` | 22 KB | 方向键合并同数，留了一步撤销 |
-| SNAKE | `/games/snake/` | 19 KB | 吃一颗长一节，越吃越快 |
-| BREAKOUT | `/games/breakout/` | 23 KB | 挡板接球，击球点决定反弹角度 |
-| MINESWEEPER | `/games/minesweeper/` | 24 KB | 三档难度，首次点击必安全 |
+| BEAN RUSH 7 | `/games/beanrush/` | 352 KB | 3D 派对，单人闯关或双人同屏（Three.js 内联） |
+| 2048 | `/games/2048/` | 6 KB | 方向键合并同数，留了一步撤销 |
+| SNAKE | `/games/snake/` | 5 KB | 吃一颗长一节，越吃越快 |
+| BREAKOUT | `/games/breakout/` | 6 KB | 挡板接球，击球点决定反弹角度 |
+| MINESWEEPER | `/games/minesweeper/` | 6 KB | 三档难度，首次点击必安全 |
 
 四款小游戏都是**单文件、零依赖**：不引 CDN、不发请求，深色外壳跟随 `prefers-color-scheme`，
 键盘与触屏都能玩（方向键 / WASD / 滑动转向 / 长按插旗），尊重 `prefers-reduced-motion`，
 最高分写 localStorage（键名 `game.<slug>.best`，和博客的 `settings` 单键不冲突）。
 
-要加新游戏：把单文件丢进 `public/games/`，在 `src/lib/site.ts` 的 `GAMES` 里加一条
-（`slug` / `title` / `subtitle` / `description` / `tags` / `facts` / `file` / `accent` /
-`badge` / `weight` / `keys`），大厅网格与试玩路由会自动出现。
+### 体积：源码可读，发布压缩
 
-两个注意点：
+`public/games/*.html` 保留**可读的源码形态**（beanrush 是三万行、内联了完整的 three.js r185 源码），
+压缩发生在构建之后：`npm run build` 会接着跑 `scripts/games.mjs`，只压 `dist` 里的产物，
+`<style>` 不动（整页 CSS 才 19KB gzip，压它省不到 5KB，而 `content:` 里的引号最容易压坏）。
+
+beanrush 的大头是 three.js，它一个人占整页的 54%。压缩分两步：
+
+1. **裁剪导出**——`scripts/lib/three-vendor.mjs` 扫游戏源码，只保留真正用到的 39 个名字，
+   用 esbuild 打成 IIFE 挂回全局 `THREE`。未压缩源码 1541KB → 554KB（gzip 143KB）。
+2. **压缩其余脚本**——esbuild transform，每块原地处理。
+
+合并效果：**2054KB → 1035KB，gzip 465 → 347KB（−25%）**。
+
+裁剪的依据是静态扫描，而静态扫描一定会漏，所以配了两道保险：
+
+- **扫描放得很宽**：`<任意标识符>.<大写名>`，不限定 `THREE.`。因为视图层用的是别名
+  `T.OrthographicCamera(...)`，只扫 `THREE.` 会让公园能进、一开竞技场就白屏。
+  几何体更是以字符串形态存在（`geo('BoxGeometry', ...)` → `new THREE[type]`），
+  所以「参数位与方括号里的字符串字面量」也要一起求交。
+- **运行时守卫**：`npm run games:smoke` 给 `window.THREE` 套 Proxy，真访问到不存在的成员就
+  把名字打出来。它同时断言：能就绪、画面不是空白、没有报错、`REVISION` 对得上、
+  以及 `OrthographicCamera` 这类被别名访问的类确实存在。
+
+新增游戏时：丢单文件进 `public/games/`、在 `src/lib/site.ts` 的 `GAMES` 里加一条
+（`slug` / `title` / `subtitle` / `description` / `tags` / `facts` / `file` / `accent` /
+`badge` / `weight`），再到 `scripts/budget.mjs` 的 `GAME_LIMITS` 里登记体积上限——
+**漏登记会直接判失败**，免得下一个 beanrush 又是涨到 2MB 才被发现。
+
+三个注意点：
 - `scripts/fonts.mjs` 扫 `dist` 统计字符集时**跳过 `dist/games/`**——这些页面用系统字体，
   混进来会把公共片撑大
-- 游戏不进 `budget.mjs`（不在首屏路径上），但 `/games/<slug>/` 与 `/games/*.html` 都在 axe 扫描列表里
+- 游戏页自成一档进 `budget.mjs`（逐页 gzip 上限），`budget-wire.mjs` 也会实测
+  六个游戏路由的真实传输；`/games/<slug>/` 与 `/games/*.html` 都在 axe 扫描列表里
+- `games.mjs` 每次都从 `public/` 重新推导、覆盖 `dist/`，所以连跑两次产物逐字节相同；
+  不要反过来手改 `dist/games/`，会被下一次构建盖掉
 
 ## 搜索
 
@@ -529,14 +560,16 @@ npm run fonts:check   # 不需要构建：正文用字是否都在字体子集�
 npm run fonts:check:pages # 需要 dist：逐页核对「公共片 + 该页增量片」是否覆盖了该页所有字
 npm run fonts         # 需要 .fonts/ 源字体与 dist：重新裁子集，产物要提交
 npm run check         # astro check：类型与模板
-npm run budget        # 需要 dist：CSS / JS / 单页 HTML / 图片 / 字体五类上限
-npm run budget:wire   # 需要先 build + preview：实测每条路由首次访问的传输字节与字体字节
+npm run budget        # 需要 dist：主站五类上限 + 五个游戏页逐页 gzip 上限
+npm run budget:wire   # 需要先 build + preview：实测 12 条路由（含六个游戏路由）首次访问的传输字节与字体字节
 npm run perf          # 需要先 build + preview：Slow 4G + 4× CPU 下实测 LCP / CLS / TBT 与首屏字节
+npm run games:smoke   # 需要先 build + preview：五个游戏能否启动、裁剪的 three 有没有缺导出
+npm run vendor:three  # 只看 three 的裁剪结果（导出名单与体积），不碰 dist
 npm run a11y          # 需要先 build + preview：axe-core 扫全站 27 条路由 × 浅/深两套主题 + 4 个游戏直连页 + 四个面板
 npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、设置面板、快捷键表、移动端抽屉、触控目标 44px
 npm run visual        # 需要先 build + preview：21 条路由 × 浅/深 × 3 视口，和基线逐像素比
 npm run visual:update # 样式改动确认无误后重建基线
-npm run preflight     # 一条命令串起：og → lint → fonts:check → check → 构建 → budget → fonts:check:pages → a11y → a11y:keys → budget:wire
+npm run preflight     # 一条命令串起：og → lint → fonts:check → check → 构建 → 游戏页压缩 → budget → fonts:check:pages → a11y → a11y:keys → games:smoke → budget:wire
 ```
 
 `preflight` 会自己起 `astro preview` 并在结束时收掉，任何一步失败就停；`--ci` 跳过分享封面
