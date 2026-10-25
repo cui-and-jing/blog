@@ -81,11 +81,22 @@ function collectFiles(dir) {
   return out;
 }
 
+/**
+ * 剥掉注释再收字符。
+ *
+ * 注释里的字永远不会渲染到页面上，但以前会被算进子集——
+ * 于是每改一句注释都可能多出一个字，把 `--check` 顶红，逼着重新裁一遍字体。
+ * 这里只处理 HTML 注释与块注释；行注释（//）不动，免得把 URL 里的 `https://` 当成注释切掉。
+ */
+function stripComments(text) {
+  return text.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
+}
+
 /** 扫 src/ 下所有文本，收集需要渲染的字符 */
 function collectChars() {
   const chars = new Set();
   for (const file of collectFiles(SRC)) {
-    const text = fs.readFileSync(file, 'utf8');
+    const text = stripComments(fs.readFileSync(file, 'utf8'));
     for (const ch of text) {
       if (SLICES.some((slice) => slice.test(ch.codePointAt(0)))) chars.add(ch);
     }

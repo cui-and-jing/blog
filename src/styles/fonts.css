@@ -1,8 +1,8 @@
 /* 由 scripts/fonts.mjs 生成，不要手改。重新生成：npm run fonts */
-/* 子集版本 ad89e4 · 1090 个字符 · 公共汉字 386 个 */
+/* 子集版本 5cfdd0 · 948 个字符 · 公共汉字 386 个 */
 @font-face {
-  font-family: 'Prose Serif ad89e4';
-  src: url('/blog/fonts/prose-serif-latin.5306b33e.woff2') format('woff2');
+  font-family: 'Prose Serif 5cfdd0';
+  src: url('/blog/fonts/prose-serif-latin.7e1b4e16.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -10,7 +10,7 @@
 }
 
 @font-face {
-  font-family: 'Prose Serif ad89e4';
+  font-family: 'Prose Serif 5cfdd0';
   src: url('/blog/fonts/prose-serif-punct.5cb8dc38.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
@@ -19,7 +19,7 @@
 }
 
 @font-face {
-  font-family: 'Prose Serif ad89e4';
+  font-family: 'Prose Serif 5cfdd0';
   src: url('/blog/fonts/prose-serif-han.7d76fadb.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
@@ -29,5 +29,5 @@
 
 /* 兜底栈里同一款字体的系统版本排后面，字体没加载完时先顶上来，不会出现空白 */
 :root {
-  --font-prose-serif: 'Prose Serif ad89e4', Georgia, 'Songti SC', 'STSong', 'SimSun', serif;
+  --font-prose-serif: 'Prose Serif 5cfdd0', Georgia, 'Songti SC', 'STSong', 'SimSun', serif;
 }
