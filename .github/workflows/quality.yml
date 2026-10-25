@@ -69,10 +69,18 @@ jobs:
         shell: bash
         run: |
           # 日志要管理员权限才能看，红的时候等于什么都没留下。
-          # tee 一份到 .shots，随工件一起上传，失败时直接看是哪一页、哪条规则。
+          # 所以：① tee 一份进 artifact；② 末尾几十行写进 step summary（那个页面公开可读）
           set -o pipefail
           mkdir -p .shots
-          npm run a11y 2>&1 | tee .shots/a11y.log
+          status=0
+          npm run a11y 2>&1 | tee .shots/a11y.log || status=$?
+          {
+            echo '## 无障碍扫描结果'
+            echo '```'
+            tail -n 60 .shots/a11y.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
 
       - name: Upload accessibility report
         if: always()

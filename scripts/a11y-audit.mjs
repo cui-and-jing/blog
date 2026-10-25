@@ -89,7 +89,7 @@ async function scanRoutes(routeList, browserInstance) {
            不等的话会扫到「半成品」页面——CI 上 rAF 的调度比本机保守，
            多等一个明确信号，比多等几百毫秒可靠。超时就算了，不能卡死在这里。 */
         await page
-          .waitForFunction(() => document.documentElement.dataset.booted === 'on', { timeout: 4000 })
+          .waitForFunction(() => document.documentElement.dataset.booted === 'on', { timeout: 2500 })
           .catch(() => {});
         await new Promise((r) => setTimeout(r, 120));
         /* 冻结过渡：主题切换会触发 0.18s 的颜色过渡，axe 跑到一半就量到中间色。
@@ -159,7 +159,7 @@ for (const panel of [
     await page.goto(`${base}/posts/hello-astro/`, { waitUntil: 'networkidle2', timeout: 30000 });
     /* 面板靠点击打开，得先确认脚本已经接管，否则点了个空 */
     await page
-      .waitForFunction(() => document.documentElement.dataset.booted === 'on', { timeout: 4000 })
+      .waitForFunction(() => document.documentElement.dataset.booted === 'on', { timeout: 2500 })
       .catch(() => {});
     await page.addScriptTag({ content: axeSource });
     await panel.open(page);
