@@ -74,7 +74,15 @@ async function auditPage(browserInstance, route, theme) {
   const page = await browserInstance.newPage();
   try {
     await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
-    const res = await page.goto(base + route, { waitUntil: 'networkidle2', timeout: 30000 });
+    /* 试玩页的 iframe 里是游戏本体，axe 又明确跳过 iframe——没必要等游戏把网络跑完。
+       beanrush 的内联 three.js 在 CI 上让 networkidle2 一直等不到（Quality #48：
+       两套主题各超时 30s，加一次重试把整轮拖到 5 分钟）。壳页只要 DOM 就位；
+       字体与 booted 两道等待照旧，够它把样式和交互外壳补完 */
+    const isPlay = /^\/games\/.+\/$/.test(route);
+    const res = await page.goto(base + route, {
+      waitUntil: isPlay ? 'domcontentloaded' : 'networkidle2',
+      timeout: 30000,
+    });
     const status = res?.status() ?? 0;
     await page.evaluate((t) => {
       document.documentElement.dataset.theme = t;
