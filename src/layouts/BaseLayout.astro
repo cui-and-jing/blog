@@ -507,6 +507,19 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
     </dialog>
 
     <script>
+      /* 这段脚本跟首屏无关：主题、字体、字号已经在 head 的内联脚本里落定，
+         正文能不能读也不依赖它。所以它等第一帧画完再接管。
+
+         原因不是「省时间」，而是「别抢排版」：在第一帧之前读 getBoundingClientRect
+         或 scrollHeight，会强制浏览器把整页布局从现在算起，本来会随渲染帧增量完成的
+         排版就被合并成一个同步任务。慢机上这一次就是几百毫秒，长任务全记在这里。 */
+      let booted = false;
+      const boot = () => {
+        if (booted) return;
+        booted = true;
+
+      /* 下面这一段保持原缩进：整块再缩两级的话，这次改动会变成七百行 diff，
+         真正改了哪几行反而看不出来。 */
       const root = document.documentElement;
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -542,6 +555,10 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       /* 表格滚动容器与代码复制按钮都是在原文上补交互外壳：不影响首屏可读性，
          但会和字体换字抢同一段主线程。先让首屏按原生样式读，交互随后再补。 */
       const enhanceProse = () => {
+        /* 包装完再统一量宽度：每包一个就读一次 scrollWidth 会强制一次同步布局，
+           表格一多就是「写-读-写-读」的来回。攒到下一帧一次性读完。 */
+        const measureTable: Array<() => void> = [];
+
         document.querySelectorAll<HTMLTableElement>('.prose table').forEach((table) => {
           if (table.closest('.table-wrap')) return;
           const box = document.createElement('div');
@@ -558,7 +575,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           };
           box.addEventListener('scroll', sync, { passive: true });
           if ('ResizeObserver' in window) new ResizeObserver(sync).observe(box);
-          sync();
+          measureTable.push(sync);
         });
 
         document.querySelectorAll<HTMLElement>('.prose pre').forEach((pre) => {
@@ -621,6 +638,8 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
             wrap.appendChild(toggle);
           }
         });
+
+        if (measureTable.length) requestAnimationFrame(() => measureTable.forEach((fn) => fn()));
       };
 
       /* Safari 还没有 requestIdleCallback，退化成一次短延时 */
@@ -1106,21 +1125,37 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 
       /* 滚动时不要读 scrollHeight：那是一次强制同步布局，滚得越快越卡，
          长文在低端机上会直接掉帧。高度只在真的变了的时候重量（窗口缩放、
-         字体换完、评论挂载），滚动回调只做纯计算 + 写样式。 */
+         字体换完、评论挂载），滚动回调只做纯计算 + 写样式。
+
+         一帧最多写一次：滚动事件在跟手滚轮上一帧能来好几次，每次都去改属性、
+         切换 class 会让样式反复失效。写之前也比一次，值没变就什么都不做。 */
       let maxScroll = 0;
       const measureScroll = () => {
         maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       };
 
-      const onScroll = () => {
+      let scrollQueued = false;
+      const paintScroll = () => {
+        scrollQueued = false;
         const y = window.scrollY;
-        header?.setAttribute('data-scrolled', String(y > 8));
-        toTop?.classList.toggle('show', y > 700);
-
+        const scrolled = y > 8;
+        if (header && header.hasAttribute('data-scrolled') !== scrolled) {
+          if (scrolled) header.setAttribute('data-scrolled', 'true');
+          else header.removeAttribute('data-scrolled');
+        }
+        const showTop = y > 700;
+        if (toTop && toTop.classList.contains('show') !== showTop) {
+          toTop.classList.toggle('show', showTop);
+        }
         if (progressFill) {
           const ratio = maxScroll > 0 ? Math.min(1, Math.max(0, y / maxScroll)) : 0;
           progressFill.style.transform = `scaleX(${ratio})`;
         }
+      };
+      const onScroll = () => {
+        if (scrollQueued) return;
+        scrollQueued = true;
+        requestAnimationFrame(paintScroll);
       };
 
       if (progress && hasArticle) progress.classList.add('active');
@@ -1147,7 +1182,11 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       });
 
       /* 滚动入场：按同组顺序错峰，元素只在 JS 就绪后隐藏 */
-      if (root.dataset.motion === 'on' && 'IntersectionObserver' in window) {
+      /* 只从页面顶部进来时才挂动效。
+         这段现在跑在第一帧之后，如果浏览器恢复了滚动位置（刷新时停在文中），
+         首屏以下的元素已经露过脸了，再补一次「隐藏 → 淡入」就是明显的闪一下。
+         顶端进来时那些元素本来就在视口外，藏起来不会被看见。 */
+      if (root.dataset.motion === 'on' && window.scrollY < 40 && 'IntersectionObserver' in window) {
         const nodes: HTMLElement[] = [];
         const observer = new IntersectionObserver(
           (entries) => {
@@ -1210,6 +1249,17 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           });
         }
       }
+      };
+
+      /* 两帧：第一帧完成首次布局与绘制，第二帧才轮到接管。
+         后台标签页不调度 rAF，用一个定时器兜底，免得脚本永远不跑。 */
+      const startOp = () => requestAnimationFrame(() => requestAnimationFrame(boot));
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startOp, { once: true });
+      } else {
+        startOp();
+      }
+      window.setTimeout(boot, 3000);
     </script>
   </body>
 </html>
