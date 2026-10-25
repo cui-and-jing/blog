@@ -1,29 +1,9 @@
 {
   "platform": "win32",
   "browser": "Edg/153.0.4234.46",
-  "generatedAt": "2026-10-22T13:32:19.940Z",
+  "generatedAt": "2026-10-25T08:18:43.659Z",
   "routes": [
-    "/",
-    "/posts/",
-    "/posts/hello-astro/",
-    "/posts/paper-notes/",
-    "/posts/writing-workflow/",
-    "/notes/",
-    "/notes/2026-10-22-1015/",
-    "/archive/",
-    "/series/",
-    "/series/从笔记到发布/",
-    "/tags/",
-    "/tags/Astro/",
-    "/tags/CSS/",
-    "/category/技术/",
-    "/authors/",
-    "/license/",
-    "/about/",
-    "/games/",
-    "/search/",
-    "/subscribe/",
-    "/styleguide/"
+    "/games/"
   ],
   "viewports": [
     "mobile 390×844",
