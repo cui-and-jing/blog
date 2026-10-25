@@ -54,17 +54,23 @@ jobs:
       - name: Per-page font coverage
         run: npm run fonts:check:pages
 
-      - name: Accessibility & keyboard audit (axe + real interactions)
+      # 三条检查拆成三个 step：合成一条时只知道「整块失败」，
+      # 分开放才能从红色叉号直接看出是 axe、键盘实测还是传输预算挂了
+      - name: Start preview server
         run: |
           npx astro preview --port 4321 > /tmp/preview.log 2>&1 &
           for _ in $(seq 1 30); do
-            if curl -sf -o /dev/null http://localhost:4321/blog/; then
-              echo "preview ready"
-              break
-            fi
+            curl -sf -o /dev/null http://localhost:4321/blog/ && break
             sleep 1
           done
-          npm run a11y
-          npm run a11y:keys
-          # 实测第一次访问要下多少字节，防止「文件没变大但每页多请求了字体」
-          npm run budget:wire
+          curl -sf -o /dev/null http://localhost:4321/blog/ && echo "preview ready"
+
+      - name: Accessibility audit (axe, light + dark)
+        run: npm run a11y
+
+      - name: Keyboard & screen reader checks
+        run: npm run a11y:keys
+
+      # 实测第一次访问要下多少字节，防止「文件没变大但每页多请求了字体」
+      - name: First-visit transfer budget
+        run: npm run budget:wire
