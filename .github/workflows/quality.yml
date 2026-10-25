@@ -47,15 +47,15 @@ jobs:
         run: npm run build
 
       # 体积一旦涨上去就很难降回来，放在构建之后、浏览器测试之前
-      - name: Size budget (CSS / JS / HTML / images)
+      - name: Size budget (CSS / JS / HTML / images / games)
         run: npm run budget
 
       # 字体按页分片：哪一页用到子集外的字，线上会悄悄回退成系统宋体
       - name: Per-page font coverage
         run: npm run fonts:check:pages
 
-      # 三条检查拆成三个 step：合成一条时只知道「整块失败」，
-      # 分开放才能从红色叉号直接看出是 axe、键盘实测还是传输预算挂了
+      # 四项检查拆成四个 step：合成一条时只知道「整块失败」，
+      # 分开放才能从红色叉号直接看出是游戏冒烟、axe、键盘实测还是传输预算挂了
       - name: Start preview server
         run: |
           npx astro preview --port 4321 > /tmp/preview.log 2>&1 &
@@ -64,6 +64,9 @@ jobs:
             sleep 1
           done
           curl -sf -o /dev/null http://localhost:4321/blog/ && echo "preview ready"
+
+      - name: Game smoke test
+        run: npm run games:smoke
 
       - name: Accessibility audit (axe, light + dark)
         shell: bash

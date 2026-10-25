@@ -75,6 +75,9 @@ async function main() {
     const buildEnv = { ...process.env };
     if (buildEnv.CODEBUDDY_SESSION_ID) buildEnv.CODEBUDDY_SAFE_DELETE_ENABLED = '0';
     run('构建', 'npx', ['astro', 'build'], buildEnv);
+    /* 这里直接调 astro build，绕过了 npm run build 的压缩步骤，得显式补上，
+       否则本地体检跑的是未压缩的游戏页，和线上不是同一份东西 */
+    run('游戏页压缩', 'node', ['scripts/games.mjs']);
   } else {
     console.log('· 跳过构建（--skip-build），直接检查现有 dist');
   }
@@ -112,6 +115,8 @@ async function main() {
 
   run('无障碍扫描（axe，浅色 + 深色）', 'node', ['scripts/a11y-audit.mjs']);
   run('键盘与读屏实测', 'node', ['scripts/a11y-keyboard.mjs']);
+  /* 游戏页是单文件、脚本被裁过，得真的跑一遍才知道还能不能玩 */
+  run('游戏冒烟（能不能启动、有没有缺导出）', 'node', ['scripts/games-smoke.mjs']);
   /* 文件体积不等于传输量：这一条量的才是「第一次访问要下多少字节」 */
   run('首屏传输预算', 'node', ['scripts/budget-wire.mjs']);
 
