@@ -58,6 +58,15 @@ const GUARD = () => {
   });
 };
 
+/**
+ * `--enable-unsafe-swiftshader` 是必须的。
+ *
+ * 浏览器统一以 `--disable-gpu --headless=new` 启动（截图要跨机一致），此时 WebGL 只能走
+ * 软件渲染；较新的 Chrome 不再默认允许，没有这个开关就创建不出 WebGL 上下文。
+ * 本机装的是旧一些的 Edge，会静默回退，所以本地跑得好好的、CI 上 beanrush 直接起不来。
+ */
+const WEBGL_ARGS = ['--enable-unsafe-swiftshader'];
+
 /** 整屏几乎同色说明白屏了。stdev 比肉眼判断可靠，也不受主题深浅影响 */
 async function looksBlank(page) {
   const shot = await page.screenshot({ type: 'png' });
@@ -65,7 +74,18 @@ async function looksBlank(page) {
   return Math.max(...stats.channels.slice(0, 3).map((channel) => channel.stdev)) < 6;
 }
 
-const browser = await launchBrowser();
+/** WebGL2 有没有可用，是「游戏坏了」还是「这台机器跑不了 3D」的分水岭 */
+function hasWebgl2(page) {
+  return page.evaluate(() => {
+    try {
+      return Boolean(document.createElement('canvas').getContext('webgl2'));
+    } catch {
+      return false;
+    }
+  });
+}
+
+const browser = await launchBrowser({ args: WEBGL_ARGS });
 const rows = [];
 const failures = [];
 
@@ -98,6 +118,7 @@ for (const file of games) {
   await page.evaluateOnNewDocument(GUARD);
 
   const started = Date.now();
+  let webgl2 = null;
   try {
     await page.goto(`${base}/games/${file}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
 
@@ -131,14 +152,27 @@ for (const file of games) {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
-    if (await looksBlank(page)) failures.push(`${file} 画面几乎全空，像是脚本没跑起来`);
+    webgl2 = await hasWebgl2(page);
+
+    if (await looksBlank(page)) {
+      failures.push(`${file} 画面几乎全空，像是脚本没跑起来（WebGL2：${webgl2 ? '有' : '无'}）`);
+    }
 
     const text = await page.evaluate(() => (document.body.innerText || '').trim().length);
     if (text < 30) failures.push(`${file} 页面上几乎没有可见文字（${text} 字）`);
 
     missing.push(...(await page.evaluate(() => [...(window.__missingThree ?? [])])));
   } catch (error) {
-    failures.push(`${file} 跑不起来：${error.message}`);
+    /* 超时的时候把游戏自己的失败提示带出来——卡在「正在布置派对赛道…」和
+       提示「请用支持 WebGL 2 的浏览器打开」是两回事：前者是脚本问题，后者是环境问题 */
+    const note = await page
+      .evaluate(() => (document.getElementById('load-text')?.textContent ?? '').trim().slice(0, 80))
+      .catch(() => '');
+    webgl2 = await hasWebgl2(page).catch(() => null);
+    failures.push(
+      `${file} 跑不起来：${error.message}` +
+        `${note ? `（页面提示：${note}）` : ''}（WebGL2：${webgl2 === null ? '未知' : webgl2 ? '有' : '无'}）`
+    );
   }
 
   for (const message of errors) failures.push(`${file} ${message}`);
@@ -149,6 +183,7 @@ for (const file of games) {
     errors: errors.length,
     missing: missing.length,
     missingList: missing,
+    webgl2,
   });
 
   await page.close();
@@ -156,11 +191,12 @@ for (const file of games) {
 
 await browser.close();
 
-console.log('\n  游戏              耗时    报错   未导出的成员');
+console.log('\n  游戏              耗时   WebGL2  报错  未导出的成员');
 for (const row of rows) {
   const flag = row.errors || row.missing.length ? '✗' : ' ';
+  const webgl = row.webgl2 === null ? ' ? ' : row.webgl2 ? ' 有 ' : ' 无 ';
   console.log(
-    `  ${flag} ${row.file.padEnd(18)}${row.seconds.toFixed(1).padStart(5)}s` +
+    `  ${flag} ${row.file.padEnd(18)}${row.seconds.toFixed(1).padStart(4)}s${webgl.padStart(6)}` +
       `${String(row.errors).padStart(5)}` +
       `${String(row.missing).padStart(10)}   ${row.missingList.slice(0, 6).join(', ')}`
   );

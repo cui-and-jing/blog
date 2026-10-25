@@ -65,8 +65,20 @@ jobs:
           done
           curl -sf -o /dev/null http://localhost:4321/blog/ && echo "preview ready"
 
+      # 同 a11y：日志要管理员权限，红的时候什么都看不到，所以写进公开可读的 step summary
       - name: Game smoke test
-        run: npm run games:smoke
+        shell: bash
+        run: |
+          set -o pipefail
+          status=0
+          npm run games:smoke 2>&1 | tee /tmp/games-smoke.log || status=$?
+          {
+            echo '## 游戏冒烟结果'
+            echo '```'
+            tail -n 40 /tmp/games-smoke.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
 
       - name: Accessibility audit (axe, light + dark)
         shell: bash
