@@ -68,6 +68,17 @@ jobs:
       - name: Accessibility audit (axe, light + dark)
         run: npm run a11y
 
+      # 这一步红的时候，日志只有一行 exit code 1（读日志要管理员权限）。
+      # 把每条路由的违规明细传上来，失败时直接下载就能定位是哪一页、哪条规则。
+      - name: Upload accessibility report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-report
+          path: .shots/a11y.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Keyboard & screen reader checks
         run: npm run a11y:keys
 

@@ -82,7 +82,10 @@ async function scanRoutes(routeList, browserInstance) {
         await page.evaluate((t) => {
           document.documentElement.dataset.theme = t;
         }, theme);
-        await new Promise((r) => setTimeout(r, 250));
+        /* 等字体真的就位再扫。CI 的机器比本机慢一截，250ms 时中文字体可能还在换，
+           axe 量到的是换字中间的排版，报出来的问题在本机永远复现不了。 */
+        await page.evaluate(() => document.fonts.ready.then(() => true));
+        await new Promise((r) => setTimeout(r, 120));
         /* 冻结过渡：主题切换会触发 0.18s 的颜色过渡，axe 跑到一半就量到中间色。
            2048 的「重开」按钮曾因此报出一条假的不合格对比度（2.5:1，真实值 5.3:1） */
         await page.addStyleTag({
