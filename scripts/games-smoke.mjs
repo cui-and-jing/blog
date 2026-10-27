@@ -244,14 +244,21 @@ async function checkGame(browser, file) {
       if (!target.visible || target.width < 42 || target.height < 42) {
         problems.push('Pixel Raid 手机触屏按钮太小或被隐藏：' + JSON.stringify(target));
       } else {
-        const beforeTouch = await page.evaluate(() => window.__raidState.x);
-        await page.mouse.move(target.x, target.y);
-        await page.mouse.down();
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        await page.mouse.up();
-        const afterTouch = await page.evaluate(() => window.__raidState.x);
-        if (!(afterTouch > beforeTouch + 20)) {
-          problems.push('Pixel Raid 手机方向键按住后没有移动：' + (afterTouch - beforeTouch));
+        /* 改变模拟设备参数有时触发 window.blur，游戏会主动暂停；
+           先确认正在游玩，之后用真实 touchStart / touchEnd 而不是鼠标事件测试触屏。 */
+        const mobileState = await page.evaluate(() => ({ ...window.__raidState }));
+        if (mobileState.phase === 'pause') {
+          await page.click('#pause');
+          await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 3000 });
+        }
+        const beforeTouch = await page.evaluate(() => ({ ...window.__raidState }));
+        await page.touchscreen.touchStart(target.x, target.y);
+        await new Promise((resolve) => setTimeout(resolve, 340));
+        const duringTouch = await page.evaluate(() => ({ ...window.__raidState }));
+        await page.touchscreen.touchEnd();
+        if (!(duringTouch.x > beforeTouch.x + 20 && duringTouch.touchCount > 0)) {
+          problems.push('Pixel Raid 手机方向键长按未生效：' +
+            JSON.stringify({ mobileState, beforeTouch, duringTouch }));
         }
       }
       await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
