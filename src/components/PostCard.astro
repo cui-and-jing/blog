@@ -14,7 +14,7 @@ const Heading = headingLevel;
 const minutes = readingTime(post.body ?? '');
 ---
 
-<li class="card">
+<li class="card" data-category={post.data.category ?? ''} data-author={post.data.author}>
   <a class="card-hit" href={url(`/posts/${post.id}/`)} aria-label={post.data.title}></a>
   <Cover seed={post.id} title={post.data.title} image={post.data.cover} />
   <div class="card-body">
