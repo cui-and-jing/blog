@@ -5,6 +5,18 @@
 
 旧站（Hexo）仍在 `cui-and-jing.github.io`，本站是它的重写版，互不影响。
 
+## 首页内容入口
+
+首页首屏有「开始阅读」和「看看笔记」两个直接入口，分别链接文章列表与笔记时间流。
+「系列」栏目复用文章 frontmatter 的 `series` 和 `seriesOrder`，由 `collectSeries()` 自动聚合并按最近更新排序：
+首页最多展示两组系列，每组预览前三篇，按钮始终指向该系列的第一篇（不是最近更新的一篇）。
+少于两篇文章的系列不会出现；系列为空时整个模块自动隐藏。
+
+- 模块结构：`src/components/HomeSeries.astro`
+- 首页数据与入口：`src/pages/index.astro`
+- 响应式样式：`src/styles/layout.css`
+- 浏览器回归：`scripts/a11y-keyboard.mjs`，验证链接、阅读顺序、键盘焦点和手机触控尺寸。
+
 ## 本地开发
 
 ```bash
