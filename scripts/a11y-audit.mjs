@@ -46,12 +46,8 @@ const routes = only.length
       '/about/',
       '/games/',
       '/games/beanrush/',
-      /* 四个小游戏的外壳页。游戏本体（直连 *.html）单独放在 gamePages，
-         用新开的浏览器扫——见下方注释 */
-      '/games/2048/',
-      '/games/snake/',
-      '/games/breakout/',
-      '/games/minesweeper/',
+      /* 原创横版游戏：外壳与单文件本体分别检查 */
+      '/games/pixelraid/',
       '/search/',
       '/subscribe/',
       '/styleguide/',
@@ -163,7 +159,7 @@ async function scanRoutes(routeList, browserInstance) {
    在跑过几十个站内路由的同一个浏览器实例里访问它们，页面的 JS 执行会卡死
    （Runtime.callFunctionOn 超时；单独开浏览器、或只访问这几页时都复现不了），
    疑似与同源渲染进程复用 + 站内页积累的状态有关。新浏览器 8 次扫描只要十几秒 */
-const gamePages = ['/games/2048.html', '/games/snake.html', '/games/breakout.html', '/games/minesweeper.html'];
+const gamePages = ['/games/pixelraid.html'];
 
 await scanRoutes(routes, browser);
 
