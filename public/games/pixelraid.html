@@ -66,19 +66,19 @@
   <header class="top">
     <div class="brand"><strong>PIXEL RAID / 像素突围</strong><span>原创横版动作 · 两关挑战</span></div>
     <div class="top-actions">
-      <button id="pause" type="button" aria-label="暂停或继续游戏">暂停 P</button>
+      <button id="pause" type="button">暂停 P</button>
       <button id="sound" type="button" aria-pressed="false">音效 关</button>
       <button id="restart" type="button">重开 R</button>
     </div>
   </header>
-  <div class="hud" aria-label="游戏状态">
+  <section class="hud" aria-label="游戏状态">
     <span>关卡 <b id="level">1 / 2</b></span>
     <span>生命 <b id="lives">3</b></span>
     <span>体力 <b id="hp">♥ ♥ ♥ ♥ ♥</b></span>
     <span>手雷 <b id="ammo">3</b></span>
     <span>得分 <b id="score">00000</b></span>
     <span>最高 <b id="best">00000</b></span>
-  </div>
+  </section>
   <main class="frame">
     <canvas id="field" width="960" height="540" role="img" aria-label="像素突围游戏画面：横向移动、跳跃、射击，消灭基地首领后抵达终点"></canvas>
     <div class="overlay" id="overlay" role="group" aria-labelledby="overlay-title">
@@ -89,7 +89,7 @@
       <p id="overlay-help">电脑：A/D 或方向键移动，W / ↑ / 空格跳跃，J 射击，K 手雷，S 下蹲，P 暂停。手机：使用下方触屏按键。</p>
     </div>
   </main>
-  <div class="controls" aria-label="触屏操作">
+  <section class="controls" aria-label="触屏操作">
     <div class="cluster">
       <button type="button" data-action="left" aria-label="向左移动">◀</button>
       <button type="button" data-action="right" aria-label="向右移动">▶</button>
@@ -100,7 +100,7 @@
       <button type="button" data-action="jump" aria-label="跳跃">跳</button>
       <button type="button" data-action="fire" aria-label="连续射击">射</button>
     </div>
-  </div>
+  </section>
   <footer class="legend">
     <span><kbd>A</kbd><kbd>D</kbd> 移动</span><span><kbd>W</kbd><kbd>空格</kbd> 跳跃</span>
     <span><kbd>J</kbd> 连射</span><span><kbd>K</kbd> 手雷</span><span><kbd>S</kbd> 下蹲</span>
