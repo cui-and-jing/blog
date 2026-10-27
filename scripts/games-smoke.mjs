@@ -247,9 +247,16 @@ async function checkGame(browser, file) {
         /* 改变模拟设备参数有时触发 window.blur，游戏会主动暂停；
            先确认正在游玩，之后用真实 touchStart / touchEnd 而不是鼠标事件测试触屏。 */
         const mobileState = await page.evaluate(() => ({ ...window.__raidState }));
-        if (mobileState.phase === 'pause') {
+        if (mobileState.phase === 'title') {
+          /* Puppeteer 将 isMobile / hasTouch 从 false 切成 true 会触发自动重载。
+             重载后游戏回到标题页，要再次点击开始才能测实际移动。 */
+          await page.click('#start');
+          await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 3000 });
+        } else if (mobileState.phase === 'pause') {
           await page.click('#pause');
           await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 3000 });
+        } else if (mobileState.phase !== 'playing') {
+          problems.push('Pixel Raid 手机视口未进入游玩状态：' + JSON.stringify(mobileState));
         }
         const beforeTouch = await page.evaluate(() => ({ ...window.__raidState }));
         await page.touchscreen.touchStart(target.x, target.y);
