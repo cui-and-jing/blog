@@ -1,0 +1,54 @@
+---
+import type { Series } from '../lib/series';
+import { url } from '../lib/site';
+
+interface Props {
+  items: Series[];
+}
+
+const { items } = Astro.props;
+---
+
+{
+  items.length > 0 && (
+    <section class="home-series" aria-labelledby="home-series-heading">
+      <div class="section-head">
+        <h2 id="home-series-heading">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 5h6a4 4 0 0 1 4 4v11a4 4 0 0 0-4-4H4zM20 5h-2a4 4 0 0 0-4 4v11a4 4 0 0 1 4-4h2z" />
+            <path d="M7 9h4M7 12h4M17 9h1M17 12h1" />
+          </svg>
+          系列
+        </h2>
+        <a href={url('/series/')}>全部系列 →</a>
+      </div>
+      <div class="home-series-grid">
+        {items.map((item) => (
+          <article class="home-series-card">
+            <div class="home-series-head">
+              <div class="home-series-summary">
+                <p class="home-series-kicker">一条线读下来</p>
+                <h3><a href={item.href}>{item.title}</a></h3>
+              </div>
+              <span class="home-series-total">{item.count} 篇</span>
+            </div>
+            <ol class="home-series-steps">
+              {item.posts.slice(0, 3).map((post, index) => (
+                <li>
+                  <span class="home-series-step-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                  <a href={url('/posts/' + post.id + '/')}>{post.data.title}</a>
+                </li>
+              ))}
+            </ol>
+            <a class="home-series-start" href={url('/posts/' + item.posts[0].id + '/')}>
+              从第一篇开始
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </a>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}

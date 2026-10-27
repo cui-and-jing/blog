@@ -53,6 +53,56 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 1.5. 首页阅读入口与系列路线 ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.goto(`${base}/`, { waitUntil: 'load' });
+  const home = await page.evaluate(() => {
+    const primary = document.querySelector('.hero-action--primary');
+    const secondary = document.querySelector('.hero-action--secondary');
+    const section = document.querySelector('.home-series');
+    const cards = [...document.querySelectorAll('.home-series-card')];
+    return {
+      primary: primary?.getAttribute('href') ?? '',
+      secondary: secondary?.getAttribute('href') ?? '',
+      labelled: Boolean(section && section.getAttribute('aria-labelledby') === 'home-series-heading'
+        && document.getElementById('home-series-heading')),
+      seriesCount: cards.length,
+      linksGood: cards.every((card) => {
+        const seriesLink = card.querySelector('.home-series-head h3 a');
+        const steps = [...card.querySelectorAll('.home-series-steps a')];
+        const start = card.querySelector('.home-series-start');
+        return Boolean(seriesLink?.getAttribute('href')?.includes('/series/')
+          && steps.length > 0
+          && steps.every((link) => link.getAttribute('href')?.includes('/posts/'))
+          && start?.getAttribute('href') === steps[0].getAttribute('href'));
+      }),
+    };
+  });
+  check('首页有明确的文章与笔记入口',
+    /\/posts\/$/.test(home.primary) && /\/notes\/$/.test(home.secondary), JSON.stringify(home));
+  check('首页系列路线有标题、正确顺序与起始链接',
+    home.labelled && home.seriesCount > 0 && home.linksGood,
+    `${home.seriesCount} 组系列，链接正常: ${home.linksGood}`);
+
+  await page.evaluate(() => document.querySelector('.hero-action--primary')?.focus());
+  const focused = await page.evaluate(() => {
+    const link = document.querySelector('.hero-action--primary');
+    const style = link ? getComputedStyle(link) : null;
+    const rect = link?.getBoundingClientRect();
+    return {
+      active: document.activeElement === link,
+      outline: style?.outlineStyle ?? '',
+      height: rect?.height ?? 0,
+    };
+  });
+  check('首页阅读入口可键盘聚焦且有焦点环',
+    focused.active && focused.outline === 'solid' && focused.height >= 44,
+    JSON.stringify(focused));
+  await page.close();
+}
+
 /* ---------- 2. 文章页：复制、字号、主题 ---------- */
 {
   const page = await browser.newPage();
@@ -223,8 +273,13 @@ const check = (name, pass, detail = '') => {
             height: Math.round(rect.height),
           };
         });
+      const actions = [...document.querySelectorAll('.hero-actions a')].map((el) => {
+        const rect = el.getBoundingClientRect();
+        return { width: Math.round(rect.width), height: Math.round(rect.height) };
+      });
       return {
         targets,
+        actions,
         overflow: document.documentElement.scrollWidth - window.innerWidth,
         linksHidden: getComputedStyle(document.querySelector('.nav-links')).display === 'none',
       };
@@ -237,6 +292,10 @@ const check = (name, pass, detail = '') => {
       tiny.length ? JSON.stringify(tiny) : `${result.targets.length} 个控件`
     );
     check(`${width}px 横向不溢出`, result.overflow <= 0, `${result.overflow}px`);
+    const smallActions = result.actions.filter((el) => el.width < 44 || el.height < 44);
+    check(`${width}px 首页阅读入口易于触控`,
+      result.actions.length === 2 && smallActions.length === 0,
+      JSON.stringify(result.actions));
     check(`${width}px 导航链接收进抽屉`, result.linksHidden, `nav-links display=none: ${result.linksHidden}`);
 
     if (width === 390) {
