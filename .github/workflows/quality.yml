@@ -43,6 +43,11 @@ jobs:
       - name: Type check
         run: npm run check
 
+      # Use a virtual clock to verify that the weapon timer, boss attack phases
+      # and stage transitions actually work, without a fragile 30s robot run.
+      - name: Pixel Raid combat contracts
+        run: npm run raid:test
+
       - name: Build
         run: npm run build
 

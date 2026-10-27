@@ -68,6 +68,7 @@ async function main() {
   /* 正文用了子集外的字，线上会悄悄回退成系统宋体，只有字形不一致这一条线索，容易漏 */
   run('字体子集校验', 'node', ['scripts/fonts.mjs', '--check']);
   run('类型检查', 'npx', ['astro', 'check']);
+  run('像素突围战斗契约', 'node', ['scripts/pixelraid-mechanics.mjs']);
 
   if (!skipBuild) {
     /* 构建收尾会清掉 dist/.prerender 下的临时目录，在 WorkBuddy 终端里这一步会被

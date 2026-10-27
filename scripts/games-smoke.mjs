@@ -228,6 +228,35 @@ async function checkGame(browser, file) {
         problems.push('Pixel Raid 重新开始没有复位：' + JSON.stringify(restarted));
       }
 
+      /* 真正移动去拾取关卡起点附近的散弹补给，不依赖测试专用状态修改。 */
+      await page.keyboard.down('d');
+      let pickupReached = false;
+      try {
+        await page.waitForFunction(() => window.__raidState?.weapon === 'spread', { timeout: 4500 });
+        pickupReached = true;
+      } catch {
+        problems.push('Pixel Raid 跑过散弹补给位置后未取得武器');
+      } finally {
+        await page.keyboard.up('d');
+      }
+      if (pickupReached) {
+        const armed = await page.evaluate(() => ({
+          ...window.__raidState,
+          weaponLabel: document.getElementById('weapon')?.textContent ?? '',
+        }));
+        if (armed.weaponTime < 1 || !armed.weaponLabel.includes('散弹')) {
+          problems.push('Pixel Raid 散弹剩余时间或状态栏错误：' + JSON.stringify(armed));
+        }
+        const prior = armed.shots;
+        await page.keyboard.down('j');
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        await page.keyboard.up('j');
+        const scatter = await page.evaluate(() => ({ ...window.__raidState }));
+        if (scatter.lastVolley !== 3 || scatter.shots < prior + 3) {
+          problems.push('Pixel Raid 拾取散弹后未打出三发弹道：' + JSON.stringify(scatter));
+        }
+      }
+
       /* 同页切成手机视口；按住屏幕右箭头，断言实际位置改变，不止检查控件是否存在 */
       await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
       const target = await page.evaluate(() => {
