@@ -126,7 +126,7 @@
           enemies:[[330,'turret'],[580,'walker'],[1050,'drone'],[1390,'turret'],[1860,'walker'],[2220,'drone'],[2750,'turret'],[3060,'walker']],
           pickups:[[490,'grenade'],[1370,'heal'],[2260,'boost'],[3030,'heal']]}
       ];
-      const held=new Set(),touch=new Map();
+      const held=new Set(),padHeld=new Set(),touch=new Map();
       let phase='title',stageIndex=0,stage=null,player=null,enemies=[],bullets=[],bombs=[],pickups=[],sparks=[],boss=null,cam=0;
       let points=0,best=0,shotsFired=0,jumpQueued=false,grenadeQueued=false,clock=0,shake=0,soundOn=false,audio=null;
       let frameLast=0,lag=0,gunPadLast=false,bombPadLast=false,jumpPadLast=false;
@@ -136,7 +136,7 @@
       const rng=(min,max)=>min+Math.random()*(max-min);
       const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
       const touches=(name)=>[...touch.values()].includes(name);
-      const pressed=(name)=>held.has(name)||touches(name);
+      const pressed=(name)=>held.has(name)||padHeld.has(name)||touches(name);
       const isGap=x=>stage.gaps.some(pair=>x>pair[0]&&x<pair[1]);
       const hit=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
       const circRect=(x,y,r,rect)=>{
@@ -520,10 +520,11 @@
         if(key==='enter'&&phase!=='playing'){e.preventDefault();activate();}
       });
       window.addEventListener('keyup',e=>{const name=inputName(e.key);if(name){e.preventDefault();held.delete(name);}});
-      window.addEventListener('blur',()=>{held.clear();touch.clear();if(phase==='playing')togglePause();});
+      window.addEventListener('blur',()=>{held.clear();padHeld.clear();touch.clear();if(phase==='playing')togglePause();});
       document.querySelectorAll('[data-action]').forEach(btn=>{
         btn.addEventListener('pointerdown',e=>{
-          e.preventDefault();btn.setPointerCapture(e.pointerId);
+          e.preventDefault();
+          try{btn.setPointerCapture(e.pointerId);}catch{/* 不支持捕获时仍允许触屏按下 */}
           const name=btn.dataset.action;
           if(name==='jump')jumpQueued=true;
           if(name==='grenade')grenadeQueued=true;
@@ -551,16 +552,16 @@
 
       function pollGamepad(){
         const pad=navigator.getGamepads?.()[0];
-        for(const name of ['padLeft','padRight','padDown','padFire','padJump'])held.delete(name);
+        padHeld.clear();
         if(!pad||!pad.connected){gunPadLast=false;bombPadLast=false;jumpPadLast=false;return;}
         const buttons=pad.buttons;const left=pad.axes[0]<-.35||buttons[14]?.pressed;
         const right=pad.axes[0]>.35||buttons[15]?.pressed;
         const down=pad.axes[1]>.45||buttons[13]?.pressed;
-        if(left)held.add('left');if(right)held.add('right');if(down)held.add('down');
+        if(left)padHeld.add('left');if(right)padHeld.add('right');if(down)padHeld.add('down');
         const jump=Boolean(buttons[0]?.pressed),bomb=Boolean(buttons[1]?.pressed),fire=Boolean(buttons[2]?.pressed||buttons[5]?.pressed);
         if(jump&&!jumpPadLast)jumpQueued=true;
         if(bomb&&!bombPadLast)grenadeQueued=true;
-        if(fire)held.add('fire');else held.delete('fire');
+        if(fire)padHeld.add('fire');
         jumpPadLast=jump;bombPadLast=bomb;gunPadLast=fire;
         if(buttons[9]?.pressed&&phase==='title')startNew();
       }
@@ -578,7 +579,7 @@
         ready:true,phase,stage:stageIndex+1,x:player?.x??0,y:player?.y??0,hp:player?.hp??0,
         lives:player?.lives??0,score:points,shots:shotsFired,bullets:bullets.length,
         grenades:player?.grenades??0,bossHp:boss?.hp??0,ground:player?.ground??false,
-        cam,worldWidth:stage?.width??0
+        cam,worldWidth:stage?.width??0,touchCount:touch.size
       })});
       resetStage(0,null);phase='title';hud();draw();window.__raidReady=true;requestAnimationFrame(loop);
     })();
