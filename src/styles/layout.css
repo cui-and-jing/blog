@@ -704,13 +704,11 @@ html[data-theme='dark'] .hero-card-avatar {
 .hero-action {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
   min-height: 46px;
   padding: 10px 18px;
   border: 1px solid var(--line);
-  border-radius: 13px;
-  color: var(--text);
+  border-radius: 12px;
   background: var(--card);
   font-size: 14px;
   font-weight: 600;
@@ -722,9 +720,9 @@ html[data-theme='dark'] .hero-card-avatar {
 }
 
 .hero-action--primary {
-  color: #fff;
   background: var(--accent);
   border-color: var(--accent);
+  color: #fff;
 }
 
 html[data-theme='dark'] .hero-action--primary {
@@ -733,11 +731,6 @@ html[data-theme='dark'] .hero-action--primary {
 
 .hero-action--secondary:hover {
   color: var(--accent);
-  border-color: var(--accent);
-}
-
-.hero-actions + .hero-stats {
-  margin-top: 22px;
 }
 
 /* ---------- home: series reading trail ---------- */
@@ -755,17 +748,11 @@ html[data-theme='dark'] .hero-action--primary {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  overflow: hidden;
   background: var(--card);
   border: 1px solid var(--line-soft);
+  border-top: 3px solid var(--accent);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
-}
-
-.home-series-card::before {
-  content: '';
-  height: 3px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
 }
 
 .home-series-head {
@@ -791,19 +778,11 @@ html[data-theme='dark'] .hero-action--primary {
   overflow-wrap: anywhere;
 }
 
-.home-series-head h3 a:hover,
-.home-series-steps a:hover {
-  color: var(--accent);
-}
-
 .home-series-total {
   flex: none;
-  white-space: nowrap;
-  font: 11px var(--font-mono);
   color: var(--accent);
-  background: var(--accent-soft);
-  padding: 5px 10px;
-  border-radius: 99px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .home-series-steps {
@@ -821,13 +800,11 @@ html[data-theme='dark'] .hero-action--primary {
 }
 
 .home-series-step-number {
-  flex: none;
-  font: 12px var(--font-mono);
+  font-size: 12px;
   color: var(--accent);
 }
 
 .home-series-steps a {
-  min-width: 0;
   font-size: 13.5px;
   color: var(--text-soft);
   overflow-wrap: anywhere;
@@ -841,11 +818,11 @@ html[data-theme='dark'] .hero-action--primary {
   min-height: 44px;
   margin: auto 24px 20px;
   padding: 9px 14px;
+  background: var(--accent-soft);
   border-radius: 11px;
   font-size: 13px;
   font-weight: 600;
   color: var(--accent);
-  background: var(--accent-soft);
 }
 
 .home-series-start svg {
@@ -856,15 +833,6 @@ html[data-theme='dark'] .hero-action--primary {
 @media (max-width: 720px) {
   .home-series-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .home-series-head {
-    padding: 18px 18px 12px;
-  }
-
-  .home-series-steps,
-  .home-series-start {
-    margin-inline: 18px;
   }
 }
 
