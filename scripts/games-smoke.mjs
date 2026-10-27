@@ -177,6 +177,84 @@ async function checkGame(browser, file) {
       });
       if (!played) problems.push(`${file} 找不到「开始游玩」按钮`);
       await new Promise((resolve) => setTimeout(resolve, 3000));
+    } else if (file === 'pixelraid.html') {
+      /* 横版动作游戏要真正按键：只验证能画出菜单无法发现移动和跳跃断掉 */
+      await page.waitForFunction(() => window.__raidReady === true, { timeout: 10000 });
+      const boot = await page.evaluate(() => ({ ...window.__raidState }));
+      if (boot.phase !== 'title' || boot.stage !== 1) {
+        problems.push('Pixel Raid 初始界面或关卡不正确：' + JSON.stringify(boot));
+      }
+      await page.click('#start');
+      await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 4000 });
+      const start = await page.evaluate(() => ({ ...window.__raidState }));
+      if (start.hp !== 5 || start.lives !== 3 || start.grenades !== 3) {
+        problems.push('Pixel Raid 初始资源不正确：' + JSON.stringify(start));
+      }
+
+      await page.keyboard.down('d');
+      await new Promise((resolve) => setTimeout(resolve, 380));
+      await page.keyboard.up('d');
+      const moved = await page.evaluate(() => ({ ...window.__raidState }));
+      if (!(moved.x > start.x + 30)) problems.push('Pixel Raid 按 D 后角色没有向右移动');
+
+      await page.keyboard.down('j');
+      await new Promise((resolve) => setTimeout(resolve, 320));
+      await page.keyboard.up('j');
+      const fired = await page.evaluate(() => ({ ...window.__raidState }));
+      if (fired.shots <= 0) problems.push('Pixel Raid 持续射击没有发射子弹');
+
+      await page.keyboard.press('w');
+      await new Promise((resolve) => setTimeout(resolve, 110));
+      const jumped = await page.evaluate(() => ({ ...window.__raidState }));
+      if (!(jumped.y < moved.y - 12 && jumped.ground === false)) {
+        problems.push('Pixel Raid 跳跃没有离地：' + JSON.stringify(jumped));
+      }
+
+      await page.keyboard.press('k');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const thrown = await page.evaluate(() => ({ ...window.__raidState }));
+      if (thrown.grenades !== start.grenades - 1) {
+        problems.push('Pixel Raid 手雷没有正确扣除：' + JSON.stringify(thrown));
+      }
+
+      await page.keyboard.press('p');
+      await page.waitForFunction(() => window.__raidState?.phase === 'pause', { timeout: 3000 });
+      await page.keyboard.press('p');
+      await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 3000 });
+      await page.click('#restart');
+      const restarted = await page.evaluate(() => ({ ...window.__raidState }));
+      if (restarted.phase !== 'playing' || restarted.stage !== 1 || restarted.shots !== 0 ||
+          restarted.grenades !== 3) {
+        problems.push('Pixel Raid 重新开始没有复位：' + JSON.stringify(restarted));
+      }
+
+      /* 同页切成手机视口；按住屏幕右箭头，断言实际位置改变，不止检查控件是否存在 */
+      await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+      const target = await page.evaluate(() => {
+        const btn = document.querySelector('[data-action="right"]');
+        const controls = document.querySelector('.controls');
+        const rect = btn?.getBoundingClientRect();
+        return {
+          visible: controls ? getComputedStyle(controls).display !== 'none' : false,
+          width: rect?.width ?? 0, height: rect?.height ?? 0,
+          x: rect ? rect.x + rect.width / 2 : 0,
+          y: rect ? rect.y + rect.height / 2 : 0,
+        };
+      });
+      if (!target.visible || target.width < 42 || target.height < 42) {
+        problems.push('Pixel Raid 手机触屏按钮太小或被隐藏：' + JSON.stringify(target));
+      } else {
+        const beforeTouch = await page.evaluate(() => window.__raidState.x);
+        await page.mouse.move(target.x, target.y);
+        await page.mouse.down();
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        await page.mouse.up();
+        const afterTouch = await page.evaluate(() => window.__raidState.x);
+        if (!(afterTouch > beforeTouch + 20)) {
+          problems.push('Pixel Raid 手机方向键按住后没有移动：' + (afterTouch - beforeTouch));
+        }
+      }
+      await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
@@ -235,6 +313,22 @@ async function main() {
     .readdirSync(SRC_DIR)
     .filter((file) => file.endsWith('.html'))
     .sort();
+
+  const expected = ['beanrush.html', 'pixelraid.html'];
+  const extras = games.filter((game) => !expected.includes(game));
+  const absent = expected.filter((game) => !games.includes(game));
+  if (extras.length || absent.length) {
+    throw new Error('游戏目录与预期不符，多余：' + extras.join(', ') + '；缺少：' + absent.join(', '));
+  }
+  for (const slug of ['2048', 'snake', 'breakout', 'minesweeper']) {
+    if (fs.existsSync(path.join(process.cwd(), 'dist', 'games', slug, 'index.html')) ||
+        fs.existsSync(path.join(SRC_DIR, slug + '.html'))) {
+      throw new Error('旧游戏仍在发布产物里：' + slug);
+    }
+  }
+  if (!fs.existsSync(path.join(process.cwd(), 'dist', 'games', 'pixelraid', 'index.html'))) {
+    throw new Error('Pixel Raid 缺少试玩页路由');
+  }
 
   const browser = await launchWithRetry();
   const rows = [];
