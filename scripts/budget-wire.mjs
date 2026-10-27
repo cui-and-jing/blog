@@ -42,10 +42,7 @@ const routes = [
      大厅重是因为它是普通站点页，要吃 150KB 字体 + 全站 CSS，不是游戏本体的问题。 */
   { path: '/games/', label: '游戏大厅', limit: 220 },
   { path: '/games/beanrush/', label: 'BEAN RUSH', limit: 385 },
-  { path: '/games/2048/', label: '2048', limit: 25 },
-  { path: '/games/snake/', label: '贪吃蛇', limit: 25 },
-  { path: '/games/breakout/', label: '打砖块', limit: 25 },
-  { path: '/games/minesweeper/', label: '扫雷', limit: 25 },
+  { path: '/games/pixelraid/', label: 'PIXEL RAID', limit: 65 },
 ];
 
 /** 字体单独设一条线：它是首屏最大的一块，回退成「一整片汉字」时总量未必超，但代价回归了 */

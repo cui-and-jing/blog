@@ -166,10 +166,8 @@ if (pageFonts.length) {
    新加游戏必须在这张表里登记——漏登记按失败处理，否则下一个 beanrush 还是没人拦。 */
 const GAME_LIMITS = {
   'games/beanrush.html': 380,
-  'games/2048.html': 30,
-  'games/snake.html': 30,
-  'games/breakout.html': 30,
-  'games/minesweeper.html': 30,
+  'games/pixelraid.html': 60, // 原创 Canvas 横版游戏，单文件 gzip 上限
+
 };
 
 const gameFiles = files.filter(isGameBundle);

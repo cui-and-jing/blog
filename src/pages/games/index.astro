@@ -6,16 +6,16 @@ import { GAMES, url, SITE } from '../../lib/site';
 const [featured, ...rest] = GAMES;
 ---
 
-<BaseLayout title="游戏" description="自己做的小游戏，打开就能玩，不用登录也不用下载。">
+<BaseLayout title="游戏" description="两款离线游戏，以派对竞技和像素动作玩法为主。">
   <div class="page-head">
     <div class="shell">
       <h1>游戏</h1>
-      <p>自己做的小东西。打开就能玩，不用登录，也不用下载。</p>
+      <p>两个游戏，各有自己的玩法。打开就能玩，不用登录，也不用下载。</p>
     </div>
   </div>
 
   <div class="shell">
-    {/* 旗舰作品保留横向大卡：它有 3D 场景和双人模式，值得占两栏 */}
+    {/* 旗舰 3D 派对游戏保持原样，其他游戏采用横向动作卡片 */}
     <article
       class="game-card"
       style={`--game-a:${featured.accent[0]};--game-b:${featured.accent[1]}`}
@@ -55,7 +55,7 @@ const [featured, ...rest] = GAMES;
       </div>
     </article>
 
-    <ul class="game-grid">
+    <ul class="game-grid" aria-label="动作游戏">
       {rest.map((game) => (
         <li
           class="game-card game-card--mini"
@@ -102,27 +102,26 @@ const [featured, ...rest] = GAMES;
       <div class="game-note">
         <h3>怎么玩</h3>
         <p>
-          点「开始游戏」进试玩页，右上角可以全屏，Esc 退出。每个游戏页底部都有它自己的操作提示，
-          不用先看说明书，打开就能上手。
+          点「开始游戏」进入试玩页，右上角可以全屏。两款玩法不同，按各自提示操作。
         </p>
       </div>
 
       <div class="game-note">
-        <h3>操作</h3>
+        <h3>像素突围</h3>
         <dl class="keys">
-          <div><dt><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></dt><dd>移动 / 转向</dd></div>
-          <div><dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>同上</dd></div>
-          <div><dt><kbd>空格</kbd></dt><dd>发球 / 暂停</dd></div>
-          <div><dt><kbd>R</kbd></dt><dd>重开</dd></div>
-          <div><dt>滑动 / 点按</dt><dd>触屏</dd></div>
+          <div><dt><kbd>A</kbd><kbd>D</kbd></dt><dd>移动</dd></div>
+          <div><dt><kbd>W</kbd><kbd>空格</kbd></dt><dd>跳跃</dd></div>
+          <div><dt><kbd>J</kbd></dt><dd>连续出击</dd></div>
+          <div><dt><kbd>K</kbd></dt><dd>手雷</dd></div>
+          <div><dt><kbd>P</kbd></dt><dd>暂停</dd></div>
         </dl>
       </div>
 
       <div class="game-note">
         <h3>说明</h3>
         <p>
-          全部单文件离线运行，没有 CDN、没有后端、也没有统计脚本。最高分和进度只存在你自己的浏览器里，
-          清掉缓存就归零。除了 3D 那款需要 WebGL2，其余都是纯 2D，手机也能跑。
+          糖河奇遇可选择关卡，与 AI 一起完成挑战。像素突围支持键盘和触屏操作。
+          两款游戏都不需要账号，单文件运行，没有 CDN、后端或统计脚本；最高分存在自己的浏览器里。
         </p>
       </div>
     </section>

@@ -177,9 +177,8 @@ html[data-theme='dark'] .game-tag {
   text-decoration-color: color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
-/* ---------- 小游戏网格 ----------
-   四款游戏，四列排满一行：auto-fill 在 1080 宽度下会切成 3 列，
-   第四张孤零零掉到下一行，看着像漏了一个。断点写在文件末尾。 */
+/* ---------- 动作游戏入口 ----------
+   两款游戏一大一小，第二张也使用横向卡片，避免一张小卡孤零零占四列。 */
 .game-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -194,8 +193,8 @@ html[data-theme='dark'] .game-tag {
    卡内其他链接要抬到遮罩之上（.game-link 的 position/z-index）。 */
 .game-card--mini {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   box-shadow: var(--shadow-sm);
   transition: transform 0.24s var(--ease), box-shadow 0.24s var(--ease);
 }
@@ -234,7 +233,7 @@ html[data-theme='dark'] .game-tag {
 }
 
 .game-card--mini .game-facts {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   padding: 12px 0;
 }
@@ -350,31 +349,12 @@ html[data-theme='dark'] .game-tag {
    这几个媒体查询特意留在这个文件里而不是 responsive.css：
    后者先于本文件被引入，写在那边会被这里的基础规则盖掉。 */
 
-/* 平板：两张一行 */
-@media (min-width: 600px) {
-  .game-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-/* 桌面：四款游戏一行排满，不留下孤零零的第四张 */
-@media (min-width: 1000px) {
-  .game-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 18px;
-  }
-
-  .game-card--mini .game-body {
-    padding: 18px 18px 20px;
-  }
-
-  .game-card--mini .game-body h2 {
-    font-size: 21px;
-  }
-}
-
 @media (max-width: 900px) {
   .game-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .game-card--mini {
     grid-template-columns: minmax(0, 1fr);
   }
 
