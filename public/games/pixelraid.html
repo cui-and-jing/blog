@@ -76,6 +76,7 @@
     <span>生命 <b id="lives">3</b></span>
     <span>体力 <b id="hp">♥ ♥ ♥ ♥ ♥</b></span>
     <span>手雷 <b id="ammo">3</b></span>
+    <span>武器 <b id="weapon">步枪</b></span>
     <span>得分 <b id="score">00000</b></span>
     <span>最高 <b id="best">00000</b></span>
   </section>
@@ -84,7 +85,7 @@
     <div class="overlay" id="overlay" role="group" aria-labelledby="overlay-title">
       <p class="eyebrow" id="overlay-kicker">ORIGINAL RUN &amp; GUN</p>
       <h1 id="overlay-title">像素突围</h1>
-      <p id="overlay-text">穿过边境和机械要塞，利用平台跳跃、连续射击和手雷击败敌人。两段场景、检查点、首领战，打开就能玩。</p>
+      <p id="overlay-text">穿过边境和机械要塞，利用跳跃与连续射击突围。拾取蓝色武器箱解锁限时散弹，Boss 红光蓄力时注意闪避。</p>
       <button id="start" type="button">开始行动</button>
       <p id="overlay-help">电脑：A/D 或方向键移动，W / ↑ / 空格跳跃，J 射击，K 手雷，S 下蹲，P 暂停。手机：使用下方触屏按键。</p>
     </div>
@@ -119,12 +120,12 @@
           gaps:[[840,940],[1700,1820],[2520,2640]],
           platforms:[[480,325,180],[890,318,170],[1320,333,180],[1760,316,175],[2270,340,180],[2570,318,170],[3000,332,150]],
           enemies:[[380,'walker'],[670,'drone'],[1120,'turret'],[1470,'walker'],[2060,'drone'],[2350,'turret'],[2830,'walker']],
-          pickups:[[590,'heal'],[1490,'grenade'],[2240,'boost'],[2790,'heal']]},
+          pickups:[[260,'spread'],[590,'heal'],[1490,'grenade'],[2240,'boost'],[2790,'heal']]},
         {name:'机械要塞',width:3840,sky:'#1e263f',far:'#38435e',near:'#283242',floor:'#565c70',light:'#a1e4ed',
           gaps:[[740,855],[1550,1680],[2460,2590],[3160,3270]],
           platforms:[[350,328,180],[810,320,180],[1280,338,165],[1600,306,180],[2100,330,195],[2550,317,190],[3185,314,175]],
           enemies:[[330,'turret'],[580,'walker'],[1050,'drone'],[1390,'turret'],[1860,'walker'],[2220,'drone'],[2750,'turret'],[3060,'walker']],
-          pickups:[[490,'grenade'],[1370,'heal'],[2260,'boost'],[3030,'heal']]}
+          pickups:[[245,'spread'],[490,'grenade'],[1370,'heal'],[2260,'boost'],[3030,'heal']]}
       ];
       const held=new Set(),padHeld=new Set(),touch=new Map();
       let phase='title',stageIndex=0,stage=null,player=null,enemies=[],bullets=[],bombs=[],pickups=[],sparks=[],boss=null,cam=0;
@@ -175,27 +176,30 @@
         $('lives').textContent=String(player?.lives??3);
         $('hp').textContent=player?('♥ '.repeat(player.hp)+'♡ '.repeat(5-player.hp)).trim():'♥ ♥ ♥ ♥ ♥';
         $('ammo').textContent=String(player?.grenades??3);
+        $('weapon').textContent=player?.weaponTime>0?'散弹 '+Math.ceil(player.weaponTime)+'s':(player?.boost>0?'步枪 · 连射':'步枪');
         $('score').textContent=String(points).padStart(5,'0');
         $('best').textContent=String(best).padStart(5,'0');
       }
       function resetStage(index,carry){
         stageIndex=index;stage=STAGES[index];
         player={x:64,y:G-44,w:27,h:44,vx:0,vy:0,face:1,hp:carry?.hp??5,
-          lives:carry?.lives??3,grenades:carry?.grenades??3,ground:true,inv:1.2,shoot:0,boost:0,checkpoint:64};
+          lives:carry?.lives??3,grenades:carry?.grenades??3,ground:true,inv:1.2,shoot:0,boost:0,
+          weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64};
         enemies=stage.enemies.map(([x,type])=>({x,y:type==='drone'?260:G-(type==='turret'?34:36),
           w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='turret'?4:type==='drone'?2:3,
           maxHp:type==='turret'?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false}));
-        pickups=stage.pickups.map(([x,kind])=>({x,y:G-93,kind,done:false,age:0}));
+        pickups=stage.pickups.map(([x,kind])=>({x,y:kind==='spread'?G-45:G-93,kind,done:false,age:0}));
         boss={x:stage.width-345,y:G-104,w:105,h:104,hp:stageIndex===0?24:34,maxHp:stageIndex===0?24:34,
-          shot:1.3,phase:0,dead:false};
+          shot:1.3,phase:0,windup:0,attacks:0,lastVolley:0,warned:false,dead:false};
         bullets=[];bombs=[];sparks=[];cam=0;clock=0;shake=0;jumpQueued=false;grenadeQueued=false;hud();
       }
       function startNew(){
-        held.clear();touch.clear();points=0;shotsFired=0;
+        held.clear();padHeld.clear();touch.clear();points=0;shotsFired=0;
         resetStage(0,null);phase='playing';hideMenu();announce('行动开始，第一关。');
       }
       function nextStage(){
-        const carry={hp:Math.min(5,player.hp+2),lives:player.lives,grenades:Math.max(2,player.grenades)};
+        const carry={hp:Math.min(5,player.hp+2),lives:player.lives,grenades:Math.max(2,player.grenades),
+          weaponTime:player.weaponTime};
         resetStage(stageIndex+1,carry);phase='playing';hideMenu();announce('进入第二关。');
       }
       function resume(){phase='playing';hideMenu();frameLast=performance.now();announce('继续游戏。');}
@@ -228,13 +232,20 @@
       }
       function fire(){
         if(player.shoot>0)return;
-        player.shoot=player.boost>0?.075:.15;
+        const scatter=player.weaponTime>0;
+        player.shoot=scatter?(player.boost>0?.19:.33):(player.boost>0?.075:.15);
         const crouch=pressed('down')&&player.ground;
         const y=player.y+(crouch?34:20);
         const up=pressed('jump')&&!player.ground;
         const vx=player.face*(up?480:650),vy=up?-340:0;
-        projectile(player.x+(player.face===1?player.w+4:-4),y,vx,vy,'p');
-        shotsFired++;beep(460,.035);spark(player.x+player.w/2+player.face*21,y,'#fff5b0',3);
+        const spread=scatter?[-1,0,1]:[0];
+        for(const offset of spread){
+          projectile(player.x+(player.face===1?player.w+4:-4),y,vx,vy+offset*(up?88:145),'p');
+        }
+        player.lastVolley=spread.length;
+        shotsFired+=spread.length;
+        beep(scatter?350:460,.035);
+        spark(player.x+player.w/2+player.face*21,y,scatter?'#a4eaff':'#fff5b0',scatter?7:3);
       }
       function throwBomb(){
         if(player.grenades<1)return;
@@ -279,6 +290,7 @@
         if(pressed('fire'))fire();
         player.shoot=Math.max(0,player.shoot-dt);
         player.inv=Math.max(0,player.inv-dt);player.boost=Math.max(0,player.boost-dt);
+        player.weaponTime=Math.max(0,player.weaponTime-dt);
         player.x=clamp(player.x+player.vx*dt,8,stage.width-player.w-6);
         const oldBottom=player.y+player.h;
         player.vy=clamp(player.vy+GRAV*dt,-800,MAX_FALL);
@@ -314,14 +326,32 @@
           }
           if(hit(player,e))hurt(1);
         }
-        boss.shot-=dt;boss.phase+=dt;
-        if(!boss.dead&&Math.abs(boss.x-player.x)<780&&boss.shot<=0){
-          aimAtPlayer({x:boss.x+18,y:boss.y+48,w:60,h:30},260+stageIndex*40);
-          if(stageIndex===1){
-            projectile(boss.x+20,boss.y+55,-270,-65,'e');
-            projectile(boss.x+20,boss.y+55,-290,70,'e');
+        boss.phase+=dt;
+        if(!boss.dead&&Math.abs(boss.x-player.x)<780){
+          if(boss.windup>0){
+            boss.windup=Math.max(0,boss.windup-dt);
+            if(boss.windup===0){
+              const enraged=boss.hp<=boss.maxHp*.5;
+              const extra=stageIndex===1?(enraged?2:1):(enraged?1:0);
+              aimAtPlayer({x:boss.x+18,y:boss.y+48,w:60,h:30},260+stageIndex*40);
+              for(let i=1;i<=extra;i++){
+                projectile(boss.x+20,boss.y+55,-260-i*35,-i*92,'e');
+                projectile(boss.x+20,boss.y+55,-260-i*35,i*92,'e');
+              }
+              boss.lastVolley=1+extra*2;boss.attacks++;
+              boss.shot=(enraged?1.35:1.8)-(stageIndex*.12);
+              beep(200,.045);
+            }
+          }else{
+            boss.shot-=dt;
+            if(boss.shot<=0){
+              boss.windup=.72;
+              if(!boss.warned){boss.warned=true;announce('首领开始蓄力，注意闪避红光。');}
+            }
           }
-          boss.shot=stageIndex===0?1.7:1.28;beep(200,.045);
+        }else{
+          boss.windup=0;
+          boss.shot=Math.max(.35,boss.shot-dt);
         }
         if(!boss.dead&&hit(player,boss))hurt(1);
 
@@ -348,8 +378,10 @@
             p.done=true;if(p.kind==='heal')player.hp=Math.min(5,player.hp+2);
             if(p.kind==='grenade')player.grenades=Math.min(7,player.grenades+2);
             if(p.kind==='boost')player.boost=12;
+            if(p.kind==='spread')player.weaponTime=12;
             addPoints(75);hud();beep(780,.13,'triangle');
-            announce(p.kind==='heal'?'恢复体力。':p.kind==='grenade'?'取得手雷。':'强化连射。');
+            announce(p.kind==='heal'?'恢复体力。':p.kind==='grenade'?'取得手雷。':
+              p.kind==='spread'?'获得散弹武器，持续十二秒。':'强化连射。');
           }
         }
         for(let i=sparks.length-1;i>=0;i--){
@@ -459,15 +491,27 @@
         rect(x+2,y+45,22,40,'#66758d');rect(x+81,y+45,22,40,'#66758d');
         rect(x+6,y+3,17,13,'#a9c6c8');rect(x+80,y+3,17,13,'#a9c6c8');
         rect(x+18,y+83,24,22,'#1d2840');rect(x+62,y+83,24,22,'#1d2840');
-        rect(x+14,y-20,75,7,'#182738');rect(x+14,y-20,75*boss.hp/boss.maxHp,7,'#f1ad65');
+        const enraged=boss.hp<=boss.maxHp*.5;
+        rect(x+14,y-20,75,7,'#182738');
+        rect(x+14,y-20,75*boss.hp/boss.maxHp,7,enraged?'#ff7068':'#f1ad65');
+        if(boss.windup>0){
+          const charging=1-boss.windup/.72;
+          rect(x-27,y+47,29,15,'#e36c59');
+          rect(x-21,y+51,19,7,'#fff0ba');
+          rect(x+13,y-32,77,6,'#1e2c42');
+          rect(x+14,y-31,75*charging,4,'#ffdc84');
+        }
       }
       function drawPickup(p){
         if(p.done)return;const y=p.y+Math.sin(p.age*4)*7;
-        rect(p.x-13,y-13,27,27,p.kind==='heal'?'#60bb8c':p.kind==='grenade'?'#eeb468':'#7bbedd');
+        rect(p.x-13,y-13,27,27,p.kind==='heal'?'#60bb8c':p.kind==='grenade'?'#eeb468':
+          p.kind==='spread'?'#a082dd':'#7bbedd');
         rect(p.x-9,y-9,19,19,'#213849');
         if(p.kind==='heal'){rect(p.x-2,y-8,5,17,'#84ebb2');rect(p.x-8,y-2,17,5,'#84ebb2');}
         else if(p.kind==='grenade'){rect(p.x-3,y-8,7,15,'#ffcf80');rect(p.x-7,y-4,15,7,'#ffcf80');}
-        else{rect(p.x-7,y-2,15,6,'#a4eafd');rect(p.x+1,y-8,6,18,'#a4eafd');}
+        else if(p.kind==='spread'){
+          rect(p.x-8,y-6,16,4,'#c3a9ff');rect(p.x-8,y,16,4,'#c3a9ff');rect(p.x-8,y+6,16,4,'#c3a9ff');
+        }else{rect(p.x-7,y-2,15,6,'#a4eafd');rect(p.x+1,y-8,6,18,'#a4eafd');}
       }
       function draw(){
         if(!c)return;
@@ -579,7 +623,11 @@
         ready:true,phase,stage:stageIndex+1,x:player?.x??0,y:player?.y??0,hp:player?.hp??0,
         lives:player?.lives??0,score:points,shots:shotsFired,bullets:bullets.length,
         grenades:player?.grenades??0,bossHp:boss?.hp??0,ground:player?.ground??false,
-        cam,worldWidth:stage?.width??0,touchCount:touch.size
+        cam,worldWidth:stage?.width??0,touchCount:touch.size,
+        weapon:player?.weaponTime>0?'spread':'rifle',weaponTime:player?.weaponTime??0,
+        lastVolley:player?.lastVolley??0,bossCharge:boss?.windup??0,
+        bossAttacks:boss?.attacks??0,bossLastVolley:boss?.lastVolley??0,
+        bossRage:!!boss&&boss.hp<=boss.maxHp*.5
       })});
       resetStage(0,null);phase='title';hud();draw();window.__raidReady=true;requestAnimationFrame(loop);
     })();
