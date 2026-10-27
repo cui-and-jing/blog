@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Featured from '../components/Featured.astro';
+import HomeSeries from '../components/HomeSeries.astro';
 import PostCard from '../components/PostCard.astro';
 import Sidebar from '../components/Sidebar.astro';
 import CategoryTiles from '../components/CategoryTiles.astro';
@@ -8,12 +9,15 @@ import { SITE, url, formatDate, daysSince } from '../lib/site';
 import { getPosts } from '../lib/posts';
 import { getNotes, noteText } from '../lib/notes';
 import { collectTags } from '../lib/tags';
+import { collectSeries } from '../lib/series';
 
 const posts = await getPosts();
 /* featured 字段原来只是躺在 schema 里，首页永远取最新一篇——标了置顶也不生效 */
 const featured = posts.find((post) => post.data.featured) ?? posts[0];
 const rest = posts.filter((post) => post.id !== featured?.id);
 const recent = rest.slice(0, 6);
+/* 系列来自文章元数据；内容不成组时不输出空模块 */
+const series = collectSeries(posts).slice(0, 2);
 const allNotes = await getNotes();
 const notes = allNotes.slice(0, 3);
 /* 标签与「最近更新」都横跨文章和笔记：只数文章会让首页在刚发过笔记时显示旧日期 */
@@ -36,6 +40,15 @@ const excerpt = (text: string, limit = 72) =>
         <p class="hero-lead">
           这里记录技术上的折腾、读过的书和一些没想明白的问题。更新不快，但每篇都认真写。
         </p>
+        <nav class="hero-actions" aria-label="阅读入口">
+          <a class="hero-action hero-action--primary" href={url('/posts/')}>
+            开始阅读
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </a>
+          <a class="hero-action hero-action--secondary" href={url('/notes/')}>看看笔记</a>
+        </nav>
         <div class="hero-stats">
           <span class="stat"><b>{posts.length}</b> 篇文章</span>
           <span class="stat"><b>{tagCount}</b> 个标签</span>
@@ -103,6 +116,8 @@ const excerpt = (text: string, limit = 72) =>
           </>
         )
       }
+
+      <HomeSeries items={series} />
 
       {
         recent.length > 0 && (
