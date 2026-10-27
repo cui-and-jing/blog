@@ -45,26 +45,6 @@
     margin-inline: auto;
   }
 
-  .post-hero {
-    max-width: 780px;
-    margin: 26px auto 0;
-  }
-
-  .page-head--narrow .shell {
-    max-width: 836px;
-    margin-inline: auto;
-  }
-
-  /* 单列时限制阅读宽度，避免 1000px 宽的行长 */
-  .article-wrap > div:first-child,
-  .article-wrap > .sidebar,
-  .about-wrap > div:first-child,
-  .about-wrap > .sidebar {
-    width: 100%;
-    max-width: 780px;
-    margin-inline: auto;
-  }
-
   .hero-inner {
     grid-template-columns: minmax(0, 1fr);
     gap: 36px;
