@@ -266,20 +266,23 @@ src/
 
 ## 游戏模块
 
-游戏大厅在 `/games/`：上面是旗舰大卡，下面是四张小卡的网格。
-试玩页是**通用路由** `/games/<slug>/`（细栏 + iframe 铺满视口，支持全屏），加游戏不用再写页面。
+游戏大厅在 `/games/`：保留《糖河奇遇》的大型封面卡片，下一张是原创横版动作游戏《像素突围》。
+两款游戏的试玩页都使用通用路由 `/games/<slug>/`（外壳 + iframe，支持全屏），本体是独立 HTML 文件。
 
-| 游戏 | 路由 | 传输（gzip） | 玩法 |
-| --- | --- | --- | --- |
-| BEAN RUSH 7 | `/games/beanrush/` | 352 KB | 3D 派对，单人闯关或双人同屏（Three.js 内联） |
-| 2048 | `/games/2048/` | 6 KB | 方向键合并同数，留了一步撤销 |
-| SNAKE | `/games/snake/` | 5 KB | 吃一颗长一节，越吃越快 |
-| BREAKOUT | `/games/breakout/` | 6 KB | 挡板接球，击球点决定反弹角度 |
-| MINESWEEPER | `/games/minesweeper/` | 6 KB | 三档难度，首次点击必安全 |
+| 游戏 | 路由 | 玩法 |
+| --- | --- | --- |
+| BEAN RUSH 7 · 糖河奇遇 | `/games/beanrush/` | 3D 派对：单人挑战或双人同屏 |
+| PIXEL RAID · 像素突围 | `/games/pixelraid/` | 原创像素横版：两关、平台跳跃、连续射击、手雷与首领战 |
 
-四款小游戏都是**单文件、零依赖**：不引 CDN、不发请求，深色外壳跟随 `prefers-color-scheme`，
-键盘与触屏都能玩（方向键 / WASD / 滑动转向 / 长按插旗），尊重 `prefers-reduced-motion`，
-最高分写 localStorage（键名 `game.<slug>.best`，和博客的 `settings` 单键不冲突）。
+**旧游戏已移除**：2048、SNAKE、BREAKOUT、MINESWEEPER 的注册、封面和源 HTML 均已删除，
+不再生成对应的试玩路由。历史链接会落到站点 404 页面。
+
+《像素突围》为纯 HTML Canvas 2D 游戏，无第三方 CDN 或素材，桌面支持 A/D 或方向键移动、
+W / ↑ / 空格跳跃、J/Z 开火、K/X 手雷、S/↓ 下蹲、P/Esc 暂停、R 重开；
+触屏提供移动、下蹲、跳跃、射击、手雷按钮，并建议横屏游玩。支持检查点、
+三条命、恢复和强化道具，以及本机最高分（`localStorage.pixel-raid.best`）。
+角色、美术、关卡和命名均原创，仅参考横版跑动射击的玩法形式。
+
 
 ### 体积：源码可读，发布压缩
 
@@ -315,6 +318,8 @@ beanrush 的大头是 three.js，它一个人占整页的 54%。压缩分两步�
   混进来会把公共片撑大
 - 游戏页自成一档进 `budget.mjs`（逐页 gzip 上限），`budget-wire.mjs` 也会实测
   六个游戏路由的真实传输；`/games/<slug>/` 与 `/games/*.html` 都在 axe 扫描列表里
+- `games-smoke.mjs` 会实际启动两款游戏，并为 Pixel Raid 检查开始、移动、跳跃、开火、手雷、
+  暂停/继续、重开、手机触屏按住移动；同时阻止被移除的旧游戏重新出现在产物中
 - `games.mjs` 每次都从 `public/` 重新推导、覆盖 `dist/`，所以连跑两次产物逐字节相同；
   不要反过来手改 `dist/games/`，会被下一次构建盖掉
 
