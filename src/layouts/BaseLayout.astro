@@ -527,13 +527,8 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
          不再支持旧式 rehype 插件，这类纯展示增强放在运行时最省事；
          即使脚本被禁用，链接本身仍然可点，只是不新开标签页。 */
       document.querySelectorAll<HTMLAnchorElement>('.prose a[href]').forEach((link) => {
-        let target: URL;
-        try {
-          target = new URL(link.href, location.href);
-        } catch {
-          return;
-        }
-        if (!/^https?:$/.test(target.protocol) || target.host === location.host) return;
+        /* HTMLAnchorElement 自带标准化的协议和域名，无需再创建 URL 实例。 */
+        if (!/^https?:$/.test(link.protocol) || link.host === location.host) return;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         link.classList.add('external-link');
