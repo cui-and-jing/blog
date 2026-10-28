@@ -536,10 +536,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 
       /* 正文里的表格与代码块：只要页面用了 .prose 就统一处理，
          这样文章页、关于页和排版样例页的表现不会各走一套。 */
-      const announceStatus = (message: string) => {
-        const status = document.getElementById('a11y-status');
-        if (status) status.textContent = message;
-      };
+
 
       /* Markdown 任务列表的复选框由解析器输出，本身没有名称；
          补一个短标签，读屏读到「已完成 / 未完成」，又不会和工作项文字重复。 */
@@ -600,10 +597,10 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
               await navigator.clipboard.writeText(text);
               btn.textContent = '已复制';
               btn.classList.add('copied');
-              announceStatus('代码已复制');
+              announce('代码已复制');
             } catch {
               btn.textContent = '复制失败';
-              announceStatus('复制失败，请手动选择代码');
+              announce('复制失败，请手动选择代码');
             }
             setTimeout(() => {
               btn.textContent = '复制';
