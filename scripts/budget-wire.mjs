@@ -12,7 +12,6 @@
  * 只统计同源请求（评论、分享这类第三方 iframe 不算）；每个路由都用禁用缓存的
  * 全新页面，量的就是第一次访问的代价。
  */
-import fs from 'node:fs';
 import { launchBrowser } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
@@ -60,7 +59,7 @@ for (const route of routes) {
   await page.setCacheEnabled(false);
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true });
 
-  const cdp = await page.target().createCDPSession();
+  const cdp = await page.createCDPSession();
   await cdp.send('Network.enable');
   await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
 
