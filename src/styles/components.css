@@ -14,7 +14,8 @@
   isolation: isolate;
 }
 
-.cover img {
+.cover img,
+.author-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -490,13 +491,6 @@ html[data-theme='dark'] .widget-cta-actions a:hover {
   overflow: hidden;
   border: 3px solid rgba(255, 255, 255, 0.5);
   box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.5);
-}
-
-.author-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
 }
 
 .author h3 {
