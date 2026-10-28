@@ -308,80 +308,72 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
     /* 字号按钮的逻辑在 BaseLayout：它和其他外观设置共用同一份 localStorage，
        同一套标记（data-setting / data-value），这里不再各写一遍 */
 
-    /* ---------- 阅读位置记忆：按正文比例保存，不受评论与页脚高度影响 ---------- */
+    /* ---------- 阅读位置：正文百分比独立于评论与页脚高度 ---------- */
     const resumeBar = document.getElementById('resume-bar');
     const resumePercent = document.getElementById('resume-percent');
     const resumeKey = `reading:pos:${location.pathname}`;
     const prose = document.querySelector<HTMLElement>('.article-card .prose');
 
     if (resumeBar && resumePercent && prose) {
-      const sightline = () => Math.min(140, window.innerHeight * .22);
-      const locationInProse = () => {
+      const sightline = () => Math.min(140, innerHeight * .22);
+      const position = () => {
         const rect = prose.getBoundingClientRect();
-        return { top: window.scrollY + rect.top, height: rect.height };
+        return { top: scrollY + rect.top, height: rect.height };
       };
-      const hideResume = () => { resumeBar.hidden = true; };
-      const readSaved = (): { p: number; v?: number } | null => {
+      const hide = () => { resumeBar.hidden = true; };
+      const saved = (() => {
         try {
-          const raw = JSON.parse(localStorage.getItem(resumeKey) ?? 'null');
-          return Number.isFinite(raw?.p) && raw.p >= 0 && raw.p <= 1
-            ? raw : null;
+          const value = JSON.parse(localStorage.getItem(resumeKey) ?? 'null');
+          return Number.isFinite(value?.p) && value.p >= 0 && value.p <= 1
+            ? value as { p: number; v?: number } : null;
         } catch { return null; }
-      };
+      })();
 
       let dismissed = false;
-      const saved = readSaved();
       if (saved && saved.p > .08 && saved.p < .96) {
         resumePercent.textContent = `${Math.round(saved.p * 100)}%`;
         resumeBar.hidden = false;
-
         document.getElementById('resume-go')?.addEventListener('click', () => {
-          const box = locationInProse();
-          /* 旧版 p 是整页比例；首次恢复按旧算法，下一次滚动改写为正文比例。 */
-          const target = saved.v === 2
-            ? box.top + box.height * saved.p - sightline()
-            : saved.p * (document.documentElement.scrollHeight - window.innerHeight);
-          const max = document.documentElement.scrollHeight - window.innerHeight;
-          window.scrollTo({
-            top: Math.round(Math.max(0, Math.min(max, target))),
+          const box = position();
+          const max = document.documentElement.scrollHeight - innerHeight;
+          /* 兼容 v1 整页比例，v2 按正文恢复。 */
+          const target = saved.v === 2 ? box.top + box.height * saved.p - sightline() : saved.p * max;
+          scrollTo({
+            top: Math.max(0, Math.min(max, target)),
             behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
           });
-          hideResume();
+          hide();
         });
-
         document.getElementById('resume-close')?.addEventListener('click', () => {
           dismissed = true;
-          hideResume();
+          hide();
           try { localStorage.removeItem(resumeKey); } catch {}
         });
       }
 
-      /* 浏览器自动恢复位置不触发轮滚和触摸，用户主动移动时才收起提示。 */
-      window.addEventListener('wheel', hideResume, { passive: true });
-      window.addEventListener('touchmove', hideResume, { passive: true });
-      window.addEventListener('keydown', (event) => {
-        if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(event.key)) hideResume();
+      /* 浏览器自动恢复滚动不算主动阅读。 */
+      addEventListener('wheel', hide, { passive: true });
+      addEventListener('touchmove', hide, { passive: true });
+      addEventListener('keydown', (event) => {
+        if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(event.key)) hide();
       }, { passive: true });
 
       const save = () => {
         if (dismissed) return;
-        const { top, height } = locationInProse();
+        const { top, height } = position();
         if (height < 240) return;
-        const progress = (window.scrollY + sightline() - top) / height;
+        const p = (scrollY + sightline() - top) / height;
         try {
-          if (progress >= .96) localStorage.removeItem(resumeKey);
-          else if (progress > .02) localStorage.setItem(resumeKey,
-            JSON.stringify({ v: 2, p: progress }));
+          if (p >= .96) localStorage.removeItem(resumeKey);
+          else if (p > .02) localStorage.setItem(resumeKey, JSON.stringify({ v: 2, p }));
         } catch {}
       };
-
-      /* 停下后保存，离开页面时立刻补存；不在每次滚动时读取布局或写存储。 */
-      let saveTimer = 0;
-      window.addEventListener('scroll', () => {
-        clearTimeout(saveTimer);
-        saveTimer = window.setTimeout(save, 450);
+      let timer = 0;
+      addEventListener('scroll', () => {
+        clearTimeout(timer);
+        timer = window.setTimeout(save, 450);
       }, { passive: true });
-      window.addEventListener('pagehide', save);
+      addEventListener('pagehide', save);
     }
 
     /* ---------- 标题锚点 ---------- */
