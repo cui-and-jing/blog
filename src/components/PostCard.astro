@@ -1,6 +1,7 @@
 ---
 import type { CollectionEntry } from 'astro:content';
 import Cover from './Cover.astro';
+import BookmarkToggle from './BookmarkToggle.astro';
 import { url, formatDate, readingTime, tagHue } from '../lib/site';
 
 interface Props {
@@ -14,7 +15,7 @@ const Heading = headingLevel;
 const minutes = readingTime(post.body ?? '');
 ---
 
-<li class="card" data-category={post.data.category ?? ''} data-author={post.data.author}>
+<li class="card" data-category={post.data.category ?? ''} data-author={post.data.author} data-post-id={post.id}>
   <a class="card-hit" href={url(`/posts/${post.id}/`)} aria-label={post.data.title}></a>
   <Cover seed={post.id} title={post.data.title} image={post.data.cover} />
   <div class="card-body">
@@ -23,6 +24,7 @@ const minutes = readingTime(post.body ?? '');
       {post.data.category && <a class="cat" href={url(`/category/${encodeURIComponent(post.data.category)}/`)}>{post.data.category}</a>}
       <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
       <span>· 约 {minutes} 分钟</span>
+      <BookmarkToggle postId={post.id} title={post.data.title} />
     </div>
     <Heading>{post.data.title}</Heading>
     {post.data.description && <p>{post.data.description}</p>}
