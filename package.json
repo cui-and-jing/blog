@@ -11,6 +11,7 @@
     "games": "node scripts/games.mjs",
     "games:smoke": "node scripts/games-smoke.mjs",
     "raid:test": "node scripts/pixelraid-mechanics.mjs",
+    "deploy:check": "node scripts/deploy-gate.test.mjs",
     "vendor:three": "node scripts/games.mjs --vendor-only",
     "new": "node scripts/new-post.mjs",
     "note": "node scripts/new-note.mjs",
