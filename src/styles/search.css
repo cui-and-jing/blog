@@ -457,3 +457,13 @@
   border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
 }
 
+/* 结果分类复用搜索历史的按钮样式，不增加新的设计体系。 */
+.search-filters { margin: 0 0 16px; }
+.search-filters[hidden] { display: none; }
+.search-filters button { min-height: 44px; }
+.search-filters [aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.search-filters button:disabled { opacity: .55; cursor: not-allowed; }
