@@ -196,7 +196,7 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
-/* ---------- 2.5. 阅读位置精度、进度条、手机目录与章节链接 ---------- */
+/* ---------- 2.5. 阅读位置精度、进度条与章节链接 ---------- */
 {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 720, deviceScaleFactor: 1 });
@@ -265,7 +265,10 @@ const check = (name, pass, detail = '') => {
     finished.progress === 'scaleX(1)' && finished.cleared, JSON.stringify(finished));
 
   /* 点击不再提示后即使切页，pagehide 也不能重新写回记录。 */
-  await page.evaluate((storageKey) => localStorage.setItem(storageKey, JSON.stringify({ v: 2, p: .4 })), key);
+  await page.evaluate((storageKey) => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    localStorage.setItem(storageKey, JSON.stringify({ v: 2, p: .4 }));
+  }, key);
   await page.reload({ waitUntil: 'load' });
   await page.click('#resume-close');
   await page.goto(base + '/posts/', { waitUntil: 'load' });
