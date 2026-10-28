@@ -1046,24 +1046,15 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         if (!panel.open) panel.showModal();
       };
 
-      settingsToggle?.addEventListener('click', () => {
-        openPanel(settingsPanel);
-        settingsToggle.setAttribute('aria-expanded', 'true');
-      });
-
-      settingsPanel?.addEventListener('close', () => {
-        settingsToggle?.setAttribute('aria-expanded', 'false');
-      });
-
-      menuToggle?.addEventListener('click', () => {
-        openPanel(navDrawer);
-        menuToggle.setAttribute('aria-expanded', 'true');
-      });
-
-      /* dialog 关闭后焦点会回到打开它的元素，aria-expanded 要跟着复位 */
-      navDrawer?.addEventListener('close', () => {
-        menuToggle?.setAttribute('aria-expanded', 'false');
-      });
+      const bindPanel = (button: HTMLElement | null, panel: HTMLDialogElement | null) => {
+        button?.addEventListener('click', () => {
+          openPanel(panel);
+          button.setAttribute('aria-expanded', 'true');
+        });
+        panel?.addEventListener('close', () => button?.setAttribute('aria-expanded', 'false'));
+      };
+      bindPanel(settingsToggle, settingsPanel);
+      bindPanel(menuToggle, navDrawer);
 
       /* 从设置里点进快捷键，先收起当前面板，避免两个 dialog 叠在一起 */
       shortcutsOpen?.addEventListener('click', () => {
