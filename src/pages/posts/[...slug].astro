@@ -505,8 +505,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
           document.querySelectorAll<HTMLAnchorElement>('.toc a').forEach((a) => {
             const current = Boolean(link && a.hash === link.hash);
             a.classList.toggle('active', current);
-            if (current) a.setAttribute('aria-current', 'location');
-            else a.removeAttribute('aria-current');
+            a.setAttribute('aria-current', current ? 'location' : 'false');
           });
 
           /* 侧栏内容超出一屏时，让当前目录项保持可见。
