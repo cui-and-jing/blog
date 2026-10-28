@@ -99,11 +99,7 @@ const topTags = [...tagCounts.entries()]
                   {post.data.tags.slice(0, 3).map((tag: string) => <span class="tag">#{tag}</span>)}
                 </div>
               </div>
-              <span class="search-arrow" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M5 12h14M13 6l6 6-6 6"></path>
-                </svg>
-              </span>
+              <span class="search-arrow" aria-hidden="true">→</span>
             </a>
           </li>
         ))
@@ -172,15 +168,7 @@ const topTags = [...tagCounts.entries()]
 
       const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      const countOf = (haystack: string, needle: string) => {
-        let n = 0;
-        let at = haystack.indexOf(needle);
-        while (at >= 0 && n < 12) {
-          n += 1;
-          at = haystack.indexOf(needle, at + needle.length);
-        }
-        return n;
-      };
+      const countOf = (haystack: string, needle: string) => Math.min(12, haystack.split(needle).length - 1);
 
       /* 只放几乎没有检索价值的虚词。像「不」「有」「这」都可能出现在实词里，不能当停用词 */
       const STOP = new Set([
@@ -195,40 +183,25 @@ const topTags = [...tagCounts.entries()]
           return frag;
         }
         const re = new RegExp(`(${terms.map(escapeRe).join('|')})`, 'gi');
-        let last = 0;
-        let match: RegExpExecArray | null;
-        while ((match = re.exec(text))) {
-          if (match.index > last) frag.append(text.slice(last, match.index));
-          const mark = document.createElement('mark');
-          mark.textContent = match[0];
-          frag.append(mark);
-          last = match.index + match[0].length;
-          if (re.lastIndex === match.index) re.lastIndex += 1;
-        }
-        if (last < text.length) frag.append(text.slice(last));
+        text.split(re).forEach((part, index) => {
+          if (index % 2) {
+            const mark = document.createElement('mark');
+            mark.textContent = part;
+            frag.append(mark);
+          } else if (part) frag.append(part);
+        });
         return frag;
       };
 
       const snippet = (post: any, terms: string[]): string => {
         const text: string = post.text ?? '';
-        const at = terms.map((t) => text.toLowerCase().indexOf(t)).filter((i) => i >= 0).sort((a, b) => a - b)[0];
-        if (at === undefined) return post.description;
-
-        let start = Math.max(0, at - 40);
-        if (start > 0) {
-          const back = text.slice(start, at);
-          const punct = Math.max(
-            back.lastIndexOf('。'),
-            back.lastIndexOf('，'),
-            back.lastIndexOf('；'),
-            back.lastIndexOf('！'),
-            back.lastIndexOf('？')
-          );
-          if (punct >= 0 && punct < back.length - 8) start += punct + 1;
-        }
-
+        const low = text.toLowerCase();
+        const hits = terms.map((term) => low.indexOf(term)).filter((at) => at >= 0);
+        if (!hits.length) return post.description;
+        const at = Math.min(...hits);
+        const start = Math.max(0, at - 40);
         const end = Math.min(text.length, at + 90);
-        return `${start > 0 ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
+        return `${start ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
       };
 
       const score = (post: any, terms: string[]) => {
@@ -336,8 +309,7 @@ const topTags = [...tagCounts.entries()]
           const arrow = document.createElement('span');
           arrow.className = 'search-arrow';
           arrow.setAttribute('aria-hidden', 'true');
-          arrow.innerHTML =
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>';
+          arrow.textContent = '→';
 
           a.append(main, arrow);
           li.append(a);
