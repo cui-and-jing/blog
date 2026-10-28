@@ -251,11 +251,6 @@
     transform 0.18s var(--ease);
 }
 
-.search-arrow svg {
-  width: 15px;
-  height: 15px;
-}
-
 .search-item:hover .search-arrow {
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
