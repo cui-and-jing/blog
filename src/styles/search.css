@@ -251,11 +251,6 @@
     transform 0.18s var(--ease);
 }
 
-.search-arrow svg {
-  width: 15px;
-  height: 15px;
-}
-
 .search-item:hover .search-arrow {
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
@@ -367,12 +362,10 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   cursor: pointer;
-  transition: color 0.18s var(--ease), border-color 0.18s var(--ease);
 }
 
 .search-history-item:hover {
   color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
 }
 
 /* ---------- 无结果时的建议 ---------- */
@@ -457,3 +450,10 @@
   border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
 }
 
+/* 结果类型使用搜索历史的按钮样式 */
+.search-filters[hidden] { display: none; }
+.search-filters button { min-height: 44px; }
+.search-filters [aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}

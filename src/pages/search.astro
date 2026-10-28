@@ -54,6 +54,14 @@ const topTags = [...tagCounts.entries()]
       <span class="search-keys" aria-hidden="true"><kbd>↑</kbd><kbd>↓</kbd> 选择 <kbd>Enter</kbd> 打开 <kbd>Esc</kbd> 清空</span>
     </div>
 
+    <div class="search-history-list search-filters" id="search-type-filters" role="group" aria-label="搜索结果" hidden>
+      <button class="search-history-item" type="button" data-search-type="all" aria-pressed="false">全部</button>
+      <button class="search-history-item" type="button" data-search-type="post" aria-pressed="false">文章</button>
+      <button class="search-history-item" type="button" data-search-type="note" aria-pressed="false">笔记</button>
+    </div>
+    <p class="search-noscript" id="search-index-warning" role="status" hidden>正文搜索不可用，笔记不可用。</p>
+    <span class="sr-only" id="search-nav-status" role="status" aria-live="polite"></span>
+
     <noscript>
       <p class="search-noscript">搜索需要启用 JavaScript。下面是全部文章，也可以直接翻<a href={url('/posts/')}>文章列表</a>。</p>
     </noscript>
@@ -78,6 +86,8 @@ const topTags = [...tagCounts.entries()]
               data-tags={post.data.tags.join(' ')}
               data-cat={post.data.category ?? ''}
               data-href={url(`/posts/${post.id}/`)}
+              data-type="post"
+              data-minutes={readingTime(post.body ?? '')}
             >
               <div class="search-item-main">
                 <h2>{post.data.title}</h2>
@@ -89,11 +99,7 @@ const topTags = [...tagCounts.entries()]
                   {post.data.tags.slice(0, 3).map((tag: string) => <span class="tag">#{tag}</span>)}
                 </div>
               </div>
-              <span class="search-arrow" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M5 12h14M13 6l6 6-6 6"></path>
-                </svg>
-              </span>
+              <span class="search-arrow" aria-hidden="true">→</span>
             </a>
           </li>
         ))
@@ -151,21 +157,18 @@ const topTags = [...tagCounts.entries()]
       const historyBox = document.getElementById('search-history');
       const historyList = document.getElementById('search-history-list');
       const historyClear = document.getElementById('search-history-clear') as HTMLButtonElement | null;
+      type SearchType = 'all' | 'post' | 'note';
+      const typeButtons = document.querySelectorAll<HTMLButtonElement>('[data-search-type]');
+      const navStatus = document.getElementById('search-nav-status');
       let posts: any[] = [];
       let active = -1;
       let ready = false;
+      let degraded = false;
+      let selectedType: SearchType = 'post';
 
       const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      const countOf = (haystack: string, needle: string) => {
-        let n = 0;
-        let at = haystack.indexOf(needle);
-        while (at >= 0 && n < 12) {
-          n += 1;
-          at = haystack.indexOf(needle, at + needle.length);
-        }
-        return n;
-      };
+      const countOf = (haystack: string, needle: string) => Math.min(12, haystack.split(needle).length - 1);
 
       /* 只放几乎没有检索价值的虚词。像「不」「有」「这」都可能出现在实词里，不能当停用词 */
       const STOP = new Set([
@@ -180,75 +183,52 @@ const topTags = [...tagCounts.entries()]
           return frag;
         }
         const re = new RegExp(`(${terms.map(escapeRe).join('|')})`, 'gi');
-        let last = 0;
-        let match: RegExpExecArray | null;
-        while ((match = re.exec(text))) {
-          if (match.index > last) frag.append(text.slice(last, match.index));
-          const mark = document.createElement('mark');
-          mark.textContent = match[0];
-          frag.append(mark);
-          last = match.index + match[0].length;
-          if (re.lastIndex === match.index) re.lastIndex += 1;
-        }
-        if (last < text.length) frag.append(text.slice(last));
+        text.split(re).forEach((part, index) => {
+          if (index % 2) {
+            const mark = document.createElement('mark');
+            mark.textContent = part;
+            frag.append(mark);
+          } else if (part) frag.append(part);
+        });
         return frag;
       };
 
       const snippet = (post: any, terms: string[]): string => {
         const text: string = post.text ?? '';
-        const at = terms.map((t) => text.toLowerCase().indexOf(t)).filter((i) => i >= 0).sort((a, b) => a - b)[0];
-        if (at === undefined) return post.description;
-
-        let start = Math.max(0, at - 40);
-        if (start > 0) {
-          const back = text.slice(start, at);
-          const punct = Math.max(
-            back.lastIndexOf('。'),
-            back.lastIndexOf('，'),
-            back.lastIndexOf('；'),
-            back.lastIndexOf('！'),
-            back.lastIndexOf('？')
-          );
-          if (punct >= 0 && punct < back.length - 8) start += punct + 1;
-        }
-
+        const low = text.toLowerCase();
+        const hits = terms.map((term) => low.indexOf(term)).filter((at) => at >= 0);
+        if (!hits.length) return post.description;
+        const at = Math.min(...hits);
+        const start = Math.max(0, at - 40);
         const end = Math.min(text.length, at + 90);
-        return `${start > 0 ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
+        return `${start ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
       };
 
       const score = (post: any, terms: string[]) => {
         const title = post.title.toLowerCase();
         const desc = (post.description ?? '').toLowerCase();
         const category = (post.category ?? '').toLowerCase();
-        const tags = (post.tags ?? []).map((t: string) => t.toLowerCase());
-        const text = (post.text ?? '').toLowerCase();
+        const tags = (post.tags ?? []).map((tag: string) => tag.toLowerCase());
+        const body = (post.text ?? '').toLowerCase();
         let total = 0;
         let hits = 0;
-
         for (const term of terms) {
-          let hit = 0;
-          if (title.includes(term)) hit += title === term ? 40 : 14;
-          if (tags.some((t: string) => t.includes(term))) hit += 9;
-          if (category.includes(term)) hit += 6;
-          if (desc.includes(term)) hit += 5;
-          const inText = countOf(text, term);
-          /* 出现次数按 log 计，避免长文靠体量碾压短文 */
-          if (inText) hit += 1 + Math.log2(inText);
-          if (hit) {
-            hits += 1;
-            total += hit;
-          }
+          const times = countOf(body, term);
+          const weight = (title === term ? 40 : title.includes(term) ? 14 : 0)
+            + (tags.some((tag: string) => tag.includes(term)) ? 9 : 0)
+            + (category.includes(term) ? 6 : 0)
+            + (desc.includes(term) ? 5 : 0)
+            + (times ? 1 + Math.log2(times) : 0);
+          if (weight) { total += weight; hits++; }
         }
-
-        /* 一个词都不沾才算无关。只命中一部分仍然收录，按覆盖率打折——
-           否则「Astro 图片」会因为某篇只提了 Astro 就整篇消失。 */
         if (!hits) return 0;
-        total *= 0.55 + (hits / terms.length) * 0.45;
-
-        const phrase = terms.join(' ');
-        if (terms.length > 1 && title.includes(phrase)) total += 24;
-        if (terms.length > 1 && text.includes(phrase)) total += 4;
-        if (hits === terms.length && terms.length > 1) total += 10;
+        total *= .55 + hits / terms.length * .45;
+        if (terms.length > 1) {
+          const phrase = terms.join(' ');
+          if (title.includes(phrase)) total += 24;
+          if (body.includes(phrase)) total += 4;
+          if (hits === terms.length) total += 10;
+        }
         return total;
       };
 
@@ -258,15 +238,28 @@ const topTags = [...tagCounts.entries()]
         active = Math.max(0, Math.min(nodes.length - 1, next));
         nodes.forEach((node, i) => node.classList.toggle('is-active', i === active));
         nodes[active].scrollIntoView({ block: 'nearest' });
+        if (navStatus) {
+          const heading = nodes[active].querySelector('h2')?.textContent ?? '';
+          navStatus.textContent = `第 ${active + 1} 条：${heading}`;
+        }
+      };
+
+      const addSpan = (parent: HTMLElement, name: string, label: string) => {
+        const el = document.createElement('span');
+        el.className = name;
+        el.textContent = label;
+        parent.append(el);
       };
 
       const render = (items: { post: any; terms: string[] }[], querying: boolean) => {
         active = -1;
+        if (navStatus) navStatus.textContent = '';
         list.replaceChildren();
 
         items.forEach(({ post, terms }) => {
           const li = document.createElement('li');
           li.className = 'search-result';
+          li.dataset.searchResultType = post.type === 'note' ? 'note' : 'post';
 
           const a = document.createElement('a');
           a.className = 'search-item';
@@ -283,40 +276,20 @@ const topTags = [...tagCounts.entries()]
 
           const meta = document.createElement('div');
           meta.className = 'search-item-meta';
-          if (post.type === 'note') {
-            const badge = document.createElement('span');
-            badge.className = 'search-type';
-            badge.textContent = '笔记';
-            meta.append(badge);
-          }
+          if (post.type === 'note') addSpan(meta, 'search-type', '笔记');
           const time = document.createElement('time');
           time.textContent = post.date;
           meta.append(time);
-          if (post.category) {
-            const cat = document.createElement('span');
-            cat.className = 'cat';
-            cat.textContent = post.category;
-            meta.append(cat);
-          }
-          if (post.type !== 'note') {
-            const mins = document.createElement('span');
-            mins.textContent = `约 ${post.minutes} 分钟`;
-            meta.append(mins);
-          }
-          (post.tags ?? []).slice(0, 3).forEach((tag: string) => {
-            const span = document.createElement('span');
-            span.className = 'tag';
-            span.textContent = `#${tag}`;
-            meta.append(span);
-          });
+          if (post.category) addSpan(meta, 'cat', post.category);
+          if (post.type !== 'note') addSpan(meta, '', `约 ${post.minutes} 分钟`);
+          (post.tags ?? []).slice(0, 3).forEach((tag: string) => addSpan(meta, 'tag', `#${tag}`));
 
           main.append(h2, p, meta);
 
           const arrow = document.createElement('span');
           arrow.className = 'search-arrow';
           arrow.setAttribute('aria-hidden', 'true');
-          arrow.innerHTML =
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>';
+          arrow.textContent = '→';
 
           a.append(main, arrow);
           li.append(a);
@@ -325,7 +298,8 @@ const topTags = [...tagCounts.entries()]
 
         const hasQuery = querying;
         /* 空查询时只列文章：笔记是碎片，混在「全部内容」里会喧宾夺主 */
-        countEl.textContent = hasQuery ? `找到 ${items.length} 条` : `共 ${items.length} 篇`;
+        countEl.textContent = hasQuery || selectedType !== 'post'
+          ? `找到 ${items.length} 条` : `共 ${items.length} 篇`;
         empty.hidden = items.length > 0;
         list.hidden = items.length === 0;
       };
@@ -361,91 +335,109 @@ const topTags = [...tagCounts.entries()]
 
       const renderHistory = () => {
         if (!historyBox || !historyList) return;
-        const items = readHistory();
-        const show = items.length > 0 && input.value.trim() === '';
-        historyBox.hidden = !show;
-        if (!show) return;
-        historyList.replaceChildren(
-          ...items.map((value) => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'search-history-item';
-            button.textContent = value;
-            button.addEventListener('click', () => {
-              input.value = value;
-              apply();
-              input.focus();
-            });
-            return button;
-          })
-        );
+        const values = readHistory();
+        historyBox.hidden = !values.length || !!input.value.trim();
+        if (historyBox.hidden) return;
+        historyList.replaceChildren(...values.map((value) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'search-history-item';
+          button.textContent = value;
+          return button;
+        }));
       };
-
+      historyList?.addEventListener('click', (event) => {
+        const button = (event.target as Element).closest('button');
+        if (!button) return;
+        input.value = button.textContent ?? '';
+        apply();
+        input.focus();
+      });
       historyClear?.addEventListener('click', () => {
         writeHistory([]);
         renderHistory();
         input.focus();
       });
 
-      const apply = () => {
+      const apply = (syncUrl = true) => {
         if (!ready) return;
         const query = input.value.trim();
+        const type = new URL(location.href).searchParams.get('type');
+        selectedType = degraded ? 'post' : type === 'all' || type === 'post' || type === 'note'
+          ? type : query ? 'all' : 'post';
         const words = query.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 6);
-        /* 整句都是「的」「了」这类虚词时按空查询处理，比返回零结果合理 */
         const terms = words.filter((word) => !STOP.has(word));
         if (clearBtn) clearBtn.hidden = query.length === 0;
 
-        const url = new URL(location.href);
-        if (query) url.searchParams.set('q', query);
-        else url.searchParams.delete('q');
-        history.replaceState(null, '', url);
-
-        if (!terms.length) {
-          render(
-            posts.filter((post) => post.type !== 'note').map((post) => ({ post, terms: [] })),
-            false
-          );
-          renderHistory();
-          return;
+        if (syncUrl) {
+          const next = new URL(location.href);
+          if (query) next.searchParams.set('q', query);
+          else next.searchParams.delete('q');
+          history.replaceState(null, '', next);
         }
 
-        const matched = posts
-          .map((post, index) => ({ post, index, score: score(post, terms) }))
-          .filter((item) => item.score > 0)
-          /* 同分时保持原有时间倒序，比按标题拼音排更符合直觉 */
-          .sort((a, b) => b.score - a.score || a.index - b.index)
-          .map((item) => ({ post: item.post, terms }));
-
-        render(matched, true);
+        const ranked = terms.length
+          ? posts.map((post, index) => ({ post, index, score: score(post, terms) }))
+              .filter((item) => item.score > 0)
+              .sort((a, b) => b.score - a.score || a.index - b.index)
+              .map(({ post }) => ({ post, terms }))
+          : posts.map((post) => ({ post, terms: [] }));
+        typeButtons.forEach((button) => {
+          const type = button.dataset.searchType as SearchType;
+          button.disabled = degraded && type !== 'post';
+          button.setAttribute('aria-pressed', String(type === selectedType));
+        });
+        document.getElementById('search-type-filters')!.hidden = false;
+        render(ranked.filter(({ post }) => selectedType === 'all' || post.type === selectedType), Boolean(terms.length));
         renderHistory();
       };
 
       const fallback = () =>
         Array.from(document.querySelectorAll<HTMLAnchorElement>('.search-item')).map((a) => ({
+          type: 'post' as const,
           title: a.dataset.title ?? '',
           description: a.dataset.desc ?? '',
           tags: (a.dataset.tags ?? '').split(' ').filter(Boolean),
           category: a.dataset.cat ?? '',
           href: a.dataset.href ?? a.href,
           date: a.querySelector('time')?.textContent ?? '',
-          minutes: 0,
-          text: '',
+          minutes: Number(a.dataset.minutes ?? '0'),
+          text: a.dataset.desc ?? '',
         }));
 
       const fetchIndex = async () => {
         try {
           const res = await fetch(`${baseUrl}/search-index.json`, { headers: { Accept: 'application/json' } });
           const data = res.ok ? await res.json() : null;
-          posts = Array.isArray(data?.posts) && data.posts.length ? data.posts : fallback();
+          if (!Array.isArray(data?.posts)) throw new Error('index');
+          posts = data.posts.filter((post: any) => post && (post.type === 'post' || post.type === 'note'));
         } catch {
-          /* 离线或请求失败时，用服务端渲染的列表做基础搜索 */
+          /* 索引不可用时仍可以搜索页面已有的文章，但不假装有完整正文与笔记数据。 */
+          degraded = true;
           posts = fallback();
+          document.getElementById('search-index-warning')!.hidden = false;
+          const next = new URL(location.href);
+          next.searchParams.delete('type');
+          history.replaceState(null, '', next);
         }
         ready = true;
-        apply();
+        apply(false);
       };
 
-      input.addEventListener('input', apply);
+      typeButtons.forEach((button) => button.addEventListener('click', () => {
+        if (button.disabled) return;
+        const next = new URL(location.href);
+        next.searchParams.set('type', button.dataset.searchType!);
+        history.pushState(null, '', next);
+        apply(false);
+      }));
+
+      window.addEventListener('popstate', () => {
+        input.value = new URL(location.href).searchParams.get('q') ?? '';
+        apply(false);
+      });
+
+      input.addEventListener('input', () => apply());
       /* 点结果跳转前记一笔，历史里才不会只有回车过的词 */
       list.addEventListener('click', (event) => {
         if ((event.target as Element).closest('.search-item')) remember(input.value);
@@ -476,16 +468,11 @@ const topTags = [...tagCounts.entries()]
         }
       });
 
-      clearBtn?.addEventListener('click', () => {
+      [clearBtn, resetBtn].forEach((button) => button?.addEventListener('click', () => {
         input.value = '';
         apply();
         input.focus();
-      });
-      resetBtn?.addEventListener('click', () => {
-        input.value = '';
-        apply();
-        input.focus();
-      });
+      }));
 
       const initial = new URL(location.href).searchParams.get('q');
       if (initial) input.value = initial;
