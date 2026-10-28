@@ -367,12 +367,10 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   cursor: pointer;
-  transition: color 0.18s var(--ease), border-color 0.18s var(--ease);
 }
 
 .search-history-item:hover {
   color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
 }
 
 /* ---------- 无结果时的建议 ---------- */
@@ -457,13 +455,10 @@
   border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
 }
 
-/* 结果分类复用搜索历史的按钮样式，不增加新的设计体系。 */
-.search-filters { margin: 0 0 16px; }
+/* 结果类型使用搜索历史的按钮样式 */
 .search-filters[hidden] { display: none; }
 .search-filters button { min-height: 44px; }
 .search-filters [aria-pressed='true'] {
-  color: var(--accent);
   background: var(--accent-soft);
-  border-color: var(--accent);
+  color: var(--accent);
 }
-.search-filters button:disabled { opacity: .55; cursor: not-allowed; }
