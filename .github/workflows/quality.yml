@@ -40,6 +40,10 @@ jobs:
       - name: Font subset coverage
         run: npm run fonts:check
 
+      # Check that Pages only publishes the current main SHA after Quality succeeds.
+      - name: Deployment release gate contract
+        run: npm run deploy:check
+
       - name: Type check
         run: npm run check
 

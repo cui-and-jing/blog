@@ -1,27 +1,52 @@
 name: Deploy to GitHub Pages
 
+# A successful Quality run for the CURRENT main commit is the only release trigger.
+# workflow_run uses the default-branch HEAD as github.sha, not the tested commit:
+# checkout MUST therefore use the triggering run's head_sha.
 on:
-  push:
+  workflow_run:
+    workflows: [Quality]
+    types: [completed]
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
+# Only eligible successful pushes share the publish group. A failed/PR Quality
+# completion must not cancel an already-running valid Pages deployment.
 concurrency:
-  group: pages
+  group: pages-${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && 'publish' || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   build:
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main'
+      }}
     runs-on: ubuntu-latest
+    outputs:
+      current: ${{ steps.verify.outputs.current }}
     steps:
-      - name: Checkout
+      - name: Checkout the exact tested commit
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Verify tested commit is still main
+        id: verify
+        shell: bash
+        env:
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          main_sha="$(git ls-remote origin refs/heads/main | cut -f1)"
+          bash scripts/deploy-gate.sh "$main_sha" "$VERIFIED_SHA"
 
       - name: Build with Astro
+        if: steps.verify.outputs.current == 'true'
         uses: withastro/action@v6
         with:
           node-version: 22
@@ -29,11 +54,36 @@ jobs:
 
   deploy:
     needs: build
+    if: needs.build.outputs.current == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Compare the SHA again: main may have moved while Astro was building.
+      - name: Recheck latest main commit before publishing
+        id: verify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          main_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          # The verified script is checked out by the build job; this job uses
+          # the same logic without bringing untrusted source into the privileged context.
+          if [[ "$main_sha" == "$VERIFIED_SHA" && "$main_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'current=false' >> "$GITHUB_OUTPUT"
+            echo "::notice::Skip stale Pages deployment; current main $main_sha differs from tested $VERIFIED_SHA"
+          fi
+
       - name: Deploy
         id: deployment
+        if: steps.verify.outputs.current == 'true'
         uses: actions/deploy-pages@v5

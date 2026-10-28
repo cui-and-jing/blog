@@ -34,6 +34,20 @@
 GitHub Pages 将旧地址交给站点 `404.html`，页面根据旧 URL 显示
 「去看现有游戏」的链接；其他不存在的页面仍使用通用 404 提示。
 
+## 发布安全门禁
+
+`main` 推送首先触发 `Quality`（代码、构建、游戏、无障碍与网络预算）。
+GitHub Pages 不再随 push 直接部署，而是只响应 **Quality completed + success + push/main**。
+部署前核对被 Quality 检查的完整提交 SHA 与当前 `main` 一致，
+构建后发布前再次核对，防止旧的成功运行覆盖新版本。
+
+- `.github/workflows/deploy.yml`：严格限制的 `workflow_run` 触发、精确 SHA checkout、部署前二次核查。
+- `scripts/deploy-gate.sh`：已验证 SHA 与最新 main 版本的比较逻辑。
+- `npm run deploy:check`：工作流结构、权限、SHA 对照和失效场景的契约测试，CI 自动执行。
+- 发布受 Quality 约束，因此比直接推送部署稍晚。已取消部署工作流的手动绕过入口；
+  如需重新部署当前提交，可在 Actions 重新运行最新 main 的 Quality。
+- 发布后仍需确认 Pages / main Quality 都成功且对应同一个 SHA；失败时原已发布版本不会被覆盖。
+
 ## 本地开发
 
 ```bash
