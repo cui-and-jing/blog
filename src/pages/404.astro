@@ -14,14 +14,20 @@ const tags = collectTags(await getPosts(), await getNotes()).slice(0, 8);
     {/* 404 页被搜索引擎收录没有任何好处，只会多一条「页面不存在」的结果 */}
     <meta name="robots" content="noindex" />
   </Fragment>
-  <div class="shell notfound">
+  <div class="shell notfound" data-games-base={url('/games/')}>
     <p class="code">404</p>
-    <h1>这页好像不在了</h1>
+    <h1 id="notfound-title">这页好像不在了</h1>
     <p>可能是链接过期，或者我改过文章标题。</p>
     <div class="notfound-actions">
       <a class="btn" href={url('/')}>回到首页</a>
       <a class="btn" href={url('/search/')}>搜索文章</a>
     </div>
+
+    <aside class="notfound-retired" id="retired-game-guide" aria-labelledby="retired-game-title" hidden>
+      <h2 id="retired-game-title">游戏更新</h2>
+      <p>这个游戏不在了。可以去看现有游戏。</p>
+      <a class="btn" href={url('/games/')}>去看现有游戏 →</a>
+    </aside>
 
     {
       tags.length > 0 && (
@@ -44,3 +50,19 @@ const tags = collectTags(await getPosts(), await getNotes()).slice(0, 8);
     }
   </div>
 </BaseLayout>
+
+<script>
+  const guide = document.getElementById('retired-game-guide');
+  const title = document.getElementById('notfound-title');
+  const shell = document.querySelector<HTMLElement>('.notfound');
+  const update = () => {
+    const gameRoot = shell?.dataset.gamesBase ?? '';
+    const path = window.location.pathname;
+    const suffix = gameRoot && path.startsWith(gameRoot) ? path.slice(gameRoot.length) : '';
+    const retired = /^(?:2048|snake|breakout|minesweeper)(?:\/|\.html)$/.test(suffix);
+    if (guide) guide.hidden = !retired;
+    if (title) title.textContent = retired ? '这个游戏不在了' : '这页好像不在了';
+  };
+  update();
+  window.addEventListener('popstate', update);
+</script>
