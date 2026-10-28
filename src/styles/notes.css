@@ -180,10 +180,6 @@
   margin: 0 0 0.9em;
 }
 
-.note-body p:last-child {
-  margin-bottom: 0;
-}
-
 .note-foot {
   display: flex;
   align-items: center;
