@@ -949,20 +949,12 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         }, origin);
         saveSettings();
 
-        const labels: Record<string, string> = {
-          auto: '跟随系统',
-          light: '浅色',
-          dark: '深色',
-          serif: '宋体',
-          sans: '黑体',
-          kai: '楷体',
-          small: '小',
-          normal: '标准',
-          large: '大',
-          loose: '宽松',
-        };
-        const names: Record<string, string> = { theme: '主题', font: '字体', size: '字号', leading: '行距' };
-        announce(`${names[key]}：${labels[value] ?? value}`);
+        /* 读屏文案直接取面板选项，避免 JS 再维护一套同义字典。 */
+        const name = document.getElementById(`label-${key}`)?.textContent?.trim() ?? key;
+        const choice = document.querySelector<HTMLElement>(
+          `#settings-panel [data-setting="${key}"][data-value="${value}"]`
+        )?.textContent?.trim() ?? value;
+        announce(`${name}：${choice}${key === 'font' ? '体' : ''}`);
       });
 
       /* 选了「跟随系统」之后，用户在系统里切深浅色，这里要跟着变 */
