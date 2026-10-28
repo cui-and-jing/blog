@@ -524,12 +524,13 @@ const check = (name, pass, detail = '') => {
       const target = headings[Math.min(1, headings.length - 1)];
       if (!target) return '';
       scrollTo({ top: scrollY + target.getBoundingClientRect().top - 155, behavior: 'instant' });
-      return '#' + target.id;
+      return target.id;
     });
     if (chapter) {
-      await page.waitForFunction((hash) =>
-        document.querySelector('.sidebar .toc a.active')?.hash === hash,
-        { timeout: 4500 }, chapter);
+      await page.waitForFunction((id) => {
+        const active = document.querySelector('.sidebar .toc a.active');
+        return active && decodeURIComponent(active.hash.slice(1)) === id;
+      }, { timeout: 4500 }, chapter);
     }
     await page.click('#bar-toc');
     await new Promise((r) => setTimeout(r, 250));
