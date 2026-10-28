@@ -504,19 +504,12 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
           /* 侧栏内容超出一屏时，让当前目录项保持可见。
              量高度这件事推到下一帧：观察器回调里直接读会强制同步布局，
              而这时正文可能刚因为字体换字重排过。 */
-          if (link && sidebar) {
-            requestAnimationFrame(() => {
-              if (sidebar.scrollHeight <= sidebar.clientHeight + 4) return;
-              const box = sidebar.getBoundingClientRect();
-              const item = link.getBoundingClientRect();
-              if (item.top < box.top + 40 || item.bottom > box.bottom - 40) {
-                sidebar.scrollTo({
-                  top: sidebar.scrollTop + (item.top - box.top) - sidebar.clientHeight / 2,
-                  behavior: 'smooth',
-                });
-              }
-            });
-          }
+          if (link && sidebar) requestAnimationFrame(() => {
+            const delta = link.getBoundingClientRect().top - sidebar.getBoundingClientRect().top;
+            if (delta < 40 || delta > sidebar.clientHeight - 40) {
+              sidebar.scrollBy({ top: delta - sidebar.clientHeight / 2, behavior: 'smooth' });
+            }
+          });
         });
       },
       { rootMargin: '-96px 0px -70% 0px' }
