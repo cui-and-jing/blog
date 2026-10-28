@@ -1108,10 +1108,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       window.addEventListener('load', measureScroll, { once: true });
       document.fonts?.ready.then(measureScroll).catch(() => {});
       window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('resize', () => {
-        measureScroll();
-        onScroll();
-      });
+      window.addEventListener('resize', measureScroll);
       if (prose && 'ResizeObserver' in window) new ResizeObserver(measureScroll).observe(prose);
 
       const scrollToTop = () => window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
