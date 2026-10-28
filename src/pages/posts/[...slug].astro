@@ -501,12 +501,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
           const link = links.find((a) => decodeURIComponent(a.hash.slice(1)) === entry.target.id);
-          /* 桌面侧栏与手机目录共用当前章节状态，读屏也可获知位置。 */
-          document.querySelectorAll<HTMLAnchorElement>('.toc a').forEach((a) => {
-            const current = Boolean(link && a.hash === link.hash);
-            a.classList.toggle('active', current);
-            a.setAttribute('aria-current', current ? 'location' : 'false');
-          });
+          links.forEach((a) => a.classList.toggle('active', a === link));
 
           /* 侧栏内容超出一屏时，让当前目录项保持可见。
              量高度这件事推到下一帧：观察器回调里直接读会强制同步布局，
