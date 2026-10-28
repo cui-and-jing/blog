@@ -887,29 +887,13 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 
       document.addEventListener('keydown', (event) => {
         const mod = event.metaKey || event.ctrlKey;
-        if (mod && event.key.toLowerCase() === 'k') {
-          event.preventDefault();
-          const field = searchField();
-          if (field) {
-            field.focus();
-            field.select();
-          } else {
-            location.href = searchUrl;
-          }
-          return;
-        }
-
-        if (event.key === '/' && !mod && !event.altKey && !isTyping(event.target)) {
-          const field = searchField();
-          if (field) {
-            event.preventDefault();
-            field.focus();
-            field.select();
-          } else {
-            event.preventDefault();
-            location.href = searchUrl;
-          }
-        }
+        const shortcut = (mod && event.key.toLowerCase() === 'k')
+          || (event.key === '/' && !mod && !event.altKey && !isTyping(event.target));
+        if (!shortcut) return;
+        event.preventDefault();
+        const field = searchField();
+        if (field) { field.focus(); field.select(); }
+        else location.href = searchUrl;
       });
 
       /* ---------- 阅读设置：主题 / 字体 / 字号 / 行距 ---------- */
