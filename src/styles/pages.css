@@ -780,13 +780,7 @@ html[data-theme='dark'] .about-banner-avatar {
   color: var(--accent);
 }
 
-.series-card-desc {
-  margin: 8px 0 0;
-  max-width: 52em;
-  font-size: 14.5px;
-  line-height: 1.72;
-  color: var(--text-soft);
-}
+.series-card-desc, 
 
 .series-card-meta {
   display: flex;
@@ -1025,38 +1019,6 @@ html[data-theme='dark'] .about-banner-avatar {
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 35%, var(--line-soft));
 }
-
-.tag-series-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 0;
-}
-
-.tag-series-line a {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 7px 15px;
-  font-size: 14px;
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: 999px;
-  box-shadow: var(--shadow-sm);
-  transition: color 0.16s var(--ease), border-color 0.16s var(--ease);
-}
-
-.tag-series-line a span {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-mute);
-}
-
-.tag-series-line a:hover {
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--line-soft));
-}
-
 
 /* ---------- posts browse filters ---------- */
 .posts-browser-shell {

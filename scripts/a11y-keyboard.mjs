@@ -578,7 +578,10 @@ const check = (name, pass, detail = '') => {
     });
     await page.keyboard.press('Enter');
     if (nextHash) {
-      await page.waitForFunction((hash) => location.hash === hash && !document.getElementById('toc-dialog')?.open,
+      await page.waitForFunction((hash) =>
+        location.hash === hash &&
+        !document.getElementById('toc-dialog')?.open &&
+        document.getElementById('bar-toc')?.getAttribute('aria-expanded') === 'false',
         { timeout: 4500 }, nextHash);
     }
     const selected = await page.evaluate(() => ({
@@ -589,6 +592,18 @@ const check = (name, pass, detail = '') => {
     check('目录章节可用键盘跳转且模态层已关闭',
       selected.closed && selected.expanded === 'false' && selected.hash === nextHash,
       JSON.stringify(selected));
+
+    await page.click('#bar-toc');
+    await page.click('#toc-dialog .toc-dialog-close');
+    await page.waitForFunction(() =>
+      !document.getElementById('toc-dialog')?.open &&
+      document.getElementById('bar-toc')?.getAttribute('aria-expanded') === 'false');
+    const closedByButton = await page.evaluate(() => ({
+      hidden: !document.getElementById('toc-dialog')?.open,
+      expanded: document.getElementById('bar-toc')?.getAttribute('aria-expanded'),
+    }));
+    check('手机目录的关闭按钮同步 aria-expanded',
+      closedByButton.hidden && closedByButton.expanded === 'false', JSON.stringify(closedByButton));
   } else {
     check('移动端存在目录入口', false, '未找到 #bar-toc');
   }
