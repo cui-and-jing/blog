@@ -1115,23 +1115,9 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         );
 
         try {
-          const selector = [
-            '.hero-copy > *',
-            '.hero-card',
-            '.section-head',
-            '.featured',
-            '.card',
-            '.cat-tile',
-            '.widget',
-            '.page-head .shell > *',
-            '.post-hero',
-            '.article-card',
-            '.comments',
-            '.archive-year',
-            '.tag-cloud li',
-            '.game-card',
-            '.game-note',
-          ].join(',');
+          const selector = '.hero-copy > *,.hero-card,.section-head,.featured,.card,.cat-tile,' +
+            '.widget,.page-head .shell > *,.post-hero,.article-card,.comments,.archive-year,' +
+            '.tag-cloud li,.game-card,.game-note';
 
           /* 首屏里的元素直接算「已入场」：把它们先藏起来再淡入，
              等于把第一眼的内容推后一整段动画，首访还会看到一次闪动。
