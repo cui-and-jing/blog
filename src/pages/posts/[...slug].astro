@@ -502,14 +502,13 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
 
     /* ---------- 目录高亮 ---------- */
     const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('.sidebar .toc a'));
-    const map = new Map(links.map((a) => [decodeURIComponent(a.hash.slice(1)), a]));
     const sidebar = document.querySelector<HTMLElement>('.sidebar');
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
-          const link = map.get(entry.target.id);
+          const link = links.find((a) => decodeURIComponent(a.hash.slice(1)) === entry.target.id);
           /* 桌面侧栏与手机目录共用当前章节状态，读屏也可获知位置。 */
           document.querySelectorAll<HTMLAnchorElement>('.toc a').forEach((a) => {
             const current = Boolean(link && a.hash === link.hash);
