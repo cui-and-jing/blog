@@ -33,7 +33,7 @@ const { postId, title, variant = 'card' } = Astro.props;
       const has = saved.has(button.dataset.bookmarkId ?? '');
       const title = button.dataset.bookmarkTitle ?? '';
       button.setAttribute('aria-pressed', String(has));
-      button.setAttribute('aria-label', `${has ? '移除收藏' : '收藏'}：${title}`);
+      button.setAttribute('aria-label', has ? `已收藏：${title}，移除收藏` : `收藏：${title}`);
       const label = button.querySelector('[data-bookmark-label]');
       if (label) label.textContent = has ? '已收藏' : '收藏';
     });
