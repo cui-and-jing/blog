@@ -500,12 +500,10 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
           const link = links.find((a) => decodeURIComponent(a.hash.slice(1)) === entry.target.id);
-          /* 手机目录是运行时克隆的，所以两个目录都需要同步当前章节。 */
-          document.querySelectorAll<HTMLAnchorElement>('.toc a').forEach((a) => {
-            const current = a.hash === link?.hash;
+          links.forEach((a) => {
+            const current = a === link;
             a.classList.toggle('active', current);
-            if (current) a.setAttribute('aria-current', 'location');
-            else a.removeAttribute('aria-current');
+            a.setAttribute('aria-current', current ? 'location' : 'false');
           });
 
           /* 侧栏内容超出一屏时，让当前目录项保持可见。
@@ -541,17 +539,17 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
 
       const close = tocDialog.querySelector('.toc-dialog-close');
       fab.addEventListener('click', () => {
+        /* 正文不会在模态目录打开时滚动，按需克隆当前状态更轻量。 */
+        if (body && source) body.querySelector('ul')?.replaceWith(source.cloneNode(true));
         tocDialog.showModal();
         fab.setAttribute('aria-expanded', 'true');
-        /* 原生焦点也会将目录滚到当前位置，长目录不用从第一节重新翻。 */
         (tocDialog.querySelector<HTMLAnchorElement>('.toc a.active') ?? tocDialog.querySelector<HTMLAnchorElement>('.toc a'))?.focus();
       });
       close?.addEventListener('click', () => tocDialog.close());
       tocDialog.addEventListener('click', (event) => {
-        if (event.target === tocDialog) tocDialog.close();
+        if (event.target === tocDialog || (event.target as Element).closest('.toc a')) tocDialog.close();
       });
       tocDialog.addEventListener('close', () => fab.setAttribute('aria-expanded', 'false'));
-      tocDialog.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => tocDialog.close()));
 
       /* 只有真生成了目录才把按钮放出来，也才声明它控制哪个 dialog——
          其它页面没有这个 dialog，提前声明 aria-controls 会指向不存在的元素 */
