@@ -500,7 +500,13 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
           const link = links.find((a) => decodeURIComponent(a.hash.slice(1)) === entry.target.id);
-          links.forEach((a) => a.classList.toggle('active', a === link));
+          /* 手机目录是运行时克隆的，所以两个目录都需要同步当前章节。 */
+          document.querySelectorAll<HTMLAnchorElement>('.toc a').forEach((a) => {
+            const current = a.hash === link?.hash;
+            a.classList.toggle('active', current);
+            if (current) a.setAttribute('aria-current', 'location');
+            else a.removeAttribute('aria-current');
+          });
 
           /* 侧栏内容超出一屏时，让当前目录项保持可见。
              量高度这件事推到下一帧：观察器回调里直接读会强制同步布局，
@@ -537,6 +543,8 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       fab.addEventListener('click', () => {
         tocDialog.showModal();
         fab.setAttribute('aria-expanded', 'true');
+        /* 原生焦点也会将目录滚到当前位置，长目录不用从第一节重新翻。 */
+        (tocDialog.querySelector('.toc a.active') ?? tocDialog.querySelector('.toc a'))?.focus();
       });
       close?.addEventListener('click', () => tocDialog.close());
       tocDialog.addEventListener('click', (event) => {
