@@ -544,7 +544,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         tocDialog.showModal();
         fab.setAttribute('aria-expanded', 'true');
         /* 原生焦点也会将目录滚到当前位置，长目录不用从第一节重新翻。 */
-        (tocDialog.querySelector('.toc a.active') ?? tocDialog.querySelector('.toc a'))?.focus();
+        (tocDialog.querySelector<HTMLAnchorElement>('.toc a.active') ?? tocDialog.querySelector<HTMLAnchorElement>('.toc a'))?.focus();
       });
       close?.addEventListener('click', () => tocDialog.close());
       tocDialog.addEventListener('click', (event) => {
