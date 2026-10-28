@@ -381,26 +381,11 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         } catch {}
       };
 
-      let lastSave = 0;
-      let pending = 0;
-      let ticking = false;
+      /* 停下后保存，离开页面时立刻补存；不在每次滚动时读取布局或写存储。 */
+      let saveTimer = 0;
       window.addEventListener('scroll', () => {
-        if (ticking) return;
-        ticking = true;
-        requestAnimationFrame(() => {
-          ticking = false;
-          const wait = 700 - (Date.now() - lastSave);
-          if (wait > 0) {
-            if (!pending) pending = window.setTimeout(() => {
-              pending = 0;
-              lastSave = Date.now();
-              save();
-            }, wait);
-          } else {
-            lastSave = Date.now();
-            save();
-          }
-        });
+        clearTimeout(saveTimer);
+        saveTimer = window.setTimeout(save, 450);
       }, { passive: true });
       window.addEventListener('pagehide', save);
     }
