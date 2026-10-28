@@ -1179,14 +1179,10 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       });
       if (prose && 'ResizeObserver' in window) new ResizeObserver(measureScroll).observe(prose);
 
-      toTop?.addEventListener('click', () => {
-        window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
-      });
-
-      /* 底部操作条上的「顶部」与桌面浮钮同源，窄屏由 CSS 顶替浮钮的位置 */
-      document.getElementById('bar-top')?.addEventListener('click', () => {
-        window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
-      });
+      const scrollToTop = () => window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+      toTop?.addEventListener('click', scrollToTop);
+      /* 手机底栏与桌面浮钮共用同一行为。 */
+      document.getElementById('bar-top')?.addEventListener('click', scrollToTop);
 
       /* 滚动入场：按同组顺序错峰，元素只在 JS 就绪后隐藏 */
       /* 只从页面顶部进来时才挂动效。
