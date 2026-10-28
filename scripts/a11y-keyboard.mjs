@@ -277,6 +277,77 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 2.7. 灯箱按需加载：无图页面免下载，有图页交互完整 ---------- */
+{
+  const plain = await browser.newPage();
+  const plainScripts = [];
+  plain.on('request', (request) => {
+    if (request.url().includes('/_astro/') && request.url().endsWith('.js')) plainScripts.push(request.url());
+  });
+  await plain.goto(base + '/', { waitUntil: 'networkidle2' });
+  await plain.waitForFunction(() => document.documentElement.dataset.booted === 'on');
+  check('无正文图片的首页不下载灯箱模块',
+    !plainScripts.some((url) => /\/lightbox[.-]/.test(url)),
+    plainScripts.map((url) => url.split('/').pop()).join(', '));
+  await plain.close();
+
+  const gallery = await browser.newPage();
+  const galleryScripts = [];
+  gallery.on('request', (request) => {
+    if (request.url().includes('/_astro/') && request.url().endsWith('.js')) galleryScripts.push(request.url());
+  });
+  await gallery.goto(base + '/styleguide/', { waitUntil: 'networkidle2' });
+  await gallery.waitForFunction(() => {
+    const image = document.querySelector('.prose img');
+    return image?.getAttribute('role') === 'button' &&
+      image.getAttribute('tabindex') === '0';
+  }, { timeout: 8000 });
+  const images = await gallery.evaluate(() => document.querySelectorAll('.prose img').length);
+  check('有配图的排版样例页才加载并启用灯箱',
+    images >= 2 && galleryScripts.some((url) => /\/lightbox[.-]/.test(url)),
+    JSON.stringify({ images, scripts: galleryScripts.map((url) => url.split('/').pop()) }));
+
+  await gallery.click('.prose img');
+  await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === true);
+  const opened = await gallery.evaluate(() => ({
+    source: document.getElementById('lightbox-img')?.getAttribute('src'),
+    locked: document.documentElement.style.overflow === 'hidden',
+    count: document.querySelectorAll('.prose img').length,
+  }));
+  check('点击正文图片可打开原图灯箱并锁定背景滚动',
+    Boolean(opened.source) && opened.locked && opened.count >= 2, JSON.stringify(opened));
+
+  await gallery.keyboard.press('+');
+  const zoomed = await gallery.evaluate(() => ({
+    transform: document.getElementById('lightbox-img')?.style.transform,
+    label: document.getElementById('lightbox-zoom')?.textContent,
+  }));
+  check('灯箱缩放键仍能改变倍率',
+    /scale\(1\.25\)/.test(zoomed.transform ?? '') && zoomed.label === '125%',
+    JSON.stringify(zoomed));
+
+  await gallery.keyboard.press('0');
+  const reset = await gallery.evaluate(() => ({
+    transform: document.getElementById('lightbox-img')?.style.transform,
+  }));
+  check('灯箱重置快捷键恢复 100%',
+    /scale\(1\)/.test(reset.transform ?? ''), JSON.stringify(reset));
+
+  const originalSrc = opened.source;
+  await gallery.keyboard.press('ArrowRight');
+  const changed = await gallery.evaluate(() => document.getElementById('lightbox-img')?.getAttribute('src'));
+  check('灯箱右箭头能切换下一张图片',
+    Boolean(changed && originalSrc && changed !== originalSrc), String(changed));
+
+  await gallery.keyboard.press('Escape');
+  const closed = await gallery.evaluate(() => ({
+    open: document.getElementById('lightbox')?.open,
+    overflow: document.documentElement.style.overflow,
+  }));
+  check('Esc 关闭灯箱且恢复背景滚动', closed.open === false && closed.overflow === '', JSON.stringify(closed));
+  await gallery.close();
+}
+
 /* ---------- 3. 搜索页键盘操作 ---------- */
 {
   const page = await browser.newPage();
