@@ -277,7 +277,7 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
-/* ---------- 2.7. 灯箱按需加载：无图页面免下载，有图页交互完整 ---------- */
+/* ---------- 2.7. 灯箱模块源码分离，构建单包，无图页不额外请求；有图页交互完整 ---------- */
 {
   const plain = await browser.newPage();
   const plainScripts = [];
@@ -286,7 +286,7 @@ const check = (name, pass, detail = '') => {
   });
   await plain.goto(base + '/', { waitUntil: 'networkidle2' });
   await plain.waitForFunction(() => document.documentElement.dataset.booted === 'on');
-  check('无正文图片的首页不下载灯箱模块',
+  check('无正文图片首页不额外请求灯箱模块',
     !plainScripts.some((url) => /\/lightbox[.-]/.test(url)),
     plainScripts.map((url) => url.split('/').pop()).join(', '));
   await plain.close();
@@ -303,8 +303,8 @@ const check = (name, pass, detail = '') => {
       image.getAttribute('tabindex') === '0';
   }, { timeout: 8000 });
   const images = await gallery.evaluate(() => document.querySelectorAll('.prose img').length);
-  check('有配图的排版样例页才加载并启用灯箱',
-    images >= 2 && galleryScripts.some((url) => /\/lightbox[.-]/.test(url)),
+  check('有配图的排版样例页正确初始化可访问灯箱',
+    images >= 2 && !galleryScripts.some((url) => /\/lightbox[.-]/.test(url)),
     JSON.stringify({ images, scripts: galleryScripts.map((url) => url.split('/').pop()) }));
 
   await gallery.click('.prose img');
