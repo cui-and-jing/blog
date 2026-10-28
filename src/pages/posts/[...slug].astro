@@ -500,7 +500,11 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
           const link = links.find((a) => decodeURIComponent(a.hash.slice(1)) === entry.target.id);
-          links.forEach((a) => a.classList.toggle('active', a === link));
+          links.forEach((a) => {
+            const current = a === link;
+            a.classList.toggle('active', current);
+            a.setAttribute('aria-current', current ? 'location' : 'false');
+          });
 
           /* 侧栏内容超出一屏时，让当前目录项保持可见。
              量高度这件事推到下一帧：观察器回调里直接读会强制同步布局，
@@ -535,15 +539,17 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
 
       const close = tocDialog.querySelector('.toc-dialog-close');
       fab.addEventListener('click', () => {
+        /* 正文不会在模态目录打开时滚动，按需克隆当前状态更轻量。 */
+        if (body && source) body.querySelector('ul')?.replaceWith(source.cloneNode(true));
         tocDialog.showModal();
         fab.setAttribute('aria-expanded', 'true');
+        (tocDialog.querySelector<HTMLAnchorElement>('.toc a.active') ?? tocDialog.querySelector<HTMLAnchorElement>('.toc a'))?.focus();
       });
       close?.addEventListener('click', () => tocDialog.close());
       tocDialog.addEventListener('click', (event) => {
-        if (event.target === tocDialog) tocDialog.close();
+        if (event.target === tocDialog || (event.target as Element).closest('.toc a')) tocDialog.close();
       });
       tocDialog.addEventListener('close', () => fab.setAttribute('aria-expanded', 'false'));
-      tocDialog.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => tocDialog.close()));
 
       /* 只有真生成了目录才把按钮放出来，也才声明它控制哪个 dialog——
          其它页面没有这个 dialog，提前声明 aria-controls 会指向不存在的元素 */

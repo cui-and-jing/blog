@@ -244,9 +244,13 @@ const topTags = [...tagCounts.entries()]
         }
       };
 
+      const element = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '') => {
+        const node = document.createElement(tag);
+        node.className = cls;
+        return node;
+      };
       const addSpan = (parent: HTMLElement, name: string, label: string) => {
-        const el = document.createElement('span');
-        el.className = name;
+        const el = element('span', name);
         el.textContent = label;
         parent.append(el);
       };
@@ -257,27 +261,23 @@ const topTags = [...tagCounts.entries()]
         list.replaceChildren();
 
         items.forEach(({ post, terms }) => {
-          const li = document.createElement('li');
-          li.className = 'search-result';
+          const li = element('li', 'search-result');
           li.dataset.searchResultType = post.type === 'note' ? 'note' : 'post';
 
-          const a = document.createElement('a');
-          a.className = 'search-item';
+          const a = element('a', 'search-item');
           a.href = post.href;
 
-          const main = document.createElement('div');
-          main.className = 'search-item-main';
+          const main = element('div', 'search-item-main');
 
-          const h2 = document.createElement('h2');
+          const h2 = element('h2');
           h2.append(highlight(post.title, terms));
 
-          const p = document.createElement('p');
+          const p = element('p');
           p.append(highlight(snippet(post, terms), terms));
 
-          const meta = document.createElement('div');
-          meta.className = 'search-item-meta';
+          const meta = element('div', 'search-item-meta');
           if (post.type === 'note') addSpan(meta, 'search-type', '笔记');
-          const time = document.createElement('time');
+          const time = element('time');
           time.textContent = post.date;
           meta.append(time);
           if (post.category) addSpan(meta, 'cat', post.category);
@@ -286,8 +286,7 @@ const topTags = [...tagCounts.entries()]
 
           main.append(h2, p, meta);
 
-          const arrow = document.createElement('span');
-          arrow.className = 'search-arrow';
+          const arrow = element('span', 'search-arrow');
           arrow.setAttribute('aria-hidden', 'true');
           arrow.textContent = '→';
 
@@ -339,9 +338,8 @@ const topTags = [...tagCounts.entries()]
         historyBox.hidden = !values.length || !!input.value.trim();
         if (historyBox.hidden) return;
         historyList.replaceChildren(...values.map((value) => {
-          const button = document.createElement('button');
+          const button = element('button', 'search-history-item');
           button.type = 'button';
-          button.className = 'search-history-item';
           button.textContent = value;
           return button;
         }));
