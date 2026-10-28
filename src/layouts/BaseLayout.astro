@@ -936,26 +936,16 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       /* 主题切换用 View Transition 的圆形扩散，以点击的按钮为圆心铺开。
          面板本身在 top layer，会一起被拍进快照，所以看起来是整屏同步变色 */
       const withTransition = (apply: () => void, origin?: { x: number; y: number }) => {
-        const startViewTransition = (document as any).startViewTransition as
-          | ((cb: () => void) => { ready: Promise<void> })
-          | undefined;
-
-        if (reduceMotion.matches || !startViewTransition || !origin) {
-          apply();
-          return;
-        }
-
+        const transition = (document as any).startViewTransition;
+        if (reduceMotion.matches || !transition || !origin) return apply();
         const { x, y } = origin;
-        const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
-        const transition = startViewTransition.call(document, apply);
-        transition.ready
-          .then(() => {
-            root.animate(
-              { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-              { duration: 540, easing: 'ease-in-out', pseudoElement: '::view-transition-new(root)' }
-            );
-          })
-          .catch(() => {});
+        const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+        transition.call(document, apply).ready.then(() => {
+          root.animate(
+            { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+            { duration: 540, easing: 'ease-in-out', pseudoElement: '::view-transition-new(root)' }
+          );
+        }).catch(() => {});
       };
 
       /* 面板和文章页的字号按钮用的是同一套标记，一个委托就够了 */
