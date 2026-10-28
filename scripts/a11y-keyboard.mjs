@@ -517,20 +517,77 @@ const check = (name, pass, detail = '') => {
 
   const fab = await page.$('#bar-toc');
   if (fab) {
+    /* 找到第二个章节，检查目录克隆是否同步正在阅读的位置。 */
+    const chapter = await page.evaluate(async () => {
+      await document.fonts.ready;
+      const headings = [...document.querySelectorAll('.prose h2, .prose h3')];
+      const target = headings[Math.min(1, headings.length - 1)];
+      if (!target) return '';
+      scrollTo({ top: scrollY + target.getBoundingClientRect().top - 155, behavior: 'instant' });
+      return '#' + target.id;
+    });
+    if (chapter) {
+      await page.waitForFunction((hash) =>
+        document.querySelector('.sidebar .toc a.active')?.hash === hash,
+        { timeout: 4500 }, chapter);
+    }
     await page.click('#bar-toc');
-    await new Promise((r) => setTimeout(r, 400));
-    const open = await page.evaluate(() => ({
-      dialog: document.getElementById('toc-dialog')?.hasAttribute('open'),
-      expanded: document.getElementById('bar-toc')?.getAttribute('aria-expanded'),
-    }));
-    check('目录抽屉可打开且 aria-expanded 同步', Boolean(open.dialog) && open.expanded === 'true', JSON.stringify(open));
+    await new Promise((r) => setTimeout(r, 250));
+    const open = await page.evaluate(() => {
+      const dialog = document.getElementById('toc-dialog');
+      const active = dialog?.querySelector('.toc a[aria-current="location"]');
+      const desktop = document.querySelector('.sidebar .toc a[aria-current="location"]');
+      const region = dialog?.querySelector('.toc-body')?.getBoundingClientRect();
+      const rect = active?.getBoundingClientRect();
+      const close = dialog?.querySelector('.toc-dialog-close')?.getBoundingClientRect();
+      const links = [...(dialog?.querySelectorAll('.toc a') ?? [])].map((a) => a.getBoundingClientRect().height);
+      return {
+        dialog: dialog?.open,
+        expanded: document.getElementById('bar-toc')?.getAttribute('aria-expanded'),
+        same: Boolean(active && desktop && active.hash === desktop.hash),
+        focused: document.activeElement === active,
+        inView: Boolean(rect && region && rect.top >= region.top - 2 && rect.bottom <= region.bottom + 2),
+        closeSize: close ? [close.width, close.height] : [],
+        links,
+      };
+    });
+    check('手机目录开启并同步当前章节与读屏位置',
+      open.dialog && open.expanded === 'true' && open.same && open.focused && open.inView,
+      JSON.stringify(open));
+    check('目录关闭按钮与章节链接满足 44px 触控高度',
+      open.closeSize[0] >= 44 && open.closeSize[1] >= 44 &&
+        open.links.length > 0 && open.links.every((h) => h >= 44),
+      JSON.stringify({ close: open.closeSize, links: open.links }));
+
     await page.keyboard.press('Escape');
-    await new Promise((r) => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, 220));
     const closed = await page.evaluate(() => ({
       dialog: document.getElementById('toc-dialog')?.hasAttribute('open'),
       expanded: document.getElementById('bar-toc')?.getAttribute('aria-expanded'),
     }));
     check('Esc 关闭目录抽屉且状态复位', !closed.dialog && closed.expanded === 'false', JSON.stringify(closed));
+
+    /* 键盘 Enter 激活其它章节，应先退出模态目录再完成原生锚点跳转。 */
+    await page.click('#bar-toc');
+    const nextHash = await page.evaluate(() => {
+      const links = [...document.querySelectorAll('#toc-dialog .toc a')];
+      const next = links.find((a) => a.getAttribute('aria-current') !== 'location') ?? links[0];
+      next?.focus();
+      return next?.hash ?? '';
+    });
+    await page.keyboard.press('Enter');
+    if (nextHash) {
+      await page.waitForFunction((hash) => location.hash === hash && !document.getElementById('toc-dialog')?.open,
+        { timeout: 4500 }, nextHash);
+    }
+    const selected = await page.evaluate(() => ({
+      closed: !document.getElementById('toc-dialog')?.open,
+      expanded: document.getElementById('bar-toc')?.getAttribute('aria-expanded'),
+      hash: location.hash,
+    }));
+    check('目录章节可用键盘跳转且模态层已关闭',
+      selected.closed && selected.expanded === 'false' && selected.hash === nextHash,
+      JSON.stringify(selected));
   } else {
     check('移动端存在目录入口', false, '未找到 #bar-toc');
   }
