@@ -196,6 +196,103 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 2.5. 阅读位置精度、进度条、手机目录与章节链接 ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 720, deviceScaleFactor: 1 });
+  await page.goto(base + '/posts/hello-astro/', { waitUntil: 'load' });
+  await page.waitForSelector('.article-card .prose h2');
+
+  const initial = await page.evaluate(() => {
+    const prose = document.querySelector('.article-card .prose');
+    const box = prose.getBoundingClientRect();
+    const top = window.scrollY + box.top;
+    const sightline = Math.min(140, window.innerHeight * .22);
+    window.scrollTo({ top: top + box.height * .48 - sightline, behavior: 'instant' });
+    return { height: box.height, top };
+  });
+  await new Promise((r) => setTimeout(r, 1100));
+  const key = 'reading:pos:' + new URL(base + '/posts/hello-astro/').pathname;
+  const saved = await page.evaluate((storageKey) => {
+    try { return JSON.parse(localStorage.getItem(storageKey) ?? 'null'); } catch { return null; }
+  }, key);
+  check('正文滚动位置以 v2 正文比例保存，而非整页高度',
+    initial.height > 500 && saved?.v === 2 && Math.abs(saved.p - .48) < .07, JSON.stringify({ initial, saved }));
+
+  await page.reload({ waitUntil: 'load' });
+  await page.evaluate(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    const footer = document.createElement('div');
+    footer.style.height = '1800px';
+    document.body.append(footer);
+  });
+  const banner = await page.evaluate(() => ({
+    visible: !document.getElementById('resume-bar')?.hidden,
+    pct: document.getElementById('resume-percent')?.textContent ?? '',
+  }));
+  check('刷新后显示继续阅读位置', banner.visible && banner.pct.includes('%'), JSON.stringify(banner));
+
+  await page.click('#resume-go');
+  await new Promise((r) => setTimeout(r, 1100));
+  const resumed = await page.evaluate(() => {
+    const rect = document.querySelector('.article-card .prose').getBoundingClientRect();
+    const top = rect.top + window.scrollY;
+    return (window.scrollY + Math.min(140, window.innerHeight * .22) - top) / rect.height;
+  });
+  check('文末新增内容改变整页高度仍可恢复相同正文位置',
+    Math.abs(resumed - saved.p) < .08, 'saved=' + saved.p + ' resumed=' + resumed);
+
+  /* 手机目录由侧栏克隆，当前章节应同步给两套链接与读屏。 */
+  await page.evaluate(() => {
+    const heading = document.querySelector('.prose h2');
+    const y = heading.getBoundingClientRect().top + scrollY - 160;
+    window.scrollTo({ top: y, behavior: 'instant' });
+  });
+  await new Promise((r) => setTimeout(r, 400));
+  await page.click('#bar-toc');
+  const toc = await page.evaluate(() => {
+    const desktop = document.querySelector('.sidebar .toc a[aria-current="location"]');
+    const mobile = document.querySelector('#toc-dialog .toc a[aria-current="location"]');
+    return { open: document.getElementById('toc-dialog')?.open,
+      same: Boolean(desktop && mobile && desktop.hash === mobile.hash),
+      active: Boolean(mobile?.classList.contains('active')) };
+  });
+  check('手机目录与桌面目录同步当前章节状态',
+    toc.open && toc.same && toc.active, JSON.stringify(toc));
+  await page.keyboard.press('Escape');
+
+  const anchor = await page.evaluate(() => {
+    const first = document.querySelector('.prose h2 .heading-anchor');
+    const before = location.hash;
+    first?.click();
+    return { exists: Boolean(first), before, after: location.hash };
+  });
+  check('复制章节链接不改变当前锚点或意外跳转',
+    anchor.exists && anchor.before === anchor.after, JSON.stringify(anchor));
+
+  await page.evaluate(() => {
+    const rect = document.querySelector('.article-card .prose').getBoundingClientRect();
+    const top = window.scrollY + rect.top;
+    window.scrollTo({ top: top + rect.height - Math.min(140, innerHeight * .22) + 10, behavior: 'instant' });
+  });
+  await new Promise((r) => setTimeout(r, 1000));
+  const finished = await page.evaluate((storageKey) => ({
+    progress: document.querySelector('#read-progress span')?.style.transform ?? '',
+    cleared: localStorage.getItem(storageKey) === null,
+  }), key);
+  check('读完正文时进度条达到终点，并清除继续阅读记录',
+    finished.progress === 'scaleX(1)' && finished.cleared, JSON.stringify(finished));
+
+  /* 点击不再提示后即使切页，pagehide 也不能重新写回记录。 */
+  await page.evaluate((storageKey) => localStorage.setItem(storageKey, JSON.stringify({ v: 2, p: .4 })), key);
+  await page.reload({ waitUntil: 'load' });
+  await page.click('#resume-close');
+  await page.goto(base + '/posts/', { waitUntil: 'load' });
+  const dismissed = await page.evaluate((storageKey) => localStorage.getItem(storageKey), key);
+  check('主动关闭继续阅读后切页不会重新生成记录', dismissed === null, String(dismissed));
+  await page.close();
+}
+
 /* ---------- 3. 搜索页键盘操作 ---------- */
 {
   const page = await browser.newPage();
