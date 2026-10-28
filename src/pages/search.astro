@@ -162,24 +162,13 @@ const topTags = [...tagCounts.entries()]
       const historyList = document.getElementById('search-history-list');
       const historyClear = document.getElementById('search-history-clear') as HTMLButtonElement | null;
       type SearchType = 'all' | 'post' | 'note';
-      const kinds: SearchType[] = ['all', 'post', 'note'];
-      const typeBox = document.getElementById('search-type-filters');
-      const typeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-search-type]'));
-      const warning = document.getElementById('search-index-warning');
+      const typeButtons = document.querySelectorAll<HTMLButtonElement>('[data-search-type]');
       const navStatus = document.getElementById('search-nav-status');
       let posts: any[] = [];
       let active = -1;
       let ready = false;
       let degraded = false;
       let selectedType: SearchType = 'post';
-      let explicitType = false;
-
-      const readTypeFromUrl = () => {
-        const params = new URL(location.href).searchParams;
-        const value = params.get('type') as SearchType | null;
-        explicitType = Boolean(value && kinds.includes(value));
-        selectedType = explicitType ? value! : (params.get('q')?.trim() ? 'all' : 'post');
-      };
 
       const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -423,8 +412,9 @@ const topTags = [...tagCounts.entries()]
       const apply = (syncUrl = true) => {
         if (!ready) return;
         const query = input.value.trim();
-        if (!explicitType) selectedType = query ? 'all' : 'post';
-        if (degraded) selectedType = 'post';
+        const type = new URL(location.href).searchParams.get('type');
+        selectedType = degraded ? 'post' : type === 'all' || type === 'post' || type === 'note'
+          ? type : query ? 'all' : 'post';
         const words = query.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 6);
         const terms = words.filter((word) => !STOP.has(word));
         if (clearBtn) clearBtn.hidden = query.length === 0;
@@ -433,8 +423,6 @@ const topTags = [...tagCounts.entries()]
           const next = new URL(location.href);
           if (query) next.searchParams.set('q', query);
           else next.searchParams.delete('q');
-          if (explicitType && !degraded) next.searchParams.set('type', selectedType);
-          else next.searchParams.delete('type');
           history.replaceState(null, '', next);
         }
 
@@ -453,10 +441,10 @@ const topTags = [...tagCounts.entries()]
           const type = button.dataset.searchType as SearchType;
           button.disabled = degraded && type !== 'post';
           button.setAttribute('aria-pressed', String(type === selectedType));
-          const count = button.querySelector('[data-search-count]');
+          const count = button.querySelector('span');
           if (count) count.textContent = String(counts[type] ?? 0);
         });
-        if (typeBox) typeBox.hidden = false;
+        document.getElementById('search-type-filters')!.hidden = false;
         render(ranked.filter(({ post }) => selectedType === 'all' || post.type === selectedType), Boolean(terms.length));
         renderHistory();
       };
@@ -485,9 +473,7 @@ const topTags = [...tagCounts.entries()]
           /* 索引不可用时仍可以搜索页面已有的文章，但不假装有完整正文与笔记数据。 */
           degraded = true;
           posts = fallback();
-          explicitType = false;
-          selectedType = 'post';
-          if (warning) warning.hidden = false;
+          document.getElementById('search-index-warning')!.hidden = false;
           const next = new URL(location.href);
           next.searchParams.delete('type');
           history.replaceState(null, '', next);
@@ -497,19 +483,15 @@ const topTags = [...tagCounts.entries()]
       };
 
       typeButtons.forEach((button) => button.addEventListener('click', () => {
-        const type = button.dataset.searchType as SearchType;
-        if (!kinds.includes(type) || button.disabled) return;
-        selectedType = type;
-        explicitType = true;
+        if (button.disabled) return;
         const next = new URL(location.href);
-        next.searchParams.set('type', type);
+        next.searchParams.set('type', button.dataset.searchType!);
         history.pushState(null, '', next);
         apply(false);
       }));
 
       window.addEventListener('popstate', () => {
         input.value = new URL(location.href).searchParams.get('q') ?? '';
-        readTypeFromUrl();
         apply(false);
       });
 
@@ -557,7 +539,6 @@ const topTags = [...tagCounts.entries()]
 
       const initial = new URL(location.href).searchParams.get('q');
       if (initial) input.value = initial;
-      readTypeFromUrl();
       fetchIndex();
 
       /* 桌面端进入即聚焦；移动端不主动弹键盘 */
