@@ -380,7 +380,7 @@ const topTags = [...tagCounts.entries()]
           ? posts.map((post, index) => ({ post, index, score: score(post, terms) }))
               .filter((item) => item.score > 0)
               .sort((a, b) => b.score - a.score || a.index - b.index)
-              .map((item) => ({ post: item.post, terms }))
+              .map(({ post }) => ({ post, terms }))
           : posts.map((post) => ({ post, terms: [] }));
         typeButtons.forEach((button) => {
           const type = button.dataset.searchType as SearchType;
@@ -408,9 +408,8 @@ const topTags = [...tagCounts.entries()]
       const fetchIndex = async () => {
         try {
           const res = await fetch(`${baseUrl}/search-index.json`, { headers: { Accept: 'application/json' } });
-          if (!res.ok) throw new Error('Search index unavailable');
-          const data = await res.json();
-          if (!Array.isArray(data?.posts)) throw new Error('Invalid search index');
+          const data = res.ok ? await res.json() : null;
+          if (!Array.isArray(data?.posts)) throw new Error('index');
           posts = data.posts.filter((post: any) => post && (post.type === 'post' || post.type === 'note'));
         } catch {
           /* 索引不可用时仍可以搜索页面已有的文章，但不假装有完整正文与笔记数据。 */
