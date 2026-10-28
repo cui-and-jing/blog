@@ -784,34 +784,25 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         });
 
         /* 拖动只在放大后生效，否则会和双击、切换图片抢事件 */
-        let dragging = false;
-        let startX = 0;
-        let startY = 0;
-        let fromX = 0;
-        let fromY = 0;
-
+        let drag: { x: number; y: number; dx: number; dy: number } | null = null;
         stage.addEventListener('pointerdown', (event) => {
           if (zoom <= 1) return;
-          dragging = true;
-          startX = event.clientX;
-          startY = event.clientY;
-          fromX = tx;
-          fromY = ty;
+          drag = { x: event.clientX, y: event.clientY, dx: tx, dy: ty };
           stage.setPointerCapture(event.pointerId);
           stage.classList.add('is-dragging');
         });
 
         stage.addEventListener('pointermove', (event) => {
-          if (!dragging) return;
-          tx = fromX + (event.clientX - startX);
-          ty = fromY + (event.clientY - startY);
+          if (!drag) return;
+          tx = drag.dx + event.clientX - drag.x;
+          ty = drag.dy + event.clientY - drag.y;
           clamp();
           paint();
         });
 
         const endDrag = (event: PointerEvent) => {
-          if (!dragging) return;
-          dragging = false;
+          if (!drag) return;
+          drag = null;
           stage.classList.remove('is-dragging');
           if (stage.hasPointerCapture(event.pointerId)) stage.releasePointerCapture(event.pointerId);
         };
