@@ -538,6 +538,11 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       }
 
       const close = tocDialog.querySelector('.toc-dialog-close');
+      /* close 事件在下一个任务执行，点击链接时需同步清除展开状态。 */
+      const closeToc = () => {
+        if (tocDialog.open) tocDialog.close();
+        fab.setAttribute('aria-expanded', 'false');
+      };
       fab.addEventListener('click', () => {
         /* 正文不会在模态目录打开时滚动，按需克隆当前状态更轻量。 */
         if (body && source) body.querySelector('ul')?.replaceWith(source.cloneNode(true));
@@ -545,9 +550,9 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         fab.setAttribute('aria-expanded', 'true');
         (tocDialog.querySelector<HTMLAnchorElement>('.toc a.active') ?? tocDialog.querySelector<HTMLAnchorElement>('.toc a'))?.focus();
       });
-      close?.addEventListener('click', () => tocDialog.close());
+      close?.addEventListener('click', closeToc);
       tocDialog.addEventListener('click', (event) => {
-        if (event.target === tocDialog || (event.target as Element).closest('.toc a')) tocDialog.close();
+        if (event.target === tocDialog || (event.target as Element).closest('.toc a')) closeToc();
       });
       tocDialog.addEventListener('close', () => fab.setAttribute('aria-expanded', 'false'));
 
