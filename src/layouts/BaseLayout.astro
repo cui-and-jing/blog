@@ -880,12 +880,8 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const DEFAULTS: Settings = { theme: 'auto', font: 'serif', size: 'normal', leading: 'normal' };
 
       const readSettings = (): Settings => {
-        try {
-          const raw = JSON.parse(localStorage.getItem(STORE) ?? '{}');
-          return { ...DEFAULTS, ...(raw && typeof raw === 'object' ? raw : {}) };
-        } catch {
-          return { ...DEFAULTS };
-        }
+        try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORE) ?? '{}') }; }
+        catch { return { ...DEFAULTS }; }
       };
 
       let settings = readSettings();
