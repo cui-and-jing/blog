@@ -329,6 +329,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         } catch { return null; }
       };
 
+      let dismissed = false;
       const saved = readSaved();
       if (saved && saved.p > .08 && saved.p < .96) {
         resumePercent.textContent = `${Math.round(saved.p * 100)}%`;
@@ -349,6 +350,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         });
 
         document.getElementById('resume-close')?.addEventListener('click', () => {
+          dismissed = true;
           hideResume();
           try { localStorage.removeItem(resumeKey); } catch {}
         });
@@ -368,6 +370,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       }, { passive: true });
 
       const save = () => {
+        if (dismissed) return;
         const { top, height } = locationInProse();
         if (height < 240) return;
         const progress = (window.scrollY + sightline() - top) / height;
