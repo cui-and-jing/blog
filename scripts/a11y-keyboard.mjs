@@ -218,6 +218,110 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 3.2. 搜索分类、URL 历史、键盘播报和索引失败降级 ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.goto(base + '/search/?q=笔记', { waitUntil: 'networkidle2' });
+  await page.waitForFunction(() => document.getElementById('search-type-filters')?.hidden === false, { timeout: 8000 });
+
+  const initial = await page.evaluate(() => ({
+    type: document.querySelector('[data-search-type="all"]')?.getAttribute('aria-pressed'),
+    types: [...document.querySelectorAll('.search-result')].map((el) => el.getAttribute('data-search-result-type')),
+    count: document.getElementById('search-count')?.textContent ?? '',
+  }));
+  check('有查询词时默认查询文章和笔记',
+    initial.type === 'true' && initial.types.includes('note') && initial.types.includes('post'),
+    JSON.stringify(initial));
+
+  await page.click('[data-search-type="note"]');
+  const notes = await page.evaluate(() => ({
+    selected: document.querySelector('[data-search-type="note"]')?.getAttribute('aria-pressed'),
+    type: new URL(location.href).searchParams.get('type'),
+    results: [...document.querySelectorAll('.search-result')].map((el) => el.getAttribute('data-search-result-type')),
+    total: document.getElementById('search-count')?.textContent ?? '',
+  }));
+  check('笔记筛选更新 URL 且只显示笔记',
+    notes.selected === 'true' && notes.type === 'note' &&
+    notes.results.length > 0 && notes.results.every((type) => type === 'note'), JSON.stringify(notes));
+
+  await page.click('[data-search-type="all"]');
+  await page.evaluate(() => history.back());
+  await page.waitForFunction(() =>
+    new URL(location.href).searchParams.get('type') === 'note' &&
+    document.querySelector('[data-search-type="note"]')?.getAttribute('aria-pressed') === 'true',
+    { timeout: 5000 });
+  const restored = await page.evaluate(() => ({
+    query: document.getElementById('search-input')?.value,
+    kinds: [...document.querySelectorAll('.search-result')].map((el) => el.getAttribute('data-search-result-type')),
+  }));
+  check('浏览器后退恢复搜索类型与关键词',
+    restored.query === '笔记' && restored.kinds.length > 0 && restored.kinds.every((type) => type === 'note'),
+    JSON.stringify(restored));
+
+  await page.click('#search-input');
+  await page.keyboard.press('ArrowDown');
+  const announced = await page.evaluate(() => ({
+    text: document.getElementById('search-nav-status')?.textContent ?? '',
+    active: document.querySelectorAll('.search-result.is-active').length,
+    inputFocused: document.activeElement?.id === 'search-input',
+  }));
+  check('键盘选择结果有读屏播报并保留输入焦点',
+    announced.active === 1 && announced.inputFocused && announced.text.includes('第 1 条'),
+    JSON.stringify(announced));
+
+  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await page.waitForFunction(() => document.getElementById('search-type-filters')?.hidden === false, { timeout: 8000 });
+  const mobile = await page.evaluate(() => ({
+    overflow: document.documentElement.scrollWidth - window.innerWidth,
+    buttons: [...document.querySelectorAll('#search-type-filters button')].map((b) => {
+      const r = b.getBoundingClientRect();
+      return { w: r.width, h: r.height };
+    }),
+  }));
+  check('390px 手机搜索分类按钮可触控且无横向溢出',
+    mobile.overflow <= 0 && mobile.buttons.length === 3 &&
+      mobile.buttons.every((b) => b.w >= 44 && b.h >= 44), JSON.stringify(mobile));
+  await page.close();
+
+  /* 网络索引暂时打不开时：原生预渲染列表仍可搜，不能错误显示 0 篇。 */
+  const offline = await browser.newPage();
+  await offline.setViewport({ width: 1280, height: 900 });
+  await offline.setRequestInterception(true);
+  offline.on('request', (request) => {
+    if (request.url().endsWith('/search-index.json')) {
+      request.respond({ status: 503, contentType: 'application/json', body: '{}' }).catch(() => {});
+    } else {
+      request.continue().catch(() => {});
+    }
+  });
+  await offline.goto(base + '/search/?q=Astro&type=note', { waitUntil: 'load' });
+  await offline.waitForSelector('#search-index-warning:not([hidden])', { timeout: 8000 });
+  const degraded = await offline.evaluate(() => ({
+    shown: [...document.querySelectorAll('.search-result')].map((el) => el.getAttribute('data-search-result-type')),
+    warning: document.getElementById('search-index-warning')?.textContent ?? '',
+    type: new URL(location.href).searchParams.get('type'),
+    pressed: document.querySelector('[data-search-type="post"]')?.getAttribute('aria-pressed'),
+    disabled: [...document.querySelectorAll('#search-type-filters button')]
+      .filter((b) => b.dataset.searchType !== 'post').every((b) => b.disabled),
+  }));
+  check('全文索引失败时可用文章兜底且提示笔记不可用',
+    degraded.shown.length > 0 && degraded.shown.every((type) => type === 'post') &&
+      degraded.warning.includes('笔记不可用') && degraded.type === null &&
+      degraded.pressed === 'true' && degraded.disabled, JSON.stringify(degraded));
+  await offline.$eval('#search-input', (el) => {
+    el.value = '';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const clearedFallback = await offline.evaluate(() => ({
+    count: document.querySelectorAll('.search-result').length,
+    visible: !document.getElementById('search-empty')?.hidden,
+  }));
+  check('索引失败并清空查询仍列出原始文章',
+    clearedFallback.count > 0 && !clearedFallback.visible, JSON.stringify(clearedFallback));
+  await offline.close();
+}
+
 /* ---------- 3.5. 阅读收藏：跨页、组合筛选与旧链接找回 ---------- */
 {
   const page = await browser.newPage();
