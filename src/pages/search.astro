@@ -54,6 +54,14 @@ const topTags = [...tagCounts.entries()]
       <span class="search-keys" aria-hidden="true"><kbd>↑</kbd><kbd>↓</kbd> 选择 <kbd>Enter</kbd> 打开 <kbd>Esc</kbd> 清空</span>
     </div>
 
+    <div class="search-history-list search-filters" id="search-type-filters" role="group" aria-label="搜索结果" hidden>
+      <button class="search-history-item" type="button" data-search-type="all" aria-pressed="false">全部 <span data-search-count="all">0</span></button>
+      <button class="search-history-item" type="button" data-search-type="post" aria-pressed="false">文章 <span data-search-count="post">0</span></button>
+      <button class="search-history-item" type="button" data-search-type="note" aria-pressed="false">笔记 <span data-search-count="note">0</span></button>
+    </div>
+    <p class="search-noscript" id="search-index-warning" role="status" hidden>正文搜索不可用，笔记不可用。</p>
+    <span class="sr-only" id="search-nav-status" role="status" aria-live="polite"></span>
+
     <noscript>
       <p class="search-noscript">搜索需要启用 JavaScript。下面是全部文章，也可以直接翻<a href={url('/posts/')}>文章列表</a>。</p>
     </noscript>
@@ -78,6 +86,8 @@ const topTags = [...tagCounts.entries()]
               data-tags={post.data.tags.join(' ')}
               data-cat={post.data.category ?? ''}
               data-href={url(`/posts/${post.id}/`)}
+              data-type="post"
+              data-minutes={readingTime(post.body ?? '')}
             >
               <div class="search-item-main">
                 <h2>{post.data.title}</h2>
