@@ -427,6 +427,15 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       });
     }
 
+    const flashAnchor = (anchor: HTMLAnchorElement) => {
+      anchor.dataset.copied = '1';
+      anchor.textContent = '已复制';
+      setTimeout(() => {
+        delete anchor.dataset.copied;
+        anchor.textContent = '#';
+      }, 1400);
+    };
+
     document.querySelectorAll<HTMLElement>('.prose h2, .prose h3').forEach((heading) => {
       if (!heading.id) return;
       const anchor = document.createElement('a');
@@ -438,20 +447,14 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         event.preventDefault(); /* 复制章节链接不应导致正文跳动 */
         const link = `${location.origin}${location.pathname}#${heading.id}`;
         if (!(await copyText(link))) return;
-        anchor.dataset.copied = '1';
-        anchor.textContent = '已复制';
+        flashAnchor(anchor);
         announce('小节链接已复制');
-        setTimeout(() => {
-          delete anchor.dataset.copied;
-          anchor.textContent = '#';
-        }, 1400);
       });
       heading.append(anchor);
     });
 
     /* ---------- 段落深链接：想引用某一段时，不必再给整篇链接 ---------- */
-    const articleTitle =
-      document.querySelector<HTMLElement>('.article-card h1')?.textContent?.trim() ?? document.title;
+    const articleTitle = shareBar?.dataset.title || document.title;
 
     document.querySelectorAll<HTMLElement>('.prose > p, .prose > blockquote').forEach((block, i) => {
       const sourceText = (block.textContent ?? '').trim();
@@ -480,13 +483,8 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
           announce('复制失败，请手动选择文字');
           return;
         }
-        anchor.dataset.copied = '1';
-        anchor.textContent = '已复制';
+        flashAnchor(anchor);
         announce('引用已复制');
-        setTimeout(() => {
-          delete anchor.dataset.copied;
-          anchor.textContent = '#';
-        }, 1400);
       });
 
       block.prepend(anchor);
