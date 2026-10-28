@@ -575,7 +575,7 @@ html[data-theme='dark'] .widget-cta-actions a:hover {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 32px;
+  min-height: 44px;
   padding: 4px 9px;
   color: var(--text-soft);
   background: var(--bg-soft);
