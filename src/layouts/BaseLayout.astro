@@ -855,7 +855,6 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 
       /* 搜索：⌘/Ctrl+K 或 / 直接聚焦，其他页面跳到搜索页 */
       const searchUrl = document.body.dataset.searchUrl || '/search/';
-      const searchField = () => document.getElementById('search-input') as HTMLInputElement | null;
       const isTyping = (target: EventTarget | null) => {
         const el = target as HTMLElement | null;
         return Boolean(el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable));
@@ -867,7 +866,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           || (event.key === '/' && !mod && !event.altKey && !isTyping(event.target));
         if (!shortcut) return;
         event.preventDefault();
-        const field = searchField();
+        const field = document.getElementById('search-input') as HTMLInputElement | null;
         if (field) { field.focus(); field.select(); }
         else location.href = searchUrl;
       });
@@ -1059,7 +1058,6 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const progress = document.getElementById('read-progress');
       const progressFill = progress?.firstElementChild as HTMLElement | null;
       const prose = document.querySelector<HTMLElement>('.article-card .prose');
-      const hasArticle = Boolean(prose);
 
       /* 滚动时不要读 scrollHeight：那是一次强制同步布局，滚得越快越卡，
          长文在低端机上会直接掉帧。高度只在真的变了的时候重量（窗口缩放、
@@ -1102,7 +1100,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         requestAnimationFrame(paintScroll);
       };
 
-      if (progress && hasArticle) progress.classList.add('active');
+      if (progress && prose) progress.classList.add('active');
       /* 开头先不量高度：读取 scrollHeight 会强制同步布局，而这时字体还没到，
          等于是把成本最高的一次排版提前到主线程上做。第一帧结束后再量，
          ResizeObserver 与 fonts.ready 会把字体换字造成的高度变化补上。 */
