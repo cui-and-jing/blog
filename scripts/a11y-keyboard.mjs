@@ -317,7 +317,7 @@ const check = (name, pass, detail = '') => {
   check('点击正文图片可打开原图灯箱并锁定背景滚动',
     Boolean(opened.source) && opened.locked && opened.count >= 2, JSON.stringify(opened));
 
-  await gallery.keyboard.press('+');
+  await gallery.keyboard.press('=');
   const zoomed = await gallery.evaluate(() => ({
     transform: document.getElementById('lightbox-img')?.style.transform,
     label: document.getElementById('lightbox-zoom')?.textContent,
@@ -346,6 +346,31 @@ const check = (name, pass, detail = '') => {
   }));
   check('Esc 关闭灯箱且恢复背景滚动', closed.open === false && closed.overflow === '', JSON.stringify(closed));
   await gallery.close();
+}
+
+/* ---------- 2.8. 系列页面排版：简介不能继承元信息样式 ---------- */
+{
+  const page = await browser.newPage();
+  await page.goto(base + '/series/', { waitUntil: 'load' });
+  const type = await page.evaluate(() => {
+    const desc = document.querySelector('.series-card-desc');
+    const meta = document.querySelector('.series-card-meta');
+    if (!desc || !meta) return null;
+    const prose = getComputedStyle(desc);
+    const details = getComputedStyle(meta);
+    return {
+      descSize: parseFloat(prose.fontSize),
+      metaSize: parseFloat(details.fontSize),
+      descDisplay: prose.display,
+      metaDisplay: details.display,
+      descLineHeight: parseFloat(prose.lineHeight),
+    };
+  });
+  check('系列简介使用正文排版，不继承日期行的元信息样式',
+    Boolean(type && type.descSize >= 14 && type.descSize > type.metaSize &&
+      type.descDisplay === 'block' && type.metaDisplay === 'flex' &&
+      type.descLineHeight > 20), JSON.stringify(type));
+  await page.close();
 }
 
 /* ---------- 3. 搜索页键盘操作 ---------- */
