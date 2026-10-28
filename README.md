@@ -17,6 +17,23 @@
 - 响应式样式：`src/styles/layout.css`
 - 浏览器回归：`scripts/a11y-keyboard.mjs`，验证链接、阅读顺序、键盘焦点和手机触控尺寸。
 
+## 稍后再读与旧游戏链接
+
+文章卡片和文章页的首尾都有「收藏」入口：单击保存，再单击移除；文章列表的
+「只看收藏」可与分类、作者组合使用，筛选状态保存在 URL（`saved=1`）。
+收藏只存文章 slug，在本机的 `localStorage['cui-jing:saved-posts:v1']`，不会上传、
+不要求登录，跨标签页会同步状态。无痕模式或禁止本地存储时，本页仍可操作，
+但重新加载后可能无法保留。收藏不承诺跨设备同步。
+
+- 存储与容错：`src/lib/bookmarks.ts`（坏数据过滤、禁止存储时的会话回退）
+- 同步组件：`src/components/BookmarkToggle.astro`（卡片、正文上方与文末共用）
+- 筛选：`src/pages/posts/index.astro`；保留不启用 JavaScript 时的分类和作者原有链接
+- 回归测试：`scripts/a11y-keyboard.mjs` 检查收藏读写、两个入口同步、组合筛选、空状态
+
+四款已移除的小游戏（2048、贪吃蛇、打砖块、扫雷）不会恢复到游戏中心。
+GitHub Pages 将旧地址交给站点 `404.html`，页面根据旧 URL 显示
+「去看现有游戏」的链接；其他不存在的页面仍使用通用 404 提示。
+
 ## 本地开发
 
 ```bash

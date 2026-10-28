@@ -1,0 +1,63 @@
+---
+interface Props {
+  postId: string;
+  title: string;
+  variant?: 'card' | 'share';
+}
+
+const { postId, title, variant = 'card' } = Astro.props;
+---
+
+<button
+  type="button"
+  class:list={['bookmark-toggle', variant === 'share' ? 'share-btn' : 'card-bookmark']}
+  data-bookmark-id={postId}
+  data-bookmark-title={title}
+  aria-pressed="false"
+  aria-label={`收藏：${title}`}
+>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4Z" />
+  </svg>
+  <span data-bookmark-label>收藏</span>
+</button>
+
+<script>
+  import { BOOKMARKS_KEY, readBookmarks, writeBookmarks } from '../lib/bookmarks';
+
+  const selector = 'button[data-bookmark-id]';
+
+  function sync() {
+    const saved = new Set(readBookmarks());
+    document.querySelectorAll<HTMLButtonElement>(selector).forEach((button) => {
+      const has = saved.has(button.dataset.bookmarkId ?? '');
+      const title = button.dataset.bookmarkTitle ?? '';
+      button.setAttribute('aria-pressed', String(has));
+      button.setAttribute('aria-label', has ? `已收藏：${title}，移除收藏` : `收藏：${title}`);
+      const label = button.querySelector('[data-bookmark-label]');
+      if (label) label.textContent = has ? '已收藏' : '收藏';
+    });
+  }
+
+  document.addEventListener('click', (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLButtonElement>(selector);
+    if (!button) return;
+    const id = button.dataset.bookmarkId;
+    if (!id) return;
+    const saved = new Set(readBookmarks());
+    if (saved.has(id)) saved.delete(id);
+    else saved.add(id);
+    writeBookmarks([...saved]);
+    sync();
+    window.dispatchEvent(new Event('blog:bookmarks-update'));
+  });
+
+  window.addEventListener('storage', (event) => {
+    if (event.key === BOOKMARKS_KEY || event.key === null) {
+      sync();
+      window.dispatchEvent(new Event('blog:bookmarks-update'));
+    }
+  });
+
+  sync();
+</script>

@@ -218,6 +218,110 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 3.5. 阅读收藏：跨页、组合筛选与旧链接找回 ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.goto(`${base}/posts/`, { waitUntil: 'load' });
+  await page.waitForSelector('#bookmark-filter:not([hidden])').catch(() => {});
+  const first = await page.evaluate(() => {
+    const card = document.querySelector('#post-grid .card');
+    const button = card?.querySelector('button[data-bookmark-id]');
+    return {
+      id: card?.getAttribute('data-post-id') ?? '',
+      category: card?.getAttribute('data-category') ?? '',
+      author: card?.getAttribute('data-author') ?? '',
+      button: Boolean(button),
+    };
+  });
+  check('文章列表每张卡有独立收藏入口', first.button && first.id.length > 0, JSON.stringify(first));
+
+  await page.click('#post-grid .card:first-child button[data-bookmark-id]');
+  const saved = await page.evaluate((id) => {
+    const button = document.querySelector('#post-grid .card:first-child button[data-bookmark-id]');
+    const raw = JSON.parse(localStorage.getItem('cui-jing:saved-posts:v1') ?? '[]');
+    return {
+      selected: button?.getAttribute('aria-pressed'),
+      text: button?.textContent?.trim(),
+      stored: Array.isArray(raw) && raw.includes(id),
+      count: document.getElementById('bookmark-count')?.textContent,
+    };
+  }, first.id);
+  check('收藏持久化并同步按钮与计数',
+    saved.selected === 'true' && saved.text === '已收藏' && saved.stored && saved.count === '1', JSON.stringify(saved));
+
+  await page.click('#bookmark-filter');
+  const only = await page.evaluate(() => ({
+    saved: new URL(location.href).searchParams.get('saved'),
+    count: [...document.querySelectorAll('#post-grid .card')].filter((el) => !el.hidden).length,
+    active: document.getElementById('bookmark-filter')?.getAttribute('aria-current'),
+  }));
+  check('只看收藏只展示已收藏文章', only.saved === '1' && only.count === 1 && only.active === 'true', JSON.stringify(only));
+
+  await page.evaluate(({ category, author }) => {
+    document.querySelector(`[data-post-filter="category"] a[data-filter-value="${category}"]`)?.click();
+    document.querySelector(`[data-post-filter="author"] a[data-filter-value="${author}"]`)?.click();
+  }, first);
+  const combined = await page.evaluate(() => ({
+    url: new URL(location.href).searchParams.toString(),
+    shown: [...document.querySelectorAll('#post-grid .card')].filter((el) => !el.hidden).length,
+  }));
+  check('收藏与分类、作者筛选可组合且保留 URL',
+    combined.shown === 1 && /saved=1/.test(combined.url)
+      && /category=/.test(combined.url) && /author=/.test(combined.url),
+    JSON.stringify(combined));
+
+  await page.goto(`${base}/posts/${first.id}/`, { waitUntil: 'load' });
+  const article = await page.evaluate(() => {
+    const buttons = [...document.querySelectorAll('button[data-bookmark-id]')];
+    return {
+      count: buttons.length,
+      selected: buttons.map((btn) => btn.getAttribute('aria-pressed')),
+    };
+  });
+  check('文章页两个收藏入口同步已有状态',
+    article.count === 2 && article.selected.every((value) => value === 'true'), JSON.stringify(article));
+
+  await page.click('.article-tools button[data-bookmark-id]');
+  const removed = await page.evaluate(() => ({
+    buttons: [...document.querySelectorAll('button[data-bookmark-id]')].map((btn) => btn.getAttribute('aria-pressed')),
+    stored: JSON.parse(localStorage.getItem('cui-jing:saved-posts:v1') ?? '[]'),
+  }));
+  check('文章页取消收藏同步顶部与文末按钮',
+    removed.buttons.length === 2 && removed.buttons.every((value) => value === 'false')
+      && Array.isArray(removed.stored) && removed.stored.length === 0, JSON.stringify(removed));
+  await page.goto(`${base}/posts/?saved=1`, { waitUntil: 'load' });
+  const emptySaved = await page.evaluate(() => ({
+    shown: [...document.querySelectorAll('#post-grid .card')].filter((el) => !el.hidden).length,
+    empty: !document.getElementById('post-filter-empty')?.hidden,
+    text: document.getElementById('post-filter-empty-text')?.textContent ?? '',
+  }));
+  check('取消最后一篇收藏后展示空状态',
+    emptySaved.shown === 0 && emptySaved.empty && emptySaved.text.includes('收藏'), JSON.stringify(emptySaved));
+
+  /* GitHub Pages 将不存在的 /games/<slug>/ 返回 404.html。
+     在预览服务上使用 404 文档模拟同源旧 URL，避免依赖其 404 fallback 实现。 */
+  await page.goto(`${base}/404.html`, { waitUntil: 'load' });
+  await page.evaluate((old) => {
+    history.replaceState(null, '', old);
+    window.dispatchEvent(new Event('popstate'));
+  }, `${base}/games/snake/`);
+  const legacy = await page.evaluate(() => ({
+    shown: !document.getElementById('retired-game-guide')?.hidden,
+    link: document.querySelector('#retired-game-guide a')?.getAttribute('href') ?? '',
+    heading: document.getElementById('notfound-title')?.textContent ?? '',
+  }));
+  check('旧游戏地址在 404 页提供当前游戏中心入口',
+    legacy.shown && /\/games\/$/.test(legacy.link) && legacy.heading.includes('游戏'), JSON.stringify(legacy));
+  await page.evaluate((next) => {
+    history.replaceState(null, '', next);
+    window.dispatchEvent(new Event('popstate'));
+  }, `${base}/not-a-page/`);
+  const normal = await page.evaluate(() => document.getElementById('retired-game-guide')?.hidden);
+  check('普通 404 不显示旧游戏专用引导', normal === true, String(normal));
+  await page.close();
+}
+
 /* ---------- 4. 移动端目录抽屉与底部操作条 ---------- */
 {
   const page = await browser.newPage();

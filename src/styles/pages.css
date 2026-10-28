@@ -1168,3 +1168,17 @@ html[data-theme='dark'] .about-banner-avatar {
     padding-top: 0;
   }
 }
+
+/* JS 不可用时，不展示无法交互的收藏筛选项。 */
+.post-filter-row[hidden],
+.notfound-retired[hidden] {
+  display: none;
+}
+
+.notfound-retired {
+  margin-top: 26px;
+}
+
+.notfound-retired h2 {
+  font: 400 20px/1.5 var(--font-serif);
+}

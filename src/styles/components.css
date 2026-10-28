@@ -568,3 +568,30 @@ html[data-theme='dark'] .widget-cta-actions a:hover {
   color: rgba(255, 255, 255, 0.66);
 }
 
+/* 阅读收藏：卡片链接覆盖整张卡，收藏按钮必须位于它上方。 */
+.card .bookmark-toggle {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 4px 9px;
+  color: var(--text-soft);
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.bookmark-toggle svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.bookmark-toggle[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
