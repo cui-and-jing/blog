@@ -55,9 +55,9 @@ const topTags = [...tagCounts.entries()]
     </div>
 
     <div class="search-history-list search-filters" id="search-type-filters" role="group" aria-label="搜索结果" hidden>
-      <button class="search-history-item" type="button" data-search-type="all" aria-pressed="false">全部 <span data-search-count="all">0</span></button>
-      <button class="search-history-item" type="button" data-search-type="post" aria-pressed="false">文章 <span data-search-count="post">0</span></button>
-      <button class="search-history-item" type="button" data-search-type="note" aria-pressed="false">笔记 <span data-search-count="note">0</span></button>
+      <button class="search-history-item" type="button" data-search-type="all" aria-pressed="false">全部</button>
+      <button class="search-history-item" type="button" data-search-type="post" aria-pressed="false">文章</button>
+      <button class="search-history-item" type="button" data-search-type="note" aria-pressed="false">笔记</button>
     </div>
     <p class="search-noscript" id="search-index-warning" role="status" hidden>正文搜索不可用，笔记不可用。</p>
     <span class="sr-only" id="search-nav-status" role="status" aria-live="polite"></span>
@@ -382,17 +382,10 @@ const topTags = [...tagCounts.entries()]
               .sort((a, b) => b.score - a.score || a.index - b.index)
               .map((item) => ({ post: item.post, terms }))
           : posts.map((post) => ({ post, terms: [] }));
-        const counts = {
-          all: ranked.length,
-          post: ranked.filter(({ post }) => post.type === 'post').length,
-          note: ranked.filter(({ post }) => post.type === 'note').length,
-        };
         typeButtons.forEach((button) => {
           const type = button.dataset.searchType as SearchType;
           button.disabled = degraded && type !== 'post';
           button.setAttribute('aria-pressed', String(type === selectedType));
-          const count = button.querySelector('span');
-          if (count) count.textContent = String(counts[type] ?? 0);
         });
         document.getElementById('search-type-filters')!.hidden = false;
         render(ranked.filter(({ post }) => selectedType === 'all' || post.type === selectedType), Boolean(terms.length));
