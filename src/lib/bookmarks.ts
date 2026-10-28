@@ -1,6 +1,6 @@
 /**
  * 本地阅读收藏，只保存公开文章的 slug，不上传，也不依赖账户。
- * 兼容存储被禁用 / 数据损坏的浏览器：当页可用，跨页持久化则按浏览器权限决定。
+ * 兼容保存被禁用 / 数据损坏的浏览器：当页可用，跨页持久化则按浏览器权限决定。
  */
 export const BOOKMARKS_KEY = 'cui-jing:saved-posts:v1';
 const LIMIT = 500;
@@ -27,6 +27,6 @@ export function writeBookmarks(value: string[]): void {
   try {
     localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(session));
   } catch {
-    // 浏览器禁止本地存储时，仅在当前页面保留状态。
+    // 浏览器禁止本地保存时，只在当前页面保留状态。
   }
 }
