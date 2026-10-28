@@ -876,13 +876,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const searchField = () => document.getElementById('search-input') as HTMLInputElement | null;
       const isTyping = (target: EventTarget | null) => {
         const el = target as HTMLElement | null;
-        if (!el || !el.tagName) return false;
-        return (
-          el.tagName === 'INPUT' ||
-          el.tagName === 'TEXTAREA' ||
-          el.tagName === 'SELECT' ||
-          el.isContentEditable
-        );
+        return Boolean(el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable));
       };
 
       document.addEventListener('keydown', (event) => {
