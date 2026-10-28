@@ -308,112 +308,98 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
     /* 字号按钮的逻辑在 BaseLayout：它和其他外观设置共用同一份 localStorage，
        同一套标记（data-setting / data-value），这里不再各写一遍 */
 
-    /* ---------- 阅读位置记忆 ---------- */
+    /* ---------- 阅读位置记忆：按正文比例保存，不受评论与页脚高度影响 ---------- */
     const resumeBar = document.getElementById('resume-bar');
     const resumePercent = document.getElementById('resume-percent');
     const resumeKey = `reading:pos:${location.pathname}`;
+    const prose = document.querySelector<HTMLElement>('.article-card .prose');
 
-    if (resumeBar && resumePercent) {
-      const hideResume = () => {
-        resumeBar.hidden = true;
+    if (resumeBar && resumePercent && prose) {
+      const sightline = () => Math.min(140, window.innerHeight * .22);
+      const locationInProse = () => {
+        const rect = prose.getBoundingClientRect();
+        return { top: window.scrollY + rect.top, height: rect.height };
       };
-
-      const readSaved = (): number | null => {
+      const hideResume = () => { resumeBar.hidden = true; };
+      const readSaved = (): { p: number; v?: number } | null => {
         try {
-          const raw: unknown = JSON.parse(localStorage.getItem(resumeKey) ?? 'null');
-          const value = (raw as { p?: unknown } | null)?.p;
-          return typeof value === 'number' && value >= 0 && value <= 1 ? value : null;
-        } catch {
-          return null;
-        }
+          const raw = JSON.parse(localStorage.getItem(resumeKey) ?? 'null');
+          return typeof raw?.p === 'number' && Number.isFinite(raw.p) && raw.p >= 0 && raw.p <= 1
+            ? raw : null;
+        } catch { return null; }
       };
 
       const saved = readSaved();
-      /* 太靠前没必要提示，太靠后基本算读完了 */
-      if (saved !== null && saved > 0.08 && saved < 0.96) {
-        resumePercent.textContent = `${Math.round(saved * 100)}%`;
+      if (saved && saved.p > .08 && saved.p < .96) {
+        resumePercent.textContent = `${Math.round(saved.p * 100)}%`;
         resumeBar.hidden = false;
 
         document.getElementById('resume-go')?.addEventListener('click', () => {
+          const box = locationInProse();
+          /* 旧版 p 是整页比例；首次恢复按旧算法，下一次滚动改写为正文比例。 */
+          const target = saved.v === 2
+            ? box.top + box.height * saved.p - sightline()
+            : saved.p * (document.documentElement.scrollHeight - window.innerHeight);
           const max = document.documentElement.scrollHeight - window.innerHeight;
-          window.scrollTo({ top: Math.round(saved * max), behavior: 'smooth' });
+          window.scrollTo({
+            top: Math.round(Math.max(0, Math.min(max, target))),
+            behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+          });
           hideResume();
         });
 
         document.getElementById('resume-close')?.addEventListener('click', () => {
           hideResume();
-          try {
-            localStorage.removeItem(resumeKey);
-          } catch {}
+          try { localStorage.removeItem(resumeKey); } catch {}
         });
       }
 
-      let lastSave = 0;
       let moved = false;
-
       const hideOnMove = () => {
         if (moved) return;
         moved = true;
         hideResume();
       };
-
-      /* 用「用户真的动了」而不是 scroll 事件判断：
-         刷新时浏览器会恢复滚动位置，scroll 一触发就会把浮条立刻藏掉 */
+      /* 刷新恢复的自动滚动不算主动阅读；只有用户滚动才收起提示。 */
       window.addEventListener('wheel', hideOnMove, { passive: true });
       window.addEventListener('touchmove', hideOnMove, { passive: true });
-      window.addEventListener(
-        'keydown',
-        (event) => {
-          if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(event.key)) {
-            hideOnMove();
-          }
-        },
-        { passive: true }
-      );
+      window.addEventListener('keydown', (event) => {
+        if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(event.key)) hideOnMove();
+      }, { passive: true });
 
       const save = () => {
-        const max = document.documentElement.scrollHeight - window.innerHeight;
-        if (max < 240) return; /* 短页面不值得记 */
-        const progress = window.scrollY / max;
+        const { top, height } = locationInProse();
+        if (height < 240) return;
+        const progress = (window.scrollY + sightline() - top) / height;
         try {
-          if (progress >= 0.96) {
-            /* 读到底了，下次不该再问「要不要继续」 */
-            localStorage.removeItem(resumeKey);
-          } else if (progress > 0.02) {
-            localStorage.setItem(resumeKey, JSON.stringify({ p: progress, t: Date.now() }));
-          }
+          if (progress >= .96) localStorage.removeItem(resumeKey);
+          else if (progress > .02) localStorage.setItem(resumeKey,
+            JSON.stringify({ v: 2, p: Math.max(0, progress), t: Date.now() }));
         } catch {}
       };
 
-      let ticking = false;
+      let lastSave = 0;
       let pending = 0;
-
-      window.addEventListener(
-        'scroll',
-        () => {
-          if (ticking) return;
-          ticking = true;
-          requestAnimationFrame(() => {
-            ticking = false;
-            const wait = 700 - (Date.now() - lastSave);
-            /* 落在节流窗口里就补一次，否则最后那一下会被丢掉：
-               滚到文末时进度永远清不掉，下次还会问「要不要继续」 */
-            if (wait > 0) {
-              if (!pending) {
-                pending = window.setTimeout(() => {
-                  pending = 0;
-                  lastSave = Date.now();
-                  save();
-                }, wait);
-              }
-              return;
-            }
+      let ticking = false;
+      window.addEventListener('scroll', () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+          ticking = false;
+          const wait = 700 - (Date.now() - lastSave);
+          if (wait > 0) {
+            if (!pending) pending = window.setTimeout(() => {
+              pending = 0;
+              lastSave = Date.now();
+              save();
+            }, wait);
+          } else {
             lastSave = Date.now();
             save();
-          });
-        },
-        { passive: true }
-      );
+          }
+        });
+      }, { passive: true });
+      window.addEventListener('pagehide', save);
     }
 
     /* ---------- 标题锚点 ---------- */
@@ -474,7 +460,8 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       anchor.href = `#${heading.id}`;
       anchor.setAttribute('aria-label', `复制「${heading.textContent?.trim() ?? ''}」的链接`);
       anchor.textContent = '#';
-      anchor.addEventListener('click', async () => {
+      anchor.addEventListener('click', async (event) => {
+        event.preventDefault(); /* 复制章节链接不应导致正文跳动 */
         const link = `${location.origin}${location.pathname}#${heading.id}`;
         if (!(await copyText(link))) return;
         anchor.dataset.copied = '1';
