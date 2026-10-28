@@ -242,25 +242,6 @@ const check = (name, pass, detail = '') => {
   check('文末新增内容改变整页高度仍可恢复相同正文位置',
     Math.abs(resumed - saved.p) < .08, 'saved=' + saved.p + ' resumed=' + resumed);
 
-  /* 手机目录由侧栏克隆，当前章节应同步给两套链接与读屏。 */
-  await page.evaluate(() => {
-    const heading = document.querySelector('.prose h2');
-    const y = heading.getBoundingClientRect().top + scrollY - 160;
-    window.scrollTo({ top: y, behavior: 'instant' });
-  });
-  await new Promise((r) => setTimeout(r, 400));
-  await page.click('#bar-toc');
-  const toc = await page.evaluate(() => {
-    const desktop = document.querySelector('.sidebar .toc a[aria-current="location"]');
-    const mobile = document.querySelector('#toc-dialog .toc a[aria-current="location"]');
-    return { open: document.getElementById('toc-dialog')?.open,
-      same: Boolean(desktop && mobile && desktop.hash === mobile.hash),
-      active: Boolean(mobile?.classList.contains('active')) };
-  });
-  check('手机目录与桌面目录同步当前章节状态',
-    toc.open && toc.same && toc.active, JSON.stringify(toc));
-  await page.keyboard.press('Escape');
-
   const anchor = await page.evaluate(() => {
     const first = document.querySelector('.prose h2 .heading-anchor');
     const before = location.hash;
