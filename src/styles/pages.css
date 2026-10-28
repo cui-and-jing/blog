@@ -780,7 +780,14 @@ html[data-theme='dark'] .about-banner-avatar {
   color: var(--accent);
 }
 
-.series-card-desc, 
+.series-card-desc,
+.series-step-desc {
+  margin: 8px 0 0;
+  max-width: 52em;
+  font-size: 14.5px;
+  line-height: 1.72;
+  color: var(--text-soft);
+}
 
 .series-card-meta {
   display: flex;
@@ -926,14 +933,6 @@ html[data-theme='dark'] .about-banner-avatar {
 
 .series-step h2 a:hover {
   color: var(--accent);
-}
-
-.series-step-desc {
-  margin: 8px 0 0;
-  max-width: 52em;
-  font-size: 14.5px;
-  line-height: 1.72;
-  color: var(--text-soft);
 }
 
 /* 空态：标签、系列、归档在没有内容时也有话说 */

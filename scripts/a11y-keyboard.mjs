@@ -277,6 +277,104 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 2.7. 灯箱模块源码分离，构建单包，无图页不额外请求；有图页交互完整 ---------- */
+{
+  const plain = await browser.newPage();
+  const plainScripts = [];
+  plain.on('request', (request) => {
+    if (request.url().includes('/_astro/') && request.url().endsWith('.js')) plainScripts.push(request.url());
+  });
+  await plain.goto(base + '/', { waitUntil: 'networkidle2' });
+  await plain.waitForFunction(() => document.documentElement.dataset.booted === 'on');
+  check('无正文图片首页不额外请求灯箱模块',
+    !plainScripts.some((url) => /\/lightbox[.-]/.test(url)),
+    plainScripts.map((url) => url.split('/').pop()).join(', '));
+  await plain.close();
+
+  const gallery = await browser.newPage();
+  const galleryScripts = [];
+  gallery.on('request', (request) => {
+    if (request.url().includes('/_astro/') && request.url().endsWith('.js')) galleryScripts.push(request.url());
+  });
+  await gallery.goto(base + '/styleguide/', { waitUntil: 'networkidle2' });
+  await gallery.waitForFunction(() => {
+    const image = document.querySelector('.prose img');
+    return image?.getAttribute('role') === 'button' &&
+      image.getAttribute('tabindex') === '0';
+  }, { timeout: 8000 });
+  const images = await gallery.evaluate(() => document.querySelectorAll('.prose img').length);
+  check('有配图的排版样例页正确初始化可访问灯箱',
+    images >= 2 && !galleryScripts.some((url) => /\/lightbox[.-]/.test(url)),
+    JSON.stringify({ images, scripts: galleryScripts.map((url) => url.split('/').pop()) }));
+
+  await gallery.click('.prose img');
+  await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === true);
+  const opened = await gallery.evaluate(() => ({
+    source: document.getElementById('lightbox-img')?.getAttribute('src'),
+    locked: document.documentElement.style.overflow === 'hidden',
+    count: document.querySelectorAll('.prose img').length,
+  }));
+  check('点击正文图片可打开原图灯箱并锁定背景滚动',
+    Boolean(opened.source) && opened.locked && opened.count >= 2, JSON.stringify(opened));
+
+  await gallery.keyboard.press('=');
+  const zoomed = await gallery.evaluate(() => ({
+    transform: document.getElementById('lightbox-img')?.style.transform,
+    label: document.getElementById('lightbox-zoom')?.textContent,
+  }));
+  check('灯箱缩放键仍能改变倍率',
+    /scale\(1\.25\)/.test(zoomed.transform ?? '') && zoomed.label === '125%',
+    JSON.stringify(zoomed));
+
+  await gallery.keyboard.press('0');
+  const reset = await gallery.evaluate(() => ({
+    transform: document.getElementById('lightbox-img')?.style.transform,
+  }));
+  check('灯箱重置快捷键恢复 100%',
+    /scale\(1\)/.test(reset.transform ?? ''), JSON.stringify(reset));
+
+  const originalSrc = opened.source;
+  await gallery.keyboard.press('ArrowRight');
+  const changed = await gallery.evaluate(() => document.getElementById('lightbox-img')?.getAttribute('src'));
+  check('灯箱右箭头能切换下一张图片',
+    Boolean(changed && originalSrc && changed !== originalSrc), String(changed));
+
+  await gallery.keyboard.press('Escape');
+  await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === false &&
+    document.documentElement.style.overflow === '', { timeout: 3000 });
+  const closed = await gallery.evaluate(() => ({
+    open: document.getElementById('lightbox')?.open,
+    overflow: document.documentElement.style.overflow,
+  }));
+  check('Esc 关闭灯箱且恢复背景滚动', closed.open === false && closed.overflow === '', JSON.stringify(closed));
+  await gallery.close();
+}
+
+/* ---------- 2.8. 系列页面排版：简介不能继承元信息样式 ---------- */
+{
+  const page = await browser.newPage();
+  await page.goto(base + '/series/', { waitUntil: 'load' });
+  const type = await page.evaluate(() => {
+    const desc = document.querySelector('.series-card-desc');
+    const meta = document.querySelector('.series-card-meta');
+    if (!desc || !meta) return null;
+    const prose = getComputedStyle(desc);
+    const details = getComputedStyle(meta);
+    return {
+      descSize: parseFloat(prose.fontSize),
+      metaSize: parseFloat(details.fontSize),
+      descDisplay: prose.display,
+      metaDisplay: details.display,
+      descLineHeight: parseFloat(prose.lineHeight),
+    };
+  });
+  check('系列简介使用正文排版，不继承日期行的元信息样式',
+    Boolean(type && type.descSize >= 14 && type.descSize > type.metaSize &&
+      type.descDisplay === 'block' && type.metaDisplay === 'flex' &&
+      type.descLineHeight > 20), JSON.stringify(type));
+  await page.close();
+}
+
 /* ---------- 3. 搜索页键盘操作 ---------- */
 {
   const page = await browser.newPage();
@@ -618,6 +716,7 @@ const check = (name, pass, detail = '') => {
     const page = await browser.newPage();
     await page.setViewport({ width, height: 844, isMobile: true, hasTouch: true });
     await page.goto(`${base}/`, { waitUntil: 'load' });
+    await page.waitForFunction(() => document.documentElement.dataset.booted === 'on', { timeout: 5000 });
 
     const result = await page.evaluate(() => {
       const visible = (el) => {
@@ -663,7 +762,9 @@ const check = (name, pass, detail = '') => {
     if (width === 390) {
       /* 抽屉：打开、焦点进入、Esc 关闭并归还焦点 */
       await page.click('#menu-toggle');
-      await new Promise((r) => setTimeout(r, 400));
+      await page.waitForFunction(() => document.getElementById('nav-drawer')?.open === true &&
+        document.getElementById('menu-toggle')?.getAttribute('aria-expanded') === 'true',
+        { timeout: 4000 });
       const drawer = await page.evaluate(() => {
         const dialog = document.getElementById('nav-drawer');
         return {
