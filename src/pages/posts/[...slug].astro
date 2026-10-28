@@ -355,7 +355,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       addEventListener('wheel', hide, { passive: true });
       addEventListener('touchmove', hide, { passive: true });
       addEventListener('keydown', (event) => {
-        if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(event.key)) hide();
+        if (/^(ArrowDown|ArrowUp|PageDown|PageUp|Home|End| )$/.test(event.key)) hide();
       }, { passive: true });
 
       const save = () => {
