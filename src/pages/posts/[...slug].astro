@@ -436,7 +436,8 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       }, 1400);
     };
 
-    document.querySelectorAll<HTMLElement>('.prose h2, .prose h3').forEach((heading) => {
+    const headings = document.querySelectorAll<HTMLElement>('.prose h2, .prose h3');
+    headings.forEach((heading) => {
       if (!heading.id) return;
       const anchor = document.createElement('a');
       anchor.className = 'heading-anchor';
@@ -515,7 +516,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       { rootMargin: '-96px 0px -70% 0px' }
     );
 
-    document.querySelectorAll('.prose h2, .prose h3').forEach((h) => observer.observe(h));
+    headings.forEach((h) => observer.observe(h));
 
     /* ---------- 移动端目录：入口在底部操作条上，不再是浮在正文上的独立按钮 ---------- */
     const fab = document.getElementById('bar-toc') as HTMLButtonElement | null;
