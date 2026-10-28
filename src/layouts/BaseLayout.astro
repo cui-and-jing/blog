@@ -527,13 +527,8 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
          不再支持旧式 rehype 插件，这类纯展示增强放在运行时最省事；
          即使脚本被禁用，链接本身仍然可点，只是不新开标签页。 */
       document.querySelectorAll<HTMLAnchorElement>('.prose a[href]').forEach((link) => {
-        let target: URL;
-        try {
-          target = new URL(link.href, location.href);
-        } catch {
-          return;
-        }
-        if (!/^https?:$/.test(target.protocol) || target.host === location.host) return;
+        /* HTMLAnchorElement 自带标准化的协议和域名，无需再创建 URL 实例。 */
+        if (!/^https?:$/.test(link.protocol) || link.host === location.host) return;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         link.classList.add('external-link');
@@ -541,10 +536,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 
       /* 正文里的表格与代码块：只要页面用了 .prose 就统一处理，
          这样文章页、关于页和排版样例页的表现不会各走一套。 */
-      const announceStatus = (message: string) => {
-        const status = document.getElementById('a11y-status');
-        if (status) status.textContent = message;
-      };
+
 
       /* Markdown 任务列表的复选框由解析器输出，本身没有名称；
          补一个短标签，读屏读到「已完成 / 未完成」，又不会和工作项文字重复。 */
@@ -605,10 +597,10 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
               await navigator.clipboard.writeText(text);
               btn.textContent = '已复制';
               btn.classList.add('copied');
-              announceStatus('代码已复制');
+              announce('代码已复制');
             } catch {
               btn.textContent = '复制失败';
-              announceStatus('复制失败，请手动选择代码');
+              announce('复制失败，请手动选择代码');
             }
             setTimeout(() => {
               btn.textContent = '复制';
@@ -792,34 +784,25 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         });
 
         /* 拖动只在放大后生效，否则会和双击、切换图片抢事件 */
-        let dragging = false;
-        let startX = 0;
-        let startY = 0;
-        let fromX = 0;
-        let fromY = 0;
-
+        let drag: { x: number; y: number; dx: number; dy: number } | null = null;
         stage.addEventListener('pointerdown', (event) => {
           if (zoom <= 1) return;
-          dragging = true;
-          startX = event.clientX;
-          startY = event.clientY;
-          fromX = tx;
-          fromY = ty;
+          drag = { x: event.clientX, y: event.clientY, dx: tx, dy: ty };
           stage.setPointerCapture(event.pointerId);
           stage.classList.add('is-dragging');
         });
 
         stage.addEventListener('pointermove', (event) => {
-          if (!dragging) return;
-          tx = fromX + (event.clientX - startX);
-          ty = fromY + (event.clientY - startY);
+          if (!drag) return;
+          tx = drag.dx + event.clientX - drag.x;
+          ty = drag.dy + event.clientY - drag.y;
           clamp();
           paint();
         });
 
         const endDrag = (event: PointerEvent) => {
-          if (!dragging) return;
-          dragging = false;
+          if (!drag) return;
+          drag = null;
           stage.classList.remove('is-dragging');
           if (stage.hasPointerCapture(event.pointerId)) stage.releasePointerCapture(event.pointerId);
         };
@@ -842,26 +825,13 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           if (event.target === lightbox) lightbox.close();
         });
         lightbox.addEventListener('keydown', (event) => {
-          if (event.key === 'ArrowLeft') {
-            event.preventDefault();
-            show(index - 1);
-          }
-          if (event.key === 'ArrowRight') {
-            event.preventDefault();
-            show(index + 1);
-          }
-          if (event.key === '+' || event.key === '=') {
-            event.preventDefault();
-            zoomAt(zoom * 1.25, 0, 0);
-          }
-          if (event.key === '-' || event.key === '_') {
-            event.preventDefault();
-            zoomAt(zoom / 1.25, 0, 0);
-          }
-          if (event.key === '0') {
-            event.preventDefault();
-            reset();
-          }
+          const key = event.key;
+          if (!['ArrowLeft', 'ArrowRight', '+', '=', '-', '_', '0'].includes(key)) return;
+          event.preventDefault();
+          if (key === 'ArrowLeft') show(index - 1);
+          else if (key === 'ArrowRight') show(index + 1);
+          else if (key === '0') reset();
+          else zoomAt(['+', '='].includes(key) ? zoom * 1.25 : zoom / 1.25, 0, 0);
         });
         lightbox.addEventListener('close', () => {
           document.documentElement.style.overflow = '';
@@ -873,43 +843,20 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 
       /* 搜索：⌘/Ctrl+K 或 / 直接聚焦，其他页面跳到搜索页 */
       const searchUrl = document.body.dataset.searchUrl || '/search/';
-      const searchField = () => document.getElementById('search-input') as HTMLInputElement | null;
       const isTyping = (target: EventTarget | null) => {
         const el = target as HTMLElement | null;
-        if (!el || !el.tagName) return false;
-        return (
-          el.tagName === 'INPUT' ||
-          el.tagName === 'TEXTAREA' ||
-          el.tagName === 'SELECT' ||
-          el.isContentEditable
-        );
+        return Boolean(el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable));
       };
 
       document.addEventListener('keydown', (event) => {
         const mod = event.metaKey || event.ctrlKey;
-        if (mod && event.key.toLowerCase() === 'k') {
-          event.preventDefault();
-          const field = searchField();
-          if (field) {
-            field.focus();
-            field.select();
-          } else {
-            location.href = searchUrl;
-          }
-          return;
-        }
-
-        if (event.key === '/' && !mod && !event.altKey && !isTyping(event.target)) {
-          const field = searchField();
-          if (field) {
-            event.preventDefault();
-            field.focus();
-            field.select();
-          } else {
-            event.preventDefault();
-            location.href = searchUrl;
-          }
-        }
+        const shortcut = (mod && event.key.toLowerCase() === 'k')
+          || (event.key === '/' && !mod && !event.altKey && !isTyping(event.target));
+        if (!shortcut) return;
+        event.preventDefault();
+        const field = document.getElementById('search-input') as HTMLInputElement | null;
+        if (field) { field.focus(); field.select(); }
+        else location.href = searchUrl;
       });
 
       /* ---------- 阅读设置：主题 / 字体 / 字号 / 行距 ---------- */
@@ -920,12 +867,8 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const DEFAULTS: Settings = { theme: 'auto', font: 'serif', size: 'normal', leading: 'normal' };
 
       const readSettings = (): Settings => {
-        try {
-          const raw = JSON.parse(localStorage.getItem(STORE) ?? '{}');
-          return { ...DEFAULTS, ...(raw && typeof raw === 'object' ? raw : {}) };
-        } catch {
-          return { ...DEFAULTS };
-        }
+        try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORE) ?? '{}') }; }
+        catch { return { ...DEFAULTS }; }
       };
 
       let settings = readSettings();
@@ -976,26 +919,16 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       /* 主题切换用 View Transition 的圆形扩散，以点击的按钮为圆心铺开。
          面板本身在 top layer，会一起被拍进快照，所以看起来是整屏同步变色 */
       const withTransition = (apply: () => void, origin?: { x: number; y: number }) => {
-        const startViewTransition = (document as any).startViewTransition as
-          | ((cb: () => void) => { ready: Promise<void> })
-          | undefined;
-
-        if (reduceMotion.matches || !startViewTransition || !origin) {
-          apply();
-          return;
-        }
-
+        const transition = (document as any).startViewTransition;
+        if (reduceMotion.matches || !transition || !origin) return apply();
         const { x, y } = origin;
-        const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
-        const transition = startViewTransition.call(document, apply);
-        transition.ready
-          .then(() => {
-            root.animate(
-              { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-              { duration: 540, easing: 'ease-in-out', pseudoElement: '::view-transition-new(root)' }
-            );
-          })
-          .catch(() => {});
+        const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+        transition.call(document, apply).ready.then(() => {
+          root.animate(
+            { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+            { duration: 540, easing: 'ease-in-out', pseudoElement: '::view-transition-new(root)' }
+          );
+        }).catch(() => {});
       };
 
       /* 面板和文章页的字号按钮用的是同一套标记，一个委托就够了 */
@@ -1062,24 +995,15 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         if (!panel.open) panel.showModal();
       };
 
-      settingsToggle?.addEventListener('click', () => {
-        openPanel(settingsPanel);
-        settingsToggle.setAttribute('aria-expanded', 'true');
-      });
-
-      settingsPanel?.addEventListener('close', () => {
-        settingsToggle?.setAttribute('aria-expanded', 'false');
-      });
-
-      menuToggle?.addEventListener('click', () => {
-        openPanel(navDrawer);
-        menuToggle.setAttribute('aria-expanded', 'true');
-      });
-
-      /* dialog 关闭后焦点会回到打开它的元素，aria-expanded 要跟着复位 */
-      navDrawer?.addEventListener('close', () => {
-        menuToggle?.setAttribute('aria-expanded', 'false');
-      });
+      const bindPanel = (button: HTMLElement | null, panel: HTMLDialogElement | null) => {
+        button?.addEventListener('click', () => {
+          openPanel(panel);
+          button.setAttribute('aria-expanded', 'true');
+        });
+        panel?.addEventListener('close', () => button?.setAttribute('aria-expanded', 'false'));
+      };
+      bindPanel(settingsToggle, settingsPanel);
+      bindPanel(menuToggle, navDrawer);
 
       /* 从设置里点进快捷键，先收起当前面板，避免两个 dialog 叠在一起 */
       shortcutsOpen?.addEventListener('click', () => {
@@ -1121,7 +1045,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const toTop = document.getElementById('to-top');
       const progress = document.getElementById('read-progress');
       const progressFill = progress?.firstElementChild as HTMLElement | null;
-      const hasArticle = Boolean(document.querySelector('.article-card'));
+      const prose = document.querySelector<HTMLElement>('.article-card .prose');
 
       /* 滚动时不要读 scrollHeight：那是一次强制同步布局，滚得越快越卡，
          长文在低端机上会直接掉帧。高度只在真的变了的时候重量（窗口缩放、
@@ -1129,9 +1053,13 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
 
          一帧最多写一次：滚动事件在跟手滚轮上一帧能来好几次，每次都去改属性、
          切换 class 会让样式反复失效。写之前也比一次，值没变就什么都不做。 */
-      let maxScroll = 0;
+      let proseTop = 0;
+      let proseHeight = 0;
       const measureScroll = () => {
-        maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        const rect = prose?.getBoundingClientRect();
+        proseTop = rect ? rect.top + window.scrollY : 0;
+        proseHeight = rect?.height ?? 0;
+        onScroll();
       };
 
       let scrollQueued = false;
@@ -1148,7 +1076,9 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           toTop.classList.toggle('show', showTop);
         }
         if (progressFill) {
-          const ratio = maxScroll > 0 ? Math.min(1, Math.max(0, y / maxScroll)) : 0;
+          const ratio = proseHeight > 0
+            ? Math.min(1, Math.max(0, (y + Math.min(140, innerHeight * .22) - proseTop) / proseHeight))
+            : 0;
           progressFill.style.transform = `scaleX(${ratio})`;
         }
       };
@@ -1158,7 +1088,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         requestAnimationFrame(paintScroll);
       };
 
-      if (progress && hasArticle) progress.classList.add('active');
+      if (progress && prose) progress.classList.add('active');
       /* 开头先不量高度：读取 scrollHeight 会强制同步布局，而这时字体还没到，
          等于是把成本最高的一次排版提前到主线程上做。第一帧结束后再量，
          ResizeObserver 与 fonts.ready 会把字体换字造成的高度变化补上。 */
@@ -1166,20 +1096,13 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       window.addEventListener('load', measureScroll, { once: true });
       document.fonts?.ready.then(measureScroll).catch(() => {});
       window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('resize', () => {
-        measureScroll();
-        onScroll();
-      });
-      if ('ResizeObserver' in window) new ResizeObserver(measureScroll).observe(document.body);
+      window.addEventListener('resize', measureScroll);
+      if (prose && 'ResizeObserver' in window) new ResizeObserver(measureScroll).observe(prose);
 
-      toTop?.addEventListener('click', () => {
-        window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
-      });
-
-      /* 底部操作条上的「顶部」与桌面浮钮同源，窄屏由 CSS 顶替浮钮的位置 */
-      document.getElementById('bar-top')?.addEventListener('click', () => {
-        window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
-      });
+      const scrollToTop = () => window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+      toTop?.addEventListener('click', scrollToTop);
+      /* 手机底栏与桌面浮钮共用同一行为。 */
+      document.getElementById('bar-top')?.addEventListener('click', scrollToTop);
 
       /* 滚动入场：按同组顺序错峰，元素只在 JS 就绪后隐藏 */
       /* 只从页面顶部进来时才挂动效。

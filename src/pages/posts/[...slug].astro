@@ -308,112 +308,72 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
     /* 字号按钮的逻辑在 BaseLayout：它和其他外观设置共用同一份 localStorage，
        同一套标记（data-setting / data-value），这里不再各写一遍 */
 
-    /* ---------- 阅读位置记忆 ---------- */
+    /* ---------- 阅读位置：正文百分比独立于评论与页脚高度 ---------- */
     const resumeBar = document.getElementById('resume-bar');
     const resumePercent = document.getElementById('resume-percent');
     const resumeKey = `reading:pos:${location.pathname}`;
+    const prose = document.querySelector<HTMLElement>('.article-card .prose');
 
-    if (resumeBar && resumePercent) {
-      const hideResume = () => {
-        resumeBar.hidden = true;
+    if (resumeBar && resumePercent && prose) {
+      const sightline = () => Math.min(140, innerHeight * .22);
+      const position = () => {
+        const rect = prose.getBoundingClientRect();
+        return { top: scrollY + rect.top, height: rect.height };
       };
-
-      const readSaved = (): number | null => {
+      const hide = () => { resumeBar.hidden = true; };
+      const saved = (() => {
         try {
-          const raw: unknown = JSON.parse(localStorage.getItem(resumeKey) ?? 'null');
-          const value = (raw as { p?: unknown } | null)?.p;
-          return typeof value === 'number' && value >= 0 && value <= 1 ? value : null;
-        } catch {
-          return null;
-        }
-      };
+          const value = JSON.parse(localStorage.getItem(resumeKey) ?? 'null');
+          return Number.isFinite(value?.p) && value.p >= 0 && value.p <= 1
+            ? value as { p: number; v?: number } : null;
+        } catch { return null; }
+      })();
 
-      const saved = readSaved();
-      /* 太靠前没必要提示，太靠后基本算读完了 */
-      if (saved !== null && saved > 0.08 && saved < 0.96) {
-        resumePercent.textContent = `${Math.round(saved * 100)}%`;
+      let dismissed = false;
+      if (saved && saved.p > .08 && saved.p < .96) {
+        resumePercent.textContent = `${Math.round(saved.p * 100)}%`;
         resumeBar.hidden = false;
-
         document.getElementById('resume-go')?.addEventListener('click', () => {
-          const max = document.documentElement.scrollHeight - window.innerHeight;
-          window.scrollTo({ top: Math.round(saved * max), behavior: 'smooth' });
-          hideResume();
+          const box = position();
+          const max = document.documentElement.scrollHeight - innerHeight;
+          /* 兼容 v1 整页比例，v2 按正文恢复。 */
+          const target = saved.v === 2 ? box.top + box.height * saved.p - sightline() : saved.p * max;
+          scrollTo({
+            top: Math.max(0, Math.min(max, target)),
+            behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+          });
+          hide();
         });
-
         document.getElementById('resume-close')?.addEventListener('click', () => {
-          hideResume();
-          try {
-            localStorage.removeItem(resumeKey);
-          } catch {}
+          dismissed = true;
+          hide();
+          try { localStorage.removeItem(resumeKey); } catch {}
         });
       }
 
-      let lastSave = 0;
-      let moved = false;
-
-      const hideOnMove = () => {
-        if (moved) return;
-        moved = true;
-        hideResume();
-      };
-
-      /* 用「用户真的动了」而不是 scroll 事件判断：
-         刷新时浏览器会恢复滚动位置，scroll 一触发就会把浮条立刻藏掉 */
-      window.addEventListener('wheel', hideOnMove, { passive: true });
-      window.addEventListener('touchmove', hideOnMove, { passive: true });
-      window.addEventListener(
-        'keydown',
-        (event) => {
-          if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(event.key)) {
-            hideOnMove();
-          }
-        },
-        { passive: true }
-      );
+      /* 浏览器自动恢复滚动不算主动阅读。 */
+      addEventListener('wheel', hide, { passive: true });
+      addEventListener('touchmove', hide, { passive: true });
+      addEventListener('keydown', (event) => {
+        if (/^(ArrowDown|ArrowUp|PageDown|PageUp|Home|End| )$/.test(event.key)) hide();
+      }, { passive: true });
 
       const save = () => {
-        const max = document.documentElement.scrollHeight - window.innerHeight;
-        if (max < 240) return; /* 短页面不值得记 */
-        const progress = window.scrollY / max;
+        if (dismissed) return;
+        const { top, height } = position();
+        if (height < 240) return;
+        const p = (scrollY + sightline() - top) / height;
         try {
-          if (progress >= 0.96) {
-            /* 读到底了，下次不该再问「要不要继续」 */
-            localStorage.removeItem(resumeKey);
-          } else if (progress > 0.02) {
-            localStorage.setItem(resumeKey, JSON.stringify({ p: progress, t: Date.now() }));
-          }
+          if (p >= .96) localStorage.removeItem(resumeKey);
+          else if (p > .02) localStorage.setItem(resumeKey, JSON.stringify({ v: 2, p }));
         } catch {}
       };
-
-      let ticking = false;
-      let pending = 0;
-
-      window.addEventListener(
-        'scroll',
-        () => {
-          if (ticking) return;
-          ticking = true;
-          requestAnimationFrame(() => {
-            ticking = false;
-            const wait = 700 - (Date.now() - lastSave);
-            /* 落在节流窗口里就补一次，否则最后那一下会被丢掉：
-               滚到文末时进度永远清不掉，下次还会问「要不要继续」 */
-            if (wait > 0) {
-              if (!pending) {
-                pending = window.setTimeout(() => {
-                  pending = 0;
-                  lastSave = Date.now();
-                  save();
-                }, wait);
-              }
-              return;
-            }
-            lastSave = Date.now();
-            save();
-          });
-        },
-        { passive: true }
-      );
+      let timer = 0;
+      addEventListener('scroll', () => {
+        clearTimeout(timer);
+        timer = window.setTimeout(save, 450);
+      }, { passive: true });
+      addEventListener('pagehide', save);
     }
 
     /* ---------- 标题锚点 ---------- */
@@ -467,30 +427,35 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       });
     }
 
-    document.querySelectorAll<HTMLElement>('.prose h2, .prose h3').forEach((heading) => {
+    const flashAnchor = (anchor: HTMLAnchorElement) => {
+      anchor.dataset.copied = '1';
+      anchor.textContent = '已复制';
+      setTimeout(() => {
+        delete anchor.dataset.copied;
+        anchor.textContent = '#';
+      }, 1400);
+    };
+
+    const headings = document.querySelectorAll<HTMLElement>('.prose h2, .prose h3');
+    headings.forEach((heading) => {
       if (!heading.id) return;
       const anchor = document.createElement('a');
       anchor.className = 'heading-anchor';
       anchor.href = `#${heading.id}`;
       anchor.setAttribute('aria-label', `复制「${heading.textContent?.trim() ?? ''}」的链接`);
       anchor.textContent = '#';
-      anchor.addEventListener('click', async () => {
+      anchor.addEventListener('click', async (event) => {
+        event.preventDefault(); /* 复制章节链接不应导致正文跳动 */
         const link = `${location.origin}${location.pathname}#${heading.id}`;
         if (!(await copyText(link))) return;
-        anchor.dataset.copied = '1';
-        anchor.textContent = '已复制';
+        flashAnchor(anchor);
         announce('小节链接已复制');
-        setTimeout(() => {
-          delete anchor.dataset.copied;
-          anchor.textContent = '#';
-        }, 1400);
       });
       heading.append(anchor);
     });
 
     /* ---------- 段落深链接：想引用某一段时，不必再给整篇链接 ---------- */
-    const articleTitle =
-      document.querySelector<HTMLElement>('.article-card h1')?.textContent?.trim() ?? document.title;
+    const articleTitle = shareBar?.dataset.title || document.title;
 
     document.querySelectorAll<HTMLElement>('.prose > p, .prose > blockquote').forEach((block, i) => {
       const sourceText = (block.textContent ?? '').trim();
@@ -519,13 +484,8 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
           announce('复制失败，请手动选择文字');
           return;
         }
-        anchor.dataset.copied = '1';
-        anchor.textContent = '已复制';
+        flashAnchor(anchor);
         announce('引用已复制');
-        setTimeout(() => {
-          delete anchor.dataset.copied;
-          anchor.textContent = '#';
-        }, 1400);
       });
 
       block.prepend(anchor);
@@ -533,39 +493,30 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
 
     /* ---------- 目录高亮 ---------- */
     const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('.sidebar .toc a'));
-    const map = new Map(links.map((a) => [decodeURIComponent(a.hash.slice(1)), a]));
     const sidebar = document.querySelector<HTMLElement>('.sidebar');
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
-          links.forEach((a) => a.classList.remove('active'));
-          const link = map.get(entry.target.id);
-          link?.classList.add('active');
+          const link = links.find((a) => decodeURIComponent(a.hash.slice(1)) === entry.target.id);
+          links.forEach((a) => a.classList.toggle('active', a === link));
 
           /* 侧栏内容超出一屏时，让当前目录项保持可见。
              量高度这件事推到下一帧：观察器回调里直接读会强制同步布局，
              而这时正文可能刚因为字体换字重排过。 */
-          if (link && sidebar) {
-            requestAnimationFrame(() => {
-              if (sidebar.scrollHeight <= sidebar.clientHeight + 4) return;
-              const box = sidebar.getBoundingClientRect();
-              const item = link.getBoundingClientRect();
-              if (item.top < box.top + 40 || item.bottom > box.bottom - 40) {
-                sidebar.scrollTo({
-                  top: sidebar.scrollTop + (item.top - box.top) - sidebar.clientHeight / 2,
-                  behavior: 'smooth',
-                });
-              }
-            });
-          }
+          if (link && sidebar) requestAnimationFrame(() => {
+            const delta = link.getBoundingClientRect().top - sidebar.getBoundingClientRect().top;
+            if (delta < 40 || delta > sidebar.clientHeight - 40) {
+              sidebar.scrollBy({ top: delta - sidebar.clientHeight / 2, behavior: 'smooth' });
+            }
+          });
         });
       },
       { rootMargin: '-96px 0px -70% 0px' }
     );
 
-    document.querySelectorAll('.prose h2, .prose h3').forEach((h) => observer.observe(h));
+    headings.forEach((h) => observer.observe(h));
 
     /* ---------- 移动端目录：入口在底部操作条上，不再是浮在正文上的独立按钮 ---------- */
     const fab = document.getElementById('bar-toc') as HTMLButtonElement | null;
