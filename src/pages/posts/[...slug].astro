@@ -324,7 +324,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       const readSaved = (): { p: number; v?: number } | null => {
         try {
           const raw = JSON.parse(localStorage.getItem(resumeKey) ?? 'null');
-          return typeof raw?.p === 'number' && Number.isFinite(raw.p) && raw.p >= 0 && raw.p <= 1
+          return Number.isFinite(raw?.p) && raw.p >= 0 && raw.p <= 1
             ? raw : null;
         } catch { return null; }
       };
@@ -356,17 +356,11 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         });
       }
 
-      let moved = false;
-      const hideOnMove = () => {
-        if (moved) return;
-        moved = true;
-        hideResume();
-      };
-      /* 刷新恢复的自动滚动不算主动阅读；只有用户滚动才收起提示。 */
-      window.addEventListener('wheel', hideOnMove, { passive: true });
-      window.addEventListener('touchmove', hideOnMove, { passive: true });
+      /* 浏览器自动恢复位置不触发轮滚和触摸，用户主动移动时才收起提示。 */
+      window.addEventListener('wheel', hideResume, { passive: true });
+      window.addEventListener('touchmove', hideResume, { passive: true });
       window.addEventListener('keydown', (event) => {
-        if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(event.key)) hideOnMove();
+        if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(event.key)) hideResume();
       }, { passive: true });
 
       const save = () => {
@@ -377,7 +371,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         try {
           if (progress >= .96) localStorage.removeItem(resumeKey);
           else if (progress > .02) localStorage.setItem(resumeKey,
-            JSON.stringify({ v: 2, p: Math.max(0, progress), t: Date.now() }));
+            JSON.stringify({ v: 2, p: progress }));
         } catch {}
       };
 
