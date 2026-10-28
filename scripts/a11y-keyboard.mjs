@@ -340,6 +340,8 @@ const check = (name, pass, detail = '') => {
     Boolean(changed && originalSrc && changed !== originalSrc), String(changed));
 
   await gallery.keyboard.press('Escape');
+  await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === false &&
+    document.documentElement.style.overflow === '', { timeout: 3000 });
   const closed = await gallery.evaluate(() => ({
     open: document.getElementById('lightbox')?.open,
     overflow: document.documentElement.style.overflow,
@@ -714,6 +716,7 @@ const check = (name, pass, detail = '') => {
     const page = await browser.newPage();
     await page.setViewport({ width, height: 844, isMobile: true, hasTouch: true });
     await page.goto(`${base}/`, { waitUntil: 'load' });
+    await page.waitForFunction(() => document.documentElement.dataset.booted === 'on', { timeout: 5000 });
 
     const result = await page.evaluate(() => {
       const visible = (el) => {
@@ -759,7 +762,9 @@ const check = (name, pass, detail = '') => {
     if (width === 390) {
       /* 抽屉：打开、焦点进入、Esc 关闭并归还焦点 */
       await page.click('#menu-toggle');
-      await new Promise((r) => setTimeout(r, 400));
+      await page.waitForFunction(() => document.getElementById('nav-drawer')?.open === true &&
+        document.getElementById('menu-toggle')?.getAttribute('aria-expanded') === 'true',
+        { timeout: 4000 });
       const drawer = await page.evaluate(() => {
         const dialog = document.getElementById('nav-drawer');
         return {
