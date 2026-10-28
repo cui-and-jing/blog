@@ -208,35 +208,27 @@ const topTags = [...tagCounts.entries()]
         const title = post.title.toLowerCase();
         const desc = (post.description ?? '').toLowerCase();
         const category = (post.category ?? '').toLowerCase();
-        const tags = (post.tags ?? []).map((t: string) => t.toLowerCase());
-        const text = (post.text ?? '').toLowerCase();
+        const tags = (post.tags ?? []).map((tag: string) => tag.toLowerCase());
+        const body = (post.text ?? '').toLowerCase();
         let total = 0;
         let hits = 0;
-
         for (const term of terms) {
-          let hit = 0;
-          if (title.includes(term)) hit += title === term ? 40 : 14;
-          if (tags.some((t: string) => t.includes(term))) hit += 9;
-          if (category.includes(term)) hit += 6;
-          if (desc.includes(term)) hit += 5;
-          const inText = countOf(text, term);
-          /* 出现次数按 log 计，避免长文靠体量碾压短文 */
-          if (inText) hit += 1 + Math.log2(inText);
-          if (hit) {
-            hits += 1;
-            total += hit;
-          }
+          const times = countOf(body, term);
+          const weight = (title === term ? 40 : title.includes(term) ? 14 : 0)
+            + (tags.some((tag: string) => tag.includes(term)) ? 9 : 0)
+            + (category.includes(term) ? 6 : 0)
+            + (desc.includes(term) ? 5 : 0)
+            + (times ? 1 + Math.log2(times) : 0);
+          if (weight) { total += weight; hits++; }
         }
-
-        /* 一个词都不沾才算无关。只命中一部分仍然收录，按覆盖率打折——
-           否则「Astro 图片」会因为某篇只提了 Astro 就整篇消失。 */
         if (!hits) return 0;
-        total *= 0.55 + (hits / terms.length) * 0.45;
-
-        const phrase = terms.join(' ');
-        if (terms.length > 1 && title.includes(phrase)) total += 24;
-        if (terms.length > 1 && text.includes(phrase)) total += 4;
-        if (hits === terms.length && terms.length > 1) total += 10;
+        total *= .55 + hits / terms.length * .45;
+        if (terms.length > 1) {
+          const phrase = terms.join(' ');
+          if (title.includes(phrase)) total += 24;
+          if (body.includes(phrase)) total += 4;
+          if (hits === terms.length) total += 10;
+        }
         return total;
       };
 
@@ -343,26 +335,24 @@ const topTags = [...tagCounts.entries()]
 
       const renderHistory = () => {
         if (!historyBox || !historyList) return;
-        const items = readHistory();
-        const show = items.length > 0 && input.value.trim() === '';
-        historyBox.hidden = !show;
-        if (!show) return;
-        historyList.replaceChildren(
-          ...items.map((value) => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'search-history-item';
-            button.textContent = value;
-            button.addEventListener('click', () => {
-              input.value = value;
-              apply();
-              input.focus();
-            });
-            return button;
-          })
-        );
+        const values = readHistory();
+        historyBox.hidden = !values.length || !!input.value.trim();
+        if (historyBox.hidden) return;
+        historyList.replaceChildren(...values.map((value) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'search-history-item';
+          button.textContent = value;
+          return button;
+        }));
       };
-
+      historyList?.addEventListener('click', (event) => {
+        const button = (event.target as Element).closest('button');
+        if (!button) return;
+        input.value = button.textContent ?? '';
+        apply();
+        input.focus();
+      });
       historyClear?.addEventListener('click', () => {
         writeHistory([]);
         renderHistory();
@@ -486,16 +476,11 @@ const topTags = [...tagCounts.entries()]
         }
       });
 
-      clearBtn?.addEventListener('click', () => {
+      [clearBtn, resetBtn].forEach((button) => button?.addEventListener('click', () => {
         input.value = '';
         apply();
         input.focus();
-      });
-      resetBtn?.addEventListener('click', () => {
-        input.value = '';
-        apply();
-        input.focus();
-      });
+      }));
 
       const initial = new URL(location.href).searchParams.get('q');
       if (initial) input.value = initial;
