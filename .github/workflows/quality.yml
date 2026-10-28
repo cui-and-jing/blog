@@ -40,7 +40,7 @@ jobs:
       - name: Font subset coverage
         run: npm run fonts:check
 
-      # 确保 Pages 只能在 main 的最新提交通过 Quality 之后发布。
+      # Check that Pages only publishes the current main SHA after Quality succeeds.
       - name: Deployment release gate contract
         run: npm run deploy:check
 
