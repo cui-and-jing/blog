@@ -252,6 +252,13 @@ const topTags = [...tagCounts.entries()]
         }
       };
 
+      const addSpan = (parent: HTMLElement, name: string, label: string) => {
+        const el = document.createElement('span');
+        el.className = name;
+        el.textContent = label;
+        parent.append(el);
+      };
+
       const render = (items: { post: any; terms: string[] }[], querying: boolean) => {
         active = -1;
         if (navStatus) navStatus.textContent = '';
@@ -277,32 +284,13 @@ const topTags = [...tagCounts.entries()]
 
           const meta = document.createElement('div');
           meta.className = 'search-item-meta';
-          if (post.type === 'note') {
-            const badge = document.createElement('span');
-            badge.className = 'search-type';
-            badge.textContent = '笔记';
-            meta.append(badge);
-          }
+          if (post.type === 'note') addSpan(meta, 'search-type', '笔记');
           const time = document.createElement('time');
           time.textContent = post.date;
           meta.append(time);
-          if (post.category) {
-            const cat = document.createElement('span');
-            cat.className = 'cat';
-            cat.textContent = post.category;
-            meta.append(cat);
-          }
-          if (post.type !== 'note') {
-            const mins = document.createElement('span');
-            mins.textContent = `约 ${post.minutes} 分钟`;
-            meta.append(mins);
-          }
-          (post.tags ?? []).slice(0, 3).forEach((tag: string) => {
-            const span = document.createElement('span');
-            span.className = 'tag';
-            span.textContent = `#${tag}`;
-            meta.append(span);
-          });
+          if (post.category) addSpan(meta, 'cat', post.category);
+          if (post.type !== 'note') addSpan(meta, '', `约 ${post.minutes} 分钟`);
+          (post.tags ?? []).slice(0, 3).forEach((tag: string) => addSpan(meta, 'tag', `#${tag}`));
 
           main.append(h2, p, meta);
 
