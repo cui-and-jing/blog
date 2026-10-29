@@ -56,6 +56,9 @@ jobs:
         run: npm run build
 
       # 体积一旦涨上去就很难降回来，放在构建之后、浏览器测试之前
+      - name: RSS full text contract
+        run: npm run rss:check
+
       - name: Size budget (CSS / JS / HTML / images / games)
         run: npm run budget
 

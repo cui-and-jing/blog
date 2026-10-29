@@ -9,12 +9,7 @@ import Sidebar from '../../components/Sidebar.astro';
 import Comments from '../../components/Comments.astro';
 import BookmarkToggle from '../../components/BookmarkToggle.astro';
 import RelatedPosts from '../../components/RelatedPosts.astro';
-import Callout from '../../components/mdx/Callout.astro';
-import KeyPoints from '../../components/mdx/KeyPoints.astro';
-import Steps from '../../components/mdx/Steps.astro';
-import Step from '../../components/mdx/Step.astro';
-import Details from '../../components/mdx/Details.astro';
-import Figure from '../../components/mdx/Figure.astro';
+import { mdxComponents } from '../../lib/mdx-components';
 import { SITE, url, formatDate, readingTime, tagHue } from '../../lib/site';
 import { findAuthor } from '../../data/authors';
 import { findSeries, positionIn } from '../../lib/series';
@@ -154,7 +149,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
             }
             <div class="prose">
               <Content
-                components={{ Callout, KeyPoints, Steps, Step, Details, Figure }}
+                components={mdxComponents}
               />
             </div>
 

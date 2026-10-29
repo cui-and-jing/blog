@@ -30,7 +30,8 @@
     "a11y": "node scripts/a11y-audit.mjs",
     "a11y:keys": "node scripts/a11y-keyboard.mjs",
     "visual": "node scripts/visual-regression.mjs",
-    "visual:update": "node scripts/visual-regression.mjs --update"
+    "visual:update": "node scripts/visual-regression.mjs --update",
+    "rss:check": "node scripts/rss-check.mjs"
   },
   "dependencies": {
     "@astrojs/mdx": "^8.1.0",
