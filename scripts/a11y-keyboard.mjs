@@ -75,6 +75,10 @@ const check = (name, pass, detail = '') => {
       if (width === 390 && !['/', '/posts/hello-astro/', '/notes/', '/games/'].includes(item.route)) continue;
       await page.goto(base + item.route, { waitUntil: 'load' });
       const results = await page.evaluate((surfaces) => {
+        /* Compare settled theme tokens, not the midpoint of a 0.2–0.28s hover/color transition. */
+        const noTransitions = document.createElement('style');
+        noTransitions.textContent = '*,*::before,*::after{transition:none!important;animation:none!important}';
+        document.head.append(noTransitions);
         const probe = document.createElement('div');
         probe.style.cssText = 'position:absolute;visibility:hidden;background:var(--card);border:1px solid var(--line-soft)';
         document.body.append(probe);
@@ -103,6 +107,7 @@ const check = (name, pass, detail = '') => {
           }
         }
         probe.remove();
+        noTransitions.remove();
         return { output, overflow: document.documentElement.scrollWidth - innerWidth };
       }, item.surfaces);
       const failures = results.output.filter((result) => !result.match);
