@@ -169,8 +169,6 @@ const topTags = [...tagCounts.entries()]
 
       const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      const countOf = (haystack: string, needle: string) => Math.min(12, haystack.split(needle).length - 1);
-
       /* 只放几乎没有检索价值的虚词。像「不」「有」「这」都可能出现在实词里，不能当停用词 */
       const STOP = new Set([
         '的', '了', '是', '在', '和', '与', '及', '或', '把', '被', '着', '吗', '呢', '吧', '啊',
@@ -197,9 +195,12 @@ const topTags = [...tagCounts.entries()]
       const snippet = (post: any, terms: string[]): string => {
         const text: string = post.text ?? '';
         const low = text.toLowerCase();
-        const hits = terms.map((term) => low.indexOf(term)).filter((at) => at >= 0);
-        if (!hits.length) return post.description;
-        const at = Math.min(...hits);
+        let at = text.length;
+        for (const term of terms) {
+          const hit = low.indexOf(term);
+          if (hit >= 0 && hit < at) at = hit;
+        }
+        if (at === text.length) return post.description;
         const start = Math.max(0, at - 40);
         const end = Math.min(text.length, at + 90);
         return `${start ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
@@ -214,7 +215,7 @@ const topTags = [...tagCounts.entries()]
         let total = 0;
         let hits = 0;
         for (const term of terms) {
-          const times = countOf(body, term);
+          const times = Math.min(12, body.split(term).length - 1);
           const weight = (title === term ? 40 : title.includes(term) ? 14 : 0)
             + (tags.some((tag: string) => tag.includes(term)) ? 9 : 0)
             + (category.includes(term) ? 6 : 0)
@@ -233,7 +234,7 @@ const topTags = [...tagCounts.entries()]
       };
 
       const setActive = (next: number) => {
-        const nodes = Array.from(list.querySelectorAll<HTMLElement>('.search-result'));
+        const nodes = list.querySelectorAll<HTMLElement>('.search-result');
         if (!nodes.length) return;
         active = Math.max(0, Math.min(nodes.length - 1, next));
         nodes.forEach((node, i) => node.classList.toggle('is-active', i === active));
