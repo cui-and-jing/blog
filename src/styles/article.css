@@ -838,10 +838,6 @@ html[data-theme='dark'] .prose .table-wrap.is-scrollable {
   transition: color 0.25s var(--ease);
 }
 
-.related-head a:hover {
-  color: var(--accent);
-}
-
 .related-grid {
   display: grid;
   grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
@@ -1015,6 +1011,7 @@ html[data-theme='dark'] .prose .table-wrap.is-scrollable {
   transition: color 0.16s var(--ease);
 }
 
+.related-head a:hover,
 .series-note-links a:hover {
   color: var(--accent);
 }
