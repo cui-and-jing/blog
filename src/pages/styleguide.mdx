@@ -13,7 +13,7 @@ import Step from '../components/mdx/Step.astro';
 import Details from '../components/mdx/Details.astro';
 import Figure from '../components/mdx/Figure.astro';
 import exampleHome from '../assets/example-home.png';
-import { url } from '../lib/site';
+import { url as siteUrl } from '../lib/site';
 
 这一页是给自己看的排版清单，不会出现在搜索和 RSS 里。
 
@@ -21,7 +21,7 @@ import { url } from '../lib/site';
 
 正文、<strong>加粗</strong>、<em>斜体</em>、<code>行内代码</code>、<kbd>Ctrl</kbd> + <kbd>K</kbd> 打开搜索、<mark>高亮的一段</mark>，以及 <abbr title="Application Programming Interface">API</abbr> 这类缩写。
 
-站内链接长这样：<a href={url('/posts/')}>全部文章</a>。站外链接会自动在新标签页打开，并带一个小箭头：[Astro 文档](https://docs.astro.build/)。
+站内链接长这样：<a href={siteUrl('/posts/')}>全部文章</a>。站外链接会自动在新标签页打开，并带一个小箭头：[Astro 文档](https://docs.astro.build/)。
 
 ## 列表
 
