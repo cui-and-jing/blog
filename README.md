@@ -294,6 +294,10 @@ src/
 
 样式拆成了多个文件，但 `global.css` 只负责 `@import`，构建时 Vite 会把它们并回一个 CSS 文件，
 运行时不会多出请求。**顺序就是层叠顺序**，`responsive.css` 必须排在它要覆盖的规则之后。
+卡片的基础材质（背景、边框、圆角和阴影）统一放在 `components.css` 中；
+各页面 CSS 只保留间距、内容排版以及悬停/响应式覆盖。不要把交互态的样式挪到公共规则中。
+`npm run a11y:keys` 通过真实 Chromium 校验文章、笔记、系列、归档、首页和游戏大厅的
+共享材质在浅/深色以及 390px 窄屏下的计算样式，防止重构引发无声的视觉退化。
 
 ## 游戏模块
 
@@ -678,8 +682,9 @@ npm run preflight     # 一条命令串起：og → lint → fonts:check → che
 - `public/og/<slug>.png` 缺失——**这一条是硬错误**，因为分享封面不会在 CI 里生成（runner 没有中文字体，
   渲染出来是方框）。`npm run og` 会同时写一份 `public/og/manifest.json`，改了标题却没重画也会被提醒。
 
-`budget` 的上限写在 `scripts/budget.mjs` 顶部：CSS 104 KB / gzip 21 KB，JS 32 KB / gzip 12 KB，
-单页 HTML 80 KB，主站图片 600 KB，字体 320 KB。游戏与分享封面不计入——它们不在首屏路径上。
+`budget` 的上限写在 `scripts/budget.mjs`：CSS 108 KiB / gzip 21 KiB，JS 32 KiB / gzip 12 KiB，
+单页 HTML 80 KiB / gzip 20 KiB，主站图片 600 KiB，最坏单页字体 220 KiB。
+分享封面不计入主站图片预算；两款单文件游戏另有逐页 gzip 体积限制，不会漏检。
 
 `budget:wire` 量的是另一件事：**第一次访问实际传输了多少字节**。`budget` 看磁盘文件大小，
 看不见 gzip、也看不见某页到底请求了哪几个字体分片。它用禁用缓存的浏览器逐路由统计
@@ -689,7 +694,7 @@ npm run preflight     # 一条命令串起：og → lint → fonts:check → che
 
 `.github/workflows/quality.yml` 在每次 push 与 PR 时依次跑
 `lint:content` → `fonts:check` → `check` → 构建 → `budget` → `fonts:check:pages` → `a11y` → `a11y:keys` → `budget:wire`，
-任一步失败都会变红（它和部署工作流相互独立，不会拦住发布）。
+任一步失败都会变红；**只有 main 的 Quality 全部通过后**，Pages 才会按同一 SHA 自动部署。
 
 工作流里的 action 都是用大版本号（`checkout@v7`、`setup-node@v7`、`deploy-pages@v5`、
 `withastro/action@v6`）。`.github/dependabot.yml` 每周一查 npm：补丁与小版本合成一个 PR，
