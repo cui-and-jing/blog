@@ -514,7 +514,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         const delta = link.getBoundingClientRect().top - sidebar.getBoundingClientRect().top;
         if (delta < 40 || delta > height - 40) sidebar.scrollBy({
           top: delta - height / 2,
-          behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+          behavior: 'auto',
         });
       });
     }, { rootMargin: '-96px 0px -70% 0px' });
