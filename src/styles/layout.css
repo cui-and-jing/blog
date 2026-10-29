@@ -239,7 +239,7 @@ html[data-theme='dark'] .hero::before {
 }
 
 .hero-card {
-position: relative;
+  position: relative;
   padding: 30px 26px 24px;
   text-align: center;
   overflow: hidden;
