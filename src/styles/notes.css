@@ -136,13 +136,9 @@
 /* ---------- 每条笔记 ---------- */
 
 .note-card {
-  position: relative;
+position: relative;
   margin-bottom: 18px;
   padding: 18px 24px 14px;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-  background: var(--card);
-  box-shadow: var(--shadow-sm);
   transition: box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
 }
 
@@ -355,10 +351,7 @@
 }
 
 .note-sheet {
-  padding: 34px 38px 22px;
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
+padding: 34px 38px 22px;
   box-shadow: var(--shadow-card);
 }
 
