@@ -54,7 +54,7 @@ function builtFile(root, pathname, base) {
     if (decoded !== suffix) candidates.unshift(decoded);
   } catch { /* malformed UTF-8 path will not exist */ }
   for (const name of candidates) {
-    for (const rel of [name, name.replace(/\/?$/, '/') + 'index.html', name + '.html']) {
+    for (const rel of [name, name ? name.replace(/\/?$/, '/') + 'index.html' : 'index.html', name + '.html']) {
       const absolute = path.resolve(root, rel);
       if (!absolute.startsWith(root + path.sep)) continue;
       if (fs.existsSync(absolute) && fs.statSync(absolute).isFile()) return absolute;
