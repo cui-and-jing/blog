@@ -1,5 +1,10 @@
 import type { APIRoute } from 'astro';
 import rss from '@astrojs/rss';
+import { render } from 'astro:content';
+import { loadRenderers } from 'astro:container';
+import { experimental_AstroContainer as AstroContainer } from 'astro/container';
+import { getContainerRenderer } from '@astrojs/mdx/container-renderer';
+import { absolutizeFeedHtml } from '../lib/rss-html.mjs';
 import { SITE, base } from '../lib/site';
 import { findAuthor } from '../data/authors';
 import { getNotes, noteText, noteTitle } from '../lib/notes';
@@ -12,18 +17,17 @@ const COPYRIGHT = `© ${SITE.since} ${SITE.author} · 文字采用 CC BY-NC-SA 4
  * 每条笔记指向自己的独立页（有分享卡），阅读器里也能直接读完全文。
  */
 export const GET: APIRoute = async (context) => {
-  const origin = new URL(context.site ?? FALLBACK_ORIGIN).origin;
   const notes = await getNotes();
 
-  const absolutize = (html: string, pageLink: string) =>
-    html
-      .replace(/(\s(?:href|src))="(\/[^"]*)"/g, (_, attr: string, path: string) => `${attr}="${origin}${path}"`)
-      .replace(/(\s(?:href|src))="#([^"]*)"/g, (_, attr: string, hash: string) => `${attr}="${pageLink}#${hash}"`);
+  const container = await AstroContainer.create({
+    renderers: await loadRenderers([getContainerRenderer()]),
+  });
 
-  const items = notes.map((note) => {
+  const items = await Promise.all(notes.map(async (note) => {
     const link = new URL(`${base}/notes/${note.id}/`, context.site ?? FALLBACK_ORIGIN).href;
-    /* 构建期每个条目都带 rendered.html；类型定义里没有，取一次即可 */
-    const html = absolutize((note as { rendered?: { html?: string } }).rendered?.html ?? '', link);
+    const { Content } = await render(note);
+    const rendered = await container.renderToString(Content);
+    const html = absolutizeFeedHtml(rendered.replace(/^<!DOCTYPE html>/i, ''), link);
     const author = findAuthor(note.data.author);
 
     return {
@@ -34,7 +38,7 @@ export const GET: APIRoute = async (context) => {
       customData: `<dc:creator>${author.name}</dc:creator>`,
       content: html || undefined,
     };
-  });
+  }));
 
   const latest = notes.reduce((acc, note) => Math.max(acc, note.data.date.valueOf()), 0);
   const selfUrl = new URL(`${base}/notes.xml`, context.site ?? FALLBACK_ORIGIN).href;
