@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-29. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: search input and mobile clarity (2026-10-29)
+## Current iteration: shared surfaces and CSS budget (2026-10-29)
+
+- **Decision:** CSS is within roughly 0.3 KiB of its 108 KiB hard cap; consolidate exact shared surface properties across homepage, posts, notes, archive, series and game lobby before adding any more UI.
+- **Scope:** factor out only equal card background, border, radius and shadow declarations into `components.css`; keep spacing, hover, gradients, dark overrides, responsive behavior, URLs and games untouched.
+- **Regression:** add Chromium computed-style comparisons against actual theme tokens in both light/dark modes; include desktop and 390px mobile with overflow checks. Existing content, fonts, RSS, builds, game smoke, axe and first-visit wire budgets remain mandatory.
+- **Gate:** do not raise any budgets, update baseline screenshots without need, merge failing checks, or change dependencies. Verify latest PR SHA and subsequent main Quality/Pages SHA.
+
+## Completed: search input and mobile clarity (2026-10-29)
 
 - **Scope:** make IME composition safe (Enter / Arrow keys), show a meaningful empty state when only ignored words are entered, and give the mobile search-clear button a 44×44px target.
 - **Regression:** Chromium covers composition before/after commit, stopword-only vs mixed queries, URL restoration, mobile clearing and pointer target dimensions. Preserve existing search index failure fallback and history.
