@@ -350,10 +350,7 @@ html[data-theme='dark'] .game-tag {
    后者先于本文件被引入，写在那边会被这里的基础规则盖掉。 */
 
 @media (max-width: 900px) {
-  .game-card {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
+  .game-card,
   .game-card--mini {
     grid-template-columns: minmax(0, 1fr);
   }
