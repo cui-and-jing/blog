@@ -647,7 +647,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const searchUrl = document.body.dataset.searchUrl || '/search/';
       const isTyping = (target: EventTarget | null) => {
         const el = target as HTMLElement | null;
-        return Boolean(el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable));
+        return Boolean(el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)));
       };
 
       document.addEventListener('keydown', (event) => {
@@ -785,8 +785,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const settingsReset = document.getElementById('settings-reset');
 
       const openPanel = (panel: HTMLDialogElement | null) => {
-        if (!panel) return;
-        if (!panel.open) panel.showModal();
+        if (panel && !panel.open) panel.showModal();
       };
 
       const bindPanel = (button: HTMLElement | null, panel: HTMLDialogElement | null) => {
@@ -862,8 +861,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         const y = window.scrollY;
         const scrolled = y > 8;
         if (header && header.hasAttribute('data-scrolled') !== scrolled) {
-          if (scrolled) header.setAttribute('data-scrolled', 'true');
-          else header.removeAttribute('data-scrolled');
+          scrolled ? header.setAttribute('data-scrolled', 'true') : header.removeAttribute('data-scrolled');
         }
         const showTop = y > 700;
         if (toTop && toTop.classList.contains('show') !== showTop) {
