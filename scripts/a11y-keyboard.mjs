@@ -542,7 +542,7 @@ const check = (name, pass, detail = '') => {
   }));
   check('只输入常见词不会误报所有文章为匹配结果',
     ignored.query === 'the' && ignored.count === 0 && ignored.empty === false
-      && ignored.message?.includes('具体') && ignored.status?.includes('0'),
+      && ignored.message?.includes('换个词') && ignored.status?.includes('0'),
     JSON.stringify(ignored));
 
   await page.$eval('#search-input', (input) => {
