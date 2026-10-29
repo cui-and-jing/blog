@@ -53,6 +53,72 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 1.2. 共享卡片材料：两主题与窄屏计算样式契约 ---------- */
+/* 这不是截图像素比较：逐个对照 CSS token，能精确拦住背景/边框/圆角/阴影回归。 */
+{
+  const routes = [
+    { route: '/', surfaces: [['.hero-card', 'lg', 'md'], ['.card', 'normal', 'sm'], ['.widget', 'normal', 'sm']] },
+    { route: '/posts/', surfaces: [['.post-browser', 'normal', 'sm'], ['.card', 'normal', 'sm']] },
+    { route: '/posts/hello-astro/', surfaces: [['.article-card', 'lg', 'md'], ['.related', 'lg', 'sm'], ['.comments', 'lg', 'sm']] },
+    { route: '/about/', surfaces: [['.about-card', 'lg', 'md']] },
+    { route: '/archive/', surfaces: [['.archive-card', 'normal', 'sm']] },
+    { route: '/series/', surfaces: [['.series-card', 'lg', 'sm']] },
+    { route: '/notes/', surfaces: [['.note-card', 'normal', 'sm']] },
+    { route: '/notes/2026-10-22-1015/', surfaces: [['.note-sheet', 'normal', 'card']] },
+    { route: '/games/', surfaces: [['.game-card', 'lg', 'lg'], ['.game-note', 'normal', 'sm']] },
+  ];
+  const page = await browser.newPage();
+  for (const width of [1280, 390]) {
+    await page.setViewport({ width, height: 844, isMobile: width === 390, hasTouch: width === 390 });
+    for (const item of routes) {
+      /* 手机重点覆盖各内容入口；全站桌面逐页验证。 */
+      if (width === 390 && !['/', '/posts/hello-astro/', '/notes/', '/games/'].includes(item.route)) continue;
+      await page.goto(base + item.route, { waitUntil: 'load' });
+      const results = await page.evaluate((surfaces) => {
+        /* Compare settled theme tokens, not the midpoint of a 0.2–0.28s hover/color transition. */
+        const noTransitions = document.createElement('style');
+        noTransitions.textContent = '*,*::before,*::after{transition:none!important;animation:none!important}';
+        document.head.append(noTransitions);
+        const probe = document.createElement('div');
+        probe.style.cssText = 'position:absolute;visibility:hidden;background:var(--card);border:1px solid var(--line-soft)';
+        document.body.append(probe);
+        const output = [];
+        for (const theme of ['light', 'dark']) {
+          document.documentElement.dataset.theme = theme;
+          for (const [selector, radius, shadow] of surfaces) {
+            const el = document.querySelector(selector);
+            if (!el) {
+              output.push({ theme, selector, match: false, reason: 'missing element' });
+              continue;
+            }
+            const mutedComments = selector === '.comments' && el.classList.contains('comments--muted');
+            probe.style.background = mutedComments ? 'var(--card-flat)' : 'var(--card)';
+            probe.style.borderStyle = mutedComments ? 'dashed' : 'solid';
+            /* Existing <=720px article breakpoint intentionally uses the smaller radius. */
+            probe.style.borderRadius = radius === 'lg' && !(selector === '.article-card' && innerWidth <= 720)
+              ? 'var(--radius-lg)' : 'var(--radius)';
+            probe.style.boxShadow = 'var(--shadow-' + shadow + ')';
+            const actual = getComputedStyle(el);
+            const expected = getComputedStyle(probe);
+            const keys = ['backgroundColor', 'borderTopColor', 'borderTopWidth', 'borderTopStyle', 'borderTopLeftRadius', 'boxShadow'];
+            const mismatches = keys.filter((key) => actual[key] !== expected[key])
+              .map((key) => key + ': ' + actual[key] + ' != ' + expected[key]);
+            output.push({ theme, selector, match: mismatches.length === 0, reason: mismatches.join('; ') });
+          }
+        }
+        probe.remove();
+        noTransitions.remove();
+        return { output, overflow: document.documentElement.scrollWidth - innerWidth };
+      }, item.surfaces);
+      const failures = results.output.filter((result) => !result.match);
+      check('两主题共享卡片样式 ' + item.route + ' @' + width,
+        failures.length === 0 && results.overflow <= 0,
+        failures.length ? JSON.stringify(failures) : 'all tokens match; horizontal overflow ' + results.overflow + 'px');
+    }
+  }
+  await page.close();
+}
+
 /* ---------- 1.5. 首页阅读入口与系列路线 ---------- */
 {
   const page = await browser.newPage();

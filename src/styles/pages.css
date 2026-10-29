@@ -6,10 +6,6 @@
 .comments {
   margin-top: 28px;
   padding: 32px 36px 34px;
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
 }
 
 .comments-head {
@@ -306,10 +302,6 @@
 }
 
 .archive-card {
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
   padding: 6px 22px;
 }
 
@@ -403,10 +395,6 @@ html[data-theme='dark'] .tag-cloud .count {
 
 .about-card {
   padding: 34px 40px 44px;
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
 }
 
 .about-banner {
@@ -729,10 +717,6 @@ html[data-theme='dark'] .about-banner-avatar {
 
 .series-card {
   padding: 26px 28px 20px;
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
 }
 
 .series-card-head {
@@ -1026,10 +1010,6 @@ html[data-theme='dark'] .about-banner-avatar {
 
 .post-browser {
   padding: 18px 20px 14px;
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
 }
 
 .post-filter-row {

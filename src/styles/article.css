@@ -128,10 +128,6 @@
 
 .article-card {
   padding: 46px 48px 52px;
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
 }
 
 /* ---------- prose ---------- */
@@ -808,10 +804,6 @@ html[data-theme='dark'] .prose .table-wrap.is-scrollable {
 .related {
   margin-top: 26px;
   padding: 26px 30px 28px;
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
 }
 
 .related-head {

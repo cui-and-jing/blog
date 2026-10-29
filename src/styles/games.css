@@ -9,9 +9,6 @@
   display: grid;
   grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
   overflow: hidden;
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
 }
 
@@ -274,10 +271,6 @@ html[data-theme='dark'] .game-tag {
 
 .game-note {
   padding: 24px 24px 22px;
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
 }
 
 .game-note h3 {
