@@ -432,6 +432,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       }, 1400);
     };
 
+    const articleUrl = location.origin + location.pathname;
     const headings = document.querySelectorAll<HTMLElement>('.prose h2, .prose h3');
     headings.forEach((heading) => {
       if (!heading.id) return;
@@ -442,7 +443,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       anchor.textContent = '#';
       anchor.addEventListener('click', async (event) => {
         event.preventDefault(); /* 复制章节链接不应导致正文跳动 */
-        const link = `${location.origin}${location.pathname}#${heading.id}`;
+        const link = `${articleUrl}#${heading.id}`;
         if (!(await copyText(link))) return;
         flashAnchor(anchor);
         announce('小节链接已复制');
@@ -474,7 +475,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
             ? selection.toString().trim()
             : '';
         const text = picked || sourceText;
-        const link = `${location.origin}${location.pathname}#${block.id}`;
+        const link = `${articleUrl}#${block.id}`;
 
         if (!(await copyText(`> ${text}\n\n—— ${articleTitle} ${link}`))) {
           announce('复制失败，请手动选择文字');
@@ -528,7 +529,6 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       const body = tocDialog.querySelector('.toc-body .toc');
       const source = document.querySelector('.sidebar .toc ul');
 
-      const close = tocDialog.querySelector('.toc-dialog-close');
       /* close 事件在下一个任务执行，点击链接时需同步清除展开状态。 */
       const closeToc = () => {
         if (tocDialog.open) tocDialog.close();
@@ -541,7 +541,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
         fab.setAttribute('aria-expanded', 'true');
         (tocDialog.querySelector<HTMLAnchorElement>('.toc a.active') ?? tocDialog.querySelector<HTMLAnchorElement>('.toc a'))?.focus();
       });
-      close?.addEventListener('click', closeToc);
+      tocDialog.querySelector('.toc-dialog-close')?.addEventListener('click', closeToc);
       tocDialog.addEventListener('click', (event) => {
         if (event.target === tocDialog || (event.target as Element).closest('.toc a')) closeToc();
       });
