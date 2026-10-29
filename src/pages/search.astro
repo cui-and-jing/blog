@@ -108,7 +108,7 @@ const topTags = [...tagCounts.entries()]
 
     <div class="search-empty" id="search-empty" hidden>
       <p class="search-empty-title">没有找到相关内容</p>
-      <p class="search-empty-hint" id="search-empty-hint">换个短一点的词，或者从下面挑一篇。</p>
+      <p class="search-empty-hint" id="search-empty-hint">试试更具体的关键词，或者从下面挑一篇。</p>
       <button class="btn" id="search-reset" type="button">清除搜索</button>
 
       <div class="search-suggest">
@@ -160,7 +160,6 @@ const topTags = [...tagCounts.entries()]
       type SearchType = 'all' | 'post' | 'note';
       const typeButtons = document.querySelectorAll<HTMLButtonElement>('[data-search-type]');
       const navStatus = document.getElementById('search-nav-status');
-      const emptyHint = document.getElementById('search-empty-hint');
       let posts: any[] = [];
       let active = -1;
       let ready = false;
@@ -227,9 +226,8 @@ const topTags = [...tagCounts.entries()]
         total *= .55 + hits / terms.length * .45;
         if (terms.length > 1) {
           const phrase = terms.join(' ');
-          if (title.includes(phrase)) total += 24;
-          if (body.includes(phrase)) total += 4;
-          if (hits === terms.length) total += 10;
+          total += (title.includes(phrase) ? 24 : 0) + (body.includes(phrase) ? 4 : 0)
+            + (hits === terms.length ? 10 : 0);
         }
         return total;
       };
@@ -365,10 +363,8 @@ const topTags = [...tagCounts.entries()]
         const type = new URL(location.href).searchParams.get('type');
         selectedType = degraded ? 'post' : type === 'all' || type === 'post' || type === 'note'
           ? type : query ? 'all' : 'post';
-        const words = query.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 6);
-        const terms = words.filter((word) => !STOP.has(word));
-        /* 全是停用词时不能把空的检索词当成「没搜索」，误报全部内容匹配。 */
-        const ignoredQuery = Boolean(query) && terms.length === 0;
+        /* 先过滤停用词再限制长度，避免前几个虚词占满所有检索位置。 */
+        const terms = query.toLowerCase().split(/\s+/).filter((word) => word && !STOP.has(word)).slice(0, 6);
         if (clearBtn) clearBtn.hidden = query.length === 0;
 
         if (syncUrl) {
@@ -378,21 +374,19 @@ const topTags = [...tagCounts.entries()]
           history.replaceState(null, '', next);
         }
 
-        const ranked = ignoredQuery ? [] : terms.length
-          ? posts.map((post, index) => ({ post, index, score: score(post, terms) }))
+        /* sort() 自 ES2019 起稳定：同分保留 getPosts() 原始时间顺序。 */
+        const ranked = terms.length
+          ? posts.map((post) => ({ post, score: score(post, terms) }))
               .filter((item) => item.score > 0)
-              .sort((a, b) => b.score - a.score || a.index - b.index)
+              .sort((a, b) => b.score - a.score)
               .map(({ post }) => ({ post, terms }))
-          : posts.map((post) => ({ post, terms: [] }));
+          : query ? [] : posts.map((post) => ({ post, terms: [] }));
         typeButtons.forEach((button) => {
           const type = button.dataset.searchType as SearchType;
           button.disabled = degraded && type !== 'post';
           button.setAttribute('aria-pressed', String(type === selectedType));
         });
         document.getElementById('search-type-filters')!.hidden = false;
-        if (emptyHint) emptyHint.textContent = ignoredQuery
-          ? '这些都是常见词，试试更具体的关键词。'
-          : '换个短一点的词，或者从下面挑一篇。';
         render(ranked.filter(({ post }) => selectedType === 'all' || post.type === selectedType), Boolean(query));
         renderHistory();
       };
