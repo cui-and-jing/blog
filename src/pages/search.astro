@@ -160,6 +160,7 @@ const topTags = [...tagCounts.entries()]
       type SearchType = 'all' | 'post' | 'note';
       const typeButtons = document.querySelectorAll<HTMLButtonElement>('[data-search-type]');
       const navStatus = document.getElementById('search-nav-status');
+      const pageUrl = () => new URL(location.href);
       let posts: any[] = [];
       let active = -1;
       let ready = false;
@@ -293,9 +294,8 @@ const topTags = [...tagCounts.entries()]
           list.append(li);
         });
 
-        const hasQuery = querying;
         /* 空查询时只列文章：笔记是碎片，混在「全部内容」里会喧宾夺主 */
-        countEl.textContent = hasQuery || selectedType !== 'post'
+        countEl.textContent = querying || selectedType !== 'post'
           ? `找到 ${items.length} 条` : `共 ${items.length} 篇`;
         empty.hidden = items.length > 0;
         list.hidden = items.length === 0;
@@ -358,7 +358,7 @@ const topTags = [...tagCounts.entries()]
       const apply = (syncUrl = true) => {
         if (!ready) return;
         const query = input.value.trim();
-        const type = new URL(location.href).searchParams.get('type');
+        const type = pageUrl().searchParams.get('type');
         selectedType = degraded ? 'post' : type === 'all' || type === 'post' || type === 'note'
           ? type : query ? 'all' : 'post';
         /* 先过滤停用词再限制长度，避免前几个虚词占满所有检索位置。 */
@@ -366,7 +366,7 @@ const topTags = [...tagCounts.entries()]
         if (clearBtn) clearBtn.hidden = query.length === 0;
 
         if (syncUrl) {
-          const next = new URL(location.href);
+          const next = pageUrl();
           if (query) next.searchParams.set('q', query);
           else next.searchParams.delete('q');
           history.replaceState(null, '', next);
@@ -413,7 +413,7 @@ const topTags = [...tagCounts.entries()]
           degraded = true;
           posts = fallback();
           document.getElementById('search-index-warning')!.hidden = false;
-          const next = new URL(location.href);
+          const next = pageUrl();
           next.searchParams.delete('type');
           history.replaceState(null, '', next);
         }
@@ -423,14 +423,14 @@ const topTags = [...tagCounts.entries()]
 
       typeButtons.forEach((button) => button.addEventListener('click', () => {
         if (button.disabled) return;
-        const next = new URL(location.href);
+        const next = pageUrl();
         next.searchParams.set('type', button.dataset.searchType!);
         history.pushState(null, '', next);
         apply(false);
       }));
 
       window.addEventListener('popstate', () => {
-        input.value = new URL(location.href).searchParams.get('q') ?? '';
+        input.value = pageUrl().searchParams.get('q') ?? '';
         apply(false);
       });
 
@@ -475,7 +475,7 @@ const topTags = [...tagCounts.entries()]
         input.focus();
       }));
 
-      const initial = new URL(location.href).searchParams.get('q');
+      const initial = pageUrl().searchParams.get('q');
       if (initial) input.value = initial;
       fetchIndex();
 
