@@ -488,15 +488,15 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
     });
 
     /* ---------- 目录高亮：只改变化的两项，避免长目录反复遍历 ---------- */
-    const linkById = new Map(Array.from(document.querySelectorAll<HTMLAnchorElement>('.sidebar .toc a'),
-      (a) => [decodeURIComponent(a.hash.slice(1)), a]));
+    const linkById = new Map([...document.querySelectorAll<HTMLAnchorElement>('.sidebar .toc a')]
+      .map((a) => [decodeURIComponent(a.hash.slice(1)), a]));
     const sidebar = document.querySelector<HTMLElement>('.sidebar');
     let active: HTMLAnchorElement | null = null;
 
     const observer = new IntersectionObserver((entries) => {
       /* 同批次选择视口最靠上的有效章节，避免在多个标题间闪烁。 */
-      const hit = entries.filter((e) => e.isIntersecting)
-        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+      const hit = entries.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        .find((e) => e.isIntersecting);
       const link = hit && linkById.get(hit.target.id);
       if (!link || link === active) return;
       active?.classList.remove('active');
@@ -507,10 +507,12 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
 
       /* 旧回调在下一帧检测选中项，若已经切换则不再测量布局。 */
       if (sidebar && innerWidth > 1080) requestAnimationFrame(() => {
-        if (link !== active || sidebar.scrollHeight <= sidebar.clientHeight) return;
+        if (link !== active) return;
+        const height = sidebar.clientHeight;
+        if (sidebar.scrollHeight <= height) return;
         const delta = link.getBoundingClientRect().top - sidebar.getBoundingClientRect().top;
-        if (delta < 40 || delta > sidebar.clientHeight - 40) sidebar.scrollBy({
-          top: delta - sidebar.clientHeight / 2,
+        if (delta < 40 || delta > height - 40) sidebar.scrollBy({
+          top: delta - height / 2,
           behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
         });
       });
