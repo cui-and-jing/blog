@@ -6,7 +6,7 @@
 /* 每张卡片在页面里用内联变量声明自己的两种主色，封面底色与按钮渐变都跟着它走，
    这样加新游戏只需要在 GAMES 里填 accent，不用回来改样式 */
 .game-card {
-display: grid;
+  display: grid;
   grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
   overflow: hidden;
   box-shadow: var(--shadow-lg);
@@ -270,7 +270,7 @@ html[data-theme='dark'] .game-tag {
 }
 
 .game-note {
-padding: 24px 24px 22px;
+  padding: 24px 24px 22px;
 }
 
 .game-note h3 {
