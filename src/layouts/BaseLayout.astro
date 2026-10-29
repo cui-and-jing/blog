@@ -9,6 +9,8 @@ interface Props {
   title?: string;
   description?: string;
   image?: string;
+  /** 404 是独立的 404.html 文件；允许特殊页面覆盖规范 URL。 */
+  canonicalPath?: string;
   /** 给排版样例这类只给自己看的页面用，不进搜索引擎 */
   noindex?: boolean;
   article?: {
@@ -22,10 +24,10 @@ interface Props {
   };
 }
 
-const { title, description = SITE.description, image, noindex = false, article } = Astro.props;
+const { title, description = SITE.description, image, canonicalPath, noindex = false, article } = Astro.props;
 const pageTitle = title ? `${title} · ${SITE.title}` : `${SITE.title} · ${SITE.tagline}`;
 const siteRoot = (Astro.site ?? new URL(SITE.github)).toString().replace(/\/$/, '');
-const canonical = new URL(Astro.url.pathname, Astro.site ?? SITE.github).toString();
+const canonical = new URL(canonicalPath ?? Astro.url.pathname, Astro.site ?? SITE.github).toString();
 const current = Astro.url.pathname.replace(/\/$/, '') || '/';
 /* 字体映射用「去掉 base、保留结尾斜杠」的路径做键，和 scripts/fonts.mjs 生成的键对齐 */
 const fontPath = Astro.url.pathname.slice(base.length) || '/';

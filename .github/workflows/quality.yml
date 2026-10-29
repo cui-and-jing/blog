@@ -55,6 +55,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      # 构建后的真实导航和静态资源也要可达；Markdown lint 无法覆盖组件生成的链接
+      - name: Emitted routes, assets and anchor links
+        run: npm run links:check
+
       # 体积一旦涨上去就很难降回来，放在构建之后、浏览器测试之前
       - name: RSS full text contract
         run: npm run rss:check
