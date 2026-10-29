@@ -1,4 +1,10 @@
 import rss from '@astrojs/rss';
+import { render } from 'astro:content';
+import { loadRenderers } from 'astro:container';
+import { experimental_AstroContainer as AstroContainer } from 'astro/container';
+import { getContainerRenderer } from '@astrojs/mdx/container-renderer';
+import { mdxComponents } from '../lib/mdx-components';
+import { absolutizeFeedHtml } from '../lib/rss-html.mjs';
 import { SITE, base } from '../lib/site';
 import { findAuthor } from '../data/authors';
 import { getPosts } from '../lib/posts';
@@ -7,7 +13,6 @@ const FALLBACK_ORIGIN = 'https://cui-and-jing.github.io';
 const COPYRIGHT = `© ${SITE.since} ${SITE.author} · 文字采用 CC BY-NC-SA 4.0`;
 
 export async function GET(context) {
-  const origin = new URL(context.site ?? FALLBACK_ORIGIN).origin;
   const sorted = await getPosts();
 
   /* 阅读器里没有站点上下文：正文中的 /blog/... 与 #锚点 都得补成绝对地址 */
@@ -18,7 +23,9 @@ export async function GET(context) {
 
   const items = sorted.map((post) => {
     const link = new URL(`${base}/posts/${post.id}/`, context.site ?? FALLBACK_ORIGIN).href;
-    const html = absolutize(post.rendered?.html ?? '', link);
+    const { Content } = await render(post);
+    const rendered = await container.renderToString(Content, { props: { components: mdxComponents } });
+    const html = absolutizeFeedHtml(rendered.replace(/^<!DOCTYPE html>/i, ''), link);
     const author = findAuthor(post.data.author);
 
     return {
@@ -33,7 +40,7 @@ export async function GET(context) {
          库会按 XML 规则转义，阅读器解析后拿到的就是原始 HTML */
       content: html || undefined,
     };
-  });
+  }));
 
   const latest = sorted.reduce((acc, post) => {
     const stamp = Math.max(post.data.date.valueOf(), post.data.updated?.valueOf() ?? 0);
