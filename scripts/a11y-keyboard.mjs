@@ -845,6 +845,88 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 3.9. 长文目录：减少重复更新、桌面滚动和系统减少动态效果 ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 800 });
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  await page.goto(base + '/posts/hello-astro/', { waitUntil: 'networkidle2' });
+  await page.waitForFunction(() => document.documentElement.dataset.booted === 'on');
+  const ids = await page.evaluate(async () => {
+    await document.fonts.ready;
+    return [...document.querySelectorAll('.prose h2, .prose h3')].map((h) => h.id).filter(Boolean);
+  });
+  check('目录有多个可观察章节用于上下滚动回归', ids.length >= 3, String(ids.length));
+
+  const scrollToChapter = async (index) => {
+    const id = ids[index];
+    await page.evaluate((target) => {
+      const heading = document.getElementById(target);
+      if (heading) scrollTo({ top: scrollY + heading.getBoundingClientRect().top - 155, behavior: 'instant' });
+    }, id);
+    await page.waitForFunction((target) => {
+      const current = document.querySelector('.sidebar .toc a.active');
+      return current && decodeURIComponent(current.hash.slice(1)) === target;
+    }, { timeout: 5000 }, id);
+    return id;
+  };
+
+  await scrollToChapter(1);
+  const first = await page.evaluate(() => ({
+    selected: [...document.querySelectorAll('.sidebar .toc a.active')].map((a) => a.hash),
+    aria: [...document.querySelectorAll('.sidebar .toc a[aria-current="location"]')].map((a) => a.hash),
+  }));
+  check('桌面目录同一时刻只高亮一节且读屏状态与高亮一致',
+    first.selected.length === 1 && first.aria.length === 1 && first.selected[0] === first.aria[0],
+    JSON.stringify(first));
+
+  await page.evaluate(() => {
+    window.__tocMutations = 0;
+    const toc = document.querySelector('.sidebar .toc');
+    new MutationObserver((records) => { window.__tocMutations += records.length; })
+      .observe(toc, { subtree: true, attributes: true, attributeFilter: ['class', 'aria-current'] });
+  });
+  await page.evaluate(() => scrollTo({ top: scrollY + 2, behavior: 'instant' }));
+  await new Promise((resolve) => setTimeout(resolve, 280));
+  const stable = await page.evaluate(() => ({
+    mutations: window.__tocMutations,
+    selected: document.querySelectorAll('.sidebar .toc a.active').length,
+  }));
+  check('同一章节内轻微滚动不重复写入目录状态',
+    stable.mutations === 0 && stable.selected === 1, JSON.stringify(stable));
+
+  await page.evaluate(() => {
+    const sidebar = document.querySelector('.sidebar');
+    sidebar.style.maxHeight = '160px';
+    window.__tocScrolls = [];
+    sidebar.scrollBy = (options) => { window.__tocScrolls.push(options.behavior); };
+  });
+  await scrollToChapter(2);
+  await page.waitForFunction(() => window.__tocScrolls.length > 0, { timeout: 5000 });
+  const desktop = await page.evaluate(() => ({
+    scrolls: window.__tocScrolls,
+    active: [...document.querySelectorAll('.sidebar .toc a[aria-current="location"]')].map((a) => a.hash),
+  }));
+  check('桌面超长目录只滚动可滚动侧栏，减少动态效果时不使用平滑动画',
+    desktop.scrolls.length > 0 && desktop.scrolls.every((behavior) => behavior === 'instant') &&
+    desktop.active.length === 1, JSON.stringify(desktop));
+
+  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await page.evaluate(() => { window.__tocScrolls = []; });
+  await scrollToChapter(0);
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  const mobile = await page.evaluate(() => ({
+    scrolls: window.__tocScrolls,
+    selected: document.querySelectorAll('.sidebar .toc a.active').length,
+    current: document.querySelectorAll('.sidebar .toc a[aria-current="location"]').length,
+    overflow: document.documentElement.scrollWidth - innerWidth,
+  }));
+  check('390px 移动布局更新章节但不对非滚动侧栏调用 scrollBy',
+    mobile.scrolls.length === 0 && mobile.selected === 1 && mobile.current === 1 && mobile.overflow <= 0,
+    JSON.stringify(mobile));
+  await page.close();
+}
+
 /* ---------- 4. 移动端目录抽屉与底部操作条 ---------- */
 {
   const page = await browser.newPage();
