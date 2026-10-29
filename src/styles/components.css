@@ -209,10 +209,10 @@ html[data-theme='dark'] .chip-pin {
 }
 
 .card {
-position: relative;
+  position: relative;
   overflow: hidden;
   transition: transform 0.28s var(--ease), box-shadow 0.28s var(--ease),
-  border-color 0.28s var(--ease);
+    border-color 0.28s var(--ease);
 }
 
 .card:hover {
@@ -368,7 +368,7 @@ html[data-theme='dark'] .widget-tags a {
 
 /* ---------- widgets ---------- */
 .widget {
-padding: 18px 20px 20px;
+  padding: 18px 20px 20px;
 }
 
 .widget h4 {
