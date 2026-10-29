@@ -634,6 +634,7 @@ html[data-theme='dark'] .hero-card-avatar {
   gap: 18px;
   max-height: calc(100vh - 116px);
   overflow-y: auto;
+  scroll-behavior: smooth;
   scrollbar-width: thin;
 }
 
