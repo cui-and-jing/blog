@@ -925,10 +925,11 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           const targets = Array.from(document.querySelectorAll<HTMLElement>(selector));
           /* 位置一次读完再动 DOM：读一次写一次会让每次读都触发一次强制布局 */
           const fold = window.innerHeight * 0.92;
-          const aboveFold = new Set(targets.filter((el) => el.getBoundingClientRect().top < fold));
+          const aboveFold = targets.map((el) => el.getBoundingClientRect().top < fold);
+          const revealedByParent = new Map<Element, number>();
 
-          targets.forEach((el) => {
-            if (aboveFold.has(el)) {
+          targets.forEach((el, i) => {
+            if (aboveFold[i]) {
               el.classList.add('is-in');
               return;
             }
@@ -936,8 +937,9 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
             el.setAttribute('data-reveal', '');
             const parent = el.parentElement;
             if (!parent) return;
-            const siblings = Array.from(parent.children).filter((child) => child.hasAttribute('data-reveal'));
-            const index = siblings.indexOf(el);
+            /* DOM 顺序已稳定：直接记录同组序号，避免每项遍历父节点的全部子元素。 */
+            const index = revealedByParent.get(parent) ?? 0;
+            revealedByParent.set(parent, index + 1);
             if (index > 0) el.style.setProperty('--d', `${Math.min(index, 6) * 55}ms`);
           });
 
