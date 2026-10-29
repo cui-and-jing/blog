@@ -526,6 +526,96 @@ const check = (name, pass, detail = '') => {
   await offline.close();
 }
 
+/* ---------- 3.3. 中文输入法、常见词空结果与手机清空按钮 ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await page.goto(base + '/search/?q=the', { waitUntil: 'networkidle2' });
+  await page.waitForFunction(() => document.getElementById('search-type-filters')?.hidden === false, { timeout: 8000 });
+
+  const ignored = await page.evaluate(() => ({
+    query: new URL(location.href).searchParams.get('q'),
+    count: document.querySelectorAll('#search-results .search-result').length,
+    empty: document.getElementById('search-empty')?.hidden,
+    message: document.getElementById('search-empty-hint')?.textContent?.trim(),
+    status: document.getElementById('search-count')?.textContent?.trim(),
+  }));
+  check('只输入常见词不会误报所有文章为匹配结果',
+    ignored.query === 'the' && ignored.count === 0 && ignored.empty === false
+      && ignored.message?.includes('换个词') && ignored.status?.includes('0'),
+    JSON.stringify(ignored));
+
+  await page.$eval('#search-input', (input) => {
+    input.value = 'the Astro';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+  });
+  const mixed = await page.evaluate(() => ({
+    query: new URL(location.href).searchParams.get('q'),
+    results: document.querySelectorAll('#search-results .search-result').length,
+    highlights: [...document.querySelectorAll('#search-results mark')].map((mark) => mark.textContent?.toLowerCase()),
+  }));
+  check('常见词与有效关键词混用时仍可检索和高亮',
+    mixed.query === 'the Astro' && mixed.results > 0 && mixed.highlights.includes('astro'), JSON.stringify(mixed));
+
+  /* 模拟输入法候选词选择：正在组合输入时方向键/Enter 不属于搜索键盘导航。 */
+  await page.$eval('#search-input', (input) => {
+    input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '笔' }));
+    input.value = '笔';
+    input.dispatchEvent(new InputEvent('input', {
+      bubbles: true, inputType: 'insertCompositionText', isComposing: true, data: '笔',
+    }));
+  });
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  const composing = await page.evaluate(() => ({
+    path: location.pathname,
+    query: new URL(location.href).searchParams.get('q'),
+    active: document.querySelectorAll('#search-results .is-active').length,
+    value: document.getElementById('search-input')?.value,
+  }));
+  check('中文输入法选词期间 Enter 和方向键不会触发跳转或改写 URL',
+    composing.path.endsWith('/search/') && composing.query === 'the Astro'
+      && composing.active === 0 && composing.value === '笔', JSON.stringify(composing));
+
+  await page.$eval('#search-input', (input) => {
+    input.value = '笔记';
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '笔记' }));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const committed = await page.evaluate(() => ({
+    query: new URL(location.href).searchParams.get('q'),
+    total: document.querySelectorAll('#search-results .search-result').length,
+    focused: document.activeElement?.id === 'search-input',
+    empty: document.getElementById('search-empty')?.hidden,
+  }));
+  check('输入法确认后立即检索完整中文词并保留输入焦点',
+    committed.query === '笔记' && committed.total > 0 && committed.focused && committed.empty,
+    JSON.stringify(committed));
+
+  await page.keyboard.press('ArrowDown');
+  check('输入法结束后方向键恢复正常结果导航',
+    await page.$eval('#search-results', (el) => el.querySelectorAll('.is-active').length === 1));
+
+  const target = await page.$eval('#search-clear', (el) => {
+    const rect = el.getBoundingClientRect();
+    return { visible: !el.hidden, width: rect.width, height: rect.height };
+  });
+  check('390px 手机清空搜索按钮触控区域至少 44×44',
+    target.visible && target.width >= 44 && target.height >= 44, JSON.stringify(target));
+
+  await page.click('#search-clear');
+  const cleared = await page.evaluate(() => ({
+    value: document.getElementById('search-input')?.value,
+    query: new URL(location.href).searchParams.get('q'),
+    empty: document.getElementById('search-empty')?.hidden,
+    total: document.querySelectorAll('#search-results .search-result').length,
+  }));
+  check('手机点击清空按钮后恢复文章列表与干净 URL',
+    cleared.value === '' && cleared.query === null && cleared.empty && cleared.total > 0, JSON.stringify(cleared));
+  await page.close();
+}
+
 /* ---------- 3.5. 阅读收藏：跨页、组合筛选与旧链接找回 ---------- */
 {
   const page = await browser.newPage();

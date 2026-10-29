@@ -647,7 +647,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const searchUrl = document.body.dataset.searchUrl || '/search/';
       const isTyping = (target: EventTarget | null) => {
         const el = target as HTMLElement | null;
-        return Boolean(el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable));
+        return Boolean(el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)));
       };
 
       document.addEventListener('keydown', (event) => {
@@ -785,8 +785,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const settingsReset = document.getElementById('settings-reset');
 
       const openPanel = (panel: HTMLDialogElement | null) => {
-        if (!panel) return;
-        if (!panel.open) panel.showModal();
+        if (panel && !panel.open) panel.showModal();
       };
 
       const bindPanel = (button: HTMLElement | null, panel: HTMLDialogElement | null) => {
@@ -862,8 +861,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         const y = window.scrollY;
         const scrolled = y > 8;
         if (header && header.hasAttribute('data-scrolled') !== scrolled) {
-          if (scrolled) header.setAttribute('data-scrolled', 'true');
-          else header.removeAttribute('data-scrolled');
+          scrolled ? header.setAttribute('data-scrolled', 'true') : header.removeAttribute('data-scrolled');
         }
         const showTop = y > 700;
         if (toTop && toTop.classList.contains('show') !== showTop) {
@@ -927,10 +925,11 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           const targets = Array.from(document.querySelectorAll<HTMLElement>(selector));
           /* 位置一次读完再动 DOM：读一次写一次会让每次读都触发一次强制布局 */
           const fold = window.innerHeight * 0.92;
-          const aboveFold = new Set(targets.filter((el) => el.getBoundingClientRect().top < fold));
+          const aboveFold = targets.map((el) => el.getBoundingClientRect().top < fold);
+          const revealedByParent = new Map<Element, number>();
 
-          targets.forEach((el) => {
-            if (aboveFold.has(el)) {
+          targets.forEach((el, i) => {
+            if (aboveFold[i]) {
               el.classList.add('is-in');
               return;
             }
@@ -938,8 +937,9 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
             el.setAttribute('data-reveal', '');
             const parent = el.parentElement;
             if (!parent) return;
-            const siblings = Array.from(parent.children).filter((child) => child.hasAttribute('data-reveal'));
-            const index = siblings.indexOf(el);
+            /* DOM 顺序已稳定：直接记录同组序号，避免每项遍历父节点的全部子元素。 */
+            const index = revealedByParent.get(parent) ?? 0;
+            revealedByParent.set(parent, index + 1);
             if (index > 0) el.style.setProperty('--d', `${Math.min(index, 6) * 55}ms`);
           });
 

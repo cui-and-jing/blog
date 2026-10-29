@@ -1,6 +1,6 @@
 # Engineering roadmap
 
-_Last reviewed: 2026-10-28. Scope: `cui-and-jing/blog`._
+_Last reviewed: 2026-10-29. Scope: `cui-and-jing/blog`._
 
 ## Baseline and constraints
 
@@ -21,6 +21,12 @@ _Last reviewed: 2026-10-28. Scope: `cui-and-jing/blog`._
 | P3 | Modularize optional UI code | Audit the large layout script. Split or defer optional features only when total built size and first-visit transfer do not regress. |
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
+
+## Current iteration: search input and mobile clarity (2026-10-29)
+
+- **Scope:** make IME composition safe (Enter / Arrow keys), show a meaningful empty state when only ignored words are entered, and give the mobile search-clear button a 44×44px target.
+- **Regression:** Chromium covers composition before/after commit, stopword-only vs mixed queries, URL restoration, mobile clearing and pointer target dimensions. Preserve existing search index failure fallback and history.
+- **Constraints:** do not modify post/notes URLs, bookmarks, reader settings, games, CSS/JS size caps or dependency versions. Validate the latest PR SHA before merge and verify main Quality + Pages after merge.
 
 ## Merge checklist for every iteration
 

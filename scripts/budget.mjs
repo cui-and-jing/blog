@@ -124,7 +124,11 @@ let failed = false;
 console.log('');
 for (const row of rows) {
   const over = row.current > row.max || (row.gzip !== null && row.gzip > row.gzipMax);
-  if (over) failed = true;
+  if (over) {
+    failed = true;
+    /* Show exact byte counts when a value rounds to its cap in the KiB summary. */
+    console.log(`    ↳ exact bytes: raw ${row.current}/${row.max}${row.gzip === null ? '' : `, gzip ${row.gzip}/${row.gzipMax}`}`);
+  }
   const gz =
     row.gzip === null ? '' : `   gzip ${kb(row.gzip)} / ${kb(row.gzipMax)} KB`;
   const ratio = Math.round((row.current / row.max) * 100);
