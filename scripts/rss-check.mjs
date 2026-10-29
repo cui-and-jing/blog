@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { absolutizeFeedHtml } from '../src/lib/rss-html.mjs';
 
 assert.equal(absolutizeFeedHtml('<a href="#chapter">Read</a><img src="/blog/test.png">', 'https://example.org/blog/posts/example/'), '<a href="https://example.org/blog/posts/example/#chapter">Read</a><img src="https://example.org/blog/test.png">');
-assert.equal(absolutizeFeedHtml('<a href="javascript:alert(1)">unsafe</a>', 'https://example.org/'), '<a >unsafe</a>');
+assert.equal(absolutizeFeedHtml('<a href="javascript:alert(1)">unsafe</a>', 'https://example.org/'), '<a>unsafe</a>');
 for (const [file, expected] of [['rss.xml', '为什么又要折腾一次'], ['notes.xml', null]]) {
   const xml = fs.readFileSync('dist/' + file, 'utf8');
   const entries = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((match) => match[1]);
