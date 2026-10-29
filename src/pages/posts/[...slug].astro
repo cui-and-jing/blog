@@ -441,6 +441,13 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       anchor.href = `#${heading.id}`;
       anchor.setAttribute('aria-label', `复制「${heading.textContent?.trim() ?? ''}」的链接`);
       anchor.textContent = '#';
+      anchor.addEventListener('click', async (event) => {
+        event.preventDefault(); /* 复制章节链接不应导致正文跳动 */
+        const link = `${articleUrl}#${heading.id}`;
+        if (!(await copyText(link))) return;
+        flashAnchor(anchor);
+        announce('小节链接已复制');
+      });
       heading.append(anchor);
     });
 
@@ -459,41 +466,31 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       anchor.href = `#${block.id}`;
       anchor.textContent = '#';
       anchor.setAttribute('aria-label', '复制这一段落的引用');
-      block.prepend(anchor);
-    });
+      anchor.addEventListener('click', async (event) => {
+        event.preventDefault();
+        /* 选中了半句就只引半句，否则引整段 */
+        const selection = window.getSelection();
+        const picked =
+          selection && selection.rangeCount && block.contains(selection.getRangeAt(0).commonAncestorContainer)
+            ? selection.toString().trim()
+            : '';
+        const text = picked || sourceText;
+        const link = `${articleUrl}#${block.id}`;
 
-    /* 长文章所有章节/段落链接共用一个处理器，保留键盘和读屏反馈。 */
-    prose?.addEventListener('click', async (event) => {
-      const anchor = (event.target as Element | null)?.closest<HTMLAnchorElement>('.heading-anchor, .para-anchor');
-      if (!anchor || !prose.contains(anchor)) return;
-      event.preventDefault();
-      const block = anchor.parentElement;
-      if (!block) return;
-      const link = articleUrl + '#' + block.id;
-      if (anchor.classList.contains('heading-anchor')) {
-        if (await copyText(link)) {
-          flashAnchor(anchor);
-          announce('小节链接已复制');
+        if (!(await copyText(`> ${text}\n\n—— ${articleTitle} ${link}`))) {
+          announce('复制失败，请手动选择文字');
+          return;
         }
-        return;
-      }
+        flashAnchor(anchor);
+        announce('引用已复制');
+      });
 
-      const selection = window.getSelection();
-      const picked = selection && selection.rangeCount && block.contains(selection.getRangeAt(0).commonAncestorContainer)
-        ? selection.toString().trim() : '';
-      /* 复制后按钮会暂时变为「已复制」，按实时前缀长度计算正文。 */
-      const text = picked || (block.textContent ?? '').slice(anchor.textContent?.length ?? 0).trim();
-      if (!(await copyText('> ' + text + '\n\n—— ' + articleTitle + ' ' + link))) {
-        announce('复制失败，请手动选择文字');
-        return;
-      }
-      flashAnchor(anchor);
-      announce('引用已复制');
+      block.prepend(anchor);
     });
 
     /* ---------- 目录高亮：只改变化的两项，避免长目录反复遍历 ---------- */
     const linkById = new Map([...document.querySelectorAll<HTMLAnchorElement>('.sidebar .toc a')]
-      .map((a) => [decodeURIComponent(a.hash.slice(1)), a]));
+      .map((a) => [a.getAttribute('href')!.slice(1), a]));
     const sidebar = document.querySelector<HTMLElement>('.sidebar');
     let active: HTMLAnchorElement | null = null;
 
