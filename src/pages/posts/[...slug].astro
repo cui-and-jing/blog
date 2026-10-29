@@ -287,7 +287,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
               </svg>
             </button>
           </div>
-          <div class="toc-body"></div>
+          <div class="toc-body"><nav class="toc" aria-label="文章目录"></nav></div>
         </dialog>
       </>
     )
@@ -527,15 +527,8 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
     const tocDialog = document.getElementById('toc-dialog') as HTMLDialogElement | null;
 
     if (fab && tocDialog) {
-      const body = tocDialog.querySelector('.toc-body');
+      const body = tocDialog.querySelector('.toc-body .toc');
       const source = document.querySelector('.sidebar .toc ul');
-      if (body && source) {
-        const nav = document.createElement('nav');
-        nav.className = 'toc';
-        nav.setAttribute('aria-label', '文章目录');
-        nav.append(source.cloneNode(true));
-        body.append(nav);
-      }
 
       const close = tocDialog.querySelector('.toc-dialog-close');
       /* close 事件在下一个任务执行，点击链接时需同步清除展开状态。 */
@@ -545,7 +538,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       };
       fab.addEventListener('click', () => {
         /* 正文不会在模态目录打开时滚动，按需克隆当前状态更轻量。 */
-        if (body && source) body.querySelector('ul')?.replaceWith(source.cloneNode(true));
+        if (body && source) body.replaceChildren(source.cloneNode(true));
         tocDialog.showModal();
         fab.setAttribute('aria-expanded', 'true');
         (tocDialog.querySelector<HTMLAnchorElement>('.toc a.active') ?? tocDialog.querySelector<HTMLAnchorElement>('.toc a'))?.focus();
