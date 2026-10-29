@@ -25,7 +25,7 @@ _Last reviewed: 2026-10-29. Scope: `cui-and-jing/blog`._
 ## Current iteration: TOC synchronization and long-page scroll efficiency (2026-10-29)
 
 - **Reason:** the old IntersectionObserver callback scanned all TOC links and wrote class/ARIA attributes for every intersecting heading, potentially repeating writes; it also queued sidebar measurements even when mobile layouts cannot scroll the sidebar.
-- **Implementation:** map section ids to sidebar links once, choose the topmost intersecting heading per observer batch, update only the former and new active link, and coalesce desktop sidebar alignment into one animation frame. Never scroll a non-scrollable/mobile sidebar; respect reduced-motion when alignment is required.
+- **Implementation:** index raw section hrefs once, choose the topmost intersecting heading per observer batch and update only the former and new active link. Defer desktop sidebar measurement to the next frame and skip stale selections; never scroll a non-scrollable/mobile sidebar. Let CSS smooth-scroll normally but switch to auto under reduced-motion. Build the mobile TOC nav shell as HTML and clone its contents only when opening.
 - **Regression:** Chromium verifies stable single active TOC and matching aria-current, no same-section writes, desktop reduced-motion behavior, mobile 390px no scroll calls and no overflow, in addition to the pre-existing mobile TOC modal tests.
 - **Budget and merge:** do not change article URL/heading IDs or local data, games, dependencies, CSS/JS size limits or release gate. Require latest PR Quality success, squash merge, then main Quality and Pages success for the exact merge SHA.
 
