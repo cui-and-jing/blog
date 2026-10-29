@@ -171,7 +171,8 @@ const topTags = [...tagCounts.entries()]
       const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
       /* 只放几乎没有检索价值的虚词。像「不」「有」「这」都可能出现在实词里，不能当停用词 */
-      const STOP = '的 了 是 在 和 与 及 或 把 被 着 吗 呢 吧 啊 the a an of and or to in is it on for at by as with'.split(' ');
+      /* 不过滤 in/as/by/it/on 等编程语境可检索的短词，避免误删技术关键词。 */
+      const STOP = '的 了 是 在 和 与 及 或 把 被 着 吗 呢 吧 啊 the a an of and or'.split(' ');
 
       const highlight = (text: string, terms: string[]): DocumentFragment => {
         const frag = document.createDocumentFragment();
