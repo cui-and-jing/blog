@@ -6,7 +6,7 @@ _Last reviewed: 2026-10-29. Scope: `cui-and-jing/blog`._
 
 - Astro 7 + Markdown/MDX, deployed to GitHub Pages.
 - Existing products: articles, notes, search, local reading list, reading progress, Bean Rush and Pixel Raid.
-- On the previous main build, CSS was about 107.9 / 108 KiB (gzip 20.9 / 21 KiB); JavaScript gzip was close to 12 / 12 KiB.
+- On the latest verified main build, CSS was about 106.7 / 108 KiB (gzip 20.9 / 21 KiB); JavaScript gzip remains close to 12 / 12 KiB.
 - Quality gates cover content, font subsets, types, build, size, per-page fonts, both games, axe, keyboard, and first-visit network transfer.
 - Deployment is chained to **completed successful main Quality** via `workflow_run` and pinned to the verified commit SHA. Stale SHA, failed Quality and PR checks cannot publish. The currently deployed SHA should still be checked after each merge.
 - The release workflow rechecks the current main SHA both before building and directly before publishing, so a delayed older successful Quality run cannot overwrite a newer release.
@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-29. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: emitted link integrity (2026-10-29)
+## Current iteration: mobile reading resume and deep-link priority (2026-10-29)
+
+- **User experience:** do not show a previous-position resume prompt when the visitor deliberately opens an article's `#section` fragment; the saved v1/v2 reading position remains intact for a future ordinary visit.
+- **Touch:** keep the existing floating bar and bottom navigation layout but make both resume and dismiss actions at least 44px high/44px wide as appropriate.
+- **Regression:** real Chromium at 320/360/390px checks touch rectangles, no sideways overflow, encoded Chinese heading fragments, saved-position preservation and normal revisit behavior. Existing reading accuracy, reduced motion, mobile TOC, fonts, pages and both game tests remain unchanged.
+- **Guardrail:** no new dependencies, game changes or URL changes; keep CSS 108 KiB / gzip 21 KiB and JS gzip 12 KiB caps. PR latest SHA must be fully green and mergeable; verify main Quality and same-SHA Pages success.
+
+## Completed: emitted link integrity (2026-10-29)
 
 - **Reason:** authored Markdown link lint does not prove that generated navigation, tags/categories, cards, media files or fragment targets exist in GitHub Pages output.
 - **Scope:** add dependency-free audit of emitted HTML routes and local assets with safe URL resolution, Unicode/percent-encoding, `/blog/` base enforcement, and static `#id` target checks. Standalone games continue to use their existing browser smoke tests.

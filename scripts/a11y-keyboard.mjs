@@ -343,6 +343,65 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 2.6. 续读浮条的手机触控与章节深链接优先级 ---------- */
+{
+  const page = await browser.newPage();
+  const articleUrl = base + '/posts/hello-astro/';
+  await page.goto(articleUrl, { waitUntil: 'load' });
+  const savedKey = await page.evaluate(() => {
+    const key = 'reading:pos:' + location.pathname;
+    localStorage.setItem(key, JSON.stringify({ v: 2, p: .48 }));
+    return key;
+  });
+
+  for (const width of [320, 360, 390]) {
+    await page.setViewport({ width, height: 844, isMobile: true, hasTouch: true });
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => document.getElementById('resume-bar')?.hidden === false, { timeout: 5000 });
+    const state = await page.evaluate(() => {
+      const bar = document.getElementById('resume-bar');
+      const go = document.getElementById('resume-go')?.getBoundingClientRect();
+      const close = document.getElementById('resume-close')?.getBoundingClientRect();
+      const rect = bar?.getBoundingClientRect();
+      return {
+        go: go ? [go.width, go.height] : [],
+        close: close ? [close.width, close.height] : [],
+        bar: rect ? [rect.left, rect.right] : [],
+        overflow: document.documentElement.scrollWidth - innerWidth,
+        labelled: document.getElementById('resume-close')?.getAttribute('aria-label'),
+      };
+    });
+    check('手机 ' + width + 'px 续读按钮触控尺寸和浮条边界',
+      state.go[0] >= 44 && state.go[1] >= 44 &&
+      state.close[0] >= 44 && state.close[1] >= 44 &&
+      state.bar[0] >= 0 && state.bar[1] <= width + 1 &&
+      state.overflow <= 0 && state.labelled?.includes('不再提示'),
+      JSON.stringify(state));
+  }
+
+  const id = await page.$eval('.article-card .prose h2', (heading) => heading.id);
+  await page.goto(base + '/posts/', { waitUntil: 'load' });
+  await page.goto(articleUrl + '#' + encodeURIComponent(id), { waitUntil: 'load' });
+  const linked = await page.evaluate((key) => ({
+    section: decodeURIComponent(location.hash.slice(1)),
+    hidden: document.getElementById('resume-bar')?.hidden,
+    saved: localStorage.getItem(key),
+  }), savedKey);
+  check('从章节深链接进入文章时优先显示目标章节、不弹续读浮条且保留旧记录',
+    linked.section === id && linked.hidden === true && Boolean(linked.saved),
+    JSON.stringify(linked));
+
+  await page.goto(base + '/posts/', { waitUntil: 'load' });
+  await page.goto(articleUrl, { waitUntil: 'load' });
+  const regular = await page.evaluate(() => ({
+    hash: location.hash,
+    visible: document.getElementById('resume-bar')?.hidden === false,
+  }));
+  check('普通打开文章仍可继续上次阅读', regular.hash === '' && regular.visible, JSON.stringify(regular));
+
+  await page.close();
+}
+
 /* ---------- 2.7. 灯箱模块源码分离，构建单包，无图页不额外请求；有图页交互完整 ---------- */
 {
   const plain = await browser.newPage();

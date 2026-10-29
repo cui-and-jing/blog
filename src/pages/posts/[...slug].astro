@@ -325,7 +325,8 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       })();
 
       let dismissed = false;
-      if (saved && saved.p > .08 && saved.p < .96) {
+      /* Deep section links take priority over the old resume prompt. */
+      if (saved && saved.p > .08 && saved.p < .96 && !location.hash) {
         resumePercent.textContent = `${Math.round(saved.p * 100)}%`;
         resumeBar.hidden = false;
         document.getElementById('resume-go')?.addEventListener('click', () => {

@@ -536,6 +536,8 @@ html[data-theme='dark'] .prose .table-wrap.is-scrollable {
 }
 
 .resume-go {
+  min-width: 44px;
+  min-height: 44px;
   padding: 6px 15px;
   font: inherit;
   font-size: 12.5px;
@@ -554,8 +556,9 @@ html[data-theme='dark'] .prose .table-wrap.is-scrollable {
 .resume-close {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  flex: none;
+  width: 44px;
+  height: 44px;
   padding: 0;
   color: var(--text-mute);
   background: none;
