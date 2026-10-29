@@ -364,7 +364,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html {
+  html,
+  .sidebar {
     scroll-behavior: auto;
   }
 
