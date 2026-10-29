@@ -4,7 +4,7 @@
    ========================================================================== */
 /* ---------- comments ---------- */
 .comments {
-margin-top: 28px;
+  margin-top: 28px;
   padding: 32px 36px 34px;
 }
 
@@ -302,7 +302,7 @@ margin-top: 28px;
 }
 
 .archive-card {
-padding: 6px 22px;
+  padding: 6px 22px;
 }
 
 .archive-item {
@@ -394,7 +394,7 @@ html[data-theme='dark'] .tag-cloud .count {
 }
 
 .about-card {
-padding: 34px 40px 44px;
+  padding: 34px 40px 44px;
 }
 
 .about-banner {
@@ -716,7 +716,7 @@ html[data-theme='dark'] .about-banner-avatar {
 }
 
 .series-card {
-padding: 26px 28px 20px;
+  padding: 26px 28px 20px;
 }
 
 .series-card-head {
@@ -1009,7 +1009,7 @@ padding: 26px 28px 20px;
 }
 
 .post-browser {
-padding: 18px 20px 14px;
+  padding: 18px 20px 14px;
 }
 
 .post-filter-row {
