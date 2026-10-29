@@ -644,6 +644,7 @@ puppeteer 直接截出来的 PNG 一张 270–300 KB，脚本会用 `sharp` 无�
 npm run lint:content  # 不需要构建：frontmatter、标题层级、图片、内链、中文排版、分享封面
 npm run fonts:check   # 不需要构建：正文用字是否都在字体子集里（缺字会静默回退）
 npm run fonts:check:pages # 需要 dist：逐页核对「公共片 + 该页增量片」是否覆盖了该页所有字
+npm run links:check    # 需要 dist：检查构建后的站内链接、静态资源和章节锚点（含单元测试）
 npm run fonts         # 需要 .fonts/ 源字体与 dist：重新裁子集，产物要提交
 npm run check         # astro check：类型与模板
 npm run budget        # 需要 dist：主站五类上限 + 五个游戏页逐页 gzip 上限
@@ -655,7 +656,7 @@ npm run a11y          # 需要先 build + preview：axe-core 扫全站 27 条路
 npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、设置面板、快捷键表、移动端抽屉、触控目标 44px
 npm run visual        # 需要先 build + preview：21 条路由 × 浅/深 × 3 视口，和基线逐像素比
 npm run visual:update # 样式改动确认无误后重建基线
-npm run preflight     # 一条命令串起：og → lint → fonts:check → check → 构建 → 游戏页压缩 → budget → fonts:check:pages → a11y → a11y:keys → games:smoke → budget:wire
+npm run preflight     # 一条命令串起：og → lint → fonts → check → 构建 → 链接检查 → budget → 字体按页 → 浏览器回归
 ```
 
 `preflight` 会自己起 `astro preview` 并在结束时收掉，任何一步失败就停；`--ci` 跳过分享封面
@@ -682,6 +683,11 @@ npm run preflight     # 一条命令串起：og → lint → fonts:check → che
 - `public/og/<slug>.png` 缺失——**这一条是硬错误**，因为分享封面不会在 CI 里生成（runner 没有中文字体，
   渲染出来是方框）。`npm run og` 会同时写一份 `public/og/manifest.json`，改了标题却没重画也会被提醒。
 
+`links:check` 与 `lint:content` 互补：前者逐页扫描 **最终构建的 HTML**，核对内部导航、相对地址、
+静态图片/脚本和实际存在的章节 `#id`；它会识别 `/blog/` 前缀、URL 编码的中文路径和 URL 查询参数，
+忽略站外网站与游戏单文件中的运行时代码。检测到 404、缺失资源、错误锚点或误跳过 base 时 CI 立即失败。
+无需浏览器或额外 npm 包，`preflight` 与 PR/main 的 Quality 都会运行；单元测试使用临时目录，不修改博客内容。
+
 `budget` 的上限写在 `scripts/budget.mjs`：CSS 108 KiB / gzip 21 KiB，JS 32 KiB / gzip 12 KiB，
 单页 HTML 80 KiB / gzip 20 KiB，主站图片 600 KiB，最坏单页字体 220 KiB。
 分享封面不计入主站图片预算；两款单文件游戏另有逐页 gzip 体积限制，不会漏检。
@@ -693,7 +699,7 @@ npm run preflight     # 一条命令串起：og → lint → fonts:check → che
 字体单独一条 200 KB 的线——它占首屏七成以上，回退成整片汉字时总量未必超，代价却回去了。
 
 `.github/workflows/quality.yml` 在每次 push 与 PR 时依次跑
-`lint:content` → `fonts:check` → `check` → 构建 → `budget` → `fonts:check:pages` → `a11y` → `a11y:keys` → `budget:wire`，
+`lint:content` → `fonts:check` → `check` → 构建 → `rss:check` → `links:check` → `budget` → `fonts:check:pages` → `a11y` → `a11y:keys` → `budget:wire`，
 任一步失败都会变红；**只有 main 的 Quality 全部通过后**，Pages 才会按同一 SHA 自动部署。
 
 工作流里的 action 都是用大版本号（`checkout@v7`、`setup-node@v7`、`deploy-pages@v5`、
