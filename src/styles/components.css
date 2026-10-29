@@ -2,6 +2,50 @@
    components.css — 通用组件：封面、主推卡、卡片网格、侧栏小部件、作者卡
    顺序即层叠顺序，调整文件顺序会改变覆盖关系
    ========================================================================== */
+/* Surface primitives: shared card materials; spacing and interactions stay local.
+   Keep this before per-page rules so custom hover / breakpoint styles override it. */
+.hero-card,
+.article-card,
+.about-card,
+.comments,
+.series-card,
+.related,
+.game-card {
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+}
+
+.archive-card,
+.post-browser,
+.card,
+.widget,
+.note-sheet,
+.game-note,
+.note-card {
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+}
+
+.hero-card,
+.article-card,
+.about-card {
+  box-shadow: var(--shadow-md);
+}
+
+.comments,
+.series-card,
+.related,
+.archive-card,
+.post-browser,
+.card,
+.widget,
+.game-note,
+.note-card {
+  box-shadow: var(--shadow-sm);
+}
+
 /* ---------- cover ---------- */
 .cover {
   --c1: #d2603a;
@@ -165,14 +209,10 @@ html[data-theme='dark'] .chip-pin {
 }
 
 .card {
-  position: relative;
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
+position: relative;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
   transition: transform 0.28s var(--ease), box-shadow 0.28s var(--ease),
-    border-color 0.28s var(--ease);
+  border-color 0.28s var(--ease);
 }
 
 .card:hover {
@@ -328,11 +368,7 @@ html[data-theme='dark'] .widget-tags a {
 
 /* ---------- widgets ---------- */
 .widget {
-  padding: 18px 20px 20px;
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+padding: 18px 20px 20px;
 }
 
 .widget h4 {
