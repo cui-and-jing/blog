@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-29. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: shared surfaces and CSS budget (2026-10-29)
+## Current iteration: emitted link integrity (2026-10-29)
+
+- **Reason:** authored Markdown link lint does not prove that generated navigation, tags/categories, cards, media files or fragment targets exist in GitHub Pages output.
+- **Scope:** add dependency-free audit of emitted HTML routes and local assets with safe URL resolution, Unicode/percent-encoding, `/blog/` base enforcement, and static `#id` target checks. Standalone games continue to use their existing browser smoke tests.
+- **Verification:** fixture tests for legitimate links, relative paths, Unicode routes, inline-script false positives, missing assets, missing anchors, base bypasses and unsafe schemes. Run immediately after build in both Quality and local preflight.
+- **Constraints:** zero runtime JS/CSS/route changes, no dependency upgrades and no raised budgets; merge only after latest PR Quality succeeds and verify the same exact main SHA in Pages.
+
+## Completed: shared surfaces and CSS budget (2026-10-29)
 
 - **Decision:** CSS is within roughly 0.3 KiB of its 108 KiB hard cap; consolidate exact shared surface properties across homepage, posts, notes, archive, series and game lobby before adding any more UI.
 - **Scope:** factor out only equal card background, border, radius and shadow declarations into `components.css`; keep spacing, hover, gradients, dark overrides, responsive behavior, URLs and games untouched.
