@@ -313,9 +313,15 @@ const check = (name, pass, detail = '') => {
     source: document.getElementById('lightbox-img')?.getAttribute('src'),
     locked: document.documentElement.style.overflow === 'hidden',
     count: document.querySelectorAll('.prose img').length,
+    closeSize: (() => {
+      const box = document.querySelector('.lightbox-close')?.getBoundingClientRect();
+      return box ? [box.width, box.height] : [];
+    })(),
   }));
   check('点击正文图片可打开原图灯箱并锁定背景滚动',
     Boolean(opened.source) && opened.locked && opened.count >= 2, JSON.stringify(opened));
+  check('灯箱关闭按钮不小于 44×44 像素',
+    opened.closeSize[0] >= 44 && opened.closeSize[1] >= 44, JSON.stringify(opened.closeSize));
 
   await gallery.keyboard.press('=');
   const zoomed = await gallery.evaluate(() => ({
@@ -348,6 +354,25 @@ const check = (name, pass, detail = '') => {
   }));
   check('Esc 关闭灯箱且恢复背景滚动', closed.open === false && closed.overflow === '', JSON.stringify(closed));
   await gallery.close();
+}
+
+/* ---------- 2.7b. 游戏大厅的平板 / 手机单列布局 ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 800, height: 900 });
+  await page.goto(base + '/games/', { waitUntil: 'load' });
+  const tablet = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.game-card')];
+    return {
+      cards: cards.length,
+      columns: cards.map((card) => getComputedStyle(card).gridTemplateColumns.trim().split(/\s+/).length),
+      overflow: document.documentElement.scrollWidth - innerWidth,
+    };
+  });
+  check('800px 游戏大厅两张游戏卡都采用单列布局',
+    tablet.cards === 2 && tablet.columns.every((n) => n === 1) && tablet.overflow <= 0,
+    JSON.stringify(tablet));
+  await page.close();
 }
 
 /* ---------- 2.8. 系列页面排版：简介不能继承元信息样式 ---------- */

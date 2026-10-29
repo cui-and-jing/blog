@@ -105,11 +105,6 @@
   transition: background 0.18s var(--ease), color 0.18s var(--ease);
 }
 
-.lightbox-origin:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.2);
-}
-
 .lightbox-zoom {
   position: fixed;
   bottom: 22px;
@@ -176,6 +171,7 @@
   transition: background 0.18s var(--ease), color 0.18s var(--ease);
 }
 
+.lightbox-origin:hover,
 .lightbox-close:hover,
 .lightbox-nav:hover {
   color: #fff;
@@ -183,8 +179,8 @@
 }
 
 .lightbox-close {
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
 }
 
 .lightbox-close svg {
