@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-29. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: mobile reading resume and deep-link priority (2026-10-29)
+## Current iteration: TOC synchronization and long-page scroll efficiency (2026-10-29)
+
+- **Reason:** the old IntersectionObserver callback scanned all TOC links and wrote class/ARIA attributes for every intersecting heading, potentially repeating writes; it also queued sidebar measurements even when mobile layouts cannot scroll the sidebar.
+- **Implementation:** index raw section hrefs once, choose the topmost intersecting heading per observer batch and update only the former and new active link. Defer desktop sidebar measurement to the next frame and skip stale selections; never scroll a non-scrollable/mobile sidebar. Let CSS smooth-scroll normally but switch to auto under reduced-motion. Build the mobile TOC nav shell as HTML and clone its contents only when opening.
+- **Regression:** Chromium verifies stable single active TOC and matching aria-current, no same-section writes, desktop reduced-motion behavior, mobile 390px no scroll calls and no overflow, in addition to the pre-existing mobile TOC modal tests.
+- **Budget and merge:** do not change article URL/heading IDs or local data, games, dependencies, CSS/JS size limits or release gate. Require latest PR Quality success, squash merge, then main Quality and Pages success for the exact merge SHA.
+
+## Completed: mobile reading resume and deep-link priority (2026-10-29)
 
 - **User experience:** do not show a previous-position resume prompt when the visitor deliberately opens an article's `#section` fragment; the saved v1/v2 reading position remains intact for a future ordinary visit.
 - **Touch:** keep the existing floating bar and bottom navigation layout but make both resume and dismiss actions at least 44px high/44px wide as appropriate.

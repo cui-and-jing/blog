@@ -287,7 +287,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
               </svg>
             </button>
           </div>
-          <div class="toc-body"></div>
+          <div class="toc-body"><nav class="toc" aria-label="文章目录"></nav></div>
         </dialog>
       </>
     )
@@ -432,6 +432,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       }, 1400);
     };
 
+    const articleUrl = location.origin + location.pathname;
     const headings = document.querySelectorAll<HTMLElement>('.prose h2, .prose h3');
     headings.forEach((heading) => {
       if (!heading.id) return;
@@ -442,7 +443,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       anchor.textContent = '#';
       anchor.addEventListener('click', async (event) => {
         event.preventDefault(); /* 复制章节链接不应导致正文跳动 */
-        const link = `${location.origin}${location.pathname}#${heading.id}`;
+        const link = `${articleUrl}#${heading.id}`;
         if (!(await copyText(link))) return;
         flashAnchor(anchor);
         announce('小节链接已复制');
@@ -474,7 +475,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
             ? selection.toString().trim()
             : '';
         const text = picked || sourceText;
-        const link = `${location.origin}${location.pathname}#${block.id}`;
+        const link = `${articleUrl}#${block.id}`;
 
         if (!(await copyText(`> ${text}\n\n—— ${articleTitle} ${link}`))) {
           announce('复制失败，请手动选择文字');
@@ -487,34 +488,36 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       block.prepend(anchor);
     });
 
-    /* ---------- 目录高亮 ---------- */
-    const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('.sidebar .toc a'));
+    /* ---------- 目录高亮：只改变化的两项，避免长目录反复遍历 ---------- */
+    const linkById = new Map([...document.querySelectorAll<HTMLAnchorElement>('.sidebar .toc a')]
+      .map((a) => [a.getAttribute('href')!.slice(1), a]));
     const sidebar = document.querySelector<HTMLElement>('.sidebar');
+    let active: HTMLAnchorElement | null = null;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          const link = links.find((a) => decodeURIComponent(a.hash.slice(1)) === entry.target.id);
-          links.forEach((a) => {
-            const current = a === link;
-            a.classList.toggle('active', current);
-            a.setAttribute('aria-current', current ? 'location' : 'false');
-          });
+    const observer = new IntersectionObserver((entries) => {
+      /* 同批次选择视口最靠上的有效章节，避免在多个标题间闪烁。 */
+      const hit = entries.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        .find((e) => e.isIntersecting);
+      const link = hit && linkById.get(hit.target.id);
+      if (!link || link === active) return;
+      active?.classList.remove('active');
+      active?.removeAttribute('aria-current');
+      link.classList.add('active');
+      link.setAttribute('aria-current', 'location');
+      active = link;
 
-          /* 侧栏内容超出一屏时，让当前目录项保持可见。
-             量高度这件事推到下一帧：观察器回调里直接读会强制同步布局，
-             而这时正文可能刚因为字体换字重排过。 */
-          if (link && sidebar) requestAnimationFrame(() => {
-            const delta = link.getBoundingClientRect().top - sidebar.getBoundingClientRect().top;
-            if (delta < 40 || delta > sidebar.clientHeight - 40) {
-              sidebar.scrollBy({ top: delta - sidebar.clientHeight / 2, behavior: 'smooth' });
-            }
-          });
+      /* 旧回调在下一帧检测选中项，若已经切换则不再测量布局。 */
+      if (sidebar && innerWidth > 1080) requestAnimationFrame(() => {
+        if (link !== active) return;
+        const height = sidebar.clientHeight;
+        if (sidebar.scrollHeight <= height) return;
+        const delta = link.getBoundingClientRect().top - sidebar.getBoundingClientRect().top;
+        if (delta < 40 || delta > height - 40) sidebar.scrollBy({
+          top: delta - height / 2,
+          behavior: 'auto',
         });
-      },
-      { rootMargin: '-96px 0px -70% 0px' }
-    );
+      });
+    }, { rootMargin: '-96px 0px -70% 0px' });
 
     headings.forEach((h) => observer.observe(h));
 
@@ -523,17 +526,9 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
     const tocDialog = document.getElementById('toc-dialog') as HTMLDialogElement | null;
 
     if (fab && tocDialog) {
-      const body = tocDialog.querySelector('.toc-body');
+      const body = tocDialog.querySelector('.toc-body .toc');
       const source = document.querySelector('.sidebar .toc ul');
-      if (body && source) {
-        const nav = document.createElement('nav');
-        nav.className = 'toc';
-        nav.setAttribute('aria-label', '文章目录');
-        nav.append(source.cloneNode(true));
-        body.append(nav);
-      }
 
-      const close = tocDialog.querySelector('.toc-dialog-close');
       /* close 事件在下一个任务执行，点击链接时需同步清除展开状态。 */
       const closeToc = () => {
         if (tocDialog.open) tocDialog.close();
@@ -541,12 +536,12 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       };
       fab.addEventListener('click', () => {
         /* 正文不会在模态目录打开时滚动，按需克隆当前状态更轻量。 */
-        if (body && source) body.querySelector('ul')?.replaceWith(source.cloneNode(true));
+        if (body && source) body.replaceChildren(source.cloneNode(true));
         tocDialog.showModal();
         fab.setAttribute('aria-expanded', 'true');
         (tocDialog.querySelector<HTMLAnchorElement>('.toc a.active') ?? tocDialog.querySelector<HTMLAnchorElement>('.toc a'))?.focus();
       });
-      close?.addEventListener('click', closeToc);
+      tocDialog.querySelector('.toc-dialog-close')?.addEventListener('click', closeToc);
       tocDialog.addEventListener('click', (event) => {
         if (event.target === tocDialog || (event.target as Element).closest('.toc a')) closeToc();
       });
