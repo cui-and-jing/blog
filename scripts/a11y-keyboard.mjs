@@ -905,11 +905,17 @@ const check = (name, pass, detail = '') => {
   await page.waitForFunction(() => window.__tocScrolls.length > 0, { timeout: 5000 });
   const desktop = await page.evaluate(() => ({
     scrolls: window.__tocScrolls,
+    behavior: getComputedStyle(document.querySelector('.sidebar')).scrollBehavior,
     active: [...document.querySelectorAll('.sidebar .toc a[aria-current="location"]')].map((a) => a.hash),
   }));
   check('桌面超长目录只滚动可滚动侧栏，减少动态效果时不使用平滑动画',
-    desktop.scrolls.length > 0 && desktop.scrolls.every((behavior) => behavior === 'instant') &&
-    desktop.active.length === 1, JSON.stringify(desktop));
+    desktop.scrolls.length > 0 && desktop.scrolls.every((behavior) => behavior === 'auto') &&
+    desktop.behavior === 'auto' && desktop.active.length === 1, JSON.stringify(desktop));
+
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+  const smooth = await page.$eval('.sidebar', (el) => getComputedStyle(el).scrollBehavior);
+  check('无减少动态效果偏好时桌面侧栏保留平滑定位', smooth === 'smooth', smooth);
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
 
   await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
   await page.evaluate(() => { window.__tocScrolls = []; });
