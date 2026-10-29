@@ -23,13 +23,15 @@ try {
     '</body></html>');
   write('posts/index.html', '<!doctype html><html><body><a href="/blog/">首页</a></body></html>');
   write('posts/中文/index.html', '<!doctype html><html><body><section id="part">正文</section><a href="../../">返回首页</a></body></html>');
+  /* GitHub Pages uses 404.html, not the pretty /404/ route. */
+  write('404.html', '<!doctype html><html><head><link rel="canonical" href="https://example.test/blog/404.html"></head></html>');
   write('rss.xml', '<rss/>');
   write('assets/a.svg', '<svg/>');
   write('assets/b.svg', '<svg/>');
 
   const config = { dist: root, base: '/blog', site: 'https://example.test' };
   const good = auditBuiltLinks(config);
-  assert.equal(good.pages, 3, 'must inspect the three generated HTML pages');
+  assert.equal(good.pages, 4, 'must inspect emitted pages including the 404 fallback');
   assert.ok(good.references >= 6, 'must inspect real navigation and media references');
   assert.deepEqual(good.errors, [], 'valid encoded routes, anchors, assets and base links pass');
 
