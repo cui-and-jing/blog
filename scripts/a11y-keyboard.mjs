@@ -90,7 +90,9 @@ const check = (name, pass, detail = '') => {
             const mutedComments = selector === '.comments' && el.classList.contains('comments--muted');
             probe.style.background = mutedComments ? 'var(--card-flat)' : 'var(--card)';
             probe.style.borderStyle = mutedComments ? 'dashed' : 'solid';
-            probe.style.borderRadius = radius === 'lg' ? 'var(--radius-lg)' : 'var(--radius)';
+            /* Existing <=720px article breakpoint intentionally uses the smaller radius. */
+            probe.style.borderRadius = radius === 'lg' && !(selector === '.article-card' && innerWidth <= 720)
+              ? 'var(--radius-lg)' : 'var(--radius)';
             probe.style.boxShadow = 'var(--shadow-' + shadow + ')';
             const actual = getComputedStyle(el);
             const expected = getComputedStyle(probe);
