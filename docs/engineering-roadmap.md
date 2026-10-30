@@ -1,6 +1,6 @@
 # Engineering roadmap
 
-_Last reviewed: 2026-10-29. Scope: `cui-and-jing/blog`._
+_Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 
 ## Baseline and constraints
 
@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-29. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: TOC synchronization and long-page scroll efficiency (2026-10-29)
+## Current iteration: conditional prose enhancement and lightbox delegation (2026-10-30)
+
+- **Finding:** BaseLayout schedules a code/table enhancement idle callback even when the current route has no relevant prose elements. Image lightbox setup also attaches two activation listeners to each image, scaling event registrations linearly with image count.
+- **Change:** only queue the existing idle enhancer when `.prose table` or `.prose pre` exists; retain Safari timeout fallback and existing print behavior. Keep image accessibility attributes on every rendered image but route click and Enter/Space through two delegated document listeners.
+- **Regression:** Chromium verifies homepage schedules no enhancement task, styleguide keeps code/table rendering and first/second-image activation, keyboard Enter/Space, zoom, original-image link, next/previous and Esc handling. Ensure no per-image activation listeners. Verify search, mobile/table access, games, RSS and transfer budgets remain stable.
+- **Guardrails:** no dependency, route, author content or theme changes; keep original CSS/JS caps and main Quality→Pages gate. Require latest PR SHA to pass all CI and verify merge SHA on main and Pages.
+
+## Completed: TOC synchronization and long-page scroll efficiency (2026-10-29)
 
 - **Reason:** the old IntersectionObserver callback scanned all TOC links and wrote class/ARIA attributes for every intersecting heading, potentially repeating writes; it also queued sidebar measurements even when mobile layouts cannot scroll the sidebar.
 - **Implementation:** index raw section hrefs once, choose the topmost intersecting heading per observer batch and update only the former and new active link. Defer desktop sidebar measurement to the next frame and skip stale selections; never scroll a non-scrollable/mobile sidebar. Let CSS smooth-scroll normally but switch to auto under reduced-motion. Build the mobile TOC nav shell as HTML and clone its contents only when opening.
