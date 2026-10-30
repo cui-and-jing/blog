@@ -751,6 +751,32 @@ const check = (name, pass, detail = '') => {
   check('灯箱关闭按钮不小于 44×44 像素',
     opened.closeSize[0] >= 44 && opened.closeSize[1] >= 44, JSON.stringify(opened.closeSize));
 
+  /* Mobile offsets belong to the fixed toolbar, not its static flex child. */
+  await gallery.setViewport({ width: 390, height: 844 });
+  const mobileLightbox = await gallery.evaluate(() => {
+    const close = document.querySelector('.lightbox-close');
+    const toolbar = document.querySelector('.lightbox-tools');
+    const closeRect = close.getBoundingClientRect();
+    const toolbarRect = toolbar.getBoundingClientRect();
+    return {
+      closePosition: getComputedStyle(close).position,
+      closeTop: getComputedStyle(close).top,
+      toolbarPosition: getComputedStyle(toolbar).position,
+      toolbarTop: toolbarRect.top,
+      toolbarRight: innerWidth - toolbarRect.right,
+      closeSize: [closeRect.width, closeRect.height],
+      overflow: document.documentElement.scrollWidth - innerWidth,
+    };
+  });
+  check('390px 灯箱关闭按钮随固定工具栏定位且维持可触控尺寸',
+    mobileLightbox.closePosition === 'static' && mobileLightbox.closeTop === 'auto' &&
+      mobileLightbox.toolbarPosition === 'fixed' &&
+      Math.abs(mobileLightbox.toolbarTop - 22) < 1 &&
+      Math.abs(mobileLightbox.toolbarRight - 22) < 1 &&
+      mobileLightbox.closeSize.every((size) => size >= 44) && mobileLightbox.overflow <= 0,
+    JSON.stringify(mobileLightbox));
+  await gallery.setViewport({ width: 1280, height: 800 });
+
   await gallery.keyboard.press('=');
   const zoomed = await gallery.evaluate(() => ({
     transform: document.getElementById('lightbox-img')?.style.transform,
