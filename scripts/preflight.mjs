@@ -87,6 +87,7 @@ async function main() {
 
   run('构建链接和资源完整性', 'node', ['scripts/built-links.test.mjs']);
   run('站点路由、资源和章节锚点', 'node', ['scripts/built-links-check.mjs']);
+  run('全站标签入口一致性', 'node', ['scripts/tag-discovery.test.mjs']);
   run('站点地图更新时间与索引规则', 'node', ['scripts/sitemap-check.mjs']);
   // 确保本地预检也能发现订阅源全文、链接与唯一性回归。
   run('RSS 全文与永久链接校验', 'node', ['scripts/rss-check.mjs']);
