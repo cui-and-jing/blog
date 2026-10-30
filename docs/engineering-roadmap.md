@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: consolidate note stylesheet declarations (2026-10-30)
+## Current iteration: remove hidden back-to-top offset rules (2026-10-30)
+
+- **Finding:** At up to 1080px, the floating `.to-top` button is hidden because the mobile bottom action bar owns the same action. A later <=900px media query still sets its `right` and `bottom` offsets, which cannot affect layout while `display: none` is active.
+- **Change:** Remove only that unreachable <=900px offset block in `motion.css`, leaving the <=1080px visibility rule, existing desktop floating button, and mobile bar intact. No dependency, route, game, content, JavaScript, or size-cap changes.
+- **Regression:** Chromium verifies the floating button is hidden and the bottom bar shown at 320/360/390px and the 900/1080px boundaries, then switches back to the floating button at 1081px. Full PR Quality must also pass built CSS gzip and all browser/accessibility/game/release checks.
+- **Release:** Never merge a failed or pending latest-head CI. Squash merge only if mergeable, then verify successful main Quality and GitHub Pages on the exact same SHA.
+
+## Completed: consolidate note stylesheet declarations (2026-10-30)
 
 - **Finding:** The note stylesheet has repeated footer, timestamp, grid-frame and link declarations while the generated CSS gzip is near its strict 21 KiB limit. Initial grouped-selector changes reduced source bytes but failed full CI: the latest failed PR run measured **21,515 / 21,504 gzip bytes**.
 - **Change:** Keep the original selector specificity, combine identical grid-frame declarations across the home note strip, tag-note list and archive-note list, and remove two earlier `text-decoration: none` declarations that are already overridden by later underlined link rules. This follow-up removes another 273 source bytes without changing breakpoints, routes, content, runtime JavaScript, dependencies or games.
