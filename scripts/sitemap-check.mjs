@@ -66,6 +66,7 @@ for (const [route, date] of expected) {
 /* All note detail pages are deliberately noindex; the notes index remains indexable. */
 for (const route of sitemap.keys()) {
   assert.doesNotMatch(route, /\/(?:search|styleguide)\/$/, 'noindex helper page leaked to sitemap');
+  assert.doesNotMatch(route, /\/404(?:\.html|\/)?$/, 'noindex 404 fallback leaked to sitemap');
   assert.doesNotMatch(route, /\/notes\/[^/]+\/$/, 'noindex note permalink leaked to sitemap');
 }
 const robots = fs.readFileSync(path.join(root, 'robots.txt'), 'utf8');
