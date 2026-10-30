@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: local preflight and CI release/feed parity (2026-10-30)
+## Current iteration: consistent post + note tag discovery (2026-10-30)
+
+- **Finding:** The tag directory and tag detail pages aggregate articles and notes, but the sidebar and empty-search suggestions counted only articles. Note-only tags could disappear from these entry points despite having working tag pages.
+- **Change:** Reuse `collectTags(posts, notes)` in both surfaces, preserving the shared popularity and locale tie-break order. Keep the existing 14-tag sidebar and 6-tag search limits.
+- **Regression:** After building, compare homepage and article sidebar links and search suggestions with the corresponding prefix of the emitted tag directory. Run this audit in CI and local preflight alongside existing link, accessibility, browser and budget gates.
+- **Guardrails:** no route, content, dependency, frontend JS/CSS, font source or budget changes. Merge only on a fully green latest PR SHA; verify main Quality and Pages deployment on the merge SHA.
+
+## Completed: local preflight and CI release/feed parity (2026-10-30)
 
 - **Finding:** CI validates the Pages release gate and built article/note RSS, but local `npm run preflight` skipped both. A developer could receive a misleading all-green local report before a red PR check.
 - **Change:** run the same deployment gate before type checking and the same RSS full-text/permalink contract after sitemap checks in local preflight. No change to runtime assets or published URLs.
