@@ -33,7 +33,6 @@
 
 .notes-bar p a {
   color: var(--accent);
-  text-decoration: none;
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
@@ -253,7 +252,6 @@
 
 .notes-end a {
   color: var(--accent);
-  text-decoration: none;
 }
 
 /* 正文里的行内链接必须有下划线：颜色与周围文字的对比度到不了 3:1 时，
@@ -293,13 +291,19 @@
 
 /* ---------- 首页的「最近想法」条 ---------- */
 
-.notes-strip {
+.notes-strip,
+.tag-notes-list,
+.archive-notes {
   display: grid;
   gap: 1px;
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
   background: var(--line-soft);
   overflow: hidden;
+}
+
+.notes-strip,
+.tag-notes-list {
+  border-radius: var(--radius);
 }
 
 .notes-strip li {
@@ -546,15 +550,6 @@
   color: var(--accent);
 }
 
-.tag-notes-list {
-  display: grid;
-  gap: 1px;
-  background: var(--line-soft);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
 .tag-notes-list li {
   padding: 14px 18px;
   background: var(--card);
@@ -593,15 +588,10 @@
 /* ---------- 归档页里的笔记行 ---------- */
 
 .archive-notes {
-  display: grid;
-  gap: 1px;
   margin: 10px 0 0;
   padding: 0;
   list-style: none;
-  background: var(--line-soft);
-  border: 1px solid var(--line-soft);
   border-radius: 12px;
-  overflow: hidden;
 }
 
 .archive-notes li {
