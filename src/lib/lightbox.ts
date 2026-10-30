@@ -110,21 +110,26 @@ export function setupLightbox(): void {
           flashHint();
         };
 
-        lightboxImages.forEach((image, i) => {
+        lightboxImages.forEach((image) => {
           /* 正文图片统一懒加载，长文首屏不必拉完全部配图 */
           image.loading = 'lazy';
           image.decoding = 'async';
           image.tabIndex = 0;
           image.setAttribute('role', 'button');
           image.setAttribute('aria-label', `放大图片：${image.alt || '正文图片'}`);
-          image.addEventListener('click', () => openLightbox(i));
-          image.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              openLightbox(i);
-            }
-          });
         });
+
+        /* 一篇长文只绑定两个委托事件，不随图片数量增加监听器。 */
+        const activateImage = (event: MouseEvent | KeyboardEvent) => {
+          if (event.type === 'keydown' && !['Enter', ' '].includes((event as KeyboardEvent).key)) return;
+          if (!(event.target instanceof HTMLImageElement)) return;
+          const i = lightboxImages.indexOf(event.target);
+          if (i < 0) return;
+          event.preventDefault();
+          openLightbox(i);
+        };
+        document.addEventListener('click', activateImage);
+        document.addEventListener('keydown', activateImage);
 
         /* 缩放：滚轮以指针为中心，双击在 1× 与 2.4× 之间切换 */
         stage.addEventListener(
