@@ -284,7 +284,7 @@ const check = (name, pass, detail = '') => {
     check(width + 'px 手机字号按钮触控尺寸、读屏标签及页面边界',
       targets.buttons.length === 3 && targets.overflow <= 1 &&
       targets.buttons.every((button) => button.width >= 44 && button.height >= 44) &&
-      targets.buttons.map((button) => button.label).join('|') === '小一号|标准字号|大一号' &&
+      targets.buttons.map((button) => button.label).join('|') === 'A− 小一号|A 标准字号|A+ 大一号' &&
       targets.buttons.every((button) => button.pressed === 'true' || button.pressed === 'false'),
       JSON.stringify(targets));
 
