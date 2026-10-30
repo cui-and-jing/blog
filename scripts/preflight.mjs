@@ -85,6 +85,7 @@ async function main() {
 
   run('构建链接和资源完整性', 'node', ['scripts/built-links.test.mjs']);
   run('站点路由、资源和章节锚点', 'node', ['scripts/built-links-check.mjs']);
+  run('站点地图更新时间与索引规则', 'node', ['scripts/sitemap-check.mjs']);
   run('体积预算', 'node', ['scripts/budget.mjs']);
   /* 字体按页分片后，每页只带自己的增量片；新增页面没进映射时这句会失败 */
   run('字体按页覆盖', 'node', ['scripts/fonts.mjs', '--check-pages']);
