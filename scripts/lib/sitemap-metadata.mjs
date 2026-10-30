@@ -53,11 +53,17 @@ export function collectLastmod(posts, notes, base) {
     if (!prev || date > prev) changes.set(route, date);
   };
 
+  /* Only series with at least two posts receive a dedicated page. */
+  const seriesCounts = new Map();
+  for (const post of posts) if (post.series) {
+    seriesCounts.set(post.series, (seriesCounts.get(post.series) ?? 0) + 1);
+  }
+
   let latestPost = null;
   for (const post of posts) {
     if (!latestPost || post.date > latestPost) latestPost = post.date;
     bump('/posts/' + post.slug + '/', post.date);
-    if (post.series) bump('/series/' + post.series + '/', post.date);
+    if (post.series && seriesCounts.get(post.series) > 1) bump('/series/' + post.series + '/', post.date);
     for (const tag of post.tags) bump('/tags/' + tag + '/', post.date);
     if (post.category) bump('/category/' + post.category + '/', post.date);
   }
