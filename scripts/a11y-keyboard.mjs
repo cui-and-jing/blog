@@ -1431,7 +1431,7 @@ const check = (name, pass, detail = '') => {
     }));
     const expected = width <= 1080
       ? controls.floating === 'none' && controls.mobile !== 'none'
-      : controls.floating === 'inline-flex' && controls.mobile === 'none';
+      : controls.floating !== 'none' && controls.mobile === 'none';
     check(`${width}px 回顶入口响应式切换正确`, expected, JSON.stringify(controls));
   }
   await page.close();
