@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: mobile dialog touch targets (2026-10-30)
+## Current iteration: consolidate note stylesheet declarations (2026-10-30)
+
+- **Finding:** Several note surfaces repeat identical declarations for flex footers, list resets, muted timestamps, link underlines and copy/permalink hover states. With CSS near its 108 KiB raw and 21 KiB gzip caps, these duplications consume scarce headroom.
+- **Change:** Group selectors within `notes.css` while preserving each original selector's specificity and all page-level overrides. Remove 612 redundant source bytes; leave breakpoint logic, routes, content, runtime JavaScript, dependencies and games unchanged.
+- **Regression:** Compare the final declarations of 22 affected selectors against the original stylesheet before committing; require the full PR Quality suite (including output CSS and first-visit transfer budgets, light/dark accessibility and keyboard/browser checks). Do not treat source byte reduction alone as evidence of smaller deployed CSS.
+- **Release:** Merge only if the latest PR head is green and mergeable; verify main Quality then Pages build/deploy against the exact squash merge SHA. Do not increase the CSS or JS budgets.
+
+## Completed: mobile dialog touch targets (2026-10-30)
 
 - **Finding:** The article font-size toolbar already has 44px targets, but the shared reading-settings dialog still renders its segmented choices at 30px high, and the settings, navigation and shortcut dialogs have 28px close buttons. The settings footer actions are also small touch targets.
 - **Change:** On narrow screens, make settings segments at least 44x44, all three shared dialog close buttons 44x44, and settings footer actions 44px high; keep existing compact desktop sizing and all settings logic.
