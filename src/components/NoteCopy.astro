@@ -55,8 +55,8 @@
       if (label) label.textContent = '已复制';
       if (status) status.textContent = '笔记链接已复制';
     } else {
-      /* 复制失败至少把地址栏指到目标，能手动复制 */
-      if (path.startsWith('/')) location.hash = '';
+      /* 两种剪贴板方式都失败时给可见反馈，不修改当前页面的锚点或地址。 */
+      if (label) label.textContent = '复制失败';
       if (status) status.textContent = `复制失败，链接是 ${link}`;
     }
 
