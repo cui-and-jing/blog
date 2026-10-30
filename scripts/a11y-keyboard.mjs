@@ -816,6 +816,72 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 3.4. 搜索历史：窄屏触控与清除记录 ---------- */
+{
+  for (const width of [320, 390]) {
+    const page = await browser.newPage();
+    await page.setViewport({ width, height: 844, isMobile: true, hasTouch: true });
+    await page.goto(base + '/search/', { waitUntil: 'networkidle2' });
+    await page.evaluate(() => {
+      localStorage.setItem('search:history', JSON.stringify(['Astro', '笔记']));
+    });
+    await page.reload({ waitUntil: 'networkidle2' });
+    await page.waitForSelector('#search-history:not([hidden])', { timeout: 8000 });
+
+    const targets = await page.evaluate(() => {
+      const bounds = (element) => {
+        const rect = element.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      };
+      const clear = document.getElementById('search-history-clear');
+      const chips = [...document.querySelectorAll('#search-history-list button')];
+      return {
+        clear: clear ? bounds(clear) : null,
+        label: clear?.getAttribute('aria-label'),
+        chips: chips.map((chip) => ({ label: chip.textContent, ...bounds(chip) })),
+        overflow: document.documentElement.scrollWidth - innerWidth,
+      };
+    });
+    check(width + 'px 搜索历史按钮、清除按钮有 44px 触控区域且无横向溢出',
+      targets.overflow <= 0 && targets.chips.length === 2 &&
+      targets.chips.every((chip) => chip.width >= 44 && chip.height >= 44) &&
+      targets.clear?.width >= 44 && targets.clear?.height >= 44 &&
+      targets.label === '清除最近搜索记录', JSON.stringify(targets));
+
+    const tapAt = await page.$eval('#search-history-list button:first-child', (button) => {
+      button.scrollIntoView({ block: 'center' });
+      const rect = button.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    });
+    await page.touchscreen.tap(tapAt.x, tapAt.y);
+    await page.waitForFunction(() => new URL(location.href).searchParams.get('q') === 'Astro', { timeout: 5000 });
+    const selected = await page.evaluate(() => ({
+      query: document.getElementById('search-input')?.value,
+      count: document.querySelectorAll('#search-results .search-result').length,
+    }));
+    check(width + 'px 点击历史词会重新执行搜索并更新 URL',
+      selected.query === 'Astro' && selected.count > 0, JSON.stringify(selected));
+
+    await page.click('#search-clear');
+    await page.waitForSelector('#search-history:not([hidden])', { timeout: 5000 });
+    await page.focus('#search-history-clear');
+    await page.keyboard.press('Enter');
+    const cleared = await page.evaluate(() => ({
+      saved: JSON.parse(localStorage.getItem('search:history') ?? '[]'),
+      hidden: document.getElementById('search-history')?.hidden,
+      query: new URL(location.href).searchParams.get('q'),
+    }));
+    check(width + 'px 键盘清除历史后记录和面板同时消失',
+      Array.isArray(cleared.saved) && cleared.saved.length === 0 &&
+      cleared.hidden === true && cleared.query === null, JSON.stringify(cleared));
+
+    await page.reload({ waitUntil: 'networkidle2' });
+    const persisted = await page.$eval('#search-history', (element) => element.hidden);
+    check(width + 'px 清除历史后刷新页面不再出现旧记录', persisted);
+    await page.close();
+  }
+}
+
 /* ---------- 3.5. 阅读收藏：跨页、组合筛选与旧链接找回 ---------- */
 {
   const page = await browser.newPage();
