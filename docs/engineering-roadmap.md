@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: editorial activity in recent discovery (2026-10-30)
+## Current iteration: homepage and series editorial freshness (2026-10-30)
+
+- **Finding:** The shared recent-update feeds now recognize later article edits, but the homepage hero's "最近更新" date still uses publication-only dates. Series discovery also ranks series by most recent publication rather than latest article revision, despite the sitemap treating edits as fresh content.
+- **Change:** Reuse one build-time activity-date reducer across the homepage hero and series ordering. Preserve original publication dates in the visible series date range, chapter sequence, archive, and article cards. An edited older series may move higher in discovery without rewriting its publication history.
+- **Regression:** Add newer/older revision and note-only fixtures plus emitted-homepage/search-index date parity. Compare series listing and homepage previews with source metadata activity, without assuming a particular publication-date order for ties.
+- **Guardrails:** no new routes, frontend JavaScript/CSS, dependencies, game changes, content edits, or raised size budgets. Require latest PR Quality, then verify main Quality and Pages for one merge SHA.
+
+## Completed: editorial activity in recent discovery (2026-10-30)
 
 - **Finding:** The sitemap now advances for a revised article, but both “最近更新” entry points still sort articles only by their original publication date. An edited older article can stay buried. Shared search entry labels also imply article-only search even though notes are indexed.
 - **Change:** Sort mixed recent sidebar and empty-search recommendations by the later of publication and article `updated`; retain the original published date in the search index and expose later editorial updates as optional metadata. Announce updated-date suggestions to assistive technology and clarify search entry labels.

@@ -1,5 +1,6 @@
 import type { CollectionEntry } from 'astro:content';
 import { url } from './site';
+import { latestActivity } from './recent-date.mjs';
 import SERIES_META from '../data/series.json';
 
 export type Post = CollectionEntry<'posts'>;
@@ -20,6 +21,8 @@ export interface Series {
   count: number;
   start: Date;
   end: Date;
+  /** Publication range and editorial activity are different dates. */
+  lastActivity: Date;
   /** 系列内文章共同出现过的标签，用来给页面一点线索 */
   tags: string[];
   latest: Post;
@@ -51,6 +54,7 @@ function build(name: string, posts: Post[]): Series {
     count: ordered.length,
     start: new Date(Math.min(...dates)),
     end: new Date(Math.max(...dates)),
+    lastActivity: latestActivity(ordered.map((post) => post.data))!,
     tags: [...counts.entries()]
       .filter(([, n]) => n > 1)
       .sort((a, b) => b[1] - a[1])
@@ -72,7 +76,7 @@ export function collectSeries(posts: Post[]): Series[] {
   return [...byName.entries()]
     .filter(([, list]) => list.length > 1)
     .map(([name, list]) => build(name, list))
-    .sort((a, b) => b.end.valueOf() - a.end.valueOf());
+    .sort((a, b) => b.lastActivity.valueOf() - a.lastActivity.valueOf());
 }
 
 export function findSeries(posts: Post[], name: string): Series | undefined {

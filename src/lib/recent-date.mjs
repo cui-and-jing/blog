@@ -8,3 +8,16 @@ export function activityDate(data) {
   return revised instanceof Date && Number.isFinite(revised.getTime())
     && revised.getTime() > data.date.getTime() ? revised : data.date;
 }
+
+/** The most recent editorial activity across posts and notes.
+ * @param {Iterable<{ date: Date, updated?: Date }>} entries
+ * @returns {Date | undefined}
+ */
+export function latestActivity(entries) {
+  let latest;
+  for (const data of entries) {
+    const date = activityDate(data);
+    if (!latest || date.getTime() > latest.getTime()) latest = date;
+  }
+  return latest;
+}
