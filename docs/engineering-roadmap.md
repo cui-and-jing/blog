@@ -22,11 +22,11 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: conditional prose enhancement and shared table observation (2026-10-30)
+## Current iteration: shared table observation and long-prose browser regression (2026-10-30)
 
-- **Finding:** BaseLayout schedules a code/table enhancement idle callback even when a route has no relevant prose elements; it also previously used a separate ResizeObserver and scroll listener for every table.
-- **Change:** only queue the existing idle enhancer when `.prose table` or `.prose pre` exists; retain Safari timeout fallback and print behavior. Share one ResizeObserver across all prose tables and use its initial notification instead of redundant per-table scroll listeners and first-frame measurements. Keep the original lightbox handlers because delegation exceeded the strict JS gzip budget.
-- **Regression:** Chromium verifies homepage schedules no unnecessary idle task; two tables share exactly one ResizeObserver and retain horizontal-scroll state. The existing code-copy and lightbox behaviors, first/second-image click and Enter/Space, zoom, next/previous and Esc all remain covered. Verify search, mobile access, games, RSS and transfer budgets remain stable.
+- **Finding:** each Markdown table created its own ResizeObserver and scroll event listener, in addition to an initial measurement callback. Long technical articles can contain many tables; these observers and callbacks need not scale per table.
+- **Change:** keep the established idle scheduling and Safari timeout fallback unchanged. Reuse one ResizeObserver for all prose tables and its initial observation notification for scrollability; avoid duplicate per-table scroll listeners and first-frame measurements. Keep the original lightbox handlers and URL behavior unchanged. Proposed broader rewrites were rejected when they exceeded the strict JS gzip budget.
+- **Regression:** Chromium injects a second table before enhancement, verifies both share a single ResizeObserver and horizontal-scroll state reacts to width changes. It also preserves code-copy, lightbox mouse/Enter/Space, zoom, next/previous and Esc checks, plus search, mobile, games, RSS and transfer budget gates.
 - **Guardrails:** no dependency, route, author content or theme changes; keep original CSS/JS caps and main Quality→Pages gate. Require latest PR SHA to pass all CI and verify merge SHA on main and Pages.
 
 ## Completed: TOC synchronization and long-page scroll efficiency (2026-10-29)
