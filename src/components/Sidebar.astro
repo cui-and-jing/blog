@@ -18,8 +18,8 @@ const notes = await getNotes();
 const tagBuckets = collectTags(posts, notes);
 const tags = tagBuckets.slice(0, 14);
 
-// 最近更新覆盖文章与笔记；文章详情页不向读者推荐正在看的同一篇。
-// 文章和笔记各自已按日期倒序，稳定排序在同一天时保留原有顺序。
+// 最近更新覆盖文章与笔记；文章页不向读者推荐正在看的同一篇。
+// 文章和笔记各自已按日期倒序，按日期排序，同一天保留原有顺序。
 const recent = [
   ...posts.filter((post) => post.id !== currentId).map((post) => ({
     type: 'post',
