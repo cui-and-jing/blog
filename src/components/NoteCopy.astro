@@ -46,8 +46,7 @@
     const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-note-link]');
     if (!button) return;
 
-    const path = button.dataset.noteLink ?? '';
-    const link = path.startsWith('http') ? path : `${location.origin}${path}`;
+    const link = new URL(button.dataset.noteLink ?? '', location.origin).href;
     const label = button.querySelector('span');
     const ok = await copyText(link);
 
