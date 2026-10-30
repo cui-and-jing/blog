@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: article font-size controls on touch screens (2026-10-30)
+## Current iteration: mobile dialog touch targets (2026-10-30)
+
+- **Finding:** The article font-size toolbar already has 44px targets, but the shared reading-settings dialog still renders its segmented choices at 30px high, and the settings, navigation and shortcut dialogs have 28px close buttons. The settings footer actions are also small touch targets.
+- **Change:** On narrow screens, make settings segments at least 44x44, all three shared dialog close buttons 44x44, and settings footer actions 44px high; keep existing compact desktop sizing and all settings logic.
+- **Regression:** Extend the real Chromium keyboard/accessibility suite at 320px and 390px, checking all eleven settings choices, footer actions and dialog close hit rectangles, no horizontal overflow, real touch changes to reading size, touch-to-close behavior and expanded-state updates. Existing keyboard, game, build and budget gates remain mandatory.
+- **Guardrails:** No content, URL, dependency, browser JavaScript, game, or budget changes. Require latest PR Quality success and mergeability, then main Quality and Pages deployment success on the exact merge SHA.
+
+## Completed: article font-size controls on touch screens (2026-10-30)
 
 - **Finding:** The three inline article font-size buttons were only 32x24 CSS pixels, below the 44x44 touch target used elsewhere on mobile. Their visible A-/A/A+ text also hid the intended size choice from screen readers.
 - **Change:** Give the size buttons a minimum 44x44 target on narrow screens or coarse pointers, keep compact desktop dimensions, and add accessible size labels without changing the reading preference logic.
