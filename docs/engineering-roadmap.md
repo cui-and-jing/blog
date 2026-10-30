@@ -26,6 +26,7 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 
 - **Finding:** Card cover sheen and game cover sheen pseudo-elements repeat exactly the same positioning, transform, opacity and pointer-event declarations. Only widths and gradient strengths differ. Keeping duplicate blocks adds CSS maintenance cost close to the strict gzip cap.
 - **Change:** Share the identical pseudo-element declarations while preserving the original distinct widths, gradients, hover animations and reduced-motion boundary. Do not change navigation, routes, game logic, JS or dependencies.
+- **Budget correction:** The first complete PR run failed only because CSS gzip was 21,508/21,504 bytes; remove the `sheen` keyframe's duplicate 0% state and let the exact same base pseudo-element transform/opacity provide the implicit starting state, preserving 18%/100% animation frames and strict limits.
 - **Regression:** Chromium tests the two pseudo-elements' computed motion properties and their distinct gradient strengths with motion enabled. Keep all existing visual, keyboard, accessibility, game, print and network budget checks.
 - **Release:** The built CSS gzip budget is authoritative, not source character savings. Do not raise any cap. Merge only on fully successful latest PR-head Quality, then verify main Quality and Pages deployment on the exact merge SHA.
 
