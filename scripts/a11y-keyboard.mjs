@@ -124,7 +124,8 @@ const check = (name, pass, detail = '') => {
     fixture.remove();
     return result;
   });
-  const shared = ['content', 'position', 'top', 'bottom', 'left', 'transform', 'opacity', 'pointerEvents'];
+  // Percentage offsets resolve to different pixel values in differently sized containers.
+  const shared = ['content', 'position', 'left', 'transform', 'opacity', 'pointerEvents'];
   check('Article and game sheen share computed motion properties',
     shared.every((key) => styles.cover[key] === styles.game[key])
       && styles.cover.content !== 'none'
