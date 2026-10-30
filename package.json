@@ -34,6 +34,7 @@
     "visual:update": "node scripts/visual-regression.mjs --update",
     "rss:check": "node scripts/rss-check.mjs",
     "links:check": "node scripts/built-links.test.mjs && node scripts/built-links-check.mjs",
+    "tags:check": "node scripts/tag-discovery.test.mjs",
     "sitemap:check": "node scripts/sitemap-check.mjs"
   },
   "dependencies": {
