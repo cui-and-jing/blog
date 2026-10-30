@@ -95,6 +95,49 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- Shared decorative sheen: same motion, distinct gradients ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+  await page.goto(base + '/', { waitUntil: 'load' });
+  const styles = await page.evaluate(() => {
+    const fixture = document.createElement('div');
+    fixture.style.cssText = 'position:absolute;left:-10000px;width:200px;height:120px';
+    fixture.innerHTML = '<div class="cover-sheen"></div><div class="game-art"></div>';
+    document.body.append(fixture);
+    const read = (selector) => {
+      const s = getComputedStyle(fixture.querySelector(selector), '::after');
+      return {
+        content: s.content,
+        position: s.position,
+        top: s.top,
+        bottom: s.bottom,
+        left: s.left,
+        transform: s.transform,
+        opacity: s.opacity,
+        pointerEvents: s.pointerEvents,
+        background: s.backgroundImage,
+      };
+    };
+    const result = { cover: read('.cover-sheen'), game: read('.game-art') };
+    fixture.remove();
+    return result;
+  });
+  const shared = ['content', 'position', 'top', 'bottom', 'left', 'transform', 'opacity', 'pointerEvents'];
+  check('Article and game sheen share computed motion properties',
+    shared.every((key) => styles.cover[key] === styles.game[key])
+      && styles.cover.content !== 'none'
+      && styles.cover.position === 'absolute'
+      && styles.cover.opacity === '0'
+      && styles.cover.pointerEvents === 'none',
+    JSON.stringify({ cover: styles.cover, game: styles.game }));
+  check('Decorative sheen retains its two distinct gradient strengths',
+    styles.cover.background.includes('0.5') && styles.game.background.includes('0.45'),
+    'cover=' + styles.cover.background + '; game=' + styles.game.background);
+  await page.close();
+}
+
 /* ---------- 1. 首页 Tab 顺序与焦点环 ---------- */
 {
   const page = await browser.newPage();
