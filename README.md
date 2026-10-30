@@ -567,9 +567,10 @@ author: cui      # 或 jing
 - `rss.xml` 输出**全文**（`content:encoded`）而不只是摘要，订阅器里能直接读完；
   正文里的 `/blog/...` 与 `#锚点` 会补成绝对地址，避免在阅读器里点不开。
 - `robots.txt` 由 `src/pages/robots.txt.ts` 生成，自动带上 sitemap 地址；
-  404 页带 `noindex`，搜索页不进 sitemap（纯客户端工具，没有独立内容）。
-- sitemap 带 `lastmod`：文章取 `updated`（没写就取 `date`），首页 / 归档 / 标签页 / 分类页 / 系列页
-  取该页涉及文章里最新的一天。没有日期的静态页不写，不拿构建时间凑数。
+  404、搜索、排版样例和 `noindex` 笔记独立页均不进 sitemap。
+- sitemap 带 `lastmod`：文章取 `updated`（没写就取 `date`），分类 / 归档 / 系列由文章更新；
+  **标签详情和标签首页同时统计文章与笔记**，只属于笔记的标签也正确记录更新日期；首页取文章与笔记较新者，
+  笔记首页取最新笔记。没有日期的静态页不写，不拿构建时间凑数。
 - 页头有「跳到正文」链接，键盘 Tab 第一下就能用。
 
 ### 图标与站点清单
@@ -651,6 +652,7 @@ npm run lint:content  # 不需要构建：frontmatter、标题层级、图片、
 npm run fonts:check   # 不需要构建：正文用字是否都在字体子集里（缺字会静默回退）
 npm run fonts:check:pages # 需要 dist：逐页核对「公共片 + 该页增量片」是否覆盖了该页所有字
 npm run links:check    # 需要 dist：检查构建后的站内链接、静态资源和章节锚点（含单元测试）
+npm run sitemap:check  # 需要 dist：核查站点地图与文章/笔记更新时间，拦截 noindex 页面
 npm run fonts         # 需要 .fonts/ 源字体与 dist：重新裁子集，产物要提交
 npm run check         # astro check：类型与模板
 npm run budget        # 需要 dist：主站五类上限 + 五个游戏页逐页 gzip 上限
@@ -662,7 +664,7 @@ npm run a11y          # 需要先 build + preview：axe-core 扫全站 27 条路
 npm run a11y:keys     # 需要先 build + preview：Tab 顺序、焦点环、复制播报、设置面板、快捷键表、移动端抽屉、触控目标 44px
 npm run visual        # 需要先 build + preview：21 条路由 × 浅/深 × 3 视口，和基线逐像素比
 npm run visual:update # 样式改动确认无误后重建基线
-npm run preflight     # 一条命令串起：og → lint → fonts → check → 构建 → 链接检查 → budget → 字体按页 → 浏览器回归
+npm run preflight     # 一条命令串起：og → lint → fonts → check → 构建 → 链接与 sitemap → budget → 字体按页 → 浏览器回归
 ```
 
 `preflight` 会自己起 `astro preview` 并在结束时收掉，任何一步失败就停；`--ci` 跳过分享封面

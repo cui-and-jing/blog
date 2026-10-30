@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: shared table observation and long-prose browser regression (2026-10-30)
+## Current iteration: sitemap note-tag freshness and discovery contract (2026-10-30)
+
+- **Finding:** tag pages aggregate both articles and notes, but `astro.config.mjs` sitemap lastmod included only article tags. New note-only tags had no lastmod and shared tags could report stale article timestamps; the tag index could similarly lag behind a newer note.
+- **Change:** factor build-only frontmatter scanning and lastmod aggregation into a shared helper. Update note-driven tag detail/index timestamps, preserve article/archive/series behavior and home/notes freshness; exclude noindex 404 fallback from sitemap.
+- **Regression:** run fixture-based tests for shared tags, note-only tags, untagged notes and date precedence. After every build, compare expected routes and lastmod with emitted sitemap XML, validate robots sitemap URL and noindex exclusions; integrate in PR/main Quality and local preflight.
+- **Guardrails:** no frontend JS/CSS, URL, game, content or dependency change. Do not relax budgets or Pages gate; merge only after latest PR Quality succeeds and verify main Quality + Pages use the exact merge SHA.
+
+## Completed: shared table observation and long-prose browser regression (2026-10-30)
 
 - **Finding:** each Markdown table created its own ResizeObserver and scroll event listener, in addition to an initial measurement callback. Long technical articles can contain many tables; these observers and callbacks need not scale per table.
 - **Change:** keep the established idle scheduling and Safari timeout fallback unchanged. Reuse one ResizeObserver for all prose tables and its initial observation notification for scrollability; avoid duplicate per-table scroll listeners and first-frame measurements. Keep the original lightbox handlers and URL behavior unchanged. Proposed broader rewrites were rejected when they exceeded the strict JS gzip budget.
