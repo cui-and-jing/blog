@@ -4,6 +4,7 @@ import Analytics from '../components/Analytics.astro';
 import fontFiles from '../data/font-files.json';
 import fontPages from '../data/font-pages.json';
 import { SITE, NAV, url, mediaUrl, base } from '../lib/site';
+import { activityDate } from '../lib/recent-date.mjs';
 
 interface Props {
   title?: string;
@@ -34,6 +35,8 @@ const fontPath = Astro.url.pathname.slice(base.length) || '/';
 type FontFaceEntry = { file: string | null; range: string; chars: string; count?: number };
 const fontPage = (fontPages.pages as Record<string, FontFaceEntry>)[fontPath] ?? null;
 const ogImage = image ? new URL(mediaUrl(image), siteRoot).toString() : `${siteRoot}${url('/og.png')}`;
+const modifiedAt = article ? activityDate({ date: article.published, updated: article.updated }) : null;
+const revised = Boolean(article && modifiedAt && modifiedAt.getTime() > article.published.getTime());
 
 const websiteSchema = {
   '@context': 'https://schema.org',
@@ -58,7 +61,7 @@ const articleSchema = article
       url: canonical,
       mainEntityOfPage: canonical,
       datePublished: article.published.toISOString(),
-      dateModified: (article.updated ?? article.published).toISOString(),
+      dateModified: modifiedAt!.toISOString(),
       inLanguage: SITE.lang,
       image: ogImage,
       /* 署名给到具体的人，而不是把两个人绑成一个字符串。
@@ -155,7 +158,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content={pageTitle} />
     {article && <meta property="article:published_time" content={article.published.toISOString()} />}
-    {article?.updated && <meta property="article:modified_time" content={article.updated.toISOString()} />}
+    {revised && <meta property="article:modified_time" content={modifiedAt!.toISOString()} />}
     {article?.tags.map((tag) => <meta property="article:tag" content={tag} />)}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={pageTitle} />
