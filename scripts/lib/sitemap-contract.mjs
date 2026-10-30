@@ -123,7 +123,7 @@ export function auditSitemap({
       const relative = route.replace(/^\/+/, '');
       const candidates = [
         relative,
-        relative.replace(/\/?$/, '/') + 'index.html',
+        relative ? relative.replace(/\/?$/, '/') + 'index.html' : 'index.html',
       ];
       const targetFile = candidates.map((candidate) => path.resolve(root, candidate))
         .find((candidate) => candidate.startsWith(root + path.sep)
