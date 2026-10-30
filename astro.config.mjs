@@ -83,7 +83,12 @@ function collectLastmod() {
   const latestNote = notes.reduce((acc, note) => (!acc || note.date > acc ? note.date : acc), null);
   if (latestNote) {
     bump('/notes/', latestNote);
+    bump('/tags/', latestNote);
     bump('/', latestNote);
+  }
+  /* Tag pages aggregate both articles and notes, so note-only changes refresh lastmod. */
+  for (const note of notes) {
+    for (const tag of note.tags) bump(`/tags/${tag}/`, note.date);
   }
   if (latest) bump('/', latest);
 
@@ -106,7 +111,7 @@ export default defineConfig({
          笔记独立页带 noindex，也不该一边说别索引、一边写进 sitemap */
       filter: (page) => {
         const path = page.replace(/\/$/, '');
-        if (/\/(search|styleguide)$/.test(path)) return false;
+        if (/\/(search|styleguide|404(?:\.html)?)$/.test(path)) return false;
         return !/\/notes\/[^/]+$/.test(path);
       },
       serialize: (item) => {

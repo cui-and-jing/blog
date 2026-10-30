@@ -83,6 +83,8 @@ async function main() {
     console.log('· 跳过构建（--skip-build），直接检查现有 dist');
   }
 
+  run('站点地图契约单测', 'node', ['scripts/sitemap-check.test.mjs']);
+  run('站点地图收录和更新时间', 'node', ['scripts/sitemap-check.mjs']);
   run('构建链接和资源完整性', 'node', ['scripts/built-links.test.mjs']);
   run('站点路由、资源和章节锚点', 'node', ['scripts/built-links-check.mjs']);
   run('体积预算', 'node', ['scripts/budget.mjs']);

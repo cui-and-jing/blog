@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: shared table observation and long-prose browser regression (2026-10-30)
+## Current iteration: sitemap freshness and published-index integrity (2026-10-30)
+
+- **Finding:** tag pages aggregate posts and notes, but the sitemap lastmod calculation only considered post tags, so note-only tags and the main tag index could appear stale after new notes. The sitemap filter also did not explicitly exclude the noindex 404 fallback.
+- **Scope:** refresh tag routes and /tags/ from published note dates without changing the existing article/series/category semantics. Explicitly exclude the 404 fallback from sitemap indexing.
+- **Regression:** add a build-output sitemap contract: robots sitemap-index, emitted routes, noindex exclusions, 404 exclusion and dynamic freshness for all published note tags. Fixture tests must fail for stale or missing note tags and incorrect robots settings.
+- **Guardrails:** zero client JS/CSS, no dependency or URL changes, no game modifications or relaxed budgets. Merge only after latest PR Quality succeeds and verify main Quality and Pages for the merge SHA.
+
+## Completed: shared table observation and long-prose browser regression (2026-10-30)
 
 - **Finding:** each Markdown table created its own ResizeObserver and scroll event listener, in addition to an initial measurement callback. Long technical articles can contain many tables; these observers and callbacks need not scale per table.
 - **Change:** keep the established idle scheduling and Safari timeout fallback unchanged. Reuse one ResizeObserver for all prose tables and its initial observation notification for scrollability; avoid duplicate per-table scroll listeners and first-frame measurements. Keep the original lightbox handlers and URL behavior unchanged. Proposed broader rewrites were rejected when they exceeded the strict JS gzip budget.

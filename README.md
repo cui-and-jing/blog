@@ -568,8 +568,12 @@ author: cui      # 或 jing
   正文里的 `/blog/...` 与 `#锚点` 会补成绝对地址，避免在阅读器里点不开。
 - `robots.txt` 由 `src/pages/robots.txt.ts` 生成，自动带上 sitemap 地址；
   404 页带 `noindex`，搜索页不进 sitemap（纯客户端工具，没有独立内容）。
-- sitemap 带 `lastmod`：文章取 `updated`（没写就取 `date`），首页 / 归档 / 标签页 / 分类页 / 系列页
-  取该页涉及文章里最新的一天。没有日期的静态页不写，不拿构建时间凑数。
+- sitemap 带 `lastmod`：文章取 `updated`（没写就取 `date`）；标签首页与标签详情页
+  同时参考文章和笔记的最新日期，笔记更新也会刷新对应标签页面。归档、分类、系列仍依据文章；
+  首页取文章和笔记两者最新日期，静态页不拿构建时间凑数。
+- `npm run sitemap:check` 在构建后检查 robots 里的 sitemap 地址、生成的所有 sitemap 页面是否存在、
+  `noindex` 页面及 404 是否被错误收录，以及笔记相关页面的 `lastmod` 是否过期。
+  该检查已加入 CI 与 `preflight`，不增加访客下载的 JS/CSS。
 - 页头有「跳到正文」链接，键盘 Tab 第一下就能用。
 
 ### 图标与站点清单
@@ -653,6 +657,7 @@ npm run fonts:check:pages # 需要 dist：逐页核对「公共片 + 该页增�
 npm run links:check    # 需要 dist：检查构建后的站内链接、静态资源和章节锚点（含单元测试）
 npm run fonts         # 需要 .fonts/ 源字体与 dist：重新裁子集，产物要提交
 npm run check         # astro check：类型与模板
+npm run sitemap:check # 需要 dist：站点地图收录、robots、noindex 与笔记标签更新时间
 npm run budget        # 需要 dist：主站五类上限 + 五个游戏页逐页 gzip 上限
 npm run budget:wire   # 需要先 build + preview：实测 12 条路由（含六个游戏路由）首次访问的传输字节与字体字节
 npm run perf          # 需要先 build + preview：Slow 4G + 4× CPU 下实测 LCP / CLS / TBT 与首屏字节
