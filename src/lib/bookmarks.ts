@@ -6,7 +6,7 @@ export const BOOKMARKS_KEY = 'cui-jing:saved-posts:v1';
 const LIMIT = 500;
 let session: string[] = [];
 // Only use in-memory values when a storage write was actually blocked.
-let sessionOnly = false;
+let sessionOnly: boolean | undefined;
 
 function clean(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
