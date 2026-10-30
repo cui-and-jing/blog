@@ -34,7 +34,18 @@ const check = (name, pass, detail = '') => {
     const sample = document.createElement('p');
     sample.innerHTML = '<a data-print-external class="external-link" href="https://example.com/print?item=1">External reference</a> <a data-print-internal href="/blog/posts/">Internal reference</a>';
     prose.append(sample);
+    prose.insertAdjacentHTML('beforeend',
+      '<details class="details" data-print-collapsed><summary>Optional steps</summary><div class="details-body">Printable closed steps</div></details>'
+      + '<details class="details" data-print-expanded open><summary>Expanded steps</summary><div class="details-body">Printable open steps</div></details>');
   });
+  const readDetails = () => page.evaluate(() =>
+    ['[data-print-collapsed]', '[data-print-expanded]'].map((selector) => {
+      const detail = document.querySelector(selector);
+      return {
+        open: detail.open,
+        visibility: getComputedStyle(detail, '::details-content').contentVisibility,
+      };
+    }));
   const readLinks = () => page.evaluate(() => {
     const external = document.querySelector('[data-print-external]');
     const internal = document.querySelector('[data-print-internal]');
@@ -49,11 +60,21 @@ const check = (name, pass, detail = '') => {
     };
   });
   await page.emulateMediaType('screen');
+  const screenDetails = await readDetails();
+  check('Screen keeps closed details collapsed',
+    !screenDetails[0].open && screenDetails[0].visibility === 'hidden'
+      && screenDetails[1].open && screenDetails[1].visibility === 'visible',
+    JSON.stringify(screenDetails));
   const screen = await readLinks();
   check('Screen external-link icon is preserved',
     screen.display === 'inline-block' && screen.mask !== 'none',
     'display=' + screen.display + ', mask=' + screen.mask.slice(0, 16));
   await page.emulateMediaType('print');
+  const printDetails = await readDetails();
+  check('Print reveals collapsed details content',
+    !printDetails[0].open && printDetails[0].visibility === 'visible'
+      && printDetails[1].open && printDetails[1].visibility === 'visible',
+    JSON.stringify(printDetails));
   const print = await readLinks();
   check('Print external-link address is visible and unmasked',
     print.display !== 'none'
@@ -65,6 +86,12 @@ const check = (name, pass, detail = '') => {
   check('Print does not append URL to internal links',
     ['none', 'normal', '""'].includes(print.internalContent),
     'internal=' + print.internalContent);
+  await page.emulateMediaType('screen');
+  const restoredDetails = await readDetails();
+  check('Printing does not change details state on screen',
+    !restoredDetails[0].open && restoredDetails[0].visibility === 'hidden'
+      && restoredDetails[1].open && restoredDetails[1].visibility === 'visible',
+    JSON.stringify(restoredDetails));
   await page.close();
 }
 
