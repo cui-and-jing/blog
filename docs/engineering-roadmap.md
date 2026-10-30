@@ -24,10 +24,10 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 
 ## Current iteration: consolidate note stylesheet declarations (2026-10-30)
 
-- **Finding:** Several note surfaces repeat identical declarations for flex footers, list resets, muted timestamps, link underlines and copy/permalink hover states. With CSS near its 108 KiB raw and 21 KiB gzip caps, these duplications consume scarce headroom.
-- **Change:** Group selectors within `notes.css` while preserving each original selector's specificity and all page-level overrides. Remove 705 redundant source bytes; leave breakpoint logic, routes, content, runtime JavaScript, dependencies and games unchanged.
-- **Regression:** Compare the final declarations of 22 affected selectors against the original stylesheet before committing; require the full PR Quality suite (including output CSS and first-visit transfer budgets, light/dark accessibility and keyboard/browser checks). Do not treat source byte reduction alone as evidence of smaller deployed CSS.
-- **Release:** Merge only if the latest PR head is green and mergeable; verify main Quality then Pages build/deploy against the exact squash merge SHA. Do not increase the CSS or JS budgets.
+- **Finding:** The note stylesheet has repeated footer, timestamp, grid-frame and link declarations while the generated CSS gzip is near its strict 21 KiB limit. Initial grouped-selector changes reduced source bytes but failed full CI: the latest failed PR run measured **21,515 / 21,504 gzip bytes**.
+- **Change:** Keep the original selector specificity, combine identical grid-frame declarations across the home note strip, tag-note list and archive-note list, and remove two earlier `text-decoration: none` declarations that are already overridden by later underlined link rules. This follow-up removes another 273 source bytes without changing breakpoints, routes, content, runtime JavaScript, dependencies or games.
+- **Regression:** Check effective final declarations for affected note selectors against the previous PR source; six target selectors match after the follow-up refactor. Require the **latest PR head SHA** to pass the full Quality suite, including built CSS gzip, fonts, build, links, RSS, games, accessibility, mobile keyboard/browser and first-visit budget checks. Source byte savings alone are not a pass.
+- **Release:** Keep this PR in draft until verified. Do not raise resource budgets or merge failing tests; after a green, mergeable PR, squash-merge and require main Quality plus Pages build/deploy on the exact merge SHA.
 
 ## Completed: mobile dialog touch targets (2026-10-30)
 
