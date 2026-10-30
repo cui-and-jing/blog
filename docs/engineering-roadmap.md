@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: unified article + note recent updates (2026-10-30)
+## Current iteration: search fallback covers notes and posts (2026-10-30)
+
+- **Finding:** Empty search suggestions say “最近更新” but offer only articles, even when notes were published more recently. On the homepage a separate article-only card group also says “最近更新”, despite a dedicated latest-note section.
+- **Change:** Use the newest three published posts and notes in the no-result search fallback, consistently ordered with the sidebar; add screen-reader type prefixes and dates. Rename the homepage article-only heading “最近文章” to distinguish it from mixed updates.
+- **Regression:** Check the built search fallback hrefs, dates and accessible type labels against the published search index; assert that the homepage article section is accurately named. Run in PR/main Quality and local preflight.
+- **Guardrails:** no new routes, dependencies, frontend JavaScript or CSS, content changes, game changes, or budget increases. Merge only on latest green PR SHA and verify main Quality + Pages on the exact merge commit.
+
+## Completed: unified article + note recent updates (2026-10-30)
 
 - **Finding:** The sidebar says “最近更新” but lists articles only. The latest notes (October 20 and 22) never appear, even though notes are first-class content in search, tags and archive.
 - **Change:** Merge posts and notes into a stable newest-first sidebar list, keep the existing four-item limit, and omit the currently opened article on article detail pages. Add screen-reader-only type prefixes without changing visual card styles.

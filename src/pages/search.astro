@@ -2,14 +2,27 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { url, formatDate, readingTime, base } from '../lib/site';
 import { getPosts } from '../lib/posts';
-import { getNotes } from '../lib/notes';
+import { getNotes, noteTitle } from '../lib/notes';
 import { collectTags } from '../lib/tags';
 
 const posts = await getPosts();
 const notes = await getNotes();
 
-/* 无结果时的兜底：给几篇最近的文章和几个高频标签，比干巴巴一句「换个词」有用 */
-const recent = posts.slice(0, 3);
+/* Search fallback should reflect published notes as well as posts. */
+const recent = [
+  ...posts.map((post) => ({
+    type: 'post' as const,
+    title: post.data.title,
+    date: post.data.date,
+    href: url(`/posts/${post.id}/`),
+  })),
+  ...notes.map((note) => ({
+    type: 'note' as const,
+    title: noteTitle(note),
+    date: note.data.date,
+    href: url(`/notes/${note.id}/`),
+  })),
+].sort((a, b) => b.date.valueOf() - a.date.valueOf()).slice(0, 3);
 const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 ---
 
@@ -111,10 +124,13 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
             <div class="search-suggest-group">
               <h2>最近更新</h2>
               <ul>
-                {recent.map((post) => (
+                {recent.map((item) => (
                   <li>
-                    <a href={url(`/posts/${post.id}/`)}>{post.data.title}</a>
-                    <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+                    <a href={item.href}>
+                      <span class="sr-only">{item.type === 'note' ? '笔记：' : '文章：'}</span>
+                      {item.title}
+                    </a>
+                    <time datetime={item.date.toISOString()}>{formatDate(item.date)}</time>
                   </li>
                 ))}
               </ul>
