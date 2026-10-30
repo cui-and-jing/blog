@@ -36,6 +36,7 @@
     "links:check": "node scripts/built-links.test.mjs && node scripts/built-links-check.mjs",
     "tags:check": "node scripts/tag-discovery.test.mjs",
     "recent:check": "node scripts/recent-discovery.test.mjs",
+    "search:suggest:check": "node scripts/search-suggestions.test.mjs",
     "sitemap:check": "node scripts/sitemap-check.mjs"
   },
   "dependencies": {
