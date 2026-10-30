@@ -89,6 +89,7 @@ async function main() {
   run('站点路由、资源和章节锚点', 'node', ['scripts/built-links-check.mjs']);
   run('全站标签入口一致性', 'node', ['scripts/tag-discovery.test.mjs']);
   run('侧栏文章与笔记最近更新顺序', 'node', ['scripts/recent-discovery.test.mjs']);
+  run('Home and series editorial activity', 'node', ['scripts/activity-freshness.test.mjs']);
   run('Search recent fallback chronology', 'node', ['scripts/search-suggestions.test.mjs']);
   run('系列接着读章节顺序', 'node', ['scripts/related-reading.test.mjs']);
   run('站点地图更新时间与索引规则', 'node', ['scripts/sitemap-check.mjs']);

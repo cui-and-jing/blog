@@ -10,6 +10,7 @@ import { getPosts } from '../lib/posts';
 import { getNotes, noteText } from '../lib/notes';
 import { collectTags } from '../lib/tags';
 import { collectSeries } from '../lib/series';
+import { latestActivity } from '../lib/recent-date.mjs';
 
 const posts = await getPosts();
 /* featured 字段原来只是躺在 schema 里，首页永远取最新一篇——标了置顶也不生效 */
@@ -22,9 +23,10 @@ const allNotes = await getNotes();
 const notes = allNotes.slice(0, 3);
 /* 标签与「最近更新」都横跨文章和笔记：只数文章会让首页在刚发过笔记时显示旧日期 */
 const tagCount = collectTags(posts, allNotes).length;
-const latest = [posts[0]?.data.date, allNotes[0]?.data.date]
-  .filter((date): date is Date => Boolean(date))
-  .sort((a, b) => b.valueOf() - a.valueOf())[0];
+const latest = latestActivity([
+  ...posts.map((post) => post.data),
+  ...allNotes.map((note) => note.data),
+]);
 const days = daysSince(SITE.since);
 
 const excerpt = (text: string, limit = 72) =>
