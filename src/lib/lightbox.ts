@@ -120,16 +120,17 @@ export function setupLightbox(): void {
         });
 
         /* 一篇长文只绑定两个委托事件，不随图片数量增加监听器。 */
-        const activateImage = (event: MouseEvent | KeyboardEvent) => {
-          if (event.type === 'keydown' && !['Enter', ' '].includes((event as KeyboardEvent).key)) return;
-          if (!(event.target instanceof HTMLImageElement)) return;
-          const i = lightboxImages.indexOf(event.target);
-          if (i < 0) return;
+        const activateImage = (event: Event) => {
+          if ((event.target as Element)?.tagName !== 'IMG') return;
+          const index = lightboxImages.indexOf(event.target as HTMLImageElement);
+          if (index < 0) return;
           event.preventDefault();
-          openLightbox(i);
+          openLightbox(index);
         };
         document.addEventListener('click', activateImage);
-        document.addEventListener('keydown', activateImage);
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') activateImage(event);
+        });
 
         /* 缩放：滚轮以指针为中心，双击在 1× 与 2.4× 之间切换 */
         stage.addEventListener(
