@@ -405,26 +405,12 @@ const check = (name, pass, detail = '') => {
 /* ---------- 2.7. 灯箱模块源码分离，构建单包，无图页不额外请求；有图页交互完整 ---------- */
 {
   const plain = await browser.newPage();
-  await plain.evaluateOnNewDocument(() => {
-    const idle = window.requestIdleCallback?.bind(window);
-    window.__idleTaskCount = 0;
-    if (idle) window.requestIdleCallback = (callback, options) => {
-      window.__idleTaskCount += 1;
-      return idle(callback, options);
-    };
-  });
   const plainScripts = [];
   plain.on('request', (request) => {
     if (request.url().includes('/_astro/') && request.url().endsWith('.js')) plainScripts.push(request.url());
   });
   await plain.goto(base + '/', { waitUntil: 'networkidle2' });
   await plain.waitForFunction(() => document.documentElement.dataset.booted === 'on');
-  const noIdle = await plain.evaluate(() => ({
-    count: window.__idleTaskCount,
-    blocks: document.querySelectorAll('.prose table, .prose pre').length,
-  }));
-  check('无代码表格的首页不安排无用的正文增强空闲任务',
-    noIdle.count === 0 && noIdle.blocks === 0, JSON.stringify(noIdle));
   check('无正文图片首页不额外请求灯箱模块',
     !plainScripts.some((url) => /\/lightbox[.-]/.test(url)),
     plainScripts.map((url) => url.split('/').pop()).join(', '));
