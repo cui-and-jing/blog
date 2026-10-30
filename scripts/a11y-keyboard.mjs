@@ -528,7 +528,7 @@ const check = (name, pass, detail = '') => {
   await gallery.keyboard.press('Enter');
   await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === true);
   const enterSrc = await gallery.evaluate(() => document.getElementById('lightbox-img')?.getAttribute('src'));
-  check('第二张图片可通过 Enter 使用委托事件打开', focusSecond && enterSrc === changed,
+  check('第二张图片可通过 Enter 正常打开', focusSecond && enterSrc === changed,
     JSON.stringify({ focusSecond, enterSrc }));
   await gallery.keyboard.press('Escape');
   await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === false);
@@ -536,9 +536,22 @@ const check = (name, pass, detail = '') => {
   await gallery.evaluate(() => document.querySelector('.prose img')?.focus());
   await gallery.keyboard.press('Space');
   await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === true);
-  const spaceSrc = await gallery.evaluate(() => document.getElementById('lightbox-img')?.getAttribute('src'));
-  check('第一张图片可通过空格键打开并保持正文位置',
-    spaceSrc === originalSrc, JSON.stringify({ spaceSrc, originalSrc }));
+  const spaceState = await gallery.evaluate(() => {
+    const first = document.querySelector('.prose img');
+    const view = document.getElementById('lightbox-img');
+    return {
+      source: view?.getAttribute('src') ?? '',
+      alt: view?.getAttribute('alt') ?? '',
+      expectedAlt: first?.getAttribute('alt') ?? '',
+      original: document.getElementById('lightbox-origin')?.href ?? '',
+      expectedOriginal: first?.src ?? '',
+    };
+  });
+  /* AVIF/WebP currentSrc may vary with responsive selection and decoding timing. */
+  check('第一张图片可通过空格键打开且保留图片身份与原图链接',
+    Boolean(spaceState.source) && spaceState.source !== changed &&
+    spaceState.alt === spaceState.expectedAlt &&
+    spaceState.original === spaceState.expectedOriginal, JSON.stringify(spaceState));
   await gallery.keyboard.press('Escape');
   await gallery.close();
 }
