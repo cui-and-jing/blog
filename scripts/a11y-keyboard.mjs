@@ -377,7 +377,9 @@ const check = (name, pass, detail = '') => {
     check(width + 'px real touch updates reading size', pressed === 'true', String(pressed));
 
     await tap('#settings-panel .panel-close');
-    await page.waitForFunction(() => !document.getElementById('settings-panel')?.open);
+    await page.waitForFunction(() => !document.getElementById('settings-panel')?.open &&
+      document.getElementById('settings-toggle')?.getAttribute('aria-expanded') === 'false',
+    { timeout: 5000 });
     const expanded = await page.$eval('#settings-toggle', (button) => button.getAttribute('aria-expanded'));
     check(width + 'px touch closes settings and restores expanded state', expanded === 'false', expanded);
 
