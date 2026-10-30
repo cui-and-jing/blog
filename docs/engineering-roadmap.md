@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: preserve note copy failure feedback (2026-10-31)
+## Current iteration: respect cross-tab reading-list removal (2026-10-31)
+
+- **Finding:** A tab that previously saved a post retains an in-memory copy. When another tab deletes the saved-post key or clears site storage, the first tab receives the storage event, but `readBookmarks()` falls back to the stale in-memory copy when the key is absent, leaving bookmark buttons and the saved-only filter wrong.
+- **Change:** Clear the in-memory fallback only after `localStorage.setItem` succeeds. Keep the session copy when a write is denied; after persistence succeeds, a missing key correctly indicates a later removal. Preserve the existing versioned storage key and same-tab behavior.
+- **Regression:** Chromium opens two tabs, saves a post, activates the saved-only filter, and clears saved-posts from the second tab using both `removeItem` and `clear`. Verify the first tab receives correct unpressed bookmarks, zero count, empty filtered list and unchanged saved-only URL. Run full Quality and maintain all performance and deployment gates.
+- **Release:** Isolated branch, no extra dependency, content, CSS, routes or games, and no raised budgets. Merge only when latest-head Quality is green and the PR is clean; then verify main Quality and Pages for the same merge SHA.
+
+## Completed: preserve note copy failure feedback (2026-10-31)
 
 - **Finding:** The shared note-copy handler falls back to legacy `execCommand('copy')` if Clipboard API permission is unavailable. If both paths fail, it only updates the screen-reader live region and clears `location.hash`; sighted users receive no visible failure feedback and a failed copy silently alters a deep-link fragment.
 - **Change:** Show a temporary `复制失败` label using the existing 1.6-second reset, keep the descriptive live-region announcement, and never mutate the current URL on clipboard failure. Keep successful modern and legacy copy paths, routes, styles, dependencies, post content, and games unchanged.
