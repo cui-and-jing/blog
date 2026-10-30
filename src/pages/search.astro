@@ -373,9 +373,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       });
 
       /* Another tab may add or clear recent searches while this page stays open. */
-      addEventListener('storage', ({ key }) => {
-        if (!key || key === HISTORY_KEY) renderHistory();
-      });
+      addEventListener('storage', (event) => (!event.key || event.key === HISTORY_KEY) && renderHistory());
 
       const apply = (syncUrl = true) => {
         if (!ready) return;
@@ -444,7 +442,6 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       };
 
       typeButtons.forEach((button) => button.addEventListener('click', () => {
-        if (button.disabled) return;
         const next = pageUrl();
         next.searchParams.set('type', button.dataset.searchType!);
         history.pushState(null, '', next);
