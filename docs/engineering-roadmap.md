@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: mobile dialog touch targets (2026-10-30)
+## Current iteration: consolidate note stylesheet declarations (2026-10-30)
+
+- **Finding:** The note stylesheet has repeated footer, timestamp, grid-frame and link declarations while the generated CSS gzip is near its strict 21 KiB limit. Initial grouped-selector changes reduced source bytes but failed full CI: the latest failed PR run measured **21,515 / 21,504 gzip bytes**.
+- **Change:** Keep the original selector specificity, combine identical grid-frame declarations across the home note strip, tag-note list and archive-note list, and remove two earlier `text-decoration: none` declarations that are already overridden by later underlined link rules. This follow-up removes another 273 source bytes without changing breakpoints, routes, content, runtime JavaScript, dependencies or games.
+- **Regression:** Check effective final declarations for affected note selectors against the previous PR source; six target selectors match after the follow-up refactor. Require the **latest PR head SHA** to pass the full Quality suite, including built CSS gzip, fonts, build, links, RSS, games, accessibility, mobile keyboard/browser and first-visit budget checks. Source byte savings alone are not a pass.
+- **Release:** Keep this PR in draft until verified. Do not raise resource budgets or merge failing tests; after a green, mergeable PR, squash-merge and require main Quality plus Pages build/deploy on the exact merge SHA.
+
+## Completed: mobile dialog touch targets (2026-10-30)
 
 - **Finding:** The article font-size toolbar already has 44px targets, but the shared reading-settings dialog still renders its segmented choices at 30px high, and the settings, navigation and shortcut dialogs have 28px close buttons. The settings footer actions are also small touch targets.
 - **Change:** On narrow screens, make settings segments at least 44x44, all three shared dialog close buttons 44x44, and settings footer actions 44px high; keep existing compact desktop sizing and all settings logic.

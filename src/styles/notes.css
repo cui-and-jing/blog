@@ -8,10 +8,15 @@
   padding-bottom: 40px;
 }
 
-.notes-bar {
+.notes-bar,
+.note-foot,
+.note-sheet-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.notes-bar {
   gap: 16px;
   margin-bottom: 34px;
   padding: 14px 18px;
@@ -28,7 +33,6 @@
 
 .notes-bar p a {
   color: var(--accent);
-  text-decoration: none;
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
@@ -36,11 +40,17 @@
   border-bottom-color: var(--accent);
 }
 
-.notes-latest {
-  margin-left: 10px;
+.notes-latest,
+.notes-strip time,
+.tag-notes-list time,
+.archive-notes time {
   font-family: var(--font-mono);
   font-size: 11.5px;
   color: var(--text-mute);
+}
+
+.notes-latest {
+  margin-left: 10px;
   white-space: nowrap;
 }
 
@@ -86,7 +96,9 @@
   text-transform: uppercase;
 }
 
-.note-items {
+.note-items,
+.notes-strip,
+.tag-notes-list {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -177,9 +189,6 @@
 }
 
 .note-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 12px;
   min-height: 30px;
   margin-top: 12px;
@@ -227,7 +236,9 @@
 }
 
 .note-copy:hover,
-.note-copy:focus-visible {
+.note-copy:focus-visible,
+.note-permalink:hover,
+.note-permalink:focus-visible {
   color: var(--accent);
   background: var(--bg-soft);
 }
@@ -241,14 +252,14 @@
 
 .notes-end a {
   color: var(--accent);
-  text-decoration: none;
 }
 
 /* 正文里的行内链接必须有下划线：颜色与周围文字的对比度到不了 3:1 时，
    axe（link-in-text-block）只认非颜色的差异。放在文件末尾，覆盖上面的 none */
 .notes-bar p a,
 .notes-end a,
-.note-body a {
+.note-body a,
+.tag-note a {
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
@@ -257,7 +268,8 @@
 
 .notes-bar p a:hover,
 .notes-end a:hover,
-.note-body a:hover {
+.note-body a:hover,
+.tag-note a:hover {
   text-decoration-color: var(--accent);
 }
 
@@ -279,26 +291,33 @@
 
 /* ---------- 首页的「最近想法」条 ---------- */
 
-.notes-strip {
+.notes-strip,
+.tag-notes-list,
+.archive-notes {
   display: grid;
   gap: 1px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
   background: var(--line-soft);
   overflow: hidden;
+}
+
+.notes-strip,
+.tag-notes-list {
+  border-radius: var(--radius);
 }
 
 .notes-strip li {
   background: var(--card);
 }
 
-.notes-strip a {
+.notes-strip a,
+.tag-notes-list li {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
   gap: 16px;
+}
+
+.notes-strip a {
   padding: 13px 18px;
   text-decoration: none;
   color: var(--text-soft);
@@ -308,9 +327,6 @@
 
 .notes-strip time {
   padding-top: 2px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--text-mute);
   transition: color 0.18s var(--ease);
 }
 
@@ -330,10 +346,14 @@
   padding-bottom: 56px;
 }
 
-.note-crumb {
+.note-crumb,
+.note-sheet-meta {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.note-crumb {
   margin-bottom: 16px;
   font-family: var(--font-mono);
   font-size: 11.5px;
@@ -356,9 +376,6 @@
 }
 
 .note-sheet-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 0;
 }
 
@@ -413,9 +430,6 @@
 }
 
 .note-sheet-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 12px;
   min-height: 34px;
   margin-top: 22px;
@@ -493,12 +507,6 @@
   transition: color 0.18s var(--ease), background 0.18s var(--ease);
 }
 
-.note-permalink:hover,
-.note-permalink:focus-visible {
-  color: var(--accent);
-  background: var(--bg-soft);
-}
-
 /* ---------- 标签详情页里的笔记区 ---------- */
 
 .tag-notes {
@@ -508,10 +516,14 @@
 /* 这个标签下只有笔记时，上方没有文章卡片，44px 的间隔会显得空 */
 .tag-notes:first-child {
   margin-top: 0;
-}.tag-notes-title {
+}.tag-notes-title,
+.archive-notes a {
   display: flex;
   align-items: baseline;
   gap: 10px;
+}
+
+.tag-notes-title {
   margin: 0 0 12px;
   font-size: 15px;
   font-weight: 600;
@@ -536,41 +548,15 @@
 
 .tag-note a {
   color: var(--accent);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
-}
-
-.tag-note a:hover {
-  text-decoration-color: var(--accent);
-}
-
-.tag-notes-list {
-  display: grid;
-  gap: 1px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  background: var(--line-soft);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-  overflow: hidden;
 }
 
 .tag-notes-list li {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: 16px;
   padding: 14px 18px;
   background: var(--card);
 }
 
 .tag-notes-list time {
   padding-top: 2px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--text-mute);
 }
 
 .tag-notes-list a {
@@ -602,15 +588,10 @@
 /* ---------- 归档页里的笔记行 ---------- */
 
 .archive-notes {
-  display: grid;
-  gap: 1px;
   margin: 10px 0 0;
   padding: 0;
   list-style: none;
-  background: var(--line-soft);
-  border: 1px solid var(--line-soft);
   border-radius: 12px;
-  overflow: hidden;
 }
 
 .archive-notes li {
@@ -622,18 +603,16 @@
   background: var(--card);
 }
 
-.archive-notes time {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--text-mute);
-}
-
 .archive-notes a {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
   min-width: 0;
   text-decoration: none;
+}
+
+.archive-note-title,
+.archive-note-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .archive-note-title {
@@ -643,9 +622,6 @@
   font-weight: 500;
   line-height: 1.6;
   color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .archive-notes a:hover .archive-note-title {
@@ -660,8 +636,5 @@
   border-left: 1px solid var(--line-soft);
   font-size: 12px;
   color: var(--text-mute);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
