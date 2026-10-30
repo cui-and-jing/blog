@@ -1,6 +1,6 @@
 # Engineering roadmap
 
-_Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
+_Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 
 ## Baseline and constraints
 
@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: share decorative sheen motion rules (2026-10-31)
+## Current iteration: remove inert mobile lightbox offsets (2026-10-31)
+
+- **Finding:** The 720px media block assigns `top` and `right` to `.lightbox-close`, but that button is a statically positioned flex child. The viewport position is actually controlled by its `position: fixed` parent, `.lightbox-tools`. These offsets never move the button, yet occupy space near the strict CSS gzip limit.
+- **Change:** Delete only the ineffective child offsets. Preserve the parent toolbar's fixed 22px placement, the 44px close hit target, image zoom and keyboard navigation, desktop layout, and the original small-screen behavior.
+- **Regression:** Extend the real Chromium lightbox test at 390px, confirming static close positioning, the fixed toolbar inset, 44×44 hit area and zero horizontal overflow. Retain all Quality checks, including CSS gzip and first-visit network budgets.
+- **Release:** No dependency, content, game, route, runtime JavaScript, or budget change. Merge only after latest-head PR Quality is fully successful and mergeable; then validate main Quality and Pages build/deploy on the same merge SHA.
+
+## Completed: share decorative sheen motion rules (2026-10-31)
 
 - **Finding:** Card cover sheen and game cover sheen pseudo-elements repeat exactly the same positioning, transform, opacity and pointer-event declarations. Only widths and gradient strengths differ. Keeping duplicate blocks adds CSS maintenance cost close to the strict gzip cap.
 - **Change:** Share the identical pseudo-element declarations while preserving the original distinct widths, gradients, hover animations and reduced-motion boundary. Do not change navigation, routes, game logic, JS or dependencies.
