@@ -94,6 +94,13 @@
     color 0.18s var(--ease);
 }
 
+@media (pointer: coarse), (max-width: 720px) {
+  .size-switch button {
+    min-width: 44px;
+    height: 44px;
+  }
+}
+
 .size-switch button:hover {
   color: var(--text);
 }
