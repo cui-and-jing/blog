@@ -25,9 +25,8 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 ## Current iteration: respect cross-tab reading-list removal (2026-10-31)
 
 - **Finding:** A tab that previously saved a post retains an in-memory copy. When another tab deletes the saved-post key or clears site storage, the first tab receives the storage event, but `readBookmarks()` falls back to the stale in-memory copy when the key is absent, leaving bookmark buttons and the saved-only filter wrong.
-- **Change:** Track whether the *last write* was blocked by storage permissions. Use the in-memory fallback only in that case (or when storage reads throw); a genuinely missing key after a successful write now means the saved list was cleared. Preserve the existing versioned storage key and same-tab behavior.
+- **Change:** Clear the in-memory fallback only after `localStorage.setItem` succeeds. Keep the session copy when a write is denied; after persistence succeeds, a missing key correctly indicates a later removal. Preserve the existing versioned storage key and same-tab behavior.
 - **Regression:** Chromium opens two tabs, saves a post, activates the saved-only filter, and clears saved-posts from the second tab using both `removeItem` and `clear`. Verify the first tab receives correct unpressed bookmarks, zero count, empty filtered list and unchanged saved-only URL. Run full Quality and maintain all performance and deployment gates.
-- **JS budget safeguard:** Keep valid note copy links identical while replacing manual origin concatenation with the native URL resolver, which correctly handles rooted and absolute links and reduces emitted JS size. Existing Chromium tests cover copied URLs in the timeline and dedicated note page.
 - **Release:** Isolated branch, no extra dependency, content, CSS, routes or games, and no raised budgets. Merge only when latest-head Quality is green and the PR is clean; then verify main Quality and Pages for the same merge SHA.
 
 ## Completed: preserve note copy failure feedback (2026-10-31)
