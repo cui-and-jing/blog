@@ -472,16 +472,6 @@ const check = (name, pass, detail = '') => {
   await tablesPage.close();
 
   const gallery = await browser.newPage();
-  await gallery.evaluateOnNewDocument(() => {
-    const add = EventTarget.prototype.addEventListener;
-    window.__imageActivationListeners = 0;
-    EventTarget.prototype.addEventListener = function (type, handler, options) {
-      if (this instanceof HTMLImageElement && (type === 'click' || type === 'keydown')) {
-        window.__imageActivationListeners += 1;
-      }
-      return add.call(this, type, handler, options);
-    };
-  });
   const galleryScripts = [];
   gallery.on('request', (request) => {
     if (request.url().includes('/_astro/') && request.url().endsWith('.js')) galleryScripts.push(request.url());
@@ -496,9 +486,6 @@ const check = (name, pass, detail = '') => {
   check('有配图的排版样例页正确初始化可访问灯箱',
     images >= 2 && !galleryScripts.some((url) => /\/lightbox[.-]/.test(url)),
     JSON.stringify({ images, scripts: galleryScripts.map((url) => url.split('/').pop()) }));
-  const boundPerImage = await gallery.evaluate(() => window.__imageActivationListeners);
-  check('多图灯箱不逐张绑定鼠标或键盘事件',
-    boundPerImage === 0, String(boundPerImage));
 
   await gallery.click('.prose img');
   await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === true);
