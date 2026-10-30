@@ -3,20 +3,14 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import { url, formatDate, readingTime, base } from '../lib/site';
 import { getPosts } from '../lib/posts';
 import { getNotes } from '../lib/notes';
+import { collectTags } from '../lib/tags';
 
 const posts = await getPosts();
 const notes = await getNotes();
 
 /* 无结果时的兜底：给几篇最近的文章和几个高频标签，比干巴巴一句「换个词」有用 */
 const recent = posts.slice(0, 3);
-const tagCounts = new Map<string, number>();
-for (const post of posts) {
-  for (const tag of post.data.tags) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
-}
-const topTags = [...tagCounts.entries()]
-  .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN'))
-  .slice(0, 6)
-  .map(([tag]) => tag);
+const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 ---
 
 <BaseLayout title="搜索" description="在文章和笔记中按标题、标签或正文查找">
