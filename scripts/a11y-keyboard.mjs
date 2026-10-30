@@ -1372,6 +1372,13 @@ const check = (name, pass, detail = '') => {
       JSON.stringify(result.actions));
     check(`${width}px 导航链接收进抽屉`, result.linksHidden, `nav-links display=none: ${result.linksHidden}`);
 
+    const topControls = await page.evaluate(() => ({
+      floating: getComputedStyle(document.getElementById('to-top')).display,
+      mobile: getComputedStyle(document.querySelector('.mobile-bar')).display,
+    }));
+    check(`${width}px 浮动回顶按钮隐藏且底部操作栏可见`,
+      topControls.floating === 'none' && topControls.mobile !== 'none', JSON.stringify(topControls));
+
     if (width === 390) {
       /* 抽屉：打开、焦点进入、Esc 关闭并归还焦点 */
       await page.click('#menu-toggle');
@@ -1409,6 +1416,25 @@ const check = (name, pass, detail = '') => {
 
     await page.close();
   }
+}
+
+/* 1080px 是浮动回顶按钮与底部操作栏切换的唯一边界。
+   900px 的旧位置覆盖不应改变这一行为。 */
+{
+  const page = await browser.newPage();
+  await page.goto(`${base}/`, { waitUntil: 'load' });
+  for (const width of [900, 1080, 1081]) {
+    await page.setViewport({ width, height: 844 });
+    const controls = await page.evaluate(() => ({
+      floating: getComputedStyle(document.getElementById('to-top')).display,
+      mobile: getComputedStyle(document.querySelector('.mobile-bar')).display,
+    }));
+    const expected = width <= 1080
+      ? controls.floating === 'none' && controls.mobile !== 'none'
+      : controls.floating === 'inline-flex' && controls.mobile === 'none';
+    check(`${width}px 回顶入口响应式切换正确`, expected, JSON.stringify(controls));
+  }
+  await page.close();
 }
 
 /* ---------- 6. 深色模式 390px 首页 ---------- */
