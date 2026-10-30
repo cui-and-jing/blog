@@ -28,17 +28,21 @@
     scale: 1.045;
   }
 
-  .cover-sheen::after {
+  .cover-sheen::after,
+  .game-art::after {
     content: '';
     position: absolute;
     top: -60%;
     bottom: -60%;
     left: 0;
-    width: 42%;
-    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.5), transparent);
     transform: translateX(-180%) skewX(-16deg);
     opacity: 0;
     pointer-events: none;
+  }
+
+  .cover-sheen::after {
+    width: 42%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.5), transparent);
   }
 
   .card:hover .cover-sheen::after,
@@ -48,16 +52,8 @@
   }
 
   .game-art::after {
-    content: '';
-    position: absolute;
-    top: -60%;
-    bottom: -60%;
-    left: 0;
     width: 40%;
     background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.45), transparent);
-    transform: translateX(-180%) skewX(-16deg);
-    opacity: 0;
-    pointer-events: none;
   }
 
   /* hero 背景光晕缓慢漂移 */
