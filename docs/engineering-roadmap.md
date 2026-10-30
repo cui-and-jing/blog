@@ -25,7 +25,7 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 ## Current iteration: consolidate note stylesheet declarations (2026-10-30)
 
 - **Finding:** Several note surfaces repeat identical declarations for flex footers, list resets, muted timestamps, link underlines and copy/permalink hover states. With CSS near its 108 KiB raw and 21 KiB gzip caps, these duplications consume scarce headroom.
-- **Change:** Group selectors within `notes.css` while preserving each original selector's specificity and all page-level overrides. Remove 612 redundant source bytes; leave breakpoint logic, routes, content, runtime JavaScript, dependencies and games unchanged.
+- **Change:** Group selectors within `notes.css` while preserving each original selector's specificity and all page-level overrides. Remove 705 redundant source bytes; leave breakpoint logic, routes, content, runtime JavaScript, dependencies and games unchanged.
 - **Regression:** Compare the final declarations of 22 affected selectors against the original stylesheet before committing; require the full PR Quality suite (including output CSS and first-visit transfer budgets, light/dark accessibility and keyboard/browser checks). Do not treat source byte reduction alone as evidence of smaller deployed CSS.
 - **Release:** Merge only if the latest PR head is green and mergeable; verify main Quality then Pages build/deploy against the exact squash merge SHA. Do not increase the CSS or JS budgets.
 
