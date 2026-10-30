@@ -300,6 +300,9 @@ const check = (name, pass, detail = '') => {
     check(width + 'px 真实触控可切换大号字并同步 aria-pressed', tapped === 'true', String(tapped));
 
     await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => document.documentElement.dataset.reading === 'large' &&
+      document.querySelector('.article-tools .size-switch [data-value="large"]')?.getAttribute('aria-pressed') === 'true',
+    { timeout: 5000 });
     const saved = await page.evaluate(() => ({
       reading: document.documentElement.dataset.reading,
       pressed: document.querySelector('.article-tools .size-switch [data-value="large"]')?.getAttribute('aria-pressed'),
@@ -308,6 +311,9 @@ const check = (name, pass, detail = '') => {
 
     await page.focus('.article-tools .size-switch [data-value="normal"]');
     await page.keyboard.press('Enter');
+    await page.waitForFunction(() => !document.documentElement.hasAttribute('data-reading') &&
+      document.querySelector('.article-tools .size-switch [data-value="normal"]')?.getAttribute('aria-pressed') === 'true',
+    { timeout: 5000 });
     const keyboard = await page.evaluate(() => ({
       reading: document.documentElement.dataset.reading ?? 'normal',
       pressed: document.querySelector('.article-tools .size-switch [data-value="normal"]')?.getAttribute('aria-pressed'),
