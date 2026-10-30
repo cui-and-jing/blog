@@ -158,7 +158,7 @@
 
   /* Closed native details must also be readable on paper. */
   .prose .details::details-content {
-    content-visibility: visible !important;
+    content-visibility: visible;
   }
 
   .prose pre {
