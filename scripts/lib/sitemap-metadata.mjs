@@ -1,6 +1,6 @@
 /**
  * Build-time sitemap lastmod metadata, shared by Astro config and CI contracts.
- * Post routes update with posts; tags and the tag index also update with notes.
+ * Aggregate pages (home, archive, authors, tags) follow both articles and notes.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,9 +27,11 @@ export function readEntries(dir) {
     catch { continue; }
     if (data.draft) continue;
 
-    const value = data.updated ?? data.date;
-    const date = value instanceof Date ? value : new Date(String(value));
-    if (Number.isNaN(date.valueOf())) continue;
+    const published = data.date instanceof Date ? data.date : new Date(String(data.date));
+    const updated = data.updated instanceof Date ? data.updated : data.updated ? new Date(String(data.updated)) : null;
+    if (Number.isNaN(published.valueOf()) || (updated && Number.isNaN(updated.valueOf()))) continue;
+    // An incorrect earlier updated date cannot make a published page look older.
+    const date = updated && updated > published ? updated : published;
 
     out.push({
       slug: path.relative(dir, file).replace(/\.mdx?$/, '').split(path.sep).join('/'),
@@ -68,7 +70,7 @@ export function collectLastmod(posts, notes, base) {
     if (post.category) bump('/category/' + post.category + '/', post.date);
   }
   if (latestPost) {
-    for (const route of ['/posts/', '/archive/', '/tags/', '/series/', '/']) bump(route, latestPost);
+    for (const route of ['/posts/', '/archive/', '/authors/', '/tags/', '/series/', '/']) bump(route, latestPost);
   }
 
   let latestNote = null;
@@ -80,7 +82,8 @@ export function collectLastmod(posts, notes, base) {
     }
   }
   if (latestNote) {
-    for (const route of ['/notes/', '/']) bump(route, latestNote);
+    // Archive and authors list notes too: note-only changes must refresh their lastmod.
+    for (const route of ['/notes/', '/archive/', '/authors/', '/']) bump(route, latestNote);
   }
 
   return new Map([...changes].map(([route, date]) => [base + route, date]));
