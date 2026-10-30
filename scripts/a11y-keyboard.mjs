@@ -23,6 +23,51 @@ const check = (name, pass, detail = '') => {
   console.log(`${pass ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+/* ---------- Print mode: external URLs must survive screen icon styling ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.goto(base + '/posts/hello-astro/', { waitUntil: 'load' });
+  await page.evaluate(() => {
+    const prose = document.querySelector('.prose');
+    if (!prose) throw new Error('Article prose missing for print link test');
+    const sample = document.createElement('p');
+    sample.innerHTML = '<a data-print-external class="external-link" href="https://example.com/print?item=1">External reference</a> <a data-print-internal href="/blog/posts/">Internal reference</a>';
+    prose.append(sample);
+  });
+  const readLinks = () => page.evaluate(() => {
+    const external = document.querySelector('[data-print-external]');
+    const internal = document.querySelector('[data-print-internal]');
+    const externalStyle = getComputedStyle(external, '::after');
+    const internalStyle = getComputedStyle(internal, '::after');
+    return {
+      display: externalStyle.display,
+      content: externalStyle.content,
+      mask: externalStyle.maskImage,
+      width: externalStyle.width,
+      internalContent: internalStyle.content,
+    };
+  });
+  await page.emulateMediaType('screen');
+  const screen = await readLinks();
+  check('Screen external-link icon is preserved',
+    screen.display === 'inline-block' && screen.mask !== 'none',
+    'display=' + screen.display + ', mask=' + screen.mask.slice(0, 16));
+  await page.emulateMediaType('print');
+  const print = await readLinks();
+  check('Print external-link address is visible and unmasked',
+    print.display !== 'none'
+      && print.display !== 'inline-block'
+      && print.content.includes('https://example.com/print?item=1')
+      && print.mask === 'none'
+      && print.width === 'auto',
+    'display=' + print.display + ', content=' + print.content + ', mask=' + print.mask);
+  check('Print does not append URL to internal links',
+    ['none', 'normal', '""'].includes(print.internalContent),
+    'internal=' + print.internalContent);
+  await page.close();
+}
+
 /* ---------- 1. 首页 Tab 顺序与焦点环 ---------- */
 {
   const page = await browser.newPage();
