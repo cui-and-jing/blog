@@ -553,7 +553,6 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         /* 包装完再统一量宽度：每包一个就读一次 scrollWidth 会强制一次同步布局，
            表格一多就是「写-读-写-读」的来回。攒到下一帧一次性读完。 */
         const tables = document.querySelectorAll<HTMLTableElement>('.prose table');
-        const boxes: HTMLElement[] = [];
         const measure = (box: HTMLElement) =>
           box.classList.toggle('is-scrollable', box.scrollWidth - box.clientWidth > 2);
         const resize = tables.length && 'ResizeObserver' in window
@@ -573,7 +572,6 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           /* 一篇文章的表格共用一个 ResizeObserver，避免每张表独立观察。 */
           box.addEventListener('scroll', () => measure(box), { passive: true });
           resize?.observe(box);
-          boxes.push(box);
         });
 
         document.querySelectorAll<HTMLElement>('.prose pre').forEach((pre) => {
@@ -637,7 +635,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           }
         });
 
-        if (boxes.length) requestAnimationFrame(() => boxes.forEach(measure));
+        if (tables.length) requestAnimationFrame(() => tables.forEach((table) => measure(table.parentElement!)));
       };
 
       /* 只有存在表格/代码块才安排空闲增强任务；列表、首页不再空跑。 */
