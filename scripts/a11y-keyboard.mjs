@@ -752,7 +752,7 @@ const check = (name, pass, detail = '') => {
     opened.closeSize[0] >= 44 && opened.closeSize[1] >= 44, JSON.stringify(opened.closeSize));
 
   /* Mobile offsets belong to the fixed toolbar, not its static flex child. */
-  await gallery.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await gallery.setViewport({ width: 390, height: 844 });
   const mobileLightbox = await gallery.evaluate(() => {
     const close = document.querySelector('.lightbox-close');
     const toolbar = document.querySelector('.lightbox-tools');
@@ -775,7 +775,7 @@ const check = (name, pass, detail = '') => {
       Math.abs(mobileLightbox.toolbarRight - 22) < 1 &&
       mobileLightbox.closeSize.every((size) => size >= 44) && mobileLightbox.overflow <= 0,
     JSON.stringify(mobileLightbox));
-  await gallery.setViewport({ width: 1280, height: 800, isMobile: false, hasTouch: false });
+  await gallery.setViewport({ width: 1280, height: 800 });
 
   await gallery.keyboard.press('=');
   const zoomed = await gallery.evaluate(() => ({
