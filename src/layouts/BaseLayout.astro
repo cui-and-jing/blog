@@ -555,9 +555,10 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         const tables = document.querySelectorAll<HTMLTableElement>('.prose table');
         const measure = (box: HTMLElement) =>
           box.classList.toggle('is-scrollable', box.scrollWidth - box.clientWidth > 2);
-        const resize = tables.length && 'ResizeObserver' in window
-          ? new ResizeObserver((entries) => entries.forEach(({ target }) => measure(target as HTMLElement)))
-          : null;
+        const resize = tables.length && 'ResizeObserver' in window &&
+          new ResizeObserver((entries) => {
+            for (const entry of entries) measure(entry.target as HTMLElement);
+          });
 
         tables.forEach((table) => {
           if (table.closest('.table-wrap')) return;
