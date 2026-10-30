@@ -27,7 +27,7 @@ export function writeBookmarks(value: string[]): void {
   try {
     localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(session));
     // Successful storage writes need no session fallback: a missing key then means it was removed.
-    session = [];
+    session.length = 0;
   } catch {
     // 浏览器禁止本地保存时，只在当前页面保留状态。
   }
