@@ -552,9 +552,15 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const enhanceProse = () => {
         /* 包装完再统一量宽度：每包一个就读一次 scrollWidth 会强制一次同步布局，
            表格一多就是「写-读-写-读」的来回。攒到下一帧一次性读完。 */
-        const measureTable: Array<() => void> = [];
+        const tables = document.querySelectorAll<HTMLTableElement>('.prose table');
+        const measure = (box: HTMLElement) =>
+          box.classList.toggle('is-scrollable', box.scrollWidth - box.clientWidth > 2);
+        const resize = tables.length && 'ResizeObserver' in window &&
+          new ResizeObserver((entries) => {
+            for (const entry of entries) measure(entry.target as HTMLElement);
+          });
 
-        document.querySelectorAll<HTMLTableElement>('.prose table').forEach((table) => {
+        tables.forEach((table) => {
           if (table.closest('.table-wrap')) return;
           const box = document.createElement('div');
           box.className = 'table-wrap';
@@ -564,13 +570,9 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           table.replaceWith(box);
           box.append(table);
 
-          /* 只有真能滚动时才加边缘阴影，否则会误伤放得下的表格 */
-          const sync = () => {
-            box.classList.toggle('is-scrollable', box.scrollWidth - box.clientWidth > 2);
-          };
-          box.addEventListener('scroll', sync, { passive: true });
-          if ('ResizeObserver' in window) new ResizeObserver(sync).observe(box);
-          measureTable.push(sync);
+          /* 首次观察会自动通知尺寸；旧浏览器退回下一帧测量。 */
+          if (resize) resize.observe(box);
+          else requestAnimationFrame(() => measure(box));
         });
 
         document.querySelectorAll<HTMLElement>('.prose pre').forEach((pre) => {
@@ -634,7 +636,6 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           }
         });
 
-        if (measureTable.length) requestAnimationFrame(() => measureTable.forEach((fn) => fn()));
       };
 
       /* Safari 还没有 requestIdleCallback，退化成一次短延时 */

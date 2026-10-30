@@ -1,6 +1,6 @@
 # Engineering roadmap
 
-_Last reviewed: 2026-10-29. Scope: `cui-and-jing/blog`._
+_Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 
 ## Baseline and constraints
 
@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-29. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: TOC synchronization and long-page scroll efficiency (2026-10-29)
+## Current iteration: shared table observation and long-prose browser regression (2026-10-30)
+
+- **Finding:** each Markdown table created its own ResizeObserver and scroll event listener, in addition to an initial measurement callback. Long technical articles can contain many tables; these observers and callbacks need not scale per table.
+- **Change:** keep the established idle scheduling and Safari timeout fallback unchanged. Reuse one ResizeObserver for all prose tables and its initial observation notification for scrollability; avoid duplicate per-table scroll listeners and first-frame measurements. Keep the original lightbox handlers and URL behavior unchanged. Proposed broader rewrites were rejected when they exceeded the strict JS gzip budget.
+- **Regression:** Chromium injects a second table before enhancement, verifies both share a single ResizeObserver and horizontal-scroll state reacts to width changes. It also preserves code-copy, lightbox mouse/Enter/Space, zoom, next/previous and Esc checks, plus search, mobile, games, RSS and transfer budget gates.
+- **Guardrails:** no dependency, route, author content or theme changes; keep original CSS/JS caps and main Quality→Pages gate. Require latest PR SHA to pass all CI and verify merge SHA on main and Pages.
+
+## Completed: TOC synchronization and long-page scroll efficiency (2026-10-29)
 
 - **Reason:** the old IntersectionObserver callback scanned all TOC links and wrote class/ARIA attributes for every intersecting heading, potentially repeating writes; it also queued sidebar measurements even when mobile layouts cannot scroll the sidebar.
 - **Implementation:** index raw section hrefs once, choose the topmost intersecting heading per observer batch and update only the former and new active link. Defer desktop sidebar measurement to the next frame and skip stale selections; never scroll a non-scrollable/mobile sidebar. Let CSS smooth-scroll normally but switch to auto under reduced-motion. Build the mobile TOC nav shell as HTML and clone its contents only when opening.
