@@ -80,10 +80,7 @@
 }
 
 @keyframes sheen {
-  0% {
-    transform: translateX(-180%) skewX(-16deg);
-    opacity: 0;
-  }
+  /* The base pseudo-element styles already define the 0% frame. */
   18% {
     opacity: 0.9;
   }
