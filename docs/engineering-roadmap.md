@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: series-first related reading (2026-10-30)
+## Current iteration: mixed-content sitemap freshness (2026-10-30)
+
+- **Finding:** The archive and authors pages both list articles and notes, but `/archive/` sitemap lastmod advanced only for article changes; `/authors/` lacked a lastmod value. Publishing a newer note could therefore leave stale metadata on both pages. An article `updated` date earlier than its publication date could also incorrectly move its lastmod backwards.
+- **Change:** Set aggregate lastmod for archive and authors to the latest article or note. Preserve article-only post/series routes and note-only note routes. Compare article publication and update dates and use the later valid date.
+- **Regression:** Add mixed, post-only and note-only sitemap fixtures; exercise older/newer update dates and verify every built sitemap lastmod against content metadata. The existing `npm run sitemap:check` runs in Quality and local preflight.
+- **Guardrails:** no site route, frontend asset, dependency, article content, game, or budget changes. Require a fully green latest PR SHA, then verify the main Quality and Pages publish on the same merge SHA.
+
+## Completed: series-first related reading (2026-10-30)
 
 - **Finding:** Article series timelines obey `seriesOrder`, but the article "接着读" related cards ignored that order and ranked same-series items by publication date. Opening the first chapter could therefore suggest chapter 3 before chapter 2.
 - **Change:** Reuse the existing `sortByOrder` rule. Prefer subsequent chapters in ascending series order, then previous chapters in reverse proximity; fill remaining cards with the existing category/tag relevance and date ordering. Continue excluding the current article.

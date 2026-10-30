@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { collectLastmod, readEntries } from './lib/sitemap-metadata.mjs';
 
 const base = (process.env.BLOG_BASE ?? '/blog').replace(/\/$/, '');
@@ -26,13 +27,49 @@ for (const [route, date] of [
   ['/posts/', '2026-10-19'],
   ['/series/流程/', '2026-10-19'],
   ['/notes/', '2026-10-23'],
+  ['/archive/', '2026-10-23'],
+  ['/authors/', '2026-10-23'],
   ['/', '2026-10-23'],
 ]) {
   assert.equal(synthetic.get(base + route)?.getTime(), stamp(date).getTime(), 'lastmod ' + route);
 }
 assert.equal(synthetic.has(base + '/posts/note/'), false, 'notes must not become article routes');
 assert.equal(synthetic.has(base + '/series/未成系列/'), false, 'single-post series has no route');
-console.log('✓ Metadata fixtures: note-only tags, shared tags, index and article/notes separation');
+// Even a site with only notes must publish fresh metadata for both mixed pages.
+const notesOnly = collectLastmod([], [
+  { slug: 'solo', date: stamp('2026-10-26'), tags: [] },
+], base);
+for (const route of ['/notes/', '/archive/', '/authors/', '/']) {
+  assert.equal(notesOnly.get(base + route)?.getTime(), stamp('2026-10-26').getTime(),
+    'note-only site stale: ' + route);
+}
+assert.equal(notesOnly.has(base + '/posts/'), false, 'no articles must not make posts fresh');
+
+const postsOnly = collectLastmod([
+  { slug: 'solo', date: stamp('2026-10-25'), tags: [], category: '', series: '' },
+], [], base);
+for (const route of ['/posts/', '/archive/', '/authors/', '/']) {
+  assert.equal(postsOnly.get(base + route)?.getTime(), stamp('2026-10-25').getTime(),
+    'post-only site stale: ' + route);
+}
+
+// A mistakenly earlier updated field must never push an article behind publication.
+const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'blog-sitemap-'));
+try {
+  fs.writeFileSync(path.join(fixtureDir, 'earlier.md'),
+    '---\\ndate: 2026-10-20\\nupdated: 2026-10-10\\n---\\nbody'.replaceAll('\\n', '\n'));
+  fs.writeFileSync(path.join(fixtureDir, 'later.md'),
+    '---\\ndate: 2026-10-20\\nupdated: 2026-10-28\\n---\\nbody'.replaceAll('\\n', '\n'));
+  const scanned = new Map(readEntries(fixtureDir).map((item) => [item.slug, item.date]));
+  assert.equal(scanned.get('earlier')?.getTime(), stamp('2026-10-20').getTime(),
+    'updated earlier than publication must not regress lastmod');
+  assert.equal(scanned.get('later')?.getTime(), stamp('2026-10-28').getTime(),
+    'later update must take precedence over publication');
+} finally {
+  fs.rmSync(fixtureDir, { recursive: true, force: true });
+}
+
+console.log('✓ Metadata fixtures: mixed archive/authors freshness, note/post-only sites and update precedence');
 
 const root = path.resolve('dist');
 const xmlFiles = fs.readdirSync(root).filter((file) => /^sitemap-\d+\.xml$/.test(file));
