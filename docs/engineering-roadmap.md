@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: mixed-content sitemap freshness (2026-10-30)
+## Current iteration: editorial activity in recent discovery (2026-10-30)
+
+- **Finding:** The sitemap now advances for a revised article, but both “最近更新” entry points still sort articles only by their original publication date. An edited older article can stay buried. Shared search entry labels also imply article-only search even though notes are indexed.
+- **Change:** Sort mixed recent sidebar and empty-search recommendations by the later of publication and article `updated`; retain the original published date in the search index and expose later editorial updates as optional metadata. Announce updated-date suggestions to assistive technology and clarify search entry labels.
+- **Regression:** Add newer/older edit fixtures, compare built links, order and dates to the emitted search index, retain stable ties, article exclusion and note discovery.
+- **Guardrails:** no frontend JS/CSS, content, route, dependency, game or budget changes. Merge only after latest PR Quality passes, then verify main Quality and Pages against the exact squash-merge SHA.
+
+## Completed: mixed-content sitemap freshness (2026-10-30)
 
 - **Finding:** The archive and authors pages both list articles and notes, but `/archive/` sitemap lastmod advanced only for article changes; `/authors/` lacked a lastmod value. Publishing a newer note could therefore leave stale metadata on both pages. An article `updated` date earlier than its publication date could also incorrectly move its lastmod backwards.
 - **Change:** Set aggregate lastmod for archive and authors to the latest article or note. Preserve article-only post/series routes and note-only note routes. Compare article publication and update dates and use the later valid date.

@@ -12,8 +12,16 @@ const records = JSON.parse(read('search-index.json')).posts;
 assert.ok(Array.isArray(records) && records.length, 'missing published search index');
 assert.ok(records.some((item) => item.type === 'note'), 'fixture needs published notes');
 
-/* Sorting is stable: the index lists posts first, then notes, both newest first. */
-const expected = [...records].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
+/* Normal search keeps publication date; recent fallback uses latest activity. */
+const byActivity = (list) => [...list].sort((a, b) =>
+  (b.updated ?? b.date).localeCompare(a.updated ?? a.date));
+assert.deepEqual(byActivity([
+  { href: '/first', date: '2026.10.20' },
+  { href: '/edited', date: '2026.10.01', updated: '2026.10.25' },
+  { href: '/note', date: '2026.10.20' },
+]).map((item) => item.href), ['/edited', '/first', '/note'],
+'older revised article should lead and same-day ties must be stable');
+const expected = byActivity(records).slice(0, 3);
 assert.ok(expected.some((item) => item.type === 'note'),
   'the current newest-three fixture must cover note suggestions');
 
@@ -30,15 +38,22 @@ const actual = [...block[1].matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/g)].map((match
 });
 assert.equal(actual.length, expected.length, 'search latest suggestion count differs');
 assert.deepEqual(actual.map(({ href, date }) => ({ href, date })),
-  expected.map(({ href, date }) => ({ href, date })),
+  expected.map(({ href, date, updated }) => ({ href, date: updated ?? date })),
   'search suggestions must match newest published posts and notes in the search index');
 for (let i = 0; i < expected.length; i++) {
   const prefix = expected[i].type === 'note' ? '笔记：' : '文章：';
   assert.ok(actual[i].html.includes('class="sr-only"') && actual[i].html.includes(prefix),
     'search suggestion lacks the accessible type label for ' + expected[i].href);
+  if (expected[i].updated) assert.ok(actual[i].html.includes('更新于'),
+    'edited article should announce an update rather than imply first publication');
 }
 
 const home = read('index.html');
+const notFound = read('404.html');
+assert.ok(home.includes('aria-label="搜索文章与笔记"') &&
+  search.includes('aria-label="搜索文章与笔记"') &&
+  notFound.includes('搜索文章与笔记'),
+  'search entry points must describe both articles and notes');
 assert.ok(home.includes('最近想法') && home.includes('最近文章'),
   'homepage notes and article-only section names should remain distinguishable');
 console.log('✓ Search fallback: newest ' + actual.length + ' posts/notes, dates and type labels match the published index');

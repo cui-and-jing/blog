@@ -3,23 +3,29 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import { url, formatDate, readingTime, base } from '../lib/site';
 import { getPosts } from '../lib/posts';
 import { getNotes, noteTitle } from '../lib/notes';
+import { activityDate } from '../lib/recent-date.mjs';
 import { collectTags } from '../lib/tags';
 
 const posts = await getPosts();
 const notes = await getNotes();
 
-/* Search fallback should reflect published notes as well as posts. */
+/* Search fallback includes new notes and article edits as well as new articles. */
 const recent = [
-  ...posts.map((post) => ({
-    type: 'post' as const,
-    title: post.data.title,
-    date: post.data.date,
-    href: url(`/posts/${post.id}/`),
-  })),
+  ...posts.map((post) => {
+    const date = activityDate(post.data);
+    return {
+      type: 'post' as const,
+      title: post.data.title,
+      date,
+      isUpdated: date.getTime() > post.data.date.getTime(),
+      href: url(`/posts/${post.id}/`),
+    };
+  }),
   ...notes.map((note) => ({
     type: 'note' as const,
     title: noteTitle(note),
     date: note.data.date,
+    isUpdated: false,
     href: url(`/notes/${note.id}/`),
   })),
 ].sort((a, b) => b.date.valueOf() - a.date.valueOf()).slice(0, 3);
@@ -130,6 +136,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
                       <span class="sr-only">{item.type === 'note' ? '笔记：' : '文章：'}</span>
                       {item.title}
                     </a>
+                    {item.isUpdated && <span class="sr-only">更新于</span>}
                     <time datetime={item.date.toISOString()}>{formatDate(item.date)}</time>
                   </li>
                 ))}
