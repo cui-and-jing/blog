@@ -319,8 +319,19 @@ kbd {
     padding: 11px 0;
   }
 
-  .seg button {
-    height: 30px;
+  .seg button,
+  .seg button[data-setting='font'] {
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .panel-close {
+    width: 44px;
+    height: 44px;
+  }
+
+  .panel-link {
+    min-height: 44px;
   }
 }
 
