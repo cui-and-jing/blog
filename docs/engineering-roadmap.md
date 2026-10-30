@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: trustworthy article revision metadata (2026-10-30)
+## Current iteration: article font-size controls on touch screens (2026-10-30)
+
+- **Finding:** The three inline article font-size buttons were only 32x24 CSS pixels, below the 44x44 touch target used elsewhere on mobile. Their visible A-/A/A+ text also hid the intended size choice from screen readers.
+- **Change:** Give the size buttons a minimum 44x44 target on narrow screens or coarse pointers, keep compact desktop dimensions, and add accessible size labels without changing the reading preference logic.
+- **Regression:** On 320px and 390px Chromium touch viewports, measure the actual button rectangles and page overflow; tap large text, reload to verify persistence, and use Enter to restore the normal setting. The existing desktop switching, axe, fonts, performance budgets, games and link checks remain mandatory.
+- **Guardrails:** no runtime JavaScript, dependency, route, post/note, or game changes. Retain the CSS/JS and first-visit budgets; require latest PR Quality and mergeability, then verify main Quality and Pages on the exact merge SHA.
+
+## Completed: trustworthy article revision metadata (2026-10-30)
 
 - **Finding:** The sitemap and search discovery already ignore an `updated` timestamp earlier than publication, but article JSON-LD, Open Graph metadata and the visible footer can still describe that older edit as the latest revision. This creates conflicting published/modified dates when content authors correct frontmatter.
 - **Change:** Normalize the article's effective revision date with the existing `activityDate` helper before producing schema, metadata or footer labels. Omit the optional modified-time tag and update label unless the update is strictly later than publication.
