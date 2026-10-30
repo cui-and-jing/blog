@@ -324,6 +324,86 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 2.2. Mobile dialog controls: real touch and hit areas ---------- */
+{
+  for (const width of [320, 390]) {
+    const page = await browser.newPage();
+    await page.setViewport({ width, height: 844, isMobile: true, hasTouch: true });
+    await page.goto(base + '/posts/hello-astro/', { waitUntil: 'load' });
+
+    const tap = async (selector) => {
+      const point = await page.$eval(selector, (button) => {
+        button.scrollIntoView({ block: 'nearest' });
+        const rect = button.getBoundingClientRect();
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      });
+      await page.touchscreen.tap(point.x, point.y);
+    };
+    const dialogCloseSize = async (selector) => page.$eval(selector, (button) => {
+      const rect = button.getBoundingClientRect();
+      return { width: rect.width, height: rect.height, label: button.getAttribute('aria-label') };
+    });
+
+    await page.click('#settings-toggle');
+    await page.waitForSelector('#settings-panel[open]');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const targets = await page.evaluate(() => {
+      const rects = (selector) => [...document.querySelectorAll(selector)].map((el) => {
+        const rect = el.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      });
+      const panel = document.getElementById('settings-panel');
+      return {
+        segments: rects('#settings-panel .seg button'),
+        footer: rects('#settings-panel .panel-link'),
+        close: rects('#settings-panel .panel-close'),
+        overflow: document.documentElement.scrollWidth - innerWidth,
+        panelOverflow: panel.scrollWidth - panel.clientWidth,
+      };
+    });
+    const atLeast44 = (rect) => rect.width >= 44 && rect.height >= 44;
+    check(width + 'px mobile settings have 44px targets without overflow',
+      targets.segments.length === 11 && targets.footer.length === 2 &&
+      targets.close.length === 1 &&
+      [...targets.segments, ...targets.close].every(atLeast44) &&
+      targets.footer.every((rect) => rect.height >= 44) &&
+      targets.overflow <= 1 && targets.panelOverflow <= 1, JSON.stringify(targets));
+
+    await page.evaluate(() => document.querySelector('#settings-panel [data-setting="size"][data-value="normal"]')?.click());
+    await tap('#settings-panel [data-setting="size"][data-value="large"]');
+    await page.waitForFunction(() => document.documentElement.dataset.reading === 'large');
+    const pressed = await page.$eval('#settings-panel [data-setting="size"][data-value="large"]',
+      (button) => button.getAttribute('aria-pressed'));
+    check(width + 'px real touch updates reading size', pressed === 'true', String(pressed));
+
+    await tap('#settings-panel .panel-close');
+    await page.waitForFunction(() => !document.getElementById('settings-panel')?.open);
+    const expanded = await page.$eval('#settings-toggle', (button) => button.getAttribute('aria-expanded'));
+    check(width + 'px touch closes settings and restores expanded state', expanded === 'false', expanded);
+
+    await page.click('#menu-toggle');
+    await page.waitForSelector('#nav-drawer[open]');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const navClose = await dialogCloseSize('#nav-drawer .panel-close');
+    check(width + 'px drawer close button has 44px target',
+      atLeast44(navClose) && Boolean(navClose.label), JSON.stringify(navClose));
+    await tap('#nav-drawer .panel-close');
+    await page.waitForFunction(() => !document.getElementById('nav-drawer')?.open);
+
+    await page.click('#settings-toggle');
+    await page.waitForSelector('#settings-panel[open]');
+    await tap('#shortcuts-open');
+    await page.waitForSelector('#shortcuts-panel[open]');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const shortcutsClose = await dialogCloseSize('#shortcuts-panel .panel-close');
+    check(width + 'px shortcuts close button has 44px target',
+      atLeast44(shortcutsClose) && Boolean(shortcutsClose.label), JSON.stringify(shortcutsClose));
+    await tap('#shortcuts-panel .panel-close');
+    await page.waitForFunction(() => !document.getElementById('shortcuts-panel')?.open);
+    await page.close();
+  }
+}
+
 /* ---------- 2.5. 阅读位置精度、进度条与章节链接 ---------- */
 {
   const page = await browser.newPage();
