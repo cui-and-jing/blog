@@ -262,6 +262,62 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 2.1. 手机字号按钮：触控区域、播报、持久化与键盘 ---------- */
+{
+  const page = await browser.newPage();
+  for (const width of [320, 390]) {
+    await page.setViewport({ width, height: 844, isMobile: true, hasTouch: true });
+    await page.goto(base + '/posts/hello-astro/', { waitUntil: 'load' });
+
+    const targets = await page.evaluate(() => ({
+      buttons: [...document.querySelectorAll('.article-tools .size-switch button')].map((button) => {
+        const rect = button.getBoundingClientRect();
+        return {
+          width: rect.width,
+          height: rect.height,
+          label: button.getAttribute('aria-label'),
+          pressed: button.getAttribute('aria-pressed'),
+        };
+      }),
+      overflow: document.documentElement.scrollWidth - innerWidth,
+    }));
+    check(width + 'px 手机字号按钮触控尺寸、读屏标签及页面边界',
+      targets.buttons.length === 3 && targets.overflow <= 1 &&
+      targets.buttons.every((button) => button.width >= 44 && button.height >= 44) &&
+      targets.buttons.map((button) => button.label).join('|') === '小一号|标准字号|大一号' &&
+      targets.buttons.every((button) => button.pressed === 'true' || button.pressed === 'false'),
+      JSON.stringify(targets));
+
+    const point = await page.$eval('.article-tools .size-switch [data-value="large"]', (button) => {
+      button.scrollIntoView({ block: 'center' });
+      const rect = button.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    });
+    await page.touchscreen.tap(point.x, point.y);
+    await page.waitForFunction(() => document.documentElement.dataset.reading === 'large', { timeout: 5000 });
+    const tapped = await page.$eval('.article-tools .size-switch [data-value="large"]',
+      (button) => button.getAttribute('aria-pressed'));
+    check(width + 'px 真实触控可切换大号字并同步 aria-pressed', tapped === 'true', String(tapped));
+
+    await page.reload({ waitUntil: 'load' });
+    const saved = await page.evaluate(() => ({
+      reading: document.documentElement.dataset.reading,
+      pressed: document.querySelector('.article-tools .size-switch [data-value="large"]')?.getAttribute('aria-pressed'),
+    }));
+    check(width + 'px 字号偏好在刷新后保持', saved.reading === 'large' && saved.pressed === 'true', JSON.stringify(saved));
+
+    await page.focus('.article-tools .size-switch [data-value="normal"]');
+    await page.keyboard.press('Enter');
+    const keyboard = await page.evaluate(() => ({
+      reading: document.documentElement.dataset.reading,
+      pressed: document.querySelector('.article-tools .size-switch [data-value="normal"]')?.getAttribute('aria-pressed'),
+    }));
+    check(width + 'px 键盘可还原标准字号', keyboard.reading === 'normal' && keyboard.pressed === 'true',
+      JSON.stringify(keyboard));
+  }
+  await page.close();
+}
+
 /* ---------- 2.5. 阅读位置精度、进度条与章节链接 ---------- */
 {
   const page = await browser.newPage();
