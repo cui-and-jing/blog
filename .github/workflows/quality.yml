@@ -66,6 +66,9 @@ jobs:
       - name: Post and note tag discovery contract
         run: npm run tags:check
 
+      - name: Mixed recent sidebar chronology contract
+        run: npm run recent:check
+
       - name: Sitemap metadata and indexability contract
         run: npm run sitemap:check
 

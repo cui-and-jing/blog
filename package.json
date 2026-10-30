@@ -35,6 +35,7 @@
     "rss:check": "node scripts/rss-check.mjs",
     "links:check": "node scripts/built-links.test.mjs && node scripts/built-links-check.mjs",
     "tags:check": "node scripts/tag-discovery.test.mjs",
+    "recent:check": "node scripts/recent-discovery.test.mjs",
     "sitemap:check": "node scripts/sitemap-check.mjs"
   },
   "dependencies": {
