@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: repair note detail copy-link control (2026-10-31)
+## Current iteration: preserve note copy failure feedback (2026-10-31)
+
+- **Finding:** The shared note-copy handler falls back to legacy `execCommand('copy')` if Clipboard API permission is unavailable. If both paths fail, it only updates the screen-reader live region and clears `location.hash`; sighted users receive no visible failure feedback and a failed copy silently alters a deep-link fragment.
+- **Change:** Show a temporary `复制失败` label using the existing 1.6-second reset, keep the descriptive live-region announcement, and never mutate the current URL on clipboard failure. Keep successful modern and legacy copy paths, routes, styles, dependencies, post content, and games unchanged.
+- **Regression:** Real Chromium checks simulate permission rejection, legacy success, and both copy APIs failing. Verify the visible label, live announcement, focus recovery, unchanged hash, and successful fallback. Require full Quality including built budgets, a11y, keyboard, game and transfer checks.
+- **Release:** Work only on an isolated branch. Do not merge unless the latest PR-head Quality passes and is conflict-free. After Squash Merge, verify successful main Quality and Pages build/deploy at the identical merged SHA.
+
+## Completed: repair note detail copy-link control (2026-10-31)
 
 - **Finding:** The notes timeline uses `data-note-link`, which the shared `NoteCopy` click delegate recognizes. The dedicated note page instead renders `data-note-copy data-link`; clicking its visible “复制链接” button triggers no handler, no clipboard copy and no confirmation.
 - **Change:** Align the detail-page button with the shared component's existing `data-note-link` contract. Keep both routes, the user-facing labels, the click delegate and the clipboard fallback behavior unchanged.
