@@ -98,7 +98,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
               data-desc={post.data.description}
               data-tags={post.data.tags.join(' ')}
               data-cat={post.data.category ?? ''}
-              data-href={url(`/posts/${post.id}/`)}
+
               data-type="post"
               data-minutes={readingTime(post.body ?? '')}
             >
@@ -374,8 +374,8 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       });
 
       /* Another tab may add or clear recent searches while this page stays open. */
-      window.addEventListener('storage', (event) => {
-        if (event.key === HISTORY_KEY || event.key === null) renderHistory();
+      addEventListener('storage', ({ key }) => {
+        if (!key || key === HISTORY_KEY) renderHistory();
       });
 
       const apply = (syncUrl = true) => {
@@ -419,7 +419,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           description: a.dataset.desc ?? '',
           tags: (a.dataset.tags ?? '').split(' ').filter(Boolean),
           category: a.dataset.cat ?? '',
-          href: a.dataset.href ?? a.href,
+          href: a.href,
           date: a.querySelector('time')?.textContent ?? '',
           minutes: Number(a.dataset.minutes ?? '0'),
           text: a.dataset.desc ?? '',
