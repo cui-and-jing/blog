@@ -430,6 +430,47 @@ const check = (name, pass, detail = '') => {
     plainScripts.map((url) => url.split('/').pop()).join(', '));
   await plain.close();
 
+  const tablesPage = await browser.newPage();
+  await tablesPage.evaluateOnNewDocument(() => {
+    window.__observedTables = [];
+    const observe = ResizeObserver.prototype.observe;
+    ResizeObserver.prototype.observe = function (element, options) {
+      if (element.classList?.contains('table-wrap')) window.__observedTables.push(this);
+      return observe.call(this, element, options);
+    };
+    const idle = window.requestIdleCallback?.bind(window);
+    if (idle) window.requestIdleCallback = (callback, options) => {
+      const table = document.querySelector('.prose table');
+      if (table && !document.getElementById('extra-table')) {
+        const extra = table.cloneNode(true);
+        extra.id = 'extra-table';
+        table.parentElement?.append(extra);
+      }
+      return idle(callback, options);
+    };
+  });
+  await tablesPage.goto(base + '/styleguide/', { waitUntil: 'networkidle2' });
+  await tablesPage.waitForFunction(() => document.querySelectorAll('.prose .table-wrap').length === 2, { timeout: 8000 });
+  const tableState = await tablesPage.evaluate(() => ({
+    wrapped: document.querySelectorAll('.prose .table-wrap').length,
+    observed: window.__observedTables.length,
+    observers: new Set(window.__observedTables).size,
+    copied: document.querySelectorAll('.prose .copy-btn').length,
+  }));
+  check('多个正文表格共享一个尺寸观察器，代码复制仍能初始化',
+    tableState.wrapped === 2 && tableState.observed === 2 &&
+    tableState.observers === 1 && tableState.copied >= 2, JSON.stringify(tableState));
+  await tablesPage.evaluate(() => {
+    const wrap = document.querySelector('.prose .table-wrap');
+    wrap.style.width = '90px';
+    wrap.querySelector('table').style.minWidth = '800px';
+  });
+  await tablesPage.waitForFunction(() => document.querySelector('.prose .table-wrap')?.classList.contains('is-scrollable'),
+    { timeout: 3000 });
+  check('正文表格缩窄时仍可标记横向滚动状态',
+    await tablesPage.$eval('.prose .table-wrap', (el) => el.classList.contains('is-scrollable')));
+  await tablesPage.close();
+
   const gallery = await browser.newPage();
   await gallery.evaluateOnNewDocument(() => {
     const add = EventTarget.prototype.addEventListener;
