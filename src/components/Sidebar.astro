@@ -1,7 +1,7 @@
 ---
 import type { CollectionEntry } from 'astro:content';
 import { SITE, url, daysSince, tagHue } from '../lib/site';
-import { getNotes } from '../lib/notes';
+import { getNotes, noteTitle } from '../lib/notes';
 import { collectTags } from '../lib/tags';
 
 interface Props {
@@ -14,9 +14,26 @@ interface Props {
 const { posts, currentId, showAuthor = true } = Astro.props;
 
 /* The sidebar and /tags/ must use the same post + note aggregation. */
-const tagBuckets = collectTags(posts, await getNotes());
+const notes = await getNotes();
+const tagBuckets = collectTags(posts, notes);
 const tags = tagBuckets.slice(0, 14);
-const recent = posts.filter((post) => post.id !== currentId).slice(0, 4);
+
+// 最近更新覆盖文章与笔记；文章页不向读者推荐正在看的同一篇。
+// 文章和笔记各自已按日期倒序，按日期排序，同一天保留原有顺序。
+const recent = [
+  ...posts.filter((post) => post.id !== currentId).map((post) => ({
+    type: 'post',
+    date: post.data.date,
+    href: url(`/posts/${post.id}/`),
+    title: post.data.title,
+  })),
+  ...notes.map((note) => ({
+    type: 'note',
+    date: note.data.date,
+    href: url(`/notes/${note.id}/`),
+    title: noteTitle(note),
+  })),
+].sort((a, b) => b.date.valueOf() - a.date.valueOf()).slice(0, 4);
 const days = daysSince(SITE.since);
 ---
 
@@ -75,11 +92,14 @@ const days = daysSince(SITE.since);
       <section class="widget">
         <h4>最近更新</h4>
         <ul class="widget-list">
-          {recent.map((post, i) => (
+          {recent.map((item, i) => (
             <li>
-              <a href={url(`/posts/${post.id}/`)}>
+              <a href={item.href}>
                 <span class="idx">{String(i + 1).padStart(2, '0')}</span>
-                <span>{post.data.title}</span>
+                <span>
+                  <span class="sr-only">{item.type === 'note' ? '笔记：' : '文章：'}</span>
+                  {item.title}
+                </span>
               </a>
             </li>
           ))}

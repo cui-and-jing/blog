@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: consistent post + note tag discovery (2026-10-30)
+## Current iteration: unified article + note recent updates (2026-10-30)
+
+- **Finding:** The sidebar says “最近更新” but lists articles only. The latest notes (October 20 and 22) never appear, even though notes are first-class content in search, tags and archive.
+- **Change:** Merge posts and notes into a stable newest-first sidebar list, keep the existing four-item limit, and omit the currently opened article on article detail pages. Add screen-reader-only type prefixes without changing visual card styles.
+- **Regression:** Compare actual homepage and every article sidebar order with the published search index, preserving equal-day ordering and excluding only the current article. Gate in PR/main Quality and local preflight.
+- **Guardrails:** no dependency, route, source content, game, CSS, or browser JS changes, and no budget increase. Merge on the latest green PR SHA; verify main Quality and Pages on the exact merge commit.
+
+## Completed: consistent post + note tag discovery (2026-10-30)
 
 - **Finding:** The tag directory and tag detail pages aggregate articles and notes, but the sidebar and empty-search suggestions counted only articles. Note-only tags could disappear from these entry points despite having working tag pages.
 - **Change:** Reuse `collectTags(posts, notes)` in both surfaces, preserving the shared popularity and locale tie-break order. Keep the existing 14-tag sidebar and 6-tag search limits.
