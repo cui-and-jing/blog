@@ -238,6 +238,38 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- Search history: storage events from another tab ---------- */
+{
+  const a = await browser.newPage();
+  const b = await browser.newPage();
+  await a.goto(base + '/search/', { waitUntil: 'load' });
+  await a.evaluate(() => localStorage.setItem('search:history', JSON.stringify(['旧搜索'])));
+  await b.goto(base + '/search/', { waitUntil: 'load' });
+  const read = () => b.evaluate(() => ({
+    hidden: document.getElementById('search-history').hidden,
+    values: [...document.querySelectorAll('#search-history-list button')].map((el) => el.textContent),
+    query: document.getElementById('search-input').value,
+  }));
+  await b.waitForFunction(() => !document.getElementById('search-history').hidden, { timeout: 4000 }).catch(() => {});
+  const before = await read();
+  check('Recent searches appear in a second tab', !before.hidden && before.values.includes('旧搜索'), JSON.stringify(before));
+  await a.evaluate(() => localStorage.removeItem('search:history'));
+  await b.waitForFunction(() => document.getElementById('search-history').hidden, { timeout: 2500 }).catch(() => {});
+  const removed = await read();
+  check('Removing search history in another tab hides stale suggestions', removed.hidden && removed.query === '', JSON.stringify(removed));
+  await a.evaluate(() => localStorage.setItem('search:history', JSON.stringify(['新搜索'])));
+  await b.waitForFunction(() => !document.getElementById('search-history').hidden
+    && document.querySelector('#search-history-list button')?.textContent === '新搜索', { timeout: 2500 }).catch(() => {});
+  const added = await read();
+  check('Recent searches added in another tab refresh immediately', !added.hidden && added.values.join() === '新搜索', JSON.stringify(added));
+  await a.evaluate(() => localStorage.clear());
+  await b.waitForFunction(() => document.getElementById('search-history').hidden, { timeout: 2500 }).catch(() => {});
+  const cleared = await read();
+  check('Clearing site storage in another tab hides search history', cleared.hidden && cleared.query === '', JSON.stringify(cleared));
+  await a.close();
+  await b.close();
+}
+
 /* ---------- 1. 首页 Tab 顺序与焦点环 ---------- */
 {
   const page = await browser.newPage();
