@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: search fallback covers notes and posts (2026-10-30)
+## Current iteration: series-first related reading (2026-10-30)
+
+- **Finding:** Article series timelines obey `seriesOrder`, but the article "接着读" related cards ignored that order and ranked same-series items by publication date. Opening the first chapter could therefore suggest chapter 3 before chapter 2.
+- **Change:** Reuse the existing `sortByOrder` rule. Prefer subsequent chapters in ascending series order, then previous chapters in reverse proximity; fill remaining cards with the existing category/tag relevance and date ordering. Continue excluding the current article.
+- **Regression:** Compare each generated series timeline to actual related-card hrefs on all of its articles, including the first, middle and final chapter; forbid duplicates/self links. Run the contract in PR/main Quality and local preflight.
+- **Guardrails:** no dependency, content, routes, client JavaScript/CSS, game, or budget changes. Require all latest PR checks to pass, then verify main Quality and Pages use the same merge SHA.
+
+## Completed: search fallback covers notes and posts (2026-10-30)
 
 - **Finding:** Empty search suggestions say “最近更新” but offer only articles, even when notes were published more recently. On the homepage a separate article-only card group also says “最近更新”, despite a dedicated latest-note section.
 - **Change:** Use the newest three published posts and notes in the no-result search fallback, consistently ordered with the sidebar; add screen-reader type prefixes and dates. Rename the homepage article-only heading “最近文章” to distinguish it from mixed updates.

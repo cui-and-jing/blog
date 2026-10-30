@@ -72,6 +72,9 @@ jobs:
       - name: Search fallback mixed recent chronology contract
         run: npm run search:suggest:check
 
+      - name: Related reading sequence contract
+        run: npm run related:check
+
       - name: Sitemap metadata and indexability contract
         run: npm run sitemap:check
 

@@ -90,6 +90,7 @@ async function main() {
   run('全站标签入口一致性', 'node', ['scripts/tag-discovery.test.mjs']);
   run('侧栏文章与笔记最近更新顺序', 'node', ['scripts/recent-discovery.test.mjs']);
   run('Search recent fallback chronology', 'node', ['scripts/search-suggestions.test.mjs']);
+  run('系列接着读章节顺序', 'node', ['scripts/related-reading.test.mjs']);
   run('站点地图更新时间与索引规则', 'node', ['scripts/sitemap-check.mjs']);
   // 确保本地预检也能发现订阅源全文、链接与唯一性回归。
   run('RSS 全文与永久链接校验', 'node', ['scripts/rss-check.mjs']);
