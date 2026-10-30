@@ -81,7 +81,6 @@
   /* 封面是装饰，打印出来是一整块深色，既费墨又压住标题 */
   .post-hero {
     margin: 0 0 16pt;
-    background: none;
     box-shadow: none;
     overflow: visible;
   }
@@ -99,7 +98,6 @@
 
   .post-hero-body h1 {
     margin: 6pt 0 0;
-    color: #111;
     font-size: 22pt;
     text-shadow: none;
   }
