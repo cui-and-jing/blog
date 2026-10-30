@@ -1348,6 +1348,40 @@ const check = (name, pass, detail = '') => {
   check('取消最后一篇收藏后展示空状态',
     emptySaved.shown === 0 && emptySaved.empty && emptySaved.text.includes('收藏'), JSON.stringify(emptySaved));
 
+  /* When another tab removes the saved-posts key, this tab must not revive
+     its last written in-memory snapshot. Cover both removeItem and clear(). */
+  for (const method of ['removeItem', 'clear']) {
+    await page.goto(`${base}/posts/`, { waitUntil: 'load' });
+    await page.click('#post-grid .card:first-child button[data-bookmark-id]');
+    await page.click('#bookmark-filter');
+
+    const otherTab = await browser.newPage();
+    await otherTab.goto(`${base}/posts/`, { waitUntil: 'load' });
+    await otherTab.evaluate((action) => {
+      const key = 'cui-jing:saved-posts:v1';
+      if (action === 'clear') localStorage.clear();
+      else localStorage.removeItem(key);
+    }, method);
+    await page.waitForFunction(() =>
+      document.querySelector('#post-grid .card:first-child button[data-bookmark-id]')?.getAttribute('aria-pressed') === 'false'
+      && document.getElementById('bookmark-count')?.textContent === '0'
+      && !document.getElementById('post-filter-empty')?.hidden,
+    { timeout: 3000 }).catch(() => null);
+    const clearedAcrossTabs = await page.evaluate(() => ({
+      pressed: document.querySelector('#post-grid .card:first-child button[data-bookmark-id]')?.getAttribute('aria-pressed'),
+      count: document.getElementById('bookmark-count')?.textContent,
+      shown: [...document.querySelectorAll('#post-grid .card')].filter((card) => !card.hidden).length,
+      empty: !document.getElementById('post-filter-empty')?.hidden,
+      savedFilter: new URL(location.href).searchParams.get('saved'),
+    }));
+    check('另一标签页 ' + method + ' 后同步清空收藏和筛选状态',
+      clearedAcrossTabs.pressed === 'false' && clearedAcrossTabs.count === '0'
+        && clearedAcrossTabs.shown === 0 && clearedAcrossTabs.empty
+        && clearedAcrossTabs.savedFilter === '1',
+      JSON.stringify(clearedAcrossTabs));
+    await otherTab.close();
+  }
+
   /* GitHub Pages 将不存在的 /games/<slug>/ 返回 404.html。
      在预览服务上使用 404 文档模拟同源旧 URL，避免依赖其 404 fallback 实现。 */
   await page.goto(`${base}/404.html`, { waitUntil: 'load' });
