@@ -110,26 +110,20 @@ export function setupLightbox(): void {
           flashHint();
         };
 
-        lightboxImages.forEach((image) => {
+        lightboxImages.forEach((image, i) => {
           /* 正文图片统一懒加载，长文首屏不必拉完全部配图 */
           image.loading = 'lazy';
           image.decoding = 'async';
           image.tabIndex = 0;
           image.setAttribute('role', 'button');
           image.setAttribute('aria-label', `放大图片：${image.alt || '正文图片'}`);
-        });
-
-        /* 一篇长文只绑定两个委托事件，不随图片数量增加监听器。 */
-        const activateImage = (event: Event) => {
-          if ((event.target as Element)?.tagName !== 'IMG') return;
-          const index = lightboxImages.indexOf(event.target as HTMLImageElement);
-          if (index < 0) return;
-          event.preventDefault();
-          openLightbox(index);
-        };
-        document.addEventListener('click', activateImage);
-        document.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter' || event.key === ' ') activateImage(event);
+          image.addEventListener('click', () => openLightbox(i));
+          image.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              openLightbox(i);
+            }
+          });
         });
 
         /* 缩放：滚轮以指针为中心，双击在 1× 与 2.4× 之间切换 */
