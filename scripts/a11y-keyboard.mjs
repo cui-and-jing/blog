@@ -309,7 +309,7 @@ const check = (name, pass, detail = '') => {
     await page.focus('.article-tools .size-switch [data-value="normal"]');
     await page.keyboard.press('Enter');
     const keyboard = await page.evaluate(() => ({
-      reading: document.documentElement.dataset.reading,
+      reading: document.documentElement.dataset.reading ?? 'normal',
       pressed: document.querySelector('.article-tools .size-switch [data-value="normal"]')?.getAttribute('aria-pressed'),
     }));
     check(width + 'px 键盘可还原标准字号', keyboard.reading === 'normal' && keyboard.pressed === 'true',
