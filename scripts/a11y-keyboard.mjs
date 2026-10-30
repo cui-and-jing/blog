@@ -141,6 +141,42 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- Notes: copying a link works in the timeline and the dedicated page ---------- */
+{
+  const page = await browser.newPage();
+  // Stub only the clipboard boundary; real browser clicks exercise the shared event handler.
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text) => { window.__copiedNoteUrl = text; },
+      },
+    });
+  });
+  for (const route of ['/notes/', '/notes/2026-10-22-1015/']) {
+    await page.goto(base + route, { waitUntil: 'load' });
+    const link = await page.$eval('button.note-copy', (button) => button.getAttribute('data-note-link'))
+      .catch(() => null);
+    if (!link) {
+      check('Note link copy on ' + route, false, 'missing canonical data-note-link');
+      continue;
+    }
+    await page.click('button.note-copy');
+    await page.waitForFunction(() => window.__copiedNoteUrl !== undefined, { timeout: 2500 })
+      .catch(() => null);
+    const actual = await page.evaluate(() => ({
+      url: window.__copiedNoteUrl ?? '',
+      label: document.querySelector('button.note-copy span')?.textContent?.trim() ?? '',
+      announcement: document.getElementById('a11y-status')?.textContent?.trim() ?? '',
+    }));
+    const expected = new URL(link, page.url()).href;
+    check('Note link copy on ' + route,
+      actual.url === expected && actual.label === '已复制' && actual.announcement === '笔记链接已复制',
+      'expected=' + expected + ', got=' + JSON.stringify(actual));
+  }
+  await page.close();
+}
+
 /* ---------- 1. 首页 Tab 顺序与焦点环 ---------- */
 {
   const page = await browser.newPage();

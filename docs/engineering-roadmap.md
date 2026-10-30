@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: remove inert mobile lightbox offsets (2026-10-31)
+## Current iteration: repair note detail copy-link control (2026-10-31)
+
+- **Finding:** The notes timeline uses `data-note-link`, which the shared `NoteCopy` click delegate recognizes. The dedicated note page instead renders `data-note-copy data-link`; clicking its visible “复制链接” button triggers no handler, no clipboard copy and no confirmation.
+- **Change:** Align the detail-page button with the shared component's existing `data-note-link` contract. Keep both routes, the user-facing labels, the click delegate and the clipboard fallback behavior unchanged.
+- **Regression:** Add real Chromium click-and-clipboard contract checks on both the timeline and a dedicated note. Verify the absolute copied URL, visible success label and accessible announcement. Keep the full Quality, games, accessibility, CSS/JS and transfer budgets.
+- **Release:** No new dependency, route, content, game, stylesheet or runtime script. Merge only after full Quality success for the exact latest PR SHA, then verify main Quality and Pages build/deploy for the same merge SHA.
+
+## Completed: remove inert mobile lightbox offsets (2026-10-31)
 
 - **Finding:** The 720px media block assigns `top` and `right` to `.lightbox-close`, but that button is a statically positioned flex child. The viewport position is actually controlled by its `position: fixed` parent, `.lightbox-tools`. These offsets never move the button, yet occupy space near the strict CSS gzip limit.
 - **Change:** Delete only the ineffective child offsets. Preserve the parent toolbar's fixed 22px placement, the 44px close hit target, image zoom and keyboard navigation, desktop layout, and the original small-screen behavior.
