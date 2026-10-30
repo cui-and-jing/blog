@@ -2,6 +2,7 @@
 import type { CollectionEntry } from 'astro:content';
 import Cover from './Cover.astro';
 import { url, formatDate } from '../lib/site';
+import { sortByOrder } from '../lib/series';
 
 interface Props {
   current: CollectionEntry<'posts'>;
@@ -10,18 +11,27 @@ interface Props {
 
 const { current, posts } = Astro.props;
 
-/* 同系列 +5，同分类 +3，每个共同标签 +2；都不沾边就按时间补位，至少让读者有下一站。
-   分数相同按发布时间倒序，理由只取最有说服力的那一条。 */
+/*
+ * "接着读"先跟随系列目录的阅读顺序，而不是按发布日期倒排：
+ * 从当前篇往后读；读到末尾时再从最近的前文倒序补齐。
+ * 空余位置才按分类、共同标签和发布时间推荐其他文章。
+ */
+const seriesPosts = current.data.series
+  ? sortByOrder(posts.filter((post) => post.data.series === current.data.series))
+  : [];
+const currentPosition = seriesPosts.findIndex((post) => post.id === current.id);
+const seriesNext = currentPosition < 0 ? [] : [
+  ...seriesPosts.slice(currentPosition + 1),
+  ...seriesPosts.slice(0, currentPosition).reverse(),
+];
+const excluded = new Set([current.id, ...seriesNext.map((post) => post.id)]);
+
 const scored = posts
-  .filter((post) => post.id !== current.id)
+  .filter((post) => !excluded.has(post.id))
   .map((post) => {
     let score = 0;
     const reasons: string[] = [];
 
-    if (post.data.series && post.data.series === current.data.series) {
-      score += 5;
-      reasons.push('同一系列');
-    }
     if (post.data.category && post.data.category === current.data.category) score += 3;
 
     const shared = post.data.tags.filter((tag) => current.data.tags.includes(tag));
@@ -34,7 +44,10 @@ const scored = posts
   })
   .sort((a, b) => b.score - a.score || b.post.data.date.valueOf() - a.post.data.date.valueOf());
 
-const related = scored.slice(0, 3);
+const related = [
+  ...seriesNext.map((post) => ({ post, reason: '同一系列' })),
+  ...scored,
+].slice(0, 3);
 ---
 
 {
