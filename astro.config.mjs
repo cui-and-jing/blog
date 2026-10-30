@@ -24,7 +24,7 @@ export default defineConfig({
          笔记独立页带 noindex，也不该一边说别索引、一边写进 sitemap */
       filter: (page) => {
         const path = page.replace(/\/$/, '');
-        if (/\/(search|styleguide)$/.test(path)) return false;
+        if (/\/(search|styleguide|404(?:\.html)?)$/.test(path)) return false;
         return !/\/notes\/[^/]+$/.test(path);
       },
       serialize: (item) => {
