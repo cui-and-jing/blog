@@ -5,6 +5,8 @@
 export const BOOKMARKS_KEY = 'cui-jing:saved-posts:v1';
 const LIMIT = 500;
 let session: string[] = [];
+// Only use in-memory values when a storage write was actually blocked.
+let sessionOnly = false;
 
 function clean(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -16,7 +18,7 @@ function clean(value: unknown): string[] {
 export function readBookmarks(): string[] {
   try {
     const stored = localStorage.getItem(BOOKMARKS_KEY);
-    return stored === null ? [...session] : clean(JSON.parse(stored));
+    return stored === null ? (sessionOnly ? [...session] : []) : clean(JSON.parse(stored));
   } catch {
     return [...session];
   }
@@ -26,7 +28,9 @@ export function writeBookmarks(value: string[]): void {
   session = clean(value);
   try {
     localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(session));
+    sessionOnly = false;
   } catch {
+    sessionOnly = true;
     // 浏览器禁止本地保存时，只在当前页面保留状态。
   }
 }
