@@ -22,7 +22,13 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: preserve external URLs in printed articles (2026-10-30)
+## Current iteration: print collapsed article details (2026-10-31)
+
+- **Finding:** MDX Details uses native closed `<details>`, but print CSS does not reveal its content. Chromium PDF output omits the hidden instructions entirely even though the component describes them as printable.
+- **Change:** Override the native `::details-content` visibility only in print media. Preserve interactive `open` state and every normal-screen layout, with no JavaScript, route, content, game or dependency changes. The pseudo-element is supported in modern Chromium, Firefox and Safari; older browsers may still omit closed details.
+- **Regression:** Extend the existing real-browser print check to verify closed and expanded details in screen vs print media and restoration after leaving print mode. A local Chromium PDF fixture confirmed the content is absent before and present after the CSS rule. Keep all Quality and size budgets, and verify PR/head mergeability, main Quality and same-SHA Pages deployment.
+
+## Completed: preserve external URLs in printed articles (2026-10-30)
 
 - **Finding:** The print stylesheet appends a URL to external prose links, but a later print-only `.prose a.external-link::after { display: none; }` cancels it. The normal screen icon also uses a masked, fixed-size pseudo-element, which is unsuitable for text in print.
 - **Change:** Reset the screen-only pseudo-element styling before adding the printable address, and remove the print rule that hides the address. Keep normal screen icons, local links, routes, posts, games, and dependencies unchanged.
