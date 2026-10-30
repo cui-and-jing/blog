@@ -637,10 +637,12 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         if (measureTable.length) requestAnimationFrame(() => measureTable.forEach((fn) => fn()));
       };
 
-      /* Safari 还没有 requestIdleCallback，退化成一次短延时 */
-      window.requestIdleCallback
-        ? window.requestIdleCallback(enhanceProse, { timeout: 1500 })
-        : window.setTimeout(enhanceProse, 200);
+      /* 只有存在表格/代码块才安排空闲增强任务；列表、首页不再空跑。 */
+      if (document.querySelector('.prose table, .prose pre')) {
+        window.requestIdleCallback
+          ? window.requestIdleCallback(enhanceProse, { timeout: 1500 })
+          : window.setTimeout(enhanceProse, 200);
+      }
 
       /* 只在正文有图时初始化灯箱；源码拆分，构建仍合并以遵守总体 JS 预算。 */
       if (document.querySelector('.prose img')) setupLightbox();
