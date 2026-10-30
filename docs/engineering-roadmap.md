@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: homepage and series editorial freshness (2026-10-30)
+## Current iteration: mobile search history touch and keyboard usability (2026-10-30)
+
+- **Finding:** Search history chips and the clear-history button use small padding and had no 44px minimum touch target. On narrow phones, these controls were harder to activate than the nearby search input clear button, and the clear-history control's accessible name was ambiguous.
+- **Change:** Give both saved-query chips and clear-history control a minimum 44px touch height, retain flexible chip wrapping, ensure the clear action is at least 44px wide and distinguish its accessible label from clearing the search query. Preserve saved-query ordering, URL behavior and local-only storage.
+- **Regression:** Chromium tests at 320px and 390px seed stored queries, measure actual hit rectangles and horizontal overflow, tap a query to restore results/URL, activate clear history by keyboard and verify persistence after reload. Existing axe, search, game, font, size and first-visit transfer gates stay mandatory.
+- **Guardrails:** no changes to posts, notes, routes, dependencies, games, or JavaScript functionality; keep the existing CSS and JS caps. Squash-merge only after the latest PR Quality fully passes; verify main Quality and Pages publish on the exact merged SHA.
+
+## Completed: homepage and series editorial freshness (2026-10-30)
 
 - **Finding:** The shared recent-update feeds now recognize later article edits, but the homepage hero's "最近更新" date still uses publication-only dates. Series discovery also ranks series by most recent publication rather than latest article revision, despite the sitemap treating edits as fresh content.
 - **Change:** Reuse one build-time activity-date reducer across the homepage hero and series ordering. Preserve original publication dates in the visible series date range, chapter sequence, archive, and article cards. An edited older series may move higher in discovery without rewriting its publication history.
