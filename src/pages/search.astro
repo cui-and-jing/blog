@@ -82,7 +82,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
     <div class="search-history" id="search-history" hidden>
       <div class="search-history-head">
         <span>最近搜索</span>
-        <button class="search-history-clear" id="search-history-clear" type="button">清除</button>
+        <button class="search-history-clear" id="search-history-clear" type="button" aria-label="清除最近搜索记录">清除</button>
       </div>
       <div class="search-history-list" id="search-history-list"></div>
     </div>
