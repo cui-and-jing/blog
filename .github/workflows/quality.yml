@@ -60,6 +60,9 @@ jobs:
         run: npm run links:check
 
       # 体积一旦涨上去就很难降回来，放在构建之后、浏览器测试之前
+      - name: Sitemap metadata and indexability contract
+        run: npm run sitemap:check
+
       - name: RSS full text contract
         run: npm run rss:check
 
