@@ -148,6 +148,8 @@
 
   /* 纸上点不动链接，把地址印在括号里 */
   .prose a[href^='http']::after {
+    /* Reset the screen-only arrow mask before showing a readable URL on paper. */
+    all: unset;
     content: ' (' attr(href) ')';
     font-size: 8.5pt;
     color: #666;
@@ -211,9 +213,6 @@
     border: 1px solid #d8d3c7;
   }
 
-  .prose a.external-link::after {
-    display: none;
-  }
 
   .prose table {
     font-size: 9.5pt;

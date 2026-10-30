@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: remove hidden back-to-top offset rules (2026-10-30)
+## Current iteration: preserve external URLs in printed articles (2026-10-30)
+
+- **Finding:** The print stylesheet appends a URL to external prose links, but a later print-only `.prose a.external-link::after { display: none; }` cancels it. The normal screen icon also uses a masked, fixed-size pseudo-element, which is unsuitable for text in print.
+- **Change:** Reset the screen-only pseudo-element styling before adding the printable address, and remove the print rule that hides the address. Keep normal screen icons, local links, routes, posts, games, and dependencies unchanged.
+- **Regression:** Run actual Chromium screen and print media checks for a styled external link and a local link in the existing keyboard/browser suite; retain all CSS gzip, JS, fonts, builds, a11y, games and transfer budgets.
+- **Release gate:** Require latest PR-head Quality success and mergeability, then successful main Quality and Pages build/deploy for one exact merge SHA.
+
+## Completed: remove hidden back-to-top offset rules (2026-10-30)
 
 - **Finding:** At up to 1080px, the floating `.to-top` button is hidden because the mobile bottom action bar owns the same action. A later <=900px media query still sets its `right` and `bottom` offsets, which cannot affect layout while `display: none` is active.
 - **Change:** Remove only that unreachable <=900px offset block in `motion.css`, leaving the <=1080px visibility rule, existing desktop floating button, and mobile bar intact. No dependency, route, game, content, JavaScript, or size-cap changes.
