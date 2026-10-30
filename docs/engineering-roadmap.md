@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: mobile search history touch and keyboard usability (2026-10-30)
+## Current iteration: trustworthy article revision metadata (2026-10-30)
+
+- **Finding:** The sitemap and search discovery already ignore an `updated` timestamp earlier than publication, but article JSON-LD, Open Graph metadata and the visible footer can still describe that older edit as the latest revision. This creates conflicting published/modified dates when content authors correct frontmatter.
+- **Change:** Normalize the article's effective revision date with the existing `activityDate` helper before producing schema, metadata or footer labels. Omit the optional modified-time tag and update label unless the update is strictly later than publication.
+- **Regression:** Extend the build-time activity contract with older/newer/invalid update fixtures and per-article comparisons of emitted JSON-LD, publish/modify meta tags, footer and sitemap effective dates.
+- **Guardrails:** no routes, content, dependencies, CSS, browser JS, games or budget changes. Merge only after full latest-head PR Quality success; verify main Quality and Pages deploy on the merge SHA.
+
+## Completed: mobile search history touch and keyboard usability (2026-10-30)
 
 - **Finding:** Search history chips and the clear-history button use small padding and had no 44px minimum touch target. On narrow phones, these controls were harder to activate than the nearby search input clear button, and the clear-history control's accessible name was ambiguous.
 - **Change:** Give both saved-query chips and clear-history control a minimum 44px touch height, retain flexible chip wrapping, ensure the clear action is at least 44px wide and distinguish its accessible label from clearing the search query. Preserve saved-query ordering, URL behavior and local-only storage.

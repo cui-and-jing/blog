@@ -14,6 +14,7 @@ import { SITE, url, formatDate, readingTime, tagHue } from '../../lib/site';
 import { findAuthor } from '../../data/authors';
 import { findSeries, positionIn } from '../../lib/series';
 import { getPosts } from '../../lib/posts';
+import { activityDate } from '../../lib/recent-date.mjs';
 
 export async function getStaticPaths() {
   const sorted = await getPosts();
@@ -37,6 +38,8 @@ interface Props {
 const { post, newer, older } = Astro.props;
 const { Content, headings } = await render(post);
 const author = findAuthor(post.data.author);
+const modifiedAt = activityDate(post.data);
+const revised = modifiedAt.getTime() > post.data.date.getTime();
 const authorHref = url(`/authors/#${author.id}`);
 const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
 const minutes = readingTime(post.body ?? '');
@@ -65,7 +68,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
   image={ogImage}
   article={{
     published: post.data.date,
-    updated: post.data.updated,
+    updated: revised ? modifiedAt : undefined,
     tags: post.data.tags,
     category: post.data.category,
     minutes,
@@ -176,10 +179,10 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
                 <span class="sep" aria-hidden="true">·</span>
                 <span>{`约 ${minutes} 分钟`}</span>
                 {
-                  post.data.updated && (
+                  revised && (
                     <>
                       <span class="sep" aria-hidden="true">·</span>
-                      <span>{`最后更新 ${formatDate(post.data.updated)}`}</span>
+                      <span>{`最后更新 ${formatDate(modifiedAt)}`}</span>
                     </>
                   )
                 }

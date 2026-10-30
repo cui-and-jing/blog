@@ -26,6 +26,10 @@ assert.equal(day(latestActivity([{ date: stamp('2026-10-30') }])), '2026-10-30',
   'note-only activity should be supported');
 assert.equal(day(activityDate({ date: stamp('2026-10-20'), updated: new Date('bad') })),
   '2026-10-20', 'invalid update should not supersede publication');
+assert.equal(day(activityDate({ date: stamp('2026-10-20'), updated: stamp('2026-10-01') })),
+  '2026-10-20', 'pre-publication edits are not later revisions');
+assert.equal(day(activityDate({ date: stamp('2026-10-20'), updated: stamp('2026-10-29') })),
+  '2026-10-29', 'later edits must advance revision metadata');
 
 const root = path.resolve('dist');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
@@ -46,6 +50,35 @@ assert.ok(records.every((item) => !item.updated || (item.type === 'post' && inst
   'the search index must retain publication dates and only expose later revisions');
 
 const publishedPosts = readEntries(path.resolve('src/content/posts'));
+
+// Generated article metadata must agree with the sitemap's effective revision date.
+for (const post of publishedPosts) {
+  const built = read('posts/' + post.slug + '/index.html');
+  const jsonLd = built.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(jsonLd, post.slug + ': missing structured data');
+  const objects = JSON.parse(jsonLd);
+  const blogPosting = objects.find((entry) => entry['@type'] === 'BlogPosting');
+  assert.ok(blogPosting, post.slug + ': missing BlogPosting schema');
+  const meta = (property) => {
+    const tag = built.match(new RegExp('<meta[^>]*property="' + property + '"[^>]*>'))?.[0];
+    return tag?.match(/content="([^"]+)"/)?.[1] ?? null;
+  };
+  const published = meta('article:published_time');
+  const modified = meta('article:modified_time');
+  assert.ok(published, post.slug + ': missing publication metadata');
+  assert.equal(blogPosting.datePublished, published, post.slug + ': datePublished mismatch');
+  assert.equal(blogPosting.dateModified, post.date.toISOString(), post.slug + ': effective revision mismatch');
+  assert.ok(Date.parse(blogPosting.dateModified) >= Date.parse(published),
+    post.slug + ': revision metadata cannot precede publication');
+  const isRevised = post.date.getTime() > Date.parse(published);
+  assert.equal(modified, isRevised ? post.date.toISOString() : null,
+    post.slug + ': modified_time must describe a later revision only');
+  const stats = built.match(/<p class="post-stats">([\s\S]*?)<\/p>/)?.[1];
+  assert.ok(stats, post.slug + ': missing article footer');
+  assert.equal(stats.includes('最后更新'), isRevised,
+    post.slug + ': visible revision label must agree with metadata');
+}
+
 const series = new Map();
 for (const post of publishedPosts) {
   if (!post.series) continue;
