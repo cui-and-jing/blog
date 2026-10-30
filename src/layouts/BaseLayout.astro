@@ -569,9 +569,9 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           table.replaceWith(box);
           box.append(table);
 
-          /* 一篇文章的表格共用一个 ResizeObserver，避免每张表独立观察。 */
-          box.addEventListener('scroll', () => measure(box), { passive: true });
-          resize?.observe(box);
+          /* 首次观察会自动通知尺寸；旧浏览器退回下一帧测量。 */
+          if (resize) resize.observe(box);
+          else requestAnimationFrame(() => measure(box));
         });
 
         document.querySelectorAll<HTMLElement>('.prose pre').forEach((pre) => {
@@ -635,7 +635,6 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           }
         });
 
-        if (tables.length) requestAnimationFrame(() => tables.forEach((table) => measure(table.parentElement!)));
       };
 
       /* 只有存在表格/代码块才安排空闲增强任务；列表、首页不再空跑。 */
