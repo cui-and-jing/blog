@@ -373,6 +373,11 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         input.focus();
       });
 
+      /* Another tab may add or clear recent searches while this page stays open. */
+      window.addEventListener('storage', (event) => {
+        if (event.key === HISTORY_KEY || event.key === null) renderHistory();
+      });
+
       const apply = (syncUrl = true) => {
         if (!ready) return;
         const query = input.value.trim();
