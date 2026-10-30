@@ -30,7 +30,7 @@ const { postId, title, variant = 'card' } = Astro.props;
   function sync() {
     const saved = new Set(readBookmarks());
     document.querySelectorAll<HTMLButtonElement>(selector).forEach((button) => {
-      const has = saved.has(button.dataset.bookmarkId ?? '');
+      const has = saved.has(button.dataset.bookmarkId!);
       const title = button.dataset.bookmarkTitle ?? '';
       button.setAttribute('aria-pressed', String(has));
       button.setAttribute('aria-label', has ? `已收藏：${title}，移除收藏` : `收藏：${title}`);
