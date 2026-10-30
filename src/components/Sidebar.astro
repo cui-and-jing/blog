@@ -2,6 +2,7 @@
 import type { CollectionEntry } from 'astro:content';
 import { SITE, url, daysSince, tagHue } from '../lib/site';
 import { getNotes, noteTitle } from '../lib/notes';
+import { activityDate } from '../lib/recent-date.mjs';
 import { collectTags } from '../lib/tags';
 
 interface Props {
@@ -18,12 +19,12 @@ const notes = await getNotes();
 const tagBuckets = collectTags(posts, notes);
 const tags = tagBuckets.slice(0, 14);
 
-// 最近更新覆盖文章与笔记；文章页不向读者推荐正在看的同一篇。
-// 文章和笔记各自已按日期倒序，按日期排序，同一天保留原有顺序。
+// 最近更新包括文章的后续编辑与新笔记；文章页排除正在阅读的篇目。
+// 日期相同时维持先文章、后笔记的稳定顺序。
 const recent = [
   ...posts.filter((post) => post.id !== currentId).map((post) => ({
     type: 'post',
-    date: post.data.date,
+    date: activityDate(post.data),
     href: url(`/posts/${post.id}/`),
     title: post.data.title,
   })),
