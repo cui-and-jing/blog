@@ -405,18 +405,42 @@ const check = (name, pass, detail = '') => {
 /* ---------- 2.7. 灯箱模块源码分离，构建单包，无图页不额外请求；有图页交互完整 ---------- */
 {
   const plain = await browser.newPage();
+  await plain.evaluateOnNewDocument(() => {
+    const idle = window.requestIdleCallback?.bind(window);
+    window.__idleTaskCount = 0;
+    if (idle) window.requestIdleCallback = (callback, options) => {
+      window.__idleTaskCount += 1;
+      return idle(callback, options);
+    };
+  });
   const plainScripts = [];
   plain.on('request', (request) => {
     if (request.url().includes('/_astro/') && request.url().endsWith('.js')) plainScripts.push(request.url());
   });
   await plain.goto(base + '/', { waitUntil: 'networkidle2' });
   await plain.waitForFunction(() => document.documentElement.dataset.booted === 'on');
+  const noIdle = await plain.evaluate(() => ({
+    count: window.__idleTaskCount,
+    blocks: document.querySelectorAll('.prose table, .prose pre').length,
+  }));
+  check('无代码表格的首页不安排无用的正文增强空闲任务',
+    noIdle.count === 0 && noIdle.blocks === 0, JSON.stringify(noIdle));
   check('无正文图片首页不额外请求灯箱模块',
     !plainScripts.some((url) => /\/lightbox[.-]/.test(url)),
     plainScripts.map((url) => url.split('/').pop()).join(', '));
   await plain.close();
 
   const gallery = await browser.newPage();
+  await gallery.evaluateOnNewDocument(() => {
+    const add = EventTarget.prototype.addEventListener;
+    window.__imageActivationListeners = 0;
+    EventTarget.prototype.addEventListener = function (type, handler, options) {
+      if (this instanceof HTMLImageElement && (type === 'click' || type === 'keydown')) {
+        window.__imageActivationListeners += 1;
+      }
+      return add.call(this, type, handler, options);
+    };
+  });
   const galleryScripts = [];
   gallery.on('request', (request) => {
     if (request.url().includes('/_astro/') && request.url().endsWith('.js')) galleryScripts.push(request.url());
@@ -431,6 +455,9 @@ const check = (name, pass, detail = '') => {
   check('有配图的排版样例页正确初始化可访问灯箱',
     images >= 2 && !galleryScripts.some((url) => /\/lightbox[.-]/.test(url)),
     JSON.stringify({ images, scripts: galleryScripts.map((url) => url.split('/').pop()) }));
+  const boundPerImage = await gallery.evaluate(() => window.__imageActivationListeners);
+  check('多图灯箱不逐张绑定鼠标或键盘事件',
+    boundPerImage === 0, String(boundPerImage));
 
   await gallery.click('.prose img');
   await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === true);
@@ -478,6 +505,27 @@ const check = (name, pass, detail = '') => {
     overflow: document.documentElement.style.overflow,
   }));
   check('Esc 关闭灯箱且恢复背景滚动', closed.open === false && closed.overflow === '', JSON.stringify(closed));
+
+  const focusSecond = await gallery.evaluate(() => {
+    const images = document.querySelectorAll('.prose img');
+    images[1]?.focus();
+    return document.activeElement === images[1];
+  });
+  await gallery.keyboard.press('Enter');
+  await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === true);
+  const enterSrc = await gallery.evaluate(() => document.getElementById('lightbox-img')?.getAttribute('src'));
+  check('第二张图片可通过 Enter 使用委托事件打开', focusSecond && enterSrc === changed,
+    JSON.stringify({ focusSecond, enterSrc }));
+  await gallery.keyboard.press('Escape');
+  await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === false);
+
+  await gallery.evaluate(() => document.querySelector('.prose img')?.focus());
+  await gallery.keyboard.press('Space');
+  await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === true);
+  const spaceSrc = await gallery.evaluate(() => document.getElementById('lightbox-img')?.getAttribute('src'));
+  check('第一张图片可通过空格键打开并保持正文位置',
+    spaceSrc === originalSrc, JSON.stringify({ spaceSrc, originalSrc }));
+  await gallery.keyboard.press('Escape');
   await gallery.close();
 }
 
