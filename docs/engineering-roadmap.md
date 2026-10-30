@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: respect cross-tab reading-list removal (2026-10-31)
+## Current iteration: synchronize recent searches across tabs (2026-10-31)
+
+- **Finding:** Search history is read from localStorage when a search page loads or its input changes. A second tab can remove, clear, or add history without triggering a refresh in a currently open search tab, leaving stale visible suggestions.
+- **Change:** Listen for browser storage events on the existing search-history key (including storage.clear's null key) and re-render the existing history area. Preserve typed queries, focus, saved-search limit, and private-mode fallback.
+- **Regression:** Open real Chromium tabs on the search route, seed history in one tab and verify a second displays it; then remove the key, add new history, and clear all storage from the first tab. Check the second tab updates without navigation or input changes.
+- **Release:** Small search-only change. Do not raise CSS/JS or transfer caps. Require latest PR Quality and clean merge before squash; then main Quality and Pages build/deploy must match the merge SHA.
+
+## Completed: respect cross-tab reading-list removal (2026-10-31)
 
 - **Finding:** A tab that previously saved a post retains an in-memory copy. When another tab deletes the saved-post key or clears site storage, the first tab receives the storage event, but `readBookmarks()` falls back to the stale in-memory copy when the key is absent, leaving bookmark buttons and the saved-only filter wrong.
 - **Change:** Clear the in-memory fallback only after `localStorage.setItem` succeeds. Keep the session copy when a write is denied; after persistence succeeds, a missing key correctly indicates a later removal. Preserve the existing versioned storage key and same-tab behavior.
