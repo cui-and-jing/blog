@@ -177,6 +177,67 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- Notes: denied clipboard and legacy fallback feedback ---------- */
+{
+  const page = await browser.newPage();
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async () => { throw new Error('clipboard denied'); } },
+    });
+    window.__allowLegacyCopy = true;
+    window.__legacyCopyAttempts = 0;
+    document.execCommand = () => {
+      window.__legacyCopyAttempts += 1;
+      return window.__allowLegacyCopy;
+    };
+  });
+  const route = '/notes/2026-10-22-1015/';
+  await page.goto(base + route, { waitUntil: 'load' });
+
+  // Clipboard API rejection should use the legacy copy path and restore button focus.
+  await page.click('button.note-copy');
+  await page.waitForFunction(() =>
+    document.querySelector('button.note-copy span')?.textContent?.trim() === '已复制',
+  { timeout: 2500 }).catch(() => null);
+  const recovered = await page.evaluate(() => ({
+    label: document.querySelector('button.note-copy span')?.textContent?.trim(),
+    announced: document.getElementById('a11y-status')?.textContent?.trim(),
+    attempts: window.__legacyCopyAttempts,
+    focusRestored: document.activeElement === document.querySelector('button.note-copy'),
+  }));
+  check('Note copy uses legacy clipboard fallback when permissions deny writeText',
+    recovered.label === '已复制' && recovered.announced === '笔记链接已复制'
+      && recovered.attempts === 1 && recovered.focusRestored,
+    JSON.stringify(recovered));
+
+  // When both APIs fail, feedback must be visible and the current URL fragment untouched.
+  await page.reload({ waitUntil: 'load' });
+  await page.evaluate(() => {
+    window.__allowLegacyCopy = false;
+    history.replaceState(null, '', '#keep-current-anchor');
+  });
+  await page.click('button.note-copy');
+  await page.waitForFunction(() =>
+    document.querySelector('button.note-copy span')?.textContent?.trim() === '复制失败',
+  { timeout: 2500 }).catch(() => null);
+  const denied = await page.evaluate(() => ({
+    label: document.querySelector('button.note-copy span')?.textContent?.trim(),
+    announced: document.getElementById('a11y-status')?.textContent?.trim(),
+    hash: location.hash,
+    attempts: window.__legacyCopyAttempts,
+    focusRestored: document.activeElement === document.querySelector('button.note-copy'),
+  }));
+  check('Note copy failure shows feedback without changing location or focus',
+    denied.label === '复制失败'
+      && denied.announced?.startsWith('复制失败，链接是 ')
+      && denied.announced.includes('/notes/2026-10-22-1015/')
+      && denied.hash === '#keep-current-anchor'
+      && denied.attempts === 1 && denied.focusRestored,
+    JSON.stringify(denied));
+  await page.close();
+}
+
 /* ---------- 1. 首页 Tab 顺序与焦点环 ---------- */
 {
   const page = await browser.newPage();
