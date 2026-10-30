@@ -124,14 +124,16 @@ const check = (name, pass, detail = '') => {
     fixture.remove();
     return result;
   });
-  // Percentage offsets resolve to different pixel values in differently sized containers.
-  const shared = ['content', 'position', 'left', 'transform', 'opacity', 'pointerEvents'];
+  // Percentage offsets and translateX percentages resolve against each element's geometry.
+  const shared = ['content', 'position', 'left', 'opacity', 'pointerEvents'];
   check('Article and game sheen share computed motion properties',
     shared.every((key) => styles.cover[key] === styles.game[key])
       && styles.cover.content !== 'none'
       && styles.cover.position === 'absolute'
       && styles.cover.opacity === '0'
-      && styles.cover.pointerEvents === 'none',
+      && styles.cover.pointerEvents === 'none'
+      && styles.cover.transform !== 'none'
+      && styles.game.transform !== 'none',
     JSON.stringify({ cover: styles.cover, game: styles.game }));
   check('Decorative sheen retains its two distinct gradient strengths',
     styles.cover.background.includes('0.5') && styles.game.background.includes('0.45'),
