@@ -184,12 +184,4 @@
   mix-blend-mode: normal;
 }
 
-@media (max-width: 900px) {
-  /* 游戏页的断点已经挪回 games.css —— 跟着对应组件走，
-     免得改一个断点要翻两个文件才能确认谁生效 */
-  .to-top {
-    right: 16px;
-    bottom: 16px;
-  }
-}
 
