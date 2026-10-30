@@ -18,9 +18,9 @@ function clean(value: unknown): string[] {
 export function readBookmarks(): string[] {
   try {
     const stored = localStorage.getItem(BOOKMARKS_KEY);
-    return stored === null ? (sessionOnly ? [...session] : []) : clean(JSON.parse(stored));
+    return stored === null ? (sessionOnly ? session : []) : clean(JSON.parse(stored));
   } catch {
-    return [...session];
+    return session;
   }
 }
 
