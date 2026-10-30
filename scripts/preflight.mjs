@@ -67,6 +67,8 @@ async function main() {
   run('内容体检', 'node', ['scripts/lint-content.mjs']);
   /* 正文用了子集外的字，线上会悄悄回退成系统宋体，只有字形不一致这一条线索，容易漏 */
   run('字体子集校验', 'node', ['scripts/fonts.mjs', '--check']);
+  // 本地发布体检与 CI 保持一致：失败的 Quality 不应触发 Pages。
+  run('部署发布门禁', 'node', ['scripts/deploy-gate.test.mjs']);
   run('类型检查', 'npx', ['astro', 'check']);
   run('像素突围战斗契约', 'node', ['scripts/pixelraid-mechanics.mjs']);
 
@@ -86,6 +88,8 @@ async function main() {
   run('构建链接和资源完整性', 'node', ['scripts/built-links.test.mjs']);
   run('站点路由、资源和章节锚点', 'node', ['scripts/built-links-check.mjs']);
   run('站点地图更新时间与索引规则', 'node', ['scripts/sitemap-check.mjs']);
+  // 确保本地预检也能发现订阅源全文、链接与唯一性回归。
+  run('RSS 全文与永久链接校验', 'node', ['scripts/rss-check.mjs']);
   run('体积预算', 'node', ['scripts/budget.mjs']);
   /* 字体按页分片后，每页只带自己的增量片；新增页面没进映射时这句会失败 */
   run('字体按页覆盖', 'node', ['scripts/fonts.mjs', '--check-pages']);
