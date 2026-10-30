@@ -1,6 +1,8 @@
 ---
 import type { CollectionEntry } from 'astro:content';
 import { SITE, url, daysSince, tagHue } from '../lib/site';
+import { getNotes } from '../lib/notes';
+import { collectTags } from '../lib/tags';
 
 interface Props {
   posts: CollectionEntry<'posts'>[];
@@ -11,13 +13,9 @@ interface Props {
 
 const { posts, currentId, showAuthor = true } = Astro.props;
 
-const tagCounts = new Map<string, number>();
-for (const post of posts) {
-  for (const tag of post.data.tags) {
-    tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
-  }
-}
-const tags = [...tagCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN')).slice(0, 14);
+/* The sidebar and /tags/ must use the same post + note aggregation. */
+const tagBuckets = collectTags(posts, await getNotes());
+const tags = tagBuckets.slice(0, 14);
 const recent = posts.filter((post) => post.id !== currentId).slice(0, 4);
 const days = daysSince(SITE.since);
 ---
@@ -37,7 +35,7 @@ const days = daysSince(SITE.since);
         </div>
         <div class="author-stats">
           <div><b>{posts.length}</b><span>文章</span></div>
-          <div><b>{tagCounts.size}</b><span>标签</span></div>
+          <div><b>{tagBuckets.length}</b><span>标签</span></div>
           <div><b>{days}</b><span>天</span></div>
         </div>
       </div>
@@ -64,7 +62,7 @@ const days = daysSince(SITE.since);
       <section class="widget">
         <h4>标签</h4>
         <div class="widget-tags">
-          {tags.map(([tag]) => (
+          {tags.map(({ tag }) => (
             <a href={url(`/tags/${encodeURIComponent(tag)}/`)} style={`--h:${tagHue(tag)}`}>{tag}</a>
           ))}
         </div>
