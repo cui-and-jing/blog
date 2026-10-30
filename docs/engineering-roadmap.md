@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-30. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: sitemap note-tag freshness and discovery contract (2026-10-30)
+## Current iteration: local preflight and CI release/feed parity (2026-10-30)
+
+- **Finding:** CI validates the Pages release gate and built article/note RSS, but local `npm run preflight` skipped both. A developer could receive a misleading all-green local report before a red PR check.
+- **Change:** run the same deployment gate before type checking and the same RSS full-text/permalink contract after sitemap checks in local preflight. No change to runtime assets or published URLs.
+- **Regression:** add an independent source-level contract in the PR Quality workflow to ensure both checks remain present, in the expected order, and also exist in CI; test that removing either local check or the CI RSS step makes the contract fail.
+- **Guardrails:** keep existing size budgets and the main Quality→Pages same-SHA publish gate. Require PR Quality success before merge and verify main Quality and Pages for the exact merge SHA.
+
+## Completed: sitemap note-tag freshness and discovery contract (2026-10-30)
 
 - **Finding:** tag pages aggregate both articles and notes, but `astro.config.mjs` sitemap lastmod included only article tags. New note-only tags had no lastmod and shared tags could report stale article timestamps; the tag index could similarly lag behind a newer note.
 - **Change:** factor build-only frontmatter scanning and lastmod aggregation into a shared helper. Update note-driven tag detail/index timestamps, preserve article/archive/series behavior and home/notes freshness; exclude noindex 404 fallback from sitemap.

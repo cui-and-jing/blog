@@ -44,6 +44,9 @@ jobs:
       - name: Deployment release gate contract
         run: npm run deploy:check
 
+      - name: Local preflight parity with CI
+        run: npm run preflight:check
+
       - name: Type check
         run: npm run check
 

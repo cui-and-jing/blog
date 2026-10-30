@@ -27,6 +27,7 @@
     "budget:wire": "node scripts/budget-wire.mjs",
     "perf": "node scripts/perf.mjs",
     "preflight": "node scripts/preflight.mjs",
+    "preflight:check": "node scripts/preflight-contract.test.mjs",
     "a11y": "node scripts/a11y-audit.mjs",
     "a11y:keys": "node scripts/a11y-keyboard.mjs",
     "visual": "node scripts/visual-regression.mjs",
