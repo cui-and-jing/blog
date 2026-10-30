@@ -552,9 +552,14 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const enhanceProse = () => {
         /* 包装完再统一量宽度：每包一个就读一次 scrollWidth 会强制一次同步布局，
            表格一多就是「写-读-写-读」的来回。攒到下一帧一次性读完。 */
-        const measureTable: Array<() => void> = [];
+        const tables = document.querySelectorAll<HTMLTableElement>('.prose table');
+        const measure = (box: HTMLElement) =>
+          box.classList.toggle('is-scrollable', box.scrollWidth - box.clientWidth > 2);
+        const resize = tables.length && 'ResizeObserver' in window
+          ? new ResizeObserver((entries) => entries.forEach(({ target }) => measure(target as HTMLElement)))
+          : null;
 
-        document.querySelectorAll<HTMLTableElement>('.prose table').forEach((table) => {
+        tables.forEach((table) => {
           if (table.closest('.table-wrap')) return;
           const box = document.createElement('div');
           box.className = 'table-wrap';
@@ -564,13 +569,9 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           table.replaceWith(box);
           box.append(table);
 
-          /* 只有真能滚动时才加边缘阴影，否则会误伤放得下的表格 */
-          const sync = () => {
-            box.classList.toggle('is-scrollable', box.scrollWidth - box.clientWidth > 2);
-          };
-          box.addEventListener('scroll', sync, { passive: true });
-          if ('ResizeObserver' in window) new ResizeObserver(sync).observe(box);
-          measureTable.push(sync);
+          /* 一篇文章的表格共用一个 ResizeObserver，避免每张表独立观察。 */
+          box.addEventListener('scroll', () => measure(box), { passive: true });
+          resize?.observe(box);
         });
 
         document.querySelectorAll<HTMLElement>('.prose pre').forEach((pre) => {
@@ -634,7 +635,8 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
           }
         });
 
-        if (measureTable.length) requestAnimationFrame(() => measureTable.forEach((fn) => fn()));
+        if (tables.length) requestAnimationFrame(() =>
+          document.querySelectorAll<HTMLElement>('.prose .table-wrap').forEach(measure));
       };
 
       /* 只有存在表格/代码块才安排空闲增强任务；列表、首页不再空跑。 */
