@@ -86,14 +86,11 @@
   }
   100% {
     transform: translateX(320%) skewX(-16deg);
-    opacity: 0;
   }
 }
 
 @keyframes drift {
-  from {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
+  /* The static hero::before uses the identity transform. */
   to {
     transform: translate3d(-18px, 16px, 0) scale(1.08);
   }
