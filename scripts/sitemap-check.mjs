@@ -13,6 +13,7 @@ const stamp = (date) => new Date(date + 'T00:00:00.000Z');
 const synthetic = collectLastmod([
   { slug: 'older', date: stamp('2026-10-10'), tags: ['共同'], category: '生活', series: '流程' },
   { slug: 'newer', date: stamp('2026-10-19'), tags: ['共同'], category: '技术', series: '流程' },
+  { slug: 'single', date: stamp('2026-10-05'), tags: [], category: '', series: '未成系列' },
 ], [
   { slug: 'note', date: stamp('2026-10-22'), tags: ['共同', '仅笔记'] },
   { slug: 'untagged', date: stamp('2026-10-23'), tags: [] },
@@ -30,6 +31,7 @@ for (const [route, date] of [
   assert.equal(synthetic.get(base + route)?.getTime(), stamp(date).getTime(), 'lastmod ' + route);
 }
 assert.equal(synthetic.has(base + '/posts/note/'), false, 'notes must not become article routes');
+assert.equal(synthetic.has(base + '/series/未成系列/'), false, 'single-post series has no route');
 console.log('✓ Metadata fixtures: note-only tags, shared tags, index and article/notes separation');
 
 const root = path.resolve('dist');
