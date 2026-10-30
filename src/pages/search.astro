@@ -171,9 +171,9 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
     if (shell && input && list && empty && countEl) {
       const baseUrl = shell.dataset.base ?? '';
-      const historyBox = document.getElementById('search-history');
-      const historyList = document.getElementById('search-history-list');
-      const historyClear = document.getElementById('search-history-clear') as HTMLButtonElement | null;
+      const historyBox = document.getElementById('search-history')!;
+      const historyList = document.getElementById('search-history-list')!;
+      const historyClear = document.getElementById('search-history-clear') as HTMLButtonElement;
       type SearchType = 'all' | 'post' | 'note';
       const typeButtons = document.querySelectorAll<HTMLButtonElement>('[data-search-type]');
       const navStatus = document.getElementById('search-nav-status');
@@ -349,7 +349,6 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       };
 
       const renderHistory = () => {
-        if (!historyBox || !historyList) return;
         const values = readHistory();
         historyBox.hidden = !values.length || !!input.value.trim();
         if (historyBox.hidden) return;
@@ -360,14 +359,14 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           return button;
         }));
       };
-      historyList?.addEventListener('click', (event) => {
+      historyList.addEventListener('click', (event) => {
         const button = (event.target as Element).closest('button');
         if (!button) return;
         input.value = button.textContent ?? '';
         apply();
         input.focus();
       });
-      historyClear?.addEventListener('click', () => {
+      historyClear.addEventListener('click', () => {
         writeHistory([]);
         renderHistory();
         input.focus();
@@ -386,7 +385,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           ? type : query ? 'all' : 'post';
         /* 先过滤停用词再限制长度，避免前几个虚词占满所有检索位置。 */
         const terms = query.toLowerCase().split(/\s+/).filter((word) => word && !STOP.includes(word)).slice(0, 6);
-        if (clearBtn) clearBtn.hidden = query.length === 0;
+        clearBtn!.hidden = query.length === 0;
 
         if (syncUrl) {
           const next = pageUrl();
@@ -492,7 +491,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         }
       });
 
-      [clearBtn, resetBtn].forEach((button) => button?.addEventListener('click', () => {
+      [clearBtn, resetBtn].forEach((button) => button!.addEventListener('click', () => {
         input.value = '';
         apply();
         input.focus();
