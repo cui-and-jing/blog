@@ -3,6 +3,7 @@ import type { CollectionEntry } from 'astro:content';
 import Cover from './Cover.astro';
 import { url, formatDate } from '../lib/site';
 import { sortByOrder } from '../lib/series';
+import { relatedTagRelevance } from '../lib/related-tags.mjs';
 
 interface Props {
   current: CollectionEntry<'posts'>;
@@ -30,17 +31,11 @@ const scored = posts
   .filter((post) => !excluded.has(post.id))
   .map((post) => {
     let score = 0;
-    const reasons: string[] = [];
-
     if (post.data.category && post.data.category === current.data.category) score += 3;
 
-    const shared = post.data.tags.filter((tag) => current.data.tags.includes(tag));
-    if (shared.length) {
-      score += shared.length * 2;
-      reasons.push(shared.slice(0, 2).map((tag) => `#${tag}`).join(' '));
-    }
-
-    return { post, score, reason: reasons[0] ?? '' };
+    const tags = relatedTagRelevance(current.data.tags, post.data.tags);
+    score += tags.score;
+    return { post, score, reason: tags.reason };
   })
   .sort((a, b) => b.score - a.score || b.post.data.date.valueOf() - a.post.data.date.valueOf());
 
