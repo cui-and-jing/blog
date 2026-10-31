@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: exclude Markdown fenced code from full-text indexing (2026-10-31)
+## Current iteration: validate emitted search records before release (2026-10-31)
+
+- **Finding:** The previous malformed HTTP 200 index fallback attempt (PR #65) failed the strict 12 KiB browser JavaScript gzip limit and was deliberately not merged. The build previously had no mandatory shape check for its own emitted records. A missing title or non-string tag in generated metadata could therefore ship and break the browser scorer.
+- **Change:** Validate the server-generated entries before JSON serialization, including string fields, tag array members, finite nonnegative reading minutes and unique paths. Fail the build rather than publish an invalid index. This does **not** claim to handle third-party/corrupted HTTP 200 responses at runtime; that remains separately scoped.
+- **Regression:** Add invalid fixture contracts and check the actual emitted search-index.json after every build. Run in both GitHub Quality and local Preflight, before gzip and browser checks.
+- **Guardrails:** No browser JavaScript or CSS, dependencies, content, games, route changes or size-cap increases. Exact-head PR Quality must be green before Squash Merge; require same-SHA main Quality and Pages deployment afterward.
+
+## Completed: exclude Markdown fenced code from full-text indexing (2026-10-31)
 
 - **Finding:** The search text helper removes paired triple-backtick spans but does not recognize `~~~` fences, longer backtick fences or an unclosed code block. This can index private-looking sample code as prose and return misleading full-text matches.
 - **Change:** Parse Markdown fence lines before existing prose cleanup. Support tilde/backtick markers, up-to-three-space indentation, longer closing markers, CRLF, mismatched closers and unclosed fences while preserving meaningful hyphens and inline behavior.

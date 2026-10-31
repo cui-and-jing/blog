@@ -94,6 +94,7 @@ async function main() {
   run('侧栏文章与笔记最近更新顺序', 'node', ['scripts/recent-discovery.test.mjs']);
   run('Home and series editorial activity', 'node', ['scripts/activity-freshness.test.mjs']);
   run('Search recent fallback chronology', 'node', ['scripts/search-suggestions.test.mjs']);
+  run('搜索索引结构完整性', 'node', ['scripts/search-index-contract.test.mjs']);
   run('搜索笔记摘要一致性', 'node', ['--experimental-strip-types', 'scripts/search-note-preview.test.mjs']);
   run('搜索标签去重一致性', 'node', ['scripts/search-tags.test.mjs']);
   run('搜索正文连字符保真', 'node', ['scripts/search-plain.test.mjs']);

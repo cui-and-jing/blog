@@ -5,6 +5,7 @@ import { getNotes, noteText, noteTitle, noteExcerpt } from '../lib/notes';
 import { activityDate } from '../lib/recent-date.mjs';
 import { uniqueSearchTags } from '../lib/search-tags.mjs';
 import { plain } from '../lib/search-plain.mjs';
+import { assertSearchEntries } from '../lib/search-index-contract.mjs';
 
 type Entry = {
   type: 'post' | 'note';
@@ -55,7 +56,9 @@ export const GET: APIRoute = async () => {
     };
   });
 
-  return new Response(JSON.stringify({ posts: [...posts, ...notes] }), {
+  const entries = [...posts, ...notes];
+  assertSearchEntries(entries);
+  return new Response(JSON.stringify({ posts: entries }), {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': 'public, max-age=3600',
