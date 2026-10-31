@@ -893,6 +893,18 @@ const check = (name, pass, detail = '') => {
   });
   check('复制章节链接不改变当前锚点或意外跳转',
     anchor.exists && anchor.before === anchor.after, JSON.stringify(anchor));
+  const paragraphAnchor = await page.evaluate(() => {
+    const first = document.querySelector('.prose > p .para-anchor');
+    const before = location.hash;
+    first?.click();
+    return { exists: Boolean(first), before, after: location.hash, href: first?.getAttribute('href'),
+      label: first?.getAttribute('aria-label') };
+  });
+  check('复制段落引用不改变当前锚点，且保留可访问名称',
+    paragraphAnchor.exists && paragraphAnchor.before === paragraphAnchor.after
+      && paragraphAnchor.href?.startsWith('#p-')
+      && paragraphAnchor.label === '复制这一段落的引用', JSON.stringify(paragraphAnchor));
+
 
   await page.evaluate(() => {
     const rect = document.querySelector('.article-card .prose').getBoundingClientRect();
