@@ -270,6 +270,69 @@ const check = (name, pass, detail = '') => {
   await b.close();
 }
 
+
+/* ---------- Reading settings: cross-tab deletion and clear must reset all controls ---------- */
+{
+  const a = await browser.newPage();
+  const b = await browser.newPage();
+  await a.goto(base + '/about/', { waitUntil: 'load' });
+  await a.evaluate(() => localStorage.removeItem('settings'));
+  await b.goto(base + '/about/', { waitUntil: 'load' });
+
+  const read = () => b.evaluate(() => {
+    const root = document.documentElement;
+    const pressed = (key, value) =>
+      document.querySelector(`[data-setting="${key}"][data-value="${value}"]`)?.getAttribute('aria-pressed');
+    return {
+      theme: root.dataset.themeChoice,
+      font: root.dataset.font ?? '',
+      size: root.dataset.reading ?? '',
+      leading: root.dataset.leading ?? '',
+      selected: [
+        pressed('theme', 'auto'), pressed('font', 'serif'),
+        pressed('size', 'normal'), pressed('leading', 'normal'),
+      ],
+    };
+  });
+
+  const choose = async () => {
+    await a.evaluate(() => localStorage.setItem('settings',
+      JSON.stringify({ theme: 'dark', font: 'sans', size: 'large', leading: 'loose' })));
+    await b.waitForFunction(() => {
+      const root = document.documentElement;
+      return root.dataset.themeChoice === 'dark' && root.dataset.font === 'sans'
+        && root.dataset.reading === 'large' && root.dataset.leading === 'loose';
+    }, { timeout: 4000 }).catch(() => {});
+  };
+
+  const defaults = (state) => state.theme === 'auto' && !state.font
+    && !state.size && !state.leading && state.selected.every((value) => value === 'true');
+
+  await choose();
+  const chosen = await read();
+  check('Settings changes from a second tab synchronize', chosen.theme === 'dark'
+    && chosen.font === 'sans' && chosen.size === 'large' && chosen.leading === 'loose', JSON.stringify(chosen));
+
+  for (const method of ['removeItem', 'clear']) {
+    await a.evaluate((action) => {
+      if (action === 'removeItem') localStorage.removeItem('settings');
+      else localStorage.clear();
+    }, method);
+    await b.waitForFunction(() => {
+      const root = document.documentElement;
+      return root.dataset.themeChoice === 'auto' && !root.dataset.font
+        && !root.dataset.reading && !root.dataset.leading
+        && document.querySelector('[data-setting="theme"][data-value="auto"]')?.getAttribute('aria-pressed') === 'true';
+    }, { timeout: 4000 }).catch(() => {});
+    const reset = await read();
+    check('Cross-tab settings ' + method + ' restores all defaults and aria-pressed',
+      defaults(reset), JSON.stringify(reset));
+    if (method === 'removeItem') await choose();
+  }
+  await a.close();
+  await b.close();
+}
+
 /* ---------- 1. 首页 Tab 顺序与焦点环 ---------- */
 {
   const page = await browser.newPage();
