@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: keep search tag labels distinct across index and cards (2026-10-31)
+## Current iteration: preserve multiword tags when search index fails (2026-10-31)
+
+- **Finding:** Static search cards serialize tags as a space-separated `data-tags` string. If a label contains whitespace (for example `React Native`), degraded search splits it into separate fake tags when `search-index.json` is unavailable, so the displayed chips no longer agree with the tag directory or healthy search.
+- **Change:** Store the complete distinct-label array in the HTML data attribute as JSON and parse it when building degraded article-only search results. Preserve label boundaries, order, all tag matches, existing index behavior and source metadata.
+- **Regression:** Extend the built search-tag contract to compare the HTML data array with each published article index entry, and add a real Chromium outage test with a synthetic two-word label and a failed index response. Both CI Quality and local preflight already run the relevant tests.
+- **Guardrails:** No dependencies, authored content, games or changed performance budget. Allow merge only after full Quality passes on the exact PR head and mergeability is clean; verify main Quality and Pages on the resulting SHA.
+
+## Completed: keep search tag labels distinct across index and cards (2026-10-31)
 
 - **Finding:** The content schema allows duplicate labels. Although tag pages and related-reading ranking have been corrected, search still emits raw repeated tags into the JSON index and the initial HTML. A result such as `['CSS', 'CSS', 'Astro', 'React']` shows `#CSS` twice and hides `#React` in the three-tag preview.
 - **Change:** Deduplicate each post/note tag list in first-seen order for the search index; apply the same rule to the pre-rendered search fallback cards. Keep exact label spelling, all unique tags available for search scoring, original content arrays and existing routes unchanged. The hydrated results already read index metadata, so no client-side script change is needed.

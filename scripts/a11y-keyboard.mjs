@@ -271,6 +271,54 @@ const check = (name, pass, detail = '') => {
 }
 
 
+/* ---------- Search index outage: multiword tags survive the static-card fallback ---------- */
+{
+  const page = await browser.newPage();
+  await page.setRequestInterception(true);
+  let indexRequest = null;
+  page.on('request', (request) => {
+    if (request.url().split('?')[0].endsWith('/search-index.json')) indexRequest = request;
+    else request.continue();
+  });
+  await page.goto(base + '/search/', { waitUntil: 'load' });
+  // Hold the failed index response until a synthetic multiword label is installed.
+  // This exercises the real fallback parser, not a separately reimplemented helper.
+  const targetHref = await page.$eval('#search-results .search-item', (card) => {
+    card.dataset.tags = JSON.stringify(['NativeScript UI', 'CSS']);
+    return card.href;
+  });
+  if (!indexRequest) {
+    check('Search fallback index-failure fixture was intercepted', false, 'index request not observed');
+  } else {
+    await indexRequest.respond({ status: 503, contentType: 'application/json', body: '{}' });
+    await page.waitForFunction(() => !document.getElementById('search-index-warning').hidden,
+      { timeout: 4000 }).catch(() => null);
+    const initial = await page.evaluate(() => ({
+      warned: !document.getElementById('search-index-warning').hidden,
+      labels: [...document.querySelectorAll('#search-results .search-result:first-child .tag')]
+        .map((node) => node.textContent),
+    }));
+    check('Degraded search preserves full multiword tag chips',
+      initial.warned && JSON.stringify(initial.labels) === JSON.stringify(['#NativeScript UI', '#CSS']),
+      JSON.stringify(initial));
+
+    await page.$eval('#search-input', (input) => {
+      input.value = 'nativescript ui';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const matched = await page.evaluate(() =>
+      [...document.querySelectorAll('#search-results .search-item')].map((node) => ({
+        href: node.href,
+        labels: [...node.querySelectorAll('.tag')].map((tag) => tag.textContent),
+      })));
+    check('Degraded search finds the complete multiword tag after filtering',
+      matched.some((item) => item.href === targetHref
+        && item.labels.includes('#NativeScript UI')),
+      JSON.stringify(matched.slice(0, 3)));
+  }
+  await page.close();
+}
+
 /* ---------- Reading settings: cross-tab deletion and clear must reset all controls ---------- */
 {
   const a = await browser.newPage();
