@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { relatedTagRelevance } from '../src/lib/related-tags.mjs';
 
 const root = path.resolve('dist');
 const seriesDir = path.join(root, 'series');
@@ -63,3 +64,26 @@ for (const seriesPage of seriesPages) {
 }
 console.log('✓ Series-related recommendations: ' + checked +
   ' article pages follow published chapter order and exclude duplicates/self');
+
+const currentTags = ['CSS', 'CSS', 'Astro'];
+const candidateTags = ['CSS', 'CSS', 'Astro', 'Astro', 'other', 'other'];
+const originalCurrent = [...currentTags];
+const originalCandidate = [...candidateTags];
+assert.deepEqual(relatedTagRelevance([], []), { score: 0, reason: '' },
+  'empty tags produce zero relevance');
+assert.deepEqual(relatedTagRelevance(currentTags, ['unrelated', 'unrelated']),
+  { score: 0, reason: '' }, 'unrelated repeats do not count');
+assert.deepEqual(relatedTagRelevance(currentTags, ['CSS', 'CSS', 'CSS']),
+  { score: 2, reason: '#CSS' }, 'repeating one label cannot inflate the score');
+assert.deepEqual(relatedTagRelevance(currentTags, candidateTags),
+  { score: 4, reason: '#CSS #Astro' }, 'each overlapping label counts once');
+assert.deepEqual(relatedTagRelevance(['CSS', 'Astro', '博客'], ['博客', '博客', 'CSS', 'Astro']),
+  { score: 6, reason: '#博客 #CSS' }, 'more unique tags increase score but the reason shows two');
+assert.deepEqual(relatedTagRelevance(['A', 'B'], ['B', 'A', 'A', 'B']),
+  { score: 4, reason: '#B #A' }, 'reason follows candidate tag order');
+assert.ok(relatedTagRelevance(['A', 'B'], ['A', 'B']).score >
+  relatedTagRelevance(['A', 'B'], ['A', 'A', 'A']).score,
+  'two genuine shared tags outrank one repeatedly authored tag');
+assert.deepEqual(currentTags, originalCurrent, 'current article tags stay unchanged');
+assert.deepEqual(candidateTags, originalCandidate, 'candidate article tags stay unchanged');
+console.log('✓ Related tag relevance: 9 unique-overlap, ranking, reason and non-mutation assertions');
