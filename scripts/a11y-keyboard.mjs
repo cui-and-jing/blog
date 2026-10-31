@@ -1131,6 +1131,17 @@ const check = (name, pass, detail = '') => {
     notes.selected === 'true' && notes.type === 'note' &&
     notes.results.length > 0 && notes.results.every((type) => type === 'note'), JSON.stringify(notes));
 
+  const historyBeforeRepeat = await page.evaluate(() => history.length);
+  await page.click('[data-search-type="note"]');
+  const repeated = await page.evaluate(() => ({
+    length: history.length,
+    type: new URL(location.href).searchParams.get('type'),
+    selected: document.querySelector('[data-search-type="note"]')?.getAttribute('aria-pressed'),
+  }));
+  check('再次选择当前搜索分类不会插入重复历史记录',
+    repeated.length === historyBeforeRepeat && repeated.type === 'note' && repeated.selected === 'true',
+    JSON.stringify(repeated));
+
   await page.click('[data-search-type="all"]');
   await page.evaluate(() => history.back());
   await page.waitForFunction(() =>

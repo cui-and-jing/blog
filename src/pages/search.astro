@@ -304,7 +304,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           main.append(h2, p, meta);
 
           const arrow = element('span', 'search-arrow');
-          arrow.setAttribute('aria-hidden', 'true');
+          arrow.ariaHidden = 'true';
           arrow.textContent = '→';
 
           a.append(main, arrow);
@@ -402,7 +402,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         typeButtons.forEach((button) => {
           const type = button.dataset.searchType as SearchType;
           button.disabled = degraded && type !== 'post';
-          button.setAttribute('aria-pressed', String(type === selectedType));
+          button.ariaPressed = String(type === selectedType);
         });
         document.getElementById('search-type-filters')!.hidden = false;
         render(ranked.filter(({ post }) => selectedType === 'all' || post.type === selectedType), Boolean(query));
@@ -442,8 +442,11 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       };
 
       typeButtons.forEach((button) => button.addEventListener('click', () => {
+        /* Re-selecting the active type must not create a duplicate Back entry. */
+        const type = button.dataset.searchType!;
+        if (selectedType === type) return;
         const next = pageUrl();
-        next.searchParams.set('type', button.dataset.searchType!);
+        next.searchParams.set('type', type);
         history.pushState(null, '', next);
         apply(false);
       }));

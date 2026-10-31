@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: reset reading preferences after cross-tab storage clear (2026-10-31)
+## Current iteration: avoid duplicate browser-history entries on search type filters (2026-10-31)
+
+- **Finding:** Search's article/note/all filter pushes a new history entry even when the clicked type is already selected. Repeating the same click creates identical Back entries, requiring unnecessary Back presses before returning to another filter or page.
+- **Change:** Ignore clicks on the active type before changing the URL, preserving intentional navigation and the existing type and query parameters.
+- **Regression:** Extend the Chromium search-type browser test to select notes twice, verify no change to history length/selection/URL, and then verify that switching to all and pressing Back still restores notes.
+- **Release:** No dependency, content, CSS, routes, or game changes. Preserve built JS gzip and first-visit limits; require latest PR Quality and clean mergeability before squash, then same-SHA main Quality and Pages build/deploy.
+
+## Completed: reset reading preferences after cross-tab storage clear (2026-10-31)
 
 - **Finding:** Reading preferences already synchronize when another tab writes or removes the `settings` key, but `localStorage.clear()` emits a storage event with a null key. The listener ignores it. Also, View Transition delays applying theme changes until after the synchronous `saveSettings()` call, so the new theme may not persist after reload.
 - **Change:** Treat null-key storage events as preference updates and repaint all controls. Save preferences *inside* the View Transition update callback, after the new selection is applied.
