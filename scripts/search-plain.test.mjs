@@ -67,5 +67,13 @@ assert.equal(plain('Hello<br>world'), 'Hello world',
   'void HTML elements adjacent to text must not leak into search');
 assert.equal(plain('图片<img src="x">说明'), '图片 说明',
   'inline HTML images must remain excluded from search text');
+assert.equal(plain('开头<pre class="language-js"><code>secret-token</code></pre>结尾'),
+  '开头 结尾', 'HTML preformatted code must not leak into search text');
+assert.equal(plain('before\n<PRE>\nprivate-token\n</PRE>\nafter'), 'before after',
+  'multiline and uppercase pre blocks must also be excluded');
+assert.equal(plain('正文<script>secretJs()</script><style>.secretCss { color: red }</style>后续'),
+  '正文 后续', 'embedded scripts and styles are not readable article prose');
+assert.equal(plain('保留<code>C#</code> 内联代码'), '保留 C# 内联代码',
+  'ordinary inline HTML code should remain searchable');
 assert.equal(plain(''), '', 'empty content stays empty');
 console.log('✓ Search plain text: hyphenated terms, list markers, rules, links and both code-fence styles');
