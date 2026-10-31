@@ -411,7 +411,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       };
 
       const fallback = () =>
-        Array.from(document.querySelectorAll<HTMLAnchorElement>('.search-item')).map((a) => ({
+        Array.from(list.querySelectorAll<HTMLAnchorElement>('.search-item')).map((a) => ({
           type: 'post' as const,
           title: a.dataset.title ?? '',
           description: a.dataset.desc ?? '',
@@ -429,12 +429,11 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           const data = res.ok ? await res.json() : null;
           /* A successful HTTP response can still carry incomplete or stale index data.
            * Validate before rendering: a malformed title/tag must not break search entirely. */
-          if (!Array.isArray(data?.posts) || data.posts.some((p: any) =>
-            !p || (p.type !== 'post' && p.type !== 'note')
-            || ![p.title, p.description, p.date, p.category, p.href, p.text]
-              .every((value) => typeof value === 'string')
-            || !Array.isArray(p.tags) || !p.tags.every((tag: unknown) => typeof tag === 'string')
-            || !Number.isFinite(p.minutes)
+          const isString = (value: unknown) => typeof value === 'string';
+          if (!Array.isArray(data?.posts) || !data.posts.every((p: any) =>
+            p && (p.type === 'post' || p.type === 'note')
+            && [p.title, p.description, p.date, p.category, p.href, p.text].every(isString)
+            && Array.isArray(p.tags) && p.tags.every(isString) && Number.isFinite(p.minutes)
           )) throw new Error('index');
           posts = data.posts;
         } catch {
