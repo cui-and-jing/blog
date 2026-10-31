@@ -17,6 +17,9 @@ export function plain(markdown) {
       return false;
     }
     if (match) {
+      // A backtick fence cannot have backticks in its info string (CommonMark).
+      // An inline code span at line start must not swallow all following prose.
+      if (match[1][0] === '`' && line.slice(match[0].length).includes('`')) return true;
       fence = match[1];
       return false;
     }
