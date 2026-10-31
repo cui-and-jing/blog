@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: keep search note previews consistent with note excerpts (2026-10-31)
+## Current iteration: keep search tag labels distinct across index and cards (2026-10-31)
+
+- **Finding:** The content schema allows duplicate labels. Although tag pages and related-reading ranking have been corrected, search still emits raw repeated tags into the JSON index and the initial HTML. A result such as `['CSS', 'CSS', 'Astro', 'React']` shows `#CSS` twice and hides `#React` in the three-tag preview.
+- **Change:** Deduplicate each post/note tag list in first-seen order for the search index; apply the same rule to the pre-rendered search fallback cards. Keep exact label spelling, all unique tags available for search scoring, original content arrays and existing routes unchanged. The hydrated results already read index metadata, so no client-side script change is needed.
+- **Regression:** Pure Node fixtures exercise repeated and case-distinct labels, the three-tag display cap and non-mutation. Post-build checks ensure every indexed entry is unique and pre-rendered post cards match the corresponding index tags. Add the check to PR/main Quality and local preflight.
+- **Guardrails:** no dependency or content changes, no browser JS/CSS or games, no increased size budgets. Merge only after complete green Quality for the latest head SHA; then verify main Quality and Pages publish that exact merge SHA.
+
+## Completed: keep search note previews consistent with note excerpts (2026-10-31)
 
 - **Finding:** Note titles come from their first sentence, but the published `search-index.json` still uses the first 120 characters of the same text as its note description. In the search page's empty-query note filter, the title and preview repeat the opening instead of showing what follows. The note-list/preview helper already solves this for normal and long leading sentences.
 - **Change:** Reuse `noteExcerpt(note, 120)` for search-index descriptions. Keep the existing first-120-characters fallback for single-sentence notes so the result card does not become blank. Leave the searchable full text and all post metadata intact.
