@@ -39,6 +39,9 @@ jobs:
       - name: Note excerpt boundary contract
         run: node --experimental-strip-types scripts/note-excerpt.test.mjs
 
+      - name: Tag bucket unique-item contract
+        run: node --experimental-strip-types scripts/tag-buckets.test.mjs
+
       # 子集缺字不会报错，只会在线上悄悄回退成系统字体，必须显式比对
       - name: Font subset coverage
         run: npm run fonts:check

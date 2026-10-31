@@ -30,10 +30,10 @@ export function collectTags(posts: Post[], notes: Note[]): TagBucket[] {
   };
 
   for (const post of posts) {
-    for (const tag of post.data.tags) ensure(tag).posts.push(post);
+    for (const tag of new Set(post.data.tags)) ensure(tag).posts.push(post);
   }
   for (const note of notes) {
-    for (const tag of note.data.tags) ensure(tag).notes.push(note);
+    for (const tag of new Set(note.data.tags)) ensure(tag).notes.push(note);
   }
 
   for (const bucket of buckets.values()) {
