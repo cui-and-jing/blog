@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: count series tags by distinct articles (2026-10-31)
+## Current iteration: deduplicate tag relevance in related reading (2026-10-31)
+
+- **Finding:** The post recommendations under “接着读” score overlapping tags by filtering the candidate's raw metadata. Repeating a tag in that array inflates its score and can display duplicate reasons such as `#CSS #CSS`; the schema currently permits duplicates. This is distinct from the tag-directory and series-overview fixes.
+- **Change:** Count each shared label once, preserving candidate tag order for the two-tag visible explanation and retaining category points, publication-date tiebreaks, series-first recommendations, URLs and existing budgets.
+- **Regression:** Add direct distinct-tag relevance contracts inside the existing related-reading test, which already runs in both CI Quality and local preflight after build. Cover single-label repeats, true multi-label overlap, ordering, scores, explanation cap and input non-mutation.
+- **Release:** Isolated branch from successful main. No dependencies, article content, client JavaScript, CSS, games or budget changes. Merge only after full Quality passes for the exact PR head and the PR is mergeable; then verify main Quality and Pages on the same merged SHA.
+
+## Completed: count series tags by distinct articles (2026-10-31)
 
 - **Finding:** A single article may repeat its tag label (the content schema permits it). The series overview counts each occurrence, so one article tagging itself `CSS` twice can falsely make `#CSS` appear as a shared series topic even when no other article uses it. This is separate from the tag-directory fix in PR #59.
 - **Change:** Count each label at most once per article when selecting the up-to-four tags that appear in multiple series articles. Preserve frequency ranking and first-encounter tie order, original metadata, series reading sequence and URL structure.
