@@ -22,7 +22,13 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: avoid duplicate browser-history entries on search type filters (2026-10-31)
+## Current iteration: share searches typed before the index loads (2026-10-31)
+
+- **Finding:** Before the asynchronous search index is ready, input events call `apply()` but return early. Once the index arrives, `fetchIndex()` calls `apply(false)`; results render from the typed query, yet the `q` URL parameter remains absent. Copying the address or reloading loses the search.
+- **Change:** Let the first successful index render synchronize the current input value with `history.replaceState`, without adding a Back entry. Existing deep links, type filters, failed-index fallback and IME behavior stay intact.
+- **Regression:** Intercept and delay the real search-index request in Chromium; type before readiness, then release the request. Verify the results, selected category and shareable URL, with no additional history entry. Preserve all Quality, game and CSS/JS transfer budgets; merge only after latest-head CI succeeds, then verify main Quality and same-SHA Pages deployment.
+
+## Completed: avoid duplicate browser-history entries on search type filters (2026-10-31)
 
 - **Finding:** Search's article/note/all filter pushes a new history entry even when the clicked type is already selected. Repeating the same click creates identical Back entries, requiring unnecessary Back presses before returning to another filter or page.
 - **Change:** Ignore clicks on the active type before changing the URL, preserving intentional navigation and the existing type and query parameters.
