@@ -256,17 +256,12 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         active = Math.max(0, Math.min(nodes.length - 1, next));
         nodes.forEach((node, i) => node.classList.toggle('is-active', i === active));
         nodes[active].scrollIntoView({ block: 'nearest' });
-        if (navStatus) {
-          const heading = nodes[active].querySelector('h2')?.textContent ?? '';
-          navStatus.textContent = `第 ${active + 1} 条：${heading}`;
-        }
+        const heading = nodes[active].querySelector('h2')?.textContent ?? '';
+        navStatus!.textContent = `第 ${active + 1} 条：${heading}`;
       };
 
-      const element = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '') => {
-        const node = document.createElement(tag);
-        node.className = cls;
-        return node;
-      };
+      const element = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '') =>
+        Object.assign(document.createElement(tag), { className: cls });
       const addSpan = (parent: HTMLElement, name: string, label: string) => {
         const el = element('span', name);
         el.textContent = label;
@@ -275,7 +270,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
       const render = (items: { post: any; terms: string[] }[], querying: boolean) => {
         active = -1;
-        if (navStatus) navStatus.textContent = '';
+        navStatus!.textContent = '';
         list.replaceChildren();
 
         items.forEach(({ post, terms }) => {
@@ -465,7 +460,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       });
 
       /* 中文/日文输入法选词期间的 Enter、方向键属于输入法，不能打开搜索结果。 */
-      input.addEventListener('compositionstart', () => { composing = true; });
+      input.addEventListener('compositionstart', () => composing = true);
       input.addEventListener('compositionend', () => { composing = false; apply(); });
       input.addEventListener('input', () => { if (!composing) apply(); });
       /* 点结果跳转前记一笔，历史里才不会只有回车过的词 */
