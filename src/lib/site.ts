@@ -98,6 +98,11 @@ export function formatDate(date: Date): string {
 
 export { readingTime } from './reading-time.mjs';
 
+export function daysSince(year: number): number {
+  const start = new Date(year, 0, 1).getTime();
+  return Math.max(1, Math.floor((Date.now() - start) / 86_400_000) + 1);
+}
+
 /** 由字符串得到稳定色相（0-359），用于彩色标签 */
 export function tagHue(tag: string): number {
   let h = 5381;
