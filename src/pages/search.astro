@@ -210,7 +210,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       };
 
       const snippet = (post: any, terms: string[]): string => {
-        const text: string = post.text ?? '';
+        const text: string = post.text;
         const low = text.toLowerCase();
         let at = text.length;
         for (const term of terms) {
@@ -225,10 +225,10 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
       const score = (post: any, terms: string[]) => {
         const title = post.title.toLowerCase();
-        const desc = (post.description ?? '').toLowerCase();
-        const category = (post.category ?? '').toLowerCase();
-        const tags = (post.tags ?? []).map((tag: string) => tag.toLowerCase());
-        const body = (post.text ?? '').toLowerCase();
+        const desc = post.description.toLowerCase();
+        const category = post.category.toLowerCase();
+        const tags = post.tags.map((tag: string) => tag.toLowerCase());
+        const body = post.text.toLowerCase();
         let total = 0;
         let hits = 0;
         for (const term of terms) {
@@ -300,7 +300,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           meta.append(time);
           if (post.category) addSpan(meta, 'cat', post.category);
           if (post.type !== 'note') addSpan(meta, '', `约 ${post.minutes} 分钟`);
-          (post.tags ?? []).slice(0, 3).forEach((tag: string) => addSpan(meta, 'tag', `#${tag}`));
+          post.tags.slice(0, 3).forEach((tag: string) => addSpan(meta, 'tag', `#${tag}`));
 
           main.append(h2, p, meta);
 
@@ -435,7 +435,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
               .every((key) => typeof post[key] === 'string')
             && Array.isArray(post.tags)
             && post.tags.every((tag: unknown) => typeof tag === 'string')
-            && typeof post.minutes === 'number' && Number.isFinite(post.minutes)
+            && Number.isFinite(post.minutes)
           )) throw new Error('index');
           posts = data.posts;
         } catch {
