@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: exclude fenced code from article reading estimates (2026-10-31)
+## Current iteration: preserve technical hash signs in Markdown search (2026-10-31)
+
+- **Finding:** The Markdown-to-search normalizer strips every `#`, not just heading syntax. A body mentioning `C#`, `F#` or `#Astro` becomes `C`, `F` or `Astro`; searches for the original technical terms can miss results. The same prose normalizer also feeds article reading-time estimates.
+- **Change:** Remove only CommonMark ATX heading prefixes (one to six hashes separated from text by whitespace) and optional closing markers on those heading lines. Preserve literal hashes inside technology names, hashtags and hash-prefixed text that is not a Markdown heading.
+- **Regression:** Expand the existing dependency-free search-plain test with language names, literal hash words, ordinary and trailing-marked headings, no-space prefixes and empty headings. The contract already runs in GitHub Quality and local Preflight.
+- **Guardrails:** Server-side text normalization and regression only: no browser JavaScript, CSS, new dependencies, authored content or game changes and no budget increase. The separate malformed HTTP 200 recovery attempt (#71) was **not merged** because total JS gzip exceeded 12 KiB; that still requires measurable headroom before another attempt.
+
+## Completed: exclude fenced code from article reading estimates (2026-10-31)
 
 - **Finding:** The shared article reading-time helper only removes paired triple-backtick snippets. Long backtick fences, tilde fences and unclosed code blocks remain in the character count, so code-heavy tutorials can show inflated estimated reading minutes on article cards and search results.
 - **Change:** Reuse the already-tested, server-side Markdown prose normalizer in a small reading-time helper; keep the existing minimum of one minute and 400-character rounding. Export the helper through the existing site.ts API so all current surfaces and the search index agree.
