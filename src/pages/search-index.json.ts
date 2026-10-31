@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { url, formatDate, readingTime } from '../lib/site';
 import { getPosts } from '../lib/posts';
-import { getNotes, noteText, noteTitle } from '../lib/notes';
+import { getNotes, noteText, noteTitle, noteExcerpt } from '../lib/notes';
 import { activityDate } from '../lib/recent-date.mjs';
 
 /** 把 Markdown 粗略压成可检索的纯文本，保留中文与英文词 */
@@ -53,7 +53,9 @@ export const GET: APIRoute = async () => {
     return {
       type: 'note',
       title: noteTitle(note),
-      description: text.slice(0, 120),
+      // Search previews should continue after the title's complete first sentence.
+      // For a single-sentence note, keep the original text instead of an empty preview.
+      description: noteExcerpt(note, 120) || text.slice(0, 120),
       date: formatDate(note.data.date),
       category: '',
       tags: note.data.tags,
