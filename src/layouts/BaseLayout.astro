@@ -663,7 +663,11 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         if (!shortcut) return;
         event.preventDefault();
         const field = document.getElementById('search-input') as HTMLInputElement | null;
-        if (field) { field.focus(); field.select(); }
+        if (field) {
+          /* Close modal panels before focusing a search field outside their top layer. */
+          document.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach((panel) => panel.close());
+          field.focus(); field.select();
+        }
         else location.href = searchUrl;
       });
 
