@@ -22,7 +22,14 @@ for (const entry of records) {
 }
 
 const postTags = new Map(records.filter((entry) => entry.type === 'post')
-  .map((entry) => [entry.href, entry.tags.slice(0, 3)]));
+  .map((entry) => [entry.href, entry.tags]));
+// Astro escapes quotes in the data attribute; browsers decode entities before dataset access.
+const decodeAttr = (value) => value
+  .replace(/&quot;|&#34;|&#x22;/gi, '"')
+  .replace(/&#39;|&#x27;/gi, "'")
+  .replace(/&lt;|&#60;|&#x3c;/gi, '<')
+  .replace(/&gt;|&#62;|&#x3e;/gi, '>')
+  .replace(/&amp;|&#38;|&#x26;/gi, '&');
 const html = dist('search/index.html');
 const cards = [...html.matchAll(/<a\b[^>]*class="search-item"[^>]*>[\s\S]*?<\/a>/g)].map((match) => match[0]);
 assert.equal(cards.length, postTags.size, 'static search cards must cover every indexed article');
@@ -31,6 +38,10 @@ for (const card of cards) {
   assert.ok(href && postTags.has(href), 'unexpected static search card: ' + href);
   const labels = [...card.matchAll(/<span class="tag">#([^<]*)<\/span>/g)]
     .map((match) => match[1]);
-  assert.deepEqual(labels, postTags.get(href), 'static and JS search tags disagree: ' + href);
+  assert.deepEqual(labels, postTags.get(href).slice(0, 3), 'static and JS search tags disagree: ' + href);
+  const serialized = card.match(/\\bdata-tags="([^"]*)"/)?.[1];
+  assert.ok(serialized, 'missing JSON tag metadata on static card: ' + href);
+  assert.deepEqual(JSON.parse(decodeAttr(serialized)), postTags.get(href),
+    'static fallback must preserve multiword tag boundaries and every unique label: ' + href);
 }
 console.log('✓ Search tags: distinct labels, stable first-three display, matching index and static cards');
