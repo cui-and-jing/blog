@@ -427,8 +427,13 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         try {
           const res = await fetch(`${baseUrl}/search-index.json`, { headers: { Accept: 'application/json' } });
           const data = res.ok ? await res.json() : null;
-          if (!Array.isArray(data?.posts)) throw new Error('index');
-          posts = data.posts.filter((post: any) => post && (post.type === 'post' || post.type === 'note'));
+          /* Reject broken HTTP 200 records before they can crash the scorer. */
+          if (!Array.isArray(data?.posts) || data.posts.some((p: any) =>
+            !['post', 'note'].includes(p?.type)
+            || !['title', 'description', 'category', 'text'].every((key) => typeof p[key] === 'string')
+            || !Array.isArray(p.tags) || p.tags.some((tag: any) => typeof tag !== 'string')
+          )) throw new Error('index');
+          posts = data.posts;
         } catch {
           /* 索引不可用时仍可以搜索页面已有的文章，但不假装有完整正文与笔记数据。 */
           degraded = true;

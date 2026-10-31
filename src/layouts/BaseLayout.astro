@@ -870,14 +870,10 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const paintScroll = () => {
         scrollQueued = false;
         const y = window.scrollY;
-        const scrolled = y > 8;
-        if (header && header.hasAttribute('data-scrolled') !== scrolled) {
-          scrolled ? header.setAttribute('data-scrolled', 'true') : header.removeAttribute('data-scrolled');
-        }
-        const showTop = y > 700;
-        if (toTop && toTop.classList.contains('show') !== showTop) {
-          toTop.classList.toggle('show', showTop);
-        }
+        /* toggleAttribute is idempotent and avoids duplicating the scroll-state check. */
+        header?.toggleAttribute('data-scrolled', y > 8);
+        /* toggle(token, force) is already idempotent; no separate contains() read. */
+        toTop?.classList.toggle('show', y > 700);
         if (progressFill) {
           const ratio = proseHeight > 0
             ? Math.min(1, Math.max(0, (y + Math.min(140, innerHeight * .22) - proseTop) / proseHeight))

@@ -319,6 +319,41 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- HTTP 200 with broken search data must use the static article fallback ---------- */
+{
+  const page = await browser.newPage();
+  let indexRequest = null;
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.setRequestInterception(true);
+  page.on('request', (request) => {
+    if (request.url().split('?')[0].endsWith('/search-index.json')) indexRequest = request;
+    else request.continue();
+  });
+  await page.goto(base + '/search/', { waitUntil: 'load' });
+  if (!indexRequest) {
+    check('Malformed HTTP 200 search fixture was intercepted', false, 'index request not observed');
+  } else {
+    await indexRequest.respond({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ posts: [{ type: 'post', title: null, tags: ['Astro'], text: 'broken' }] }),
+    });
+    await page.waitForFunction(() => !document.getElementById('search-index-warning').hidden,
+      { timeout: 4000 }).catch(() => null);
+    const state = await page.evaluate(() => ({
+      warned: !document.getElementById('search-index-warning').hidden,
+      count: document.querySelectorAll('#search-results .search-item').length,
+      firstTitle: document.querySelector('#search-results .search-item h2')?.textContent,
+      filters: [...document.querySelectorAll('[data-search-type]')].map((el) => el.disabled),
+    }));
+    check('Malformed HTTP 200 search index uses visible article fallback',
+      state.warned && state.count > 0 && !!state.firstTitle
+        && JSON.stringify(state.filters) === JSON.stringify([true, false, true]) && errors.length === 0,
+      JSON.stringify({ state, errors }));
+  }
+  await page.close();
+}
+
 /* ---------- Reading settings: cross-tab deletion and clear must reset all controls ---------- */
 {
   const a = await browser.newPage();

@@ -1,6 +1,6 @@
 # Engineering roadmap
 
-_Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
+_Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 
 ## Baseline and constraints
 
@@ -22,7 +22,15 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: consolidate article permalink copy interactions (2026-11-01)
+## Current iteration: recover malformed HTTP 200 search indexes (2026-11-01)
+
+- **Finding:** the search client checks only that `posts` is an array before accepting an HTTP 200 payload. A partially corrupted entry (for example, `title: null` or non-array `tags`) can crash result scoring, leaving search unusable even though static article cards are already in the page.
+- **Change:** reject incomplete entry metadata before assigning the downloaded array; use the existing static article fallback and visible warning instead of rendering broken records. The build-time index schema gate remains unchanged and serves a different purpose.
+- **Regression:** use Chromium request interception to serve malformed HTTP 200 JSON; assert the warning, preserved static article results, disabled unavailable result-type filters, and no page exceptions. Keep the existing HTTP 503/multiword-tag fallback regression.
+- **Budget:** reduce duplicate layout scroll-state checks using native idempotent `toggleAttribute` and `classList.toggle(force)`, preserving the scrolled header style through an attribute-presence selector. Browser JS gzip is unchanged as a hard 12 KiB cap; no new dependencies.
+- **Release gate:** require unchanged CSS/JS gzip caps, full PR Quality, mergeability, and post-merge main Quality + Pages on the exact merge SHA. If gzip exceeds 12 KiB, do not merge.
+
+## Completed: consolidate article permalink copy interactions (2026-11-01)
 
 - **Finding:** Heading and paragraph permalink widgets independently construct the same anchor element and register near-identical click, clipboard, success-feedback and live-announcement handlers. This duplicates browser JavaScript while the total gzip budget is nearly exhausted.
 - **Change:** Share the anchor construction and copy interaction, keep heading/per-paragraph URL and quote semantics, accessible labels, clipboard fallback, and click-without-jump behavior. A failed heading copy now announces the failure just like the paragraph action.
