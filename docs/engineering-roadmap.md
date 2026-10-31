@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: avoid duplicate long-note openings in excerpts (2026-10-31)
+## Current iteration: avoid duplicate entries in tag buckets (2026-10-31)
+
+- **Finding:** The content schema accepts repeated tag labels in a single post or note. `collectTags()` appends that entry once for every occurrence. Tag pages then render the same card repeatedly, and totals and popularity rankings are inflated.
+- **Change:** Deduplicate each entry's tag labels while aggregating, without changing the authored tag arrays. Preserve distinct posts/notes sharing a tag, chronological ordering, the existing tag routes, and ranking.
+- **Regression:** Add a deterministic Node 22 contract with duplicate post and note labels, unique entry counts, ordering, non-mutation, and empty-content cases. Run it before the build in both CI Quality and local preflight.
+- **Release:** No dependencies, runtime JavaScript, CSS, game, content, route, or budget changes. Use an isolated branch; require exact-head full Quality and clean mergeability before squash. Verify main Quality and same-SHA Pages deployment.
+
+## Completed: avoid duplicate long-note openings in excerpts (2026-10-31)
 
 - **Finding:** Note titles truncate after 40 characters, but the preview helper only recognizes a sentence ending within the first 120 characters. A note whose first sentence is longer than 120 characters previews its opening from the start, repeating the visible title instead of describing what follows.
 - **Change:** Extract the note excerpt boundary logic into the pure text helper, then skip the entire first sentence when it has a sentence-ending mark, no matter how long it is. Keep punctuation-free notes, the 90-character preview limit, title rules and existing routes unchanged.
