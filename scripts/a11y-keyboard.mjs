@@ -319,6 +319,50 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- HTTP 200 can contain malformed search index records ---------- */
+{
+  // A bad cached index must never throw while scoring/rendering or make the static articles unusable.
+  const cases = [
+    { name: 'missing article title', entry: { type: 'post', title: null } },
+    { name: 'non-string note tag', entry: {
+      type: 'note', title: 'Broken note', description: 'Broken preview',
+      date: '2026-10-31', category: '', href: '/blog/notes/broken/',
+      text: 'Astro', minutes: 0, tags: ['Astro', 123],
+    } },
+  ];
+  for (const fixture of cases) {
+    const page = await browser.newPage();
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      if (request.url().split('?')[0].endsWith('/search-index.json')) {
+        request.respond({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({ posts: [fixture.entry] }),
+        }).catch(() => {});
+      } else request.continue().catch(() => {});
+    });
+    await page.goto(base + '/search/?q=Astro&type=note', { waitUntil: 'load' });
+    await page.waitForSelector('#search-index-warning:not([hidden])', { timeout: 8000 }).catch(() => {});
+    const state = await page.evaluate(() => ({
+      warned: !document.getElementById('search-index-warning').hidden,
+      query: new URL(location.href).searchParams.get('q'),
+      type: new URL(location.href).searchParams.get('type'),
+      selected: document.querySelector('[data-search-type="post"]')?.getAttribute('aria-pressed'),
+      noteDisabled: document.querySelector('[data-search-type="note"]')?.disabled,
+      results: [...document.querySelectorAll('#search-results .search-item')].map((a) => ({
+        href: a.getAttribute('href'), title: a.querySelector('h2')?.textContent,
+      })),
+    }));
+    check('Malformed index (' + fixture.name + ') falls back to searchable articles',
+      state.warned && state.query === 'Astro' && state.type === null
+        && state.selected === 'true' && state.noteDisabled
+        && state.results.length > 0
+        && state.results.every((item) => item.href?.includes('/posts/') && item.title),
+      JSON.stringify(state));
+    await page.close();
+  }
+}
+
 /* ---------- Reading settings: cross-tab deletion and clear must reset all controls ---------- */
 {
   const a = await browser.newPage();
