@@ -870,10 +870,8 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const paintScroll = () => {
         scrollQueued = false;
         const y = window.scrollY;
-        const scrolled = y > 8;
-        if (header && header.hasAttribute('data-scrolled') !== scrolled) {
-          scrolled ? header.setAttribute('data-scrolled', 'true') : header.removeAttribute('data-scrolled');
-        }
+        /* toggleAttribute is idempotent and avoids duplicating the scroll-state check. */
+        header?.toggleAttribute('data-scrolled', y > 8);
         /* toggle(token, force) is already idempotent; no separate contains() read. */
         toTop?.classList.toggle('show', y > 700);
         if (progressFill) {
