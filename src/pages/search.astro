@@ -210,7 +210,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       };
 
       const snippet = (post: any, terms: string[]): string => {
-        const text: string = post.text ?? '';
+        const text: string = post.text;
         const low = text.toLowerCase();
         let at = text.length;
         for (const term of terms) {
@@ -225,10 +225,10 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
       const score = (post: any, terms: string[]) => {
         const title = post.title.toLowerCase();
-        const desc = (post.description ?? '').toLowerCase();
-        const category = (post.category ?? '').toLowerCase();
-        const tags = (post.tags ?? []).map((tag: string) => tag.toLowerCase());
-        const body = (post.text ?? '').toLowerCase();
+        const desc = post.description.toLowerCase();
+        const category = post.category.toLowerCase();
+        const tags = post.tags.map((tag: string) => tag.toLowerCase());
+        const body = post.text.toLowerCase();
         let total = 0;
         let hits = 0;
         for (const term of terms) {
@@ -300,7 +300,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           meta.append(time);
           if (post.category) addSpan(meta, 'cat', post.category);
           if (post.type !== 'note') addSpan(meta, '', `约 ${post.minutes} 分钟`);
-          (post.tags ?? []).slice(0, 3).forEach((tag: string) => addSpan(meta, 'tag', `#${tag}`));
+          post.tags.slice(0, 3).forEach((tag: string) => addSpan(meta, 'tag', `#${tag}`));
 
           main.append(h2, p, meta);
 
@@ -384,7 +384,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           ? type : query ? 'all' : 'post';
         /* 先过滤停用词再限制长度，避免前几个虚词占满所有检索位置。 */
         const terms = query.toLowerCase().split(/\s+/).filter((word) => word && !STOP.includes(word)).slice(0, 6);
-        clearBtn!.hidden = query.length === 0;
+        clearBtn!.hidden = !query;
 
         if (syncUrl) {
           const next = pageUrl();
@@ -406,7 +406,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           button.ariaPressed = String(type === selectedType);
         });
         document.getElementById('search-type-filters')!.hidden = false;
-        render(ranked.filter(({ post }) => selectedType === 'all' || post.type === selectedType), Boolean(query));
+        render(ranked.filter(({ post }) => selectedType === 'all' || post.type === selectedType), !!query);
         renderHistory();
       };
 
