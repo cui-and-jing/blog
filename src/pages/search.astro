@@ -5,6 +5,7 @@ import { getPosts } from '../lib/posts';
 import { getNotes, noteTitle } from '../lib/notes';
 import { activityDate } from '../lib/recent-date.mjs';
 import { collectTags } from '../lib/tags';
+import { uniqueSearchTags } from '../lib/search-tags.mjs';
 
 const posts = await getPosts();
 const notes = await getNotes();
@@ -96,7 +97,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
               href={url(`/posts/${post.id}/`)}
               data-title={post.data.title}
               data-desc={post.data.description}
-              data-tags={post.data.tags.join(' ')}
+              data-tags={uniqueSearchTags(post.data.tags).join(' ')}
               data-cat={post.data.category ?? ''}
 
               data-type="post"
@@ -109,7 +110,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
                   <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
                   {post.data.category && <span class="cat">{post.data.category}</span>}
                   <span>约 {readingTime(post.body ?? '')} 分钟</span>
-                  {post.data.tags.slice(0, 3).map((tag: string) => <span class="tag">#{tag}</span>)}
+                  {uniqueSearchTags(post.data.tags).slice(0, 3).map((tag: string) => <span class="tag">#{tag}</span>)}
                 </div>
               </div>
               <span class="search-arrow" aria-hidden="true">→</span>
