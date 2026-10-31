@@ -22,7 +22,14 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: recover malformed HTTP 200 search indexes (2026-11-01)
+## Current iteration: preserve generic type syntax in technical search (2026-11-01)
+
+- **Finding:** Markdown-to-search treats angle-bracket spans beginning with letters as HTML, even in TypeScript/C++ generic expressions (Map<string, number>, Array<Result<T>>, std::vector<int>). The full-text search index loses these technical terms.
+- **Change:** preserve angle-bracket arguments attached to preceding identifiers, including nested and Unicode examples, while retaining normal standalone HTML, comment and declaration removal.
+- **Regression:** dependency-free Node fixtures cover nested/multi-argument generics, non-ASCII names, actual HTML tags and attributes, alongside existing comparison, code-fence and link checks. Already wired into PR/main Quality and local preflight.
+- **Scope:** server-side normalizer, regression and roadmap only. No new dependencies, browser JS/CSS, authored content, games or budget changes. Require latest PR Quality green and same-merge-SHA main Quality and Pages deployment.
+
+## Completed: recover malformed HTTP 200 search indexes (2026-11-01)
 
 - **Finding:** the search client checks only that `posts` is an array before accepting an HTTP 200 payload. A partially corrupted entry (for example, `title: null` or non-array `tags`) can crash result scoring, leaving search unusable even though static article cards are already in the page.
 - **Change:** reject incomplete entry metadata before assigning the downloaded array; use the existing static article fallback and visible warning instead of rendering broken records. The build-time index schema gate remains unchanged and serves a different purpose.
