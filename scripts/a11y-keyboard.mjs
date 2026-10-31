@@ -371,6 +371,9 @@ const check = (name, pass, detail = '') => {
   await page.keyboard.down('Control');
   await page.keyboard.press('k');
   await page.keyboard.up('Control');
+  await page.waitForFunction(() => document.activeElement?.id === 'search-input'
+    && !document.getElementById('nav-drawer')?.open
+    && document.getElementById('menu-toggle')?.getAttribute('aria-expanded') === 'false');
   const fromMenu = await page.evaluate(() => ({
     focus: document.activeElement?.id,
     drawer: document.getElementById('nav-drawer')?.open,
@@ -385,6 +388,9 @@ const check = (name, pass, detail = '') => {
   await page.click('#shortcuts-open');
   await page.waitForSelector('#shortcuts-panel[open]');
   await page.keyboard.press('/');
+  await page.waitForFunction(() => document.activeElement?.id === 'search-input'
+    && !document.getElementById('shortcuts-panel')?.open
+    && document.getElementById('settings-toggle')?.getAttribute('aria-expanded') === 'false');
   const fromHelp = await page.evaluate(() => ({
     focus: document.activeElement?.id,
     settings: document.getElementById('settings-panel')?.open,
