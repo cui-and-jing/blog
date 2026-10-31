@@ -59,5 +59,9 @@ assert.equal(plain('List<用户> 和 std::vector<int>'), 'List<用户> 和 std::
   'generic brackets following Chinese and Latin identifiers must remain intact');
 assert.equal(plain('文字 <strong>加粗</strong> 和 <span class="note">注释</span>'),
   '文字 加粗 和 注释', 'actual HTML elements and attributes must still be removed');
+assert.equal(plain('Hello<strong>world</strong>'), 'Hello world',
+  'paired inline HTML without spacing must not leak markup into search');
+assert.equal(plain('中文<a href="/">链接</a>'), '中文 链接',
+  'inline HTML following Unicode prose must still be removed');
 assert.equal(plain(''), '', 'empty content stays empty');
 console.log('✓ Search plain text: hyphenated terms, list markers, rules, links and both code-fence styles');
