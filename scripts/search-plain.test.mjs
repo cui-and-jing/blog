@@ -13,5 +13,15 @@ assert.equal(plain('one-two\n```js\nsecret-token\n```\nthree-four'),
   'one-two three-four', 'fenced code remains excluded');
 assert.equal(plain('中文-英文  A-B  foo - bar'), '中文-英文 A-B foo - bar',
   'Chinese/Latin hyphens and spaced punctuation are not flattened');
+assert.equal(plain('before\n~~~ts\nsecret-token\n~~~\nafter'), 'before after',
+  'tilde-fenced code must not be searchable');
+assert.equal(plain('before\r\n  ````js\r\nsecret-token\r\n  `````\r\nafter'), 'before after',
+  'longer closing fence, indentation and CRLF must work');
+assert.equal(plain('before\n~~~js\nsecret-token\n```\nstill-code\n~~~~\nafter'), 'before after',
+  'another fence character cannot close a tilde block');
+assert.equal(plain('before\n```ts\nsecret-token'), 'before',
+  'an unclosed code fence must hide trailing code');
+assert.equal(plain('before ```secret-token``` after'), 'before after',
+  'existing inline triple-backtick handling must remain unchanged');
 assert.equal(plain(''), '', 'empty content stays empty');
-console.log('✓ Search plain text: hyphenated terms, list markers, rules, links and code fences');
+console.log('✓ Search plain text: hyphenated terms, list markers, rules, links and both code-fence styles');

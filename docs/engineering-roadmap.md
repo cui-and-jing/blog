@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: keep meaningful hyphens in full-text search (2026-10-31)
+## Current iteration: exclude Markdown fenced code from full-text indexing (2026-10-31)
+
+- **Finding:** The search text helper removes paired triple-backtick spans but does not recognize `~~~` fences, longer backtick fences or an unclosed code block. This can index private-looking sample code as prose and return misleading full-text matches.
+- **Change:** Parse Markdown fence lines before existing prose cleanup. Support tilde/backtick markers, up-to-three-space indentation, longer closing markers, CRLF, mismatched closers and unclosed fences while preserving meaningful hyphens and inline behavior.
+- **Regression:** Extend the existing dependency-free search-plain contract with real fenced-code fixtures; it already runs in both GitHub Quality and local preflight.
+- **Release scope:** Search index server helper, test and roadmap only. No dependencies, authored content, runtime browser JavaScript/CSS, games or size-cap changes. Merge only after complete exact-head PR Quality; verify the subsequent main Quality and Pages deploy at the merge SHA.
+
+## Completed: keep meaningful hyphens in full-text search (2026-10-31)
 
 - **Finding:** The Markdown-to-index text normalizer strips every hyphen alongside Markdown punctuation. Full-text queries such as `CSS-in-JS`, `foo-bar` and `Vue-3` therefore fail to match those exact body terms, even though the prose contains them.
 - **Change:** Extract the existing index-only normalization into a shared server helper. Keep hyphens that belong to content, while explicitly removing Markdown list bullets and horizontal rules. Preserve code fence, image, link, HTML and decoration exclusions.
