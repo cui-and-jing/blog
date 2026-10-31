@@ -21,6 +21,8 @@ assert.equal(readingTime('开头\n' + ticks + 'inline' + ticks + ' 结尾\n' + '
   'line-start inline backticks must preserve prose after the span');
 assert.equal(readingTime('开头\n' + tick.repeat(3) + 'js\n' + longCode + '\n' + tick.repeat(3) + '\n结尾'), 1,
   'the existing triple-backtick behavior must remain');
+assert.equal(readingTime('开头<pre><code>' + longCode + '</code></pre>结尾'), 1,
+  'HTML preformatted code must not inflate reading time');
 assert.equal(readingTime('**' + '文'.repeat(800) + '**'), 2,
   'Markdown decoration should not distort prose length');
 
