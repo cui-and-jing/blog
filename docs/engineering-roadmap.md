@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: preserve multiword tags when search index fails (2026-10-31)
+## Current iteration: recover from malformed successful search index responses (2026-10-31)
+
+- **Finding:** The search loader only verifies that `posts` is an array and entries have a known type. An HTTP 200 JSON payload with a null title, non-string tags or missing fields is accepted; scoring then throws (for example at `title.toLowerCase()`), leaving search unusable instead of using its existing pre-rendered article fallback.
+- **Change:** Validate the index entry shape before assigning it to search state. If any entry is incomplete, reuse the same degraded article-only mode and warning already used for network/JSON failures. Preserve valid-index ranking, full-text/notes search and original index generation.
+- **Regression:** Real Chromium intercepts HTTP 200 responses containing incomplete article metadata and an invalid note tag. Confirm that degraded mode keeps an editable query, filtered article results, disabled note filter and URL/history consistency.
+- **Guardrails:** No dependencies, content, games, CSS or loosened size caps. Run the full exact-head PR Quality (including the browser suite and gzip budgets) before squash merge; afterward validate main Quality and Pages Build/Deploy on the merge SHA.
+
+## Completed: preserve multiword tags when search index fails (2026-10-31)
 
 - **Finding:** Static search cards serialize tags as a space-separated `data-tags` string. If a label contains whitespace (for example `React Native`), degraded search splits it into separate fake tags when `search-index.json` is unavailable, so the displayed chips no longer agree with the tag directory or healthy search.
 - **Change:** Store the complete distinct-label array in the HTML data attribute as JSON and parse it when building degraded article-only search results. Preserve label boundaries, order, all tag matches, existing index behavior and source metadata.
