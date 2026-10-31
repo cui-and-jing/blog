@@ -847,6 +847,10 @@ const check = (name, pass, detail = '') => {
     const page = await browser.newPage();
     await page.setViewport({ width, height: 844, isMobile: true, hasTouch: true });
     await page.goto(base + '/posts/hello-astro/', { waitUntil: 'load' });
+    // The load event can precede the shared shell's event-handler registration.
+    // Wait for its readiness signal before testing real mobile taps/clicks.
+    await page.waitForFunction(() => document.documentElement.dataset.booted === 'on',
+      { timeout: 5000 });
 
     const tap = async (selector) => {
       const point = await page.$eval(selector, (button) => {
@@ -862,7 +866,7 @@ const check = (name, pass, detail = '') => {
     });
 
     await page.click('#settings-toggle');
-    await page.waitForSelector('#settings-panel[open]');
+    await page.waitForSelector('#settings-panel[open]', { timeout: 5000 });
     await new Promise((resolve) => setTimeout(resolve, 300));
     const targets = await page.evaluate(() => {
       const rects = (selector) => [...document.querySelectorAll(selector)].map((el) => {
@@ -901,7 +905,7 @@ const check = (name, pass, detail = '') => {
     check(width + 'px touch closes settings and restores expanded state', expanded === 'false', expanded);
 
     await page.click('#menu-toggle');
-    await page.waitForSelector('#nav-drawer[open]');
+    await page.waitForSelector('#nav-drawer[open]', { timeout: 5000 });
     await new Promise((resolve) => setTimeout(resolve, 300));
     const navClose = await dialogCloseSize('#nav-drawer .panel-close');
     check(width + 'px drawer close button has 44px target',
@@ -910,9 +914,9 @@ const check = (name, pass, detail = '') => {
     await page.waitForFunction(() => !document.getElementById('nav-drawer')?.open);
 
     await page.click('#settings-toggle');
-    await page.waitForSelector('#settings-panel[open]');
+    await page.waitForSelector('#settings-panel[open]', { timeout: 5000 });
     await tap('#shortcuts-open');
-    await page.waitForSelector('#shortcuts-panel[open]');
+    await page.waitForSelector('#shortcuts-panel[open]', { timeout: 5000 });
     await new Promise((resolve) => setTimeout(resolve, 300));
     const shortcutsClose = await dialogCloseSize('#shortcuts-panel .panel-close');
     check(width + 'px shortcuts close button has 44px target',
