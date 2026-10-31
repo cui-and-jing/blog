@@ -383,7 +383,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         selectedType = degraded ? 'post' : type === 'all' || type === 'post' || type === 'note'
           ? type : query ? 'all' : 'post';
         /* 停用词过滤、去重后再取前 6 个；重复词不能挤掉有效搜索词。 */
-        const terms = [...new Set(query.toLowerCase().split(/\s+/).filter((word) => word && !STOP.includes(word)))].slice(0, 6);
+        const terms = Array.from(new Set(query.toLowerCase().split(/\s+/).filter((word) => word && !STOP.includes(word)))).slice(0, 6);
         clearBtn!.hidden = query.length === 0;
 
         if (syncUrl) {
