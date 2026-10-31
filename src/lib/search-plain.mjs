@@ -36,7 +36,9 @@ export function plain(markdown) {
         if (tag[1] !== '/' && /^<[A-Za-z]/.test(tag)
             && /[\p{L}\p{N}_]/u.test(source[index - 1] ?? '')) {
           const name = /^<([A-Za-z][\w-]*)/.exec(tag)?.[1];
-          if (name && !tag.endsWith('/>') && !source.slice(index + tag.length).includes('' + '</' + name + '>')) return tag;
+          if (name && !tag.endsWith('/>')
+              && !/^(?:area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/i.test(name)
+              && !source.slice(index + tag.length).includes('</' + name + '>')) return tag;
         }
         return ' ';
       })
