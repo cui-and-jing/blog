@@ -1,6 +1,7 @@
 import type { CollectionEntry } from 'astro:content';
 import { url } from './site';
 import { latestActivity } from './recent-date.mjs';
+import { sharedSeriesTags } from './series-tags.mjs';
 import SERIES_META from '../data/series.json';
 
 export type Post = CollectionEntry<'posts'>;
@@ -41,10 +42,6 @@ export function sortByOrder(posts: Post[]): Post[] {
 function build(name: string, posts: Post[]): Series {
   const ordered = sortByOrder(posts);
   const dates = ordered.map((post) => post.data.date.valueOf());
-  const counts = new Map<string, number>();
-  for (const post of ordered) {
-    for (const tag of post.data.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-  }
   return {
     name,
     title: meta[name]?.title ?? name,
@@ -55,11 +52,7 @@ function build(name: string, posts: Post[]): Series {
     start: new Date(Math.min(...dates)),
     end: new Date(Math.max(...dates)),
     lastActivity: latestActivity(ordered.map((post) => post.data))!,
-    tags: [...counts.entries()]
-      .filter(([, n]) => n > 1)
-      .sort((a, b) => b[1] - a[1])
-      .map(([tag]) => tag)
-      .slice(0, 4),
+    tags: sharedSeriesTags(ordered),
     latest: ordered.reduce((a, b) => (a.data.date > b.data.date ? a : b)),
   };
 }
