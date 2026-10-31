@@ -427,14 +427,14 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         try {
           const res = await fetch(`${baseUrl}/search-index.json`, { headers: { Accept: 'application/json' } });
           const data = res.ok ? await res.json() : null;
-          /* A cached HTTP 200 response can still contain broken records. */
-          if (!Array.isArray(data?.posts) || !data.posts.every((p: any) =>
-            p && (p.type === 'post' || p.type === 'note')
-            && ['title', 'description', 'category', 'href', 'date', 'text']
-              .every((key) => typeof p[key] === 'string')
-            && Array.isArray(p.tags) && p.tags.every((tag: unknown) => typeof tag === 'string')
-            && Number.isFinite(p.minutes))) throw new Error('index');
-          posts = data.posts;
+          if (!Array.isArray(data?.posts)) throw new Error('index');
+          posts = data.posts.filter((p: any) => p && (p.type === 'post' || p.type === 'note'));
+          /* Reuse the scorer to reject unsafe fields without a second browser parser. */
+          posts.forEach((p) => {
+            if (typeof p.href !== 'string' || typeof p.date !== 'string'
+              || typeof p.text !== 'string' || !Number.isFinite(p.minutes)) throw new Error('index');
+            score(p, ['\0']);
+          });
         } catch {
           /* 索引不可用时仍可以搜索页面已有的文章，但不假装有完整正文与笔记数据。 */
           degraded = true;
