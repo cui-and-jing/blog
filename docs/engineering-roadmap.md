@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: retain comparison operators in technical search (2026-11-01)
+## Current iteration: consolidate article permalink copy interactions (2026-11-01)
+
+- **Finding:** Heading and paragraph permalink widgets independently construct the same anchor element and register near-identical click, clipboard, success-feedback and live-announcement handlers. This duplicates browser JavaScript while the total gzip budget is nearly exhausted.
+- **Change:** Share the anchor construction and copy interaction, keep heading/per-paragraph URL and quote semantics, accessible labels, clipboard fallback, and click-without-jump behavior. A failed heading copy now announces the failure just like the paragraph action.
+- **Regression:** Exercise both widget types in the Chromium keyboard suite, including no unwanted hash navigation and paragraph accessible naming, plus existing full Quality and JavaScript gzip budgets. No CSS, authored content, game, route, dependency or budget changes.
+- **Release:** Only merge the exact tested PR head if complete Quality is green and mergeability is clean; validate main Quality and Pages on the merge SHA. Malformed HTTP 200 search-index recovery remains separate until measured JavaScript headroom exists.
+
+## Completed: retain comparison operators in technical search (2026-11-01)
 
 - **Finding:** The prose normalizer treats any text between angle brackets as HTML, so a sentence such as x < 10 && y > 5 loses its numeric condition. It also strips every greater-than sign as if it were a Markdown quote. These are meaningful terms in technical tutorials and the shared reading-time prose.
 - **Change:** Remove actual tags/comments/declarations rather than arbitrary angle-delimited text; strip Markdown blockquote prefixes at line starts while retaining inline comparison operators. Preserve fenced-code, heading, link and existing formatting cleanup.

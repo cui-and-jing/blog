@@ -436,59 +436,54 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
     };
 
     const articleUrl = location.origin + location.pathname;
+
+    /* A single accessible copy interaction for heading and paragraph permalinks. */
+    const createCopyAnchor = (
+      block: HTMLElement, className: string, label: string, text: () => string, success: string
+    ) => {
+      const anchor = document.createElement('a');
+      anchor.className = className;
+      anchor.href = `#${block.id}`;
+      anchor.textContent = '#';
+      anchor.setAttribute('aria-label', label);
+      anchor.addEventListener('click', async (event) => {
+        event.preventDefault();
+        if (!(await copyText(text()))) {
+          announce('复制失败，请手动选择文字');
+          return;
+        }
+        flashAnchor(anchor);
+        announce(success);
+      });
+      return anchor;
+    };
+
     const headings = document.querySelectorAll<HTMLElement>('.prose h2, .prose h3');
     headings.forEach((heading) => {
       if (!heading.id) return;
-      const anchor = document.createElement('a');
-      anchor.className = 'heading-anchor';
-      anchor.href = `#${heading.id}`;
-      anchor.setAttribute('aria-label', `复制「${heading.textContent?.trim() ?? ''}」的链接`);
-      anchor.textContent = '#';
-      anchor.addEventListener('click', async (event) => {
-        event.preventDefault(); /* 复制章节链接不应导致正文跳动 */
-        const link = `${articleUrl}#${heading.id}`;
-        if (!(await copyText(link))) return;
-        flashAnchor(anchor);
-        announce('小节链接已复制');
-      });
-      heading.append(anchor);
+      heading.append(createCopyAnchor(
+        heading, 'heading-anchor', `复制「${heading.textContent?.trim() ?? ''}」的链接`,
+        () => `${articleUrl}#${heading.id}`, '小节链接已复制'
+      ));
     });
 
     /* ---------- 段落深链接：想引用某一段时，不必再给整篇链接 ---------- */
     const articleTitle = shareBar?.dataset.title || document.title;
-
     document.querySelectorAll<HTMLElement>('.prose > p, .prose > blockquote').forEach((block, i) => {
       const sourceText = (block.textContent ?? '').trim();
       if (sourceText.length < 24) return;
 
       if (!block.id) block.id = `p-${i + 1}`;
       block.classList.add('has-anchor');
-
-      const anchor = document.createElement('a');
-      anchor.className = 'para-anchor';
-      anchor.href = `#${block.id}`;
-      anchor.textContent = '#';
-      anchor.setAttribute('aria-label', '复制这一段落的引用');
-      anchor.addEventListener('click', async (event) => {
-        event.preventDefault();
-        /* 选中了半句就只引半句，否则引整段 */
+      block.prepend(createCopyAnchor(block, 'para-anchor', '复制这一段落的引用', () => {
+        /* Quote the selected portion, or the complete paragraph if nothing is selected. */
         const selection = window.getSelection();
         const picked =
           selection && selection.rangeCount && block.contains(selection.getRangeAt(0).commonAncestorContainer)
             ? selection.toString().trim()
             : '';
-        const text = picked || sourceText;
-        const link = `${articleUrl}#${block.id}`;
-
-        if (!(await copyText(`> ${text}\n\n—— ${articleTitle} ${link}`))) {
-          announce('复制失败，请手动选择文字');
-          return;
-        }
-        flashAnchor(anchor);
-        announce('引用已复制');
-      });
-
-      block.prepend(anchor);
+        return `> ${picked || sourceText}\n\n—— ${articleTitle} ${articleUrl}#${block.id}`;
+      }, '引用已复制'));
     });
 
     /* ---------- 目录高亮：只改变化的两项，避免长目录反复遍历 ---------- */
