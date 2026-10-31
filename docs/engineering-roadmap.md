@@ -22,7 +22,14 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: retain underscores inside technical search terms (2026-11-01)
+## Current iteration: de-duplicate search query keywords (2026-11-01)
+
+- **Finding:** The browser currently scores identical query tokens repeatedly, so repeating the same word can unfairly increase its weight. With a six-keyword cap, six copies of one token can also discard a distinct later keyword entirely.
+- **Change:** Remove repeated tokens *after* stop-word filtering but *before* the six-keyword cap, retaining the first occurrence's order. Keep the existing scoring weights, query URL, keyboard navigation and result-type filters.
+- **Regression:** Use Chromium with a two-record HTTP 200 search-index fixture. Query six repetitions of Astro followed by CSS; verify the article matching both unique terms outranks the Astro-only article without runtime errors or fallback.
+- **Guardrails:** No new dependency or budget increase; require full PR Quality (including browser and gzip checks), Squash Merge, and matching post-merge main Quality + Pages SHA.
+
+## Completed: retain underscores inside technical search terms (2026-11-01)
 
 - **Finding:** The shared Markdown prose normalizer removes every underscore, so article-body terms such as `user_id`, `get_user_name` and `api_v2` become separate words. Literal searches for the original code identifiers then miss body-only matches.
 - **Change:** Preserve underscore runs between Unicode letters/digits while still removing underscores used solely as Markdown emphasis delimiters. Keep other punctuation, code-fence and HTML rules unchanged.
