@@ -31,9 +31,13 @@ export function plain(markdown) {
     .replace(/<[^>]+>/g, ' ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    // CommonMark ATX headings need a space after 1–6 leading hashes.
+    // Keep inline hashes in technical terms like C# and F#.
+    .replace(/^ {0,3}#{1,6}(?:[ \t]+|$)(.*)$/gm,
+      (_line, heading) => heading.replace(/[ \t]+#+[ \t]*$/, ''))
     .replace(/(^|\n)[ \t]*-[ \t]+/g, '$1 ')
     .replace(/(^|\n)[ \t]*-{3,}(?=[ \t]*(?:\n|$))/g, '$1 ')
-    .replace(/[#>*_~`|=]+/g, ' ')
+    .replace(/[>*_~`|=]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
