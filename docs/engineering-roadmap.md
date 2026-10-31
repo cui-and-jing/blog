@@ -406,6 +406,13 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 - **Regression:** Chromium covers composition before/after commit, stopword-only vs mixed queries, URL restoration, mobile clearing and pointer target dimensions. Preserve existing search index failure fallback and history.
 - **Constraints:** do not modify post/notes URLs, bookmarks, reader settings, games, CSS/JS size caps or dependency versions. Validate the latest PR SHA before merge and verify main Quality + Pages after merge.
 
+## Completed: mobile dialog test readiness and bounded diagnostics (2026-11-01)
+
+- **Finding:** After PR #79 was merged, main Quality attempt 1 timed out at `scripts/a11y-keyboard.mjs:865` waiting for `#settings-panel[open]` in the 320/390px touch test. The same SHA passed on rerun. That fixture navigated with `waitUntil: 'load'` and clicked the settings toggle immediately, without waiting for the shared client shell to finish binding handlers. This is a plausible race, not a proven production defect.
+- **Change:** Wait for the existing `data-booted="on"` readiness signal before testing genuine mobile pointer interactions; retain physical touch/click checks. Bound the dialog-open waits to 5 seconds so future failures surface quickly rather than consuming the default 30 seconds.
+- **Regression:** Keep the entire Chromium keyboard, mobile touch and accessibility Quality suite mandatory. Verify the final PR SHA, merged main Quality and Pages deployment SHA; a green run reduces but cannot eliminate intermittent-failure uncertainty.
+- **Guardrails:** test/docs only; no product JS/CSS, games, article content, dependencies, URLs or performance-budget changes.
+
 ## Merge checklist for every iteration
 
 1. Branch from current `main`; avoid unreviewed dependency upgrades. `npm run deploy:check` verifies the release gate configuration.
