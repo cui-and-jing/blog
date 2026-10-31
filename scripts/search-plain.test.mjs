@@ -42,5 +42,15 @@ assert.equal(plain('#不是标题\n# 合法标题'), '#不是标题 合法标题
   'without a heading separator, a leading hash is literal text');
 assert.equal(plain('###\n正文'), '正文',
   'an empty CommonMark ATX heading must not become search noise');
+assert.equal(plain('x < 10 && y > 5'), 'x < 10 && y > 5',
+  'technical comparisons must survive HTML stripping and Markdown cleanup');
+assert.equal(plain('a < b > c'), 'a < b > c',
+  'spaced angle comparisons are prose, not HTML tags');
+assert.equal(plain('> 引用 C#\n> > 深层引用'), '引用 C# 深层引用',
+  'blockquote prefixes, including nested quotes, must still be removed');
+assert.equal(plain('<strong>强调</strong> <!-- hidden --> <em>斜体</em>'),
+  '强调 斜体', 'actual HTML tags and comments must still be excluded');
+assert.equal(plain('x < 10 && y > 5\n> 引用解释'), 'x < 10 && y > 5 引用解释',
+  'comparison operators and blockquote markup can coexist');
 assert.equal(plain(''), '', 'empty content stays empty');
 console.log('✓ Search plain text: hyphenated terms, list markers, rules, links and both code-fence styles');

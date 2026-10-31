@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: preserve technical hash signs in Markdown search (2026-10-31)
+## Current iteration: retain comparison operators in technical search (2026-11-01)
+
+- **Finding:** The prose normalizer treats any text between angle brackets as HTML, so a sentence such as x < 10 && y > 5 loses its numeric condition. It also strips every greater-than sign as if it were a Markdown quote. These are meaningful terms in technical tutorials and the shared reading-time prose.
+- **Change:** Remove actual tags/comments/declarations rather than arbitrary angle-delimited text; strip Markdown blockquote prefixes at line starts while retaining inline comparison operators. Preserve fenced-code, heading, link and existing formatting cleanup.
+- **Regression:** Add dependency-free Node assertions for comparisons, nested blockquotes, real HTML tags/comments and mixed quote/comparison lines. Run in existing search-plain contract in full PR/main Quality and local Preflight.
+- **Guardrails:** Server-side helper, tests and roadmap only; no browser JS, CSS, games, dependencies, authored content or budget changes. HTTP 200 malformed index runtime fallback remains separate until JavaScript headroom exists.
+
+## Completed: preserve technical hash signs in Markdown search (2026-10-31)
 
 - **Finding:** The Markdown-to-search normalizer strips every `#`, not just heading syntax. A body mentioning `C#`, `F#` or `#Astro` becomes `C`, `F` or `Astro`; searches for the original technical terms can miss results. The same prose normalizer also feeds article reading-time estimates.
 - **Change:** Remove only CommonMark ATX heading prefixes (one to six hashes separated from text by whitespace) and optional closing markers on those heading lines. Preserve literal hashes inside technology names, hashtags and hash-prefixed text that is not a Markdown heading.
