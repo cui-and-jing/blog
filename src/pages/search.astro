@@ -477,7 +477,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           /* 没有用方向键选过时，回车直接打开第一条结果 */
           const nodes = list.querySelectorAll<HTMLAnchorElement>('.search-item');
           const node = nodes[active >= 0 ? active : 0];
-          if (node) {
+          if (node && ready) {
             event.preventDefault();
             remember(input.value);
             location.href = node.href;
