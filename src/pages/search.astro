@@ -402,7 +402,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         typeButtons.forEach((button) => {
           const type = button.dataset.searchType as SearchType;
           button.disabled = degraded && type !== 'post';
-          button.setAttribute('aria-pressed', String(type === selectedType));
+          button.ariaPressed = String(type === selectedType);
         });
         document.getElementById('search-type-filters')!.hidden = false;
         render(ranked.filter(({ post }) => selectedType === 'all' || post.type === selectedType), Boolean(query));
