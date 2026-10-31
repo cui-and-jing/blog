@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: share searches typed before the index loads (2026-10-31)
+## Current iteration: block stale Enter navigation while search index loads (2026-10-31)
+
+- **Finding:** Before the search index is ready, the page still displays its server-rendered all-article fallback list. Inputting a new keyword updates the field but cannot filter the list yet. Pressing Enter immediately opens the first *unfiltered* article, even when it has nothing to do with the keyword.
+- **Change:** Allow Enter to navigate to a result only after the index has resolved (including the existing degraded fallback). Preserve ordinary clicks on pre-rendered links and normal Enter navigation once the search results are ready.
+- **Regression:** Intercept the search-index request in Chromium, type a pending keyword, press Enter, and verify the user remains on the search page. Release the request and verify that the query, shareable URL, results and history are still correct. Keep all budget, accessibility, game and deploy gates unchanged.
+- **Release:** Implement on an isolated branch, merge only after the exact latest PR SHA passes full Quality with no conflicts, then verify successful main Quality and same-SHA Pages build/deploy.
+
+## Completed: share searches typed before the index loads (2026-10-31)
 
 - **Finding:** Before the asynchronous search index is ready, input events call `apply()` but return early. Once the index arrives, `fetchIndex()` calls `apply(false)`; results render from the typed query, yet the `q` URL parameter remains absent. Copying the address or reloading loses the search.
 - **Change:** Let the first successful index render synchronize the current input value with `history.replaceState`, without adding a Back entry. Existing deep links, type filters, failed-index fallback and IME behavior stay intact.

@@ -1252,6 +1252,13 @@ const check = (name, pass, detail = '') => {
   check('Typing before search index loads retains the pending query',
     waiting.value === 'Astro' && waiting.filtersHidden && waiting.query === null,
     JSON.stringify(waiting));
+  /* Before the index arrives, server-rendered articles are not search matches. */
+  await page.focus('#search-input');
+  await page.keyboard.press('Enter');
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  const pendingUrl = page.url();
+  check('Enter during index loading does not open an unrelated article',
+    new URL(pendingUrl).pathname.endsWith('/search/'), pendingUrl);
   await indexRequest.continue();
   await page.waitForFunction(() =>
     document.getElementById('search-type-filters')?.hidden === false
