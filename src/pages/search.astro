@@ -424,10 +424,10 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           const data = res.ok ? await res.json() : null;
           if (!Array.isArray(data?.posts)) throw new Error('index');
           posts = data.posts.filter((p: any) => p && (p.type === 'post' || p.type === 'note'));
-          /* Reuse the scorer to reject unsafe fields without a second browser parser. */
+          /* Scoring an impossible term checks all fields the renderer also reads. */
           posts.forEach((p) => {
             if (typeof p.href !== 'string' || typeof p.date !== 'string'
-              || typeof p.text !== 'string' || !Number.isFinite(p.minutes)) throw new Error('index');
+              || !Number.isFinite(p.minutes)) throw 0;
             score(p, ['\0']);
           });
         } catch {
