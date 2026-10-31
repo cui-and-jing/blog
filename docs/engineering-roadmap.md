@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: exclude fenced code from article reading estimates (2026-10-31)
+## Current iteration: recover from malformed HTTP 200 search indexes (2026-10-31)
+
+- **Finding:** The search client checks the index's array shape but only discards unknown record types. A cached HTTP 200 response containing a null title, a number in a tag list or a missing body can then throw in the scorer/renderer, leaving search unusable rather than showing pre-rendered articles.
+- **Change:** Before assigning index entries, require known types, all scorer/renderer string fields, a string-only tags array and finite reading minutes. Treat any invalid entry like a failed index request; retain query state, display article-only search and disable unavailable note/full-text discovery. Keep valid search ranking and server-generated index unchanged.
+- **Regression:** The existing Chromium keyboard/accessibility suite intercepts HTTP 200 responses with three malformed index fixtures and checks warning, retained query, article results and disabled note mode. No additional workflow or dependency needed.
+- **Guardrails:** Existing 12 KiB browser JS gzip cap remains binding. No authored content, CSS, games, dependencies or budget increases. Never merge unless latest-head PR Quality is green; subsequently verify main Quality and Pages Build/Deploy on the exact merge SHA.
+
+## Completed: exclude fenced code from article reading estimates (2026-10-31)
 
 - **Finding:** The shared article reading-time helper only removes paired triple-backtick snippets. Long backtick fences, tilde fences and unclosed code blocks remain in the character count, so code-heavy tutorials can show inflated estimated reading minutes on article cards and search results.
 - **Change:** Reuse the already-tested, server-side Markdown prose normalizer in a small reading-time helper; keep the existing minimum of one minute and 400-character rounding. Export the helper through the existing site.ts API so all current surfaces and the search index agree.
