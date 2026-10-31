@@ -438,8 +438,8 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           history.replaceState(null, '', next);
         }
         ready = true;
-        /* 输入可能发生在索引下载期间：首次渲染也要同步输入框到分享 URL。 */
-        apply();
+        /* 索引下载期间可能已输入，但拼音组词中不能提前改写地址栏。 */
+        apply(!composing);
       };
 
       typeButtons.forEach((button) => button.addEventListener('click', () => {
