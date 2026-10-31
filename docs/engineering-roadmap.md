@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: deduplicate tag relevance in related reading (2026-10-31)
+## Current iteration: keep search note previews consistent with note excerpts (2026-10-31)
+
+- **Finding:** Note titles come from their first sentence, but the published `search-index.json` still uses the first 120 characters of the same text as its note description. In the search page's empty-query note filter, the title and preview repeat the opening instead of showing what follows. The note-list/preview helper already solves this for normal and long leading sentences.
+- **Change:** Reuse `noteExcerpt(note, 120)` for search-index descriptions. Keep the existing first-120-characters fallback for single-sentence notes so the result card does not become blank. Leave the searchable full text and all post metadata intact.
+- **Regression:** Assert punctuation, long (>120 character) first sentences, no-punctuation and single-sentence behavior in a dependency-free Node test. Check every built note entry's title/description against the same text semantics so changing the generator cannot silently undo the fix; run after build in PR/main Quality and local preflight.
+- **Guardrails:** no new dependencies, content edits, routes, browser JS/CSS, game changes or budget increases. Require complete Quality success on the exact PR head before squash merge; validate main Quality and Pages deploy the same resulting SHA.
+
+## Completed: deduplicate tag relevance in related reading (2026-10-31)
 
 - **Finding:** The post recommendations under “接着读” score overlapping tags by filtering the candidate's raw metadata. Repeating a tag in that array inflates its score and can display duplicate reasons such as `#CSS #CSS`; the schema currently permits duplicates. This is distinct from the tag-directory and series-overview fixes.
 - **Change:** Count each shared label once, preserving candidate tag order for the two-tag visible explanation and retaining category points, publication-date tiebreaks, series-first recommendations, URLs and existing budgets.
