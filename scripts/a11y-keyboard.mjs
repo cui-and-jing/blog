@@ -319,6 +319,51 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- Search: malformed successful index response must degrade safely ---------- */
+{
+  const malformed = [
+    { label: 'missing title', record: { type: 'post', title: null } },
+    { label: 'non-string tag', record: {
+      type: 'note', title: 'Bad note', description: '', category: '', date: '2026-10-31',
+      href: '/blog/notes/bad/', text: 'Astro', minutes: 0, tags: ['Astro', 42],
+    } },
+    { label: 'missing body', record: {
+      type: 'post', title: 'Bad post', description: '', category: '', date: '2026-10-31',
+      href: '/blog/posts/bad/', minutes: 1, tags: ['Astro'],
+    } },
+  ];
+  for (const fixture of malformed) {
+    const page = await browser.newPage();
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      if (request.url().split('?')[0].endsWith('/search-index.json')) {
+        request.respond({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({ posts: [fixture.record] }),
+        }).catch(() => {});
+      } else request.continue().catch(() => {});
+    });
+    await page.goto(base + '/search/?q=Astro&type=note', { waitUntil: 'load' });
+    await page.waitForSelector('#search-index-warning:not([hidden])', { timeout: 8000 }).catch(() => {});
+    const state = await page.evaluate(() => ({
+      warned: !document.getElementById('search-index-warning').hidden,
+      query: new URL(location.href).searchParams.get('q'),
+      type: new URL(location.href).searchParams.get('type'),
+      selected: document.querySelector('[data-search-type="post"]')?.getAttribute('aria-pressed'),
+      noteDisabled: document.querySelector('[data-search-type="note"]')?.disabled,
+      results: [...document.querySelectorAll('#search-results .search-item')]
+        .map((a) => a.getAttribute('href')),
+    }));
+    check('Malformed HTTP 200 search index: ' + fixture.label,
+      state.warned && state.query === 'Astro' && state.type === null
+        && state.selected === 'true' && state.noteDisabled
+        && state.results.length > 0
+        && state.results.every((href) => href?.includes('/posts/')),
+      JSON.stringify(state));
+    await page.close();
+  }
+}
+
 /* ---------- Reading settings: cross-tab deletion and clear must reset all controls ---------- */
 {
   const a = await browser.newPage();
