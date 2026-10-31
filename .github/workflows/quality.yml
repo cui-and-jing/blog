@@ -87,6 +87,9 @@ jobs:
       - name: Search note preview excerpt contract
         run: node --experimental-strip-types scripts/search-note-preview.test.mjs
 
+      - name: Search tag consistency contract
+        run: node scripts/search-tags.test.mjs
+
       - name: Related reading sequence contract
         run: npm run related:check
 
