@@ -382,8 +382,8 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         const type = pageUrl().searchParams.get('type');
         selectedType = degraded ? 'post' : type === 'all' || type === 'post' || type === 'note'
           ? type : query ? 'all' : 'post';
-        /* 先过滤停用词再限制长度，避免前几个虚词占满所有检索位置。 */
-        const terms = query.toLowerCase().split(/\s+/).filter((word) => word && !STOP.includes(word)).slice(0, 6);
+        /* 停用词过滤、去重后再取前 6 个；重复词不能挤掉有效搜索词。 */
+        const terms = [...new Set(query.toLowerCase().split(/\s+/).filter((word) => word && !STOP.includes(word)))].slice(0, 6);
         clearBtn!.hidden = query.length === 0;
 
         if (syncUrl) {
