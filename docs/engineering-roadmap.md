@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: avoid stacked modal dialogs from the mobile keyboard shortcut (2026-10-31)
+## Current iteration: search shortcut must close active mobile dialogs (2026-10-31)
+
+- **Finding:** Ctrl/⌘+K and / are documented to focus search on the search page, but the global handler tries to focus the search input while a modal navigation or shortcut-help dialog is still open. The browser's modal top layer keeps focus inside the dialog, so the shortcut does not take the user to search.
+- **Change:** When the target search input exists, close active dialogs before focusing and selecting the input. Preserve normal navigation to search from other routes, URL state, and standard dialog close events/aria-expanded updates.
+- **Regression:** In real 390px Chromium, open mobile navigation on the search route, use Ctrl+K, and check the drawer closes, aria-expanded resets, and input gains focus. Repeat with / from keyboard shortcut help launched through reading settings. Keep full build, size, a11y, games and deployment gates.
+- **Release:** Separate branch from verified main. Squash only after exact-head PR Quality succeeds and mergeability is clean; then verify main Quality and Pages on the resulting SHA.
+
+## Completed: avoid stacked modal dialogs from the mobile keyboard shortcut (2026-10-31)
 
 - **Finding:** Pressing `?` while the mobile navigation dialog is open launches the shortcut-help dialog without closing navigation. Both modal dialogs remain open in the top layer, forcing two Esc presses and leaving menu state visually confusing.
 - **Change:** Close any open navigation/settings dialog before showing shortcut help. Preserve shortcut activation from normal pages and the existing menu and settings controls. The revised handler is no larger than the previous code.
