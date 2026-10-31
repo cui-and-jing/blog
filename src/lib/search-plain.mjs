@@ -29,7 +29,9 @@ export function plain(markdown) {
   // Match actual HTML elements/comments, not mathematical comparisons such as x < 10.
   return prose
     .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][^>]*>|<![A-Za-z][^>]*>/g, ' ')
+    .replace(// Generic type parameters attached to an identifier are prose, not HTML tags.
+    // Closing tags are stripped independently from opening tags.
+    /<!--[\s\S]*?-->|<\/[A-Za-z][^>]*>|(?<![\p{L}\p{N}_])<[A-Za-z][^>]*>|<![A-Za-z][^>]*>/gu, ' ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     // CommonMark ATX headings need a space after 1–6 leading hashes.
