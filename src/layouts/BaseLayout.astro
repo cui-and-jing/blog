@@ -665,7 +665,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         const field = document.getElementById('search-input') as HTMLInputElement | null;
         if (field) {
           /* Close modal panels before focusing a search field outside their top layer. */
-          document.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach((panel) => panel.close());
+          document.querySelector<HTMLDialogElement>('dialog[open]')?.close();
           field.focus(); field.select();
         }
         else location.href = searchUrl;
