@@ -96,16 +96,7 @@ export function formatDate(date: Date): string {
   return `${y}.${m}.${day}`;
 }
 
-export function readingTime(body: string): number {
-  if (!body) return 1;
-  const text = body.replace(/```[\s\S]*?```/g, ' ').replace(/\s+/g, '');
-  return Math.max(1, Math.round(text.length / 400));
-}
-
-export function daysSince(year: number): number {
-  const start = new Date(year, 0, 1).getTime();
-  return Math.max(1, Math.floor((Date.now() - start) / 86_400_000) + 1);
-}
+export { readingTime } from './reading-time.mjs';
 
 /** 由字符串得到稳定色相（0-359），用于彩色标签 */
 export function tagHue(tag: string): number {
