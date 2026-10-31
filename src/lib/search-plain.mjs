@@ -54,7 +54,11 @@ export function plain(markdown) {
     .replace(/(^|\n)[ \t]*-{3,}(?=[ \t]*(?:\n|$))/g, '$1 ')
     // Only line-start blockquote markers are formatting; inline > is searchable.
     .replace(/(^|\n)[ \t]{0,3}(?:>[ \t]?)+/g, '$1')
-    .replace(/[*_~`|=]+/g, ' ')
+    .replace(/[*~`|=]+/g, ' ')
+    // Underscores inside identifiers are searchable; outside them they mark emphasis.
+    .replace(/_+/g, (marks, at, text) =>
+      /[\p{L}\p{N}]/u.test(text[at - 1] ?? '')
+      && /[\p{L}\p{N}]/u.test(text[at + marks.length] ?? '') ? marks : ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

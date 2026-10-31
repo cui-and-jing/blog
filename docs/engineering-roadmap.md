@@ -22,7 +22,14 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: ignore embedded HTML code blocks in search (2026-11-01)
+## Current iteration: retain underscores inside technical search terms (2026-11-01)
+
+- **Finding:** The shared Markdown prose normalizer removes every underscore, so article-body terms such as `user_id`, `get_user_name` and `api_v2` become separate words. Literal searches for the original code identifiers then miss body-only matches.
+- **Change:** Preserve underscore runs between Unicode letters/digits while still removing underscores used solely as Markdown emphasis delimiters. Keep other punctuation, code-fence and HTML rules unchanged.
+- **Regression:** Add dependency-free cases for English/Chinese identifiers, multiple underscores, digit suffixes, emphasis and formatted link labels to the existing search-plain contract in full Quality and Preflight.
+- **Guardrails:** Only server-side prose normalization, tests and roadmap change; no browser JS/CSS, dependencies, authored articles, games or relaxed gzip limits. Merge only with complete PR Quality green; confirm post-merge main Quality and Pages on the same SHA.
+
+## Completed: ignore embedded HTML code blocks in search (2026-11-01)
 
 - **Finding:** The shared prose normalizer strips `<pre>`, `<script>` and `<style>` markup but leaves their bodies searchable, causing hidden code and CSS/JS to create false search hits and inflate reading-time estimates.
 - **Change:** Remove complete HTML preformatted/code, script and style blocks before the generic HTML-tag cleaner. Keep inline `<code>` text searchable and preserve the existing Markdown fenced-code and generic-type behavior.

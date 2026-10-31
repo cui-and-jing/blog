@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import { plain } from '../src/lib/search-plain.mjs';
 
+assert.equal(plain('user_id get_user_name foo__bar'), 'user_id get_user_name foo__bar',
+  'underscores within code identifiers must survive full-text indexing');
+assert.equal(plain('用户_编号 api_v2'), '用户_编号 api_v2',
+  'Unicode identifiers and digit suffixes must retain their underscores');
+assert.equal(plain('_italic_ and __strong__'), 'italic and strong',
+  'Markdown underscore emphasis remains plain text rather than search punctuation');
+assert.equal(plain('**set_user_id** 与 [user_id](https://example.com/a_b)'),
+  'set_user_id 与 user_id', 'formatted identifiers and link labels must remain searchable');
+
 assert.equal(plain('CSS-in-JS 与 Vue-3'), 'CSS-in-JS 与 Vue-3',
   'hyphens inside search terms must survive indexing');
 assert.equal(plain('- CSS-in-JS\n- foo-bar'), 'CSS-in-JS foo-bar',
