@@ -97,7 +97,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
               href={url(`/posts/${post.id}/`)}
               data-title={post.data.title}
               data-desc={post.data.description}
-              data-tags={uniqueSearchTags(post.data.tags).join(' ')}
+              data-tags={JSON.stringify(uniqueSearchTags(post.data.tags))}
               data-cat={post.data.category ?? ''}
 
               data-type="post"
@@ -415,7 +415,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           type: 'post' as const,
           title: a.dataset.title ?? '',
           description: a.dataset.desc ?? '',
-          tags: (a.dataset.tags ?? '').split(' ').filter(Boolean),
+          tags: JSON.parse(a.dataset.tags ?? '[]') as string[],
           category: a.dataset.cat ?? '',
           href: a.href,
           date: a.querySelector('time')?.textContent ?? '',
