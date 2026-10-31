@@ -39,7 +39,7 @@ for (const card of cards) {
   const labels = [...card.matchAll(/<span class="tag">#([^<]*)<\/span>/g)]
     .map((match) => match[1]);
   assert.deepEqual(labels, postTags.get(href).slice(0, 3), 'static and JS search tags disagree: ' + href);
-  const serialized = card.match(/\\bdata-tags="([^"]*)"/)?.[1];
+  const serialized = card.match(/\bdata-tags="([^"]*)"/)?.[1];
   assert.ok(serialized, 'missing JSON tag metadata on static card: ' + href);
   assert.deepEqual(JSON.parse(decodeAttr(serialized)), postTags.get(href),
     'static fallback must preserve multiword tag boundaries and every unique label: ' + href);
