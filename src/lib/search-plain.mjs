@@ -29,7 +29,19 @@ export function plain(markdown) {
   // Match actual HTML elements/comments, not mathematical comparisons such as x < 10.
   return prose
     .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][^>]*>|<![A-Za-z][^>]*>/g, ' ')
+    .replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][^>]*>|<![A-Za-z][^>]*>/g,
+      (tag, index, source) => {
+        // Generic type arguments follow an identifier, unlike standalone HTML tags.
+        // Paired inline HTML immediately after text still loses its markup.
+        if (tag[1] !== '/' && /^<[A-Za-z]/.test(tag)
+            && /[\p{L}\p{N}_]/u.test(source[index - 1] ?? '')) {
+          const name = /^<([A-Za-z][\w-]*)/.exec(tag)?.[1];
+          if (name && !tag.endsWith('/>')
+              && !/^(?:area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/i.test(name)
+              && !source.slice(index + tag.length).includes('</' + name + '>')) return tag;
+        }
+        return ' ';
+      })
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     // CommonMark ATX headings need a space after 1–6 leading hashes.

@@ -52,5 +52,20 @@ assert.equal(plain('<strong>强调</strong> <!-- hidden --> <em>斜体</em>'),
   '强调 斜体', 'actual HTML tags and comments must still be excluded');
 assert.equal(plain('x < 10 && y > 5\n> 引用解释'), 'x < 10 && y > 5 引用解释',
   'comparison operators and blockquote markup can coexist');
+assert.equal(plain('Map<string, number> 与 Array<Result<T>>'),
+  'Map<string, number> 与 Array<Result<T>>',
+  'generic arguments must remain searchable instead of being mistaken for HTML tags');
+assert.equal(plain('List<用户> 和 std::vector<int>'), 'List<用户> 和 std::vector<int>',
+  'generic brackets following Chinese and Latin identifiers must remain intact');
+assert.equal(plain('文字 <strong>加粗</strong> 和 <span class="note">注释</span>'),
+  '文字 加粗 和 注释', 'actual HTML elements and attributes must still be removed');
+assert.equal(plain('Hello<strong>world</strong>'), 'Hello world',
+  'paired inline HTML without spacing must not leak markup into search');
+assert.equal(plain('中文<a href="/">链接</a>'), '中文 链接',
+  'inline HTML following Unicode prose must still be removed');
+assert.equal(plain('Hello<br>world'), 'Hello world',
+  'void HTML elements adjacent to text must not leak into search');
+assert.equal(plain('图片<img src="x">说明'), '图片 说明',
+  'inline HTML images must remain excluded from search text');
 assert.equal(plain(''), '', 'empty content stays empty');
 console.log('✓ Search plain text: hyphenated terms, list markers, rules, links and both code-fence styles');
