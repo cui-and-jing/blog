@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: avoid duplicate entries in tag buckets (2026-10-31)
+## Current iteration: count series tags by distinct articles (2026-10-31)
+
+- **Finding:** A single article may repeat its tag label (the content schema permits it). The series overview counts each occurrence, so one article tagging itself `CSS` twice can falsely make `#CSS` appear as a shared series topic even when no other article uses it. This is separate from the tag-directory fix in PR #59.
+- **Change:** Count each label at most once per article when selecting the up-to-four tags that appear in multiple series articles. Preserve frequency ranking and first-encounter tie order, original metadata, series reading sequence and URL structure.
+- **Regression:** Add a dependency-free Node contract for single-article repeats, real shared labels, ordering, four-tag cap, empty series and non-mutation; run it before build in both CI and local preflight.
+- **Release:** Keep dependency versions, runtime JS/CSS, games, content and budgets unchanged. Validate the exact PR head in full Quality before squash, then require main Quality and same-SHA Pages success.
+
+## Completed: avoid duplicate entries in tag buckets (2026-10-31)
 
 - **Finding:** The content schema accepts repeated tag labels in a single post or note. `collectTags()` appends that entry once for every occurrence. Tag pages then render the same card repeatedly, and totals and popularity rankings are inflated.
 - **Change:** Deduplicate each entry's tag labels while aggregating, without changing the authored tag arrays. Preserve distinct posts/notes sharing a tag, chronological ordering, the existing tag routes, and ranking.

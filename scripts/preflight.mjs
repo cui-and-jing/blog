@@ -67,6 +67,7 @@ async function main() {
   run('内容体检', 'node', ['scripts/lint-content.mjs']);
   run('笔记摘要边界', 'node', ['--experimental-strip-types', 'scripts/note-excerpt.test.mjs']);
   run('标签聚合去重', 'node', ['--experimental-strip-types', 'scripts/tag-buckets.test.mjs']);
+  run('系列共现标签去重', 'node', ['scripts/series-tags.test.mjs']);
   /* 正文用了子集外的字，线上会悄悄回退成系统宋体，只有字形不一致这一条线索，容易漏 */
   run('字体子集校验', 'node', ['scripts/fonts.mjs', '--check']);
   // 本地发布体检与 CI 保持一致：失败的 Quality 不应触发 Pages。
