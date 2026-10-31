@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: block stale Enter navigation while search index loads (2026-10-31)
+## Current iteration: avoid stacked modal dialogs from the mobile keyboard shortcut (2026-10-31)
+
+- **Finding:** Pressing `?` while the mobile navigation dialog is open launches the shortcut-help dialog without closing navigation. Both modal dialogs remain open in the top layer, forcing two Esc presses and leaving menu state visually confusing.
+- **Change:** Close any open navigation/settings dialog before showing shortcut help. Preserve shortcut activation from normal pages and the existing menu and settings controls. The revised handler is no larger than the previous code.
+- **Regression:** In real 390px Chromium, open the navigation drawer then press `?`; require only the shortcut dialog to be open and focused, menu `aria-expanded` to reset, and one Esc to close the sole remaining dialog. Continue all existing build, browser, keyboard, axe, games, budget and deploy gates.
+- **Release:** Separate branch. Only squash-merge after the latest PR Quality succeeds, then confirm main Quality and Pages deploy on the resulting SHA.
+
+## Completed: block stale Enter navigation while search index loads (2026-10-31)
 
 - **Finding:** Before the search index is ready, the page still displays its server-rendered all-article fallback list. Inputting a new keyword updates the field but cannot filter the list yet. Pressing Enter immediately opens the first *unfiltered* article, even when it has nothing to do with the keyword.
 - **Change:** Allow Enter to navigate to a result only after the index has resolved (including the existing degraded fallback). Preserve ordinary clicks on pre-rendered links and normal Enter navigation once the search results are ready.
