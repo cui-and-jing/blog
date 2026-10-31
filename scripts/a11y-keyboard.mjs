@@ -363,6 +363,37 @@ const check = (name, pass, detail = '') => {
   }));
   check('Escape closes shortcuts without leaving a hidden navigation dialog',
     !closed.drawer && !closed.shortcuts && closed.expanded === 'false', JSON.stringify(closed));
+
+  /* Search shortcuts must dismiss a modal before focus can leave its top layer. */
+  await page.goto(base + '/search/', { waitUntil: 'load' });
+  await page.waitForFunction(() => document.documentElement.dataset.booted === 'on');
+  await page.click('#menu-toggle');
+  await page.keyboard.down('Control');
+  await page.keyboard.press('k');
+  await page.keyboard.up('Control');
+  const fromMenu = await page.evaluate(() => ({
+    focus: document.activeElement?.id,
+    drawer: document.getElementById('nav-drawer')?.open,
+    expanded: document.getElementById('menu-toggle')?.getAttribute('aria-expanded'),
+  }));
+  check('Mobile Ctrl+K closes navigation and focuses search field',
+    fromMenu.focus === 'search-input' && !fromMenu.drawer && fromMenu.expanded === 'false',
+    JSON.stringify(fromMenu));
+
+  await page.click('#settings-toggle');
+  await page.waitForSelector('#settings-panel[open]');
+  await page.click('#shortcuts-open');
+  await page.waitForSelector('#shortcuts-panel[open]');
+  await page.keyboard.press('/');
+  const fromHelp = await page.evaluate(() => ({
+    focus: document.activeElement?.id,
+    settings: document.getElementById('settings-panel')?.open,
+    shortcuts: document.getElementById('shortcuts-panel')?.open,
+    expanded: document.getElementById('settings-toggle')?.getAttribute('aria-expanded'),
+  }));
+  check('Slash shortcut exits shortcut help and focuses search field',
+    fromHelp.focus === 'search-input' && !fromHelp.settings && !fromHelp.shortcuts
+      && fromHelp.expanded === 'false', JSON.stringify(fromHelp));
   await page.close();
 }
 
