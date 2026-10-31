@@ -63,5 +63,9 @@ assert.equal(plain('Hello<strong>world</strong>'), 'Hello world',
   'paired inline HTML without spacing must not leak markup into search');
 assert.equal(plain('中文<a href="/">链接</a>'), '中文 链接',
   'inline HTML following Unicode prose must still be removed');
+assert.equal(plain('Hello<br>world'), 'Hello world',
+  'void HTML elements adjacent to text must not leak into search');
+assert.equal(plain('图片<img src="x">说明'), '图片 说明',
+  'inline HTML images must remain excluded from search text');
 assert.equal(plain(''), '', 'empty content stays empty');
 console.log('✓ Search plain text: hyphenated terms, list markers, rules, links and both code-fence styles');
