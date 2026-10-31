@@ -442,6 +442,8 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       };
 
       typeButtons.forEach((button) => button.addEventListener('click', () => {
+        /* Re-selecting the active type must not create a duplicate Back entry. */
+        if (selectedType === button.dataset.searchType) return;
         const next = pageUrl();
         next.searchParams.set('type', button.dataset.searchType!);
         history.pushState(null, '', next);
