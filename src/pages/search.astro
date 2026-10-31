@@ -177,7 +177,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       const historyClear = document.getElementById('search-history-clear') as HTMLButtonElement;
       type SearchType = 'all' | 'post' | 'note';
       const typeButtons = document.querySelectorAll<HTMLButtonElement>('[data-search-type]');
-      const navStatus = document.getElementById('search-nav-status');
+      const navStatus = document.getElementById('search-nav-status')!;
       const pageUrl = () => new URL(location.href);
       let posts: any[] = [];
       let active = -1;
@@ -256,10 +256,8 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         active = Math.max(0, Math.min(nodes.length - 1, next));
         nodes.forEach((node, i) => node.classList.toggle('is-active', i === active));
         nodes[active].scrollIntoView({ block: 'nearest' });
-        if (navStatus) {
-          const heading = nodes[active].querySelector('h2')?.textContent ?? '';
-          navStatus.textContent = `第 ${active + 1} 条：${heading}`;
-        }
+        const heading = nodes[active].querySelector('h2')?.textContent ?? '';
+        navStatus.textContent = `第 ${active + 1} 条：${heading}`;
       };
 
       const element = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '') => {
@@ -275,7 +273,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
       const render = (items: { post: any; terms: string[] }[], querying: boolean) => {
         active = -1;
-        if (navStatus) navStatus.textContent = '';
+        navStatus.textContent = '';
         list.replaceChildren();
 
         items.forEach(({ post, terms }) => {
