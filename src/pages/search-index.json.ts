@@ -4,18 +4,7 @@ import { getPosts } from '../lib/posts';
 import { getNotes, noteText, noteTitle, noteExcerpt } from '../lib/notes';
 import { activityDate } from '../lib/recent-date.mjs';
 import { uniqueSearchTags } from '../lib/search-tags.mjs';
-
-/** 把 Markdown 粗略压成可检索的纯文本，保留中文与英文词 */
-function plain(markdown: string): string {
-  return markdown
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/[#>*_~`|=\-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+import { plain } from '../lib/search-plain.mjs';
 
 type Entry = {
   type: 'post' | 'note';
