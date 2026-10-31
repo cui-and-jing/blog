@@ -542,6 +542,8 @@ const check = (name, pass, detail = '') => {
     JSON.stringify(themed)
   );
 
+  const savedTheme = await page.evaluate(() => JSON.parse(localStorage.getItem('settings') || '{}').theme);
+  check('View-transition theme choice persists after its visual update', savedTheme === 'dark', String(savedTheme));
   await page.evaluate(() => document.querySelector('[data-setting="theme"][data-value="light"]')?.click());
   await new Promise((r) => setTimeout(r, 900));
   await page.keyboard.press('Escape');
