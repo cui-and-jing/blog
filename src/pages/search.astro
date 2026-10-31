@@ -384,7 +384,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           ? type : query ? 'all' : 'post';
         /* 先过滤停用词再限制长度，避免前几个虚词占满所有检索位置。 */
         const terms = query.toLowerCase().split(/\s+/).filter((word) => word && !STOP.includes(word)).slice(0, 6);
-        clearBtn!.hidden = query.length === 0;
+        clearBtn!.hidden = !query;
 
         if (syncUrl) {
           const next = pageUrl();
@@ -406,7 +406,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           button.ariaPressed = String(type === selectedType);
         });
         document.getElementById('search-type-filters')!.hidden = false;
-        render(ranked.filter(({ post }) => selectedType === 'all' || post.type === selectedType), Boolean(query));
+        render(ranked.filter(({ post }) => selectedType === 'all' || post.type === selectedType), !!query);
         renderHistory();
       };
 
@@ -429,13 +429,12 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           const data = res.ok ? await res.json() : null;
           /* A successful HTTP response can still carry incomplete or stale index data.
            * Validate before rendering: a malformed title/tag must not break search entirely. */
-          if (!Array.isArray(data?.posts) || !data.posts.every((post: any) =>
-            post && (post.type === 'post' || post.type === 'note')
-            && ['title', 'description', 'date', 'category', 'href', 'text']
-              .every((key) => typeof post[key] === 'string')
-            && Array.isArray(post.tags)
-            && post.tags.every((tag: unknown) => typeof tag === 'string')
-            && Number.isFinite(post.minutes)
+          if (!Array.isArray(data?.posts) || data.posts.some((p: any) =>
+            !p || (p.type !== 'post' && p.type !== 'note')
+            || ![p.title, p.description, p.date, p.category, p.href, p.text]
+              .every((value) => typeof value === 'string')
+            || !Array.isArray(p.tags) || !p.tags.every((tag: unknown) => typeof tag === 'string')
+            || !Number.isFinite(p.minutes)
           )) throw new Error('index');
           posts = data.posts;
         } catch {
