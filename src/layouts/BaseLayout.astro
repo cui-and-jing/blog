@@ -772,9 +772,9 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         applyThemeColor();
       });
 
-      /* 同一个浏览器开着两个标签页时，一边改了另一边也要跟上 */
+      /* 同步其他标签页的设置修改，也处理 localStorage.clear() 的 null key。 */
       window.addEventListener('storage', (event) => {
-        if (event.key !== STORE) return;
+        if (event.key && event.key !== STORE) return;
         settings = readSettings();
         paintSettings();
       });
