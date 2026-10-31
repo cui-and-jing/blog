@@ -29,6 +29,8 @@ export function plain(markdown) {
   // Match actual HTML elements/comments, not mathematical comparisons such as x < 10.
   return prose
     .replace(/```[\s\S]*?```/g, ' ')
+    // HTML code and embedded scripts/styles are not article prose.
+    .replace(/<(pre|script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
     .replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][^>]*>|<![A-Za-z][^>]*>/g,
       (tag, index, source) => {
         // Generic type arguments follow an identifier, unlike standalone HTML tags.
