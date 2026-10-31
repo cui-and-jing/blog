@@ -96,11 +96,7 @@ export function formatDate(date: Date): string {
   return `${y}.${m}.${day}`;
 }
 
-export function readingTime(body: string): number {
-  if (!body) return 1;
-  const text = body.replace(/```[\s\S]*?```/g, ' ').replace(/\s+/g, '');
-  return Math.max(1, Math.round(text.length / 400));
-}
+export { readingTime } from './reading-time.mjs';
 
 export function daysSince(year: number): number {
   const start = new Date(year, 0, 1).getTime();

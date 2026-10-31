@@ -98,6 +98,7 @@ async function main() {
   run('搜索笔记摘要一致性', 'node', ['--experimental-strip-types', 'scripts/search-note-preview.test.mjs']);
   run('搜索标签去重一致性', 'node', ['scripts/search-tags.test.mjs']);
   run('搜索正文连字符保真', 'node', ['scripts/search-plain.test.mjs']);
+  run('正文阅读时间不计代码块', 'node', ['scripts/reading-time.test.mjs']);
   run('系列接着读章节顺序', 'node', ['scripts/related-reading.test.mjs']);
   run('站点地图更新时间与索引规则', 'node', ['scripts/sitemap-check.mjs']);
   // 确保本地预检也能发现订阅源全文、链接与唯一性回归。
