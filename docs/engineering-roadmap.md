@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: preserve multiword tags when search index fails (2026-10-31)
+## Current iteration: keep meaningful hyphens in full-text search (2026-10-31)
+
+- **Finding:** The Markdown-to-index text normalizer strips every hyphen alongside Markdown punctuation. Full-text queries such as `CSS-in-JS`, `foo-bar` and `Vue-3` therefore fail to match those exact body terms, even though the prose contains them.
+- **Change:** Extract the existing index-only normalization into a shared server helper. Keep hyphens that belong to content, while explicitly removing Markdown list bullets and horizontal rules. Preserve code fence, image, link, HTML and decoration exclusions.
+- **Regression:** A dependency-free Node contract exercises hyphenated Chinese/English and technical terms, list bullets, horizontal rules, links and fenced code. Run in both Quality and local preflight.
+- **Scope and gates:** No browser JavaScript/CSS, dependency, authored-content, game or size-cap changes. Only merge after full latest-head Quality succeeds (including size, browser/a11y and games), then verify main Quality and Pages Build/Deploy on the same SHA.
+
+## Completed: preserve multiword tags when search index fails (2026-10-31)
 
 - **Finding:** Static search cards serialize tags as a space-separated `data-tags` string. If a label contains whitespace (for example `React Native`), degraded search splits it into separate fake tags when `search-index.json` is unavailable, so the displayed chips no longer agree with the tag directory or healthy search.
 - **Change:** Store the complete distinct-label array in the HTML data attribute as JSON and parse it when building degraded article-only search results. Preserve label boundaries, order, all tag matches, existing index behavior and source metadata.
