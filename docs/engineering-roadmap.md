@@ -27,6 +27,7 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 - **Finding:** the search client checks only that `posts` is an array before accepting an HTTP 200 payload. A partially corrupted entry (for example, `title: null` or non-array `tags`) can crash result scoring, leaving search unusable even though static article cards are already in the page.
 - **Change:** reject incomplete entry metadata before assigning the downloaded array; use the existing static article fallback and visible warning instead of rendering broken records. The build-time index schema gate remains unchanged and serves a different purpose.
 - **Regression:** use Chromium request interception to serve malformed HTTP 200 JSON; assert the warning, preserved static article results, disabled unavailable result-type filters, and no page exceptions. Keep the existing HTTP 503/multiword-tag fallback regression.
+- **Budget:** reduce duplicate layout scroll-state checks using native idempotent `toggleAttribute` and `classList.toggle(force)`, preserving the scrolled header style through an attribute-presence selector. Browser JS gzip is unchanged as a hard 12 KiB cap; no new dependencies.
 - **Release gate:** require unchanged CSS/JS gzip caps, full PR Quality, mergeability, and post-merge main Quality + Pages on the exact merge SHA. If gzip exceeds 12 KiB, do not merge.
 
 ## Completed: consolidate article permalink copy interactions (2026-11-01)
