@@ -345,6 +345,9 @@ const check = (name, pass, detail = '') => {
     expanded: document.getElementById('menu-toggle')?.getAttribute('aria-expanded'),
   }));
   await page.keyboard.type('?');
+  await page.waitForFunction(() => document.getElementById('shortcuts-panel')?.open
+    && !document.getElementById('nav-drawer')?.open
+    && document.getElementById('menu-toggle')?.getAttribute('aria-expanded') === 'false');
   const opened = await page.evaluate(() => ({
     drawer: document.getElementById('nav-drawer')?.open,
     shortcuts: document.getElementById('shortcuts-panel')?.open,
