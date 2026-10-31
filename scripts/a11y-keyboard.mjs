@@ -1219,6 +1219,59 @@ const check = (name, pass, detail = '') => {
   await offline.close();
 }
 
+/* ---------- Delayed search index: queries entered before readiness must reach the URL ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.setRequestInterception(true);
+  let resolveRequest;
+  const indexRequested = new Promise((resolve) => { resolveRequest = resolve; });
+  page.on('request', (request) => {
+    if (request.url().endsWith('/search-index.json')) resolveRequest(request);
+    else request.continue().catch(() => {});
+  });
+  await page.goto(base + '/search/', { waitUntil: 'domcontentloaded' });
+  let timer;
+  const indexRequest = await Promise.race([
+    indexRequested,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Search index request was not intercepted')), 8000);
+    }),
+  ]);
+  clearTimeout(timer);
+  const initialHistory = await page.evaluate(() => history.length);
+  await page.$eval('#search-input', (input) => {
+    input.value = 'Astro';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const waiting = await page.evaluate(() => ({
+    value: document.getElementById('search-input').value,
+    filtersHidden: document.getElementById('search-type-filters').hidden,
+    query: new URL(location.href).searchParams.get('q'),
+  }));
+  check('Typing before search index loads retains the pending query',
+    waiting.value === 'Astro' && waiting.filtersHidden && waiting.query === null,
+    JSON.stringify(waiting));
+  await indexRequest.continue();
+  await page.waitForFunction(() =>
+    document.getElementById('search-type-filters')?.hidden === false
+    && new URL(location.href).searchParams.get('q') === 'Astro',
+    { timeout: 8000 }).catch(() => {});
+  const resolved = await page.evaluate(() => ({
+    value: document.getElementById('search-input').value,
+    query: new URL(location.href).searchParams.get('q'),
+    selected: document.querySelector('[data-search-type="all"]')?.getAttribute('aria-pressed'),
+    count: document.querySelectorAll('#search-results .search-result').length,
+    historyLength: history.length,
+  }));
+  check('Delayed index syncs typed search to shareable URL without a Back entry',
+    resolved.value === 'Astro' && resolved.query === 'Astro'
+      && resolved.selected === 'true' && resolved.count > 0
+      && resolved.historyLength === initialHistory,
+    JSON.stringify(resolved));
+  await page.close();
+}
+
 /* ---------- 3.3. 中文输入法、常见词空结果与手机清空按钮 ---------- */
 {
   const page = await browser.newPage();

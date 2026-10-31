@@ -438,7 +438,8 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           history.replaceState(null, '', next);
         }
         ready = true;
-        apply(false);
+        /* 索引下载期间可能已输入，但拼音组词中不能提前改写地址栏。 */
+        apply(!composing);
       };
 
       typeButtons.forEach((button) => button.addEventListener('click', () => {
