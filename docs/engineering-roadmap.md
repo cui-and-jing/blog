@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: retain prose after inline Markdown code at line start (2026-10-31)
+## Current iteration: exclude fenced code from article reading estimates (2026-10-31)
+
+- **Finding:** The shared article reading-time helper only removes paired triple-backtick snippets. Long backtick fences, tilde fences and unclosed code blocks remain in the character count, so code-heavy tutorials can show inflated estimated reading minutes on article cards and search results.
+- **Change:** Reuse the already-tested, server-side Markdown prose normalizer in a small reading-time helper; keep the existing minimum of one minute and 400-character rounding. Export the helper through the existing site.ts API so all current surfaces and the search index agree.
+- **Regression:** Add Node fixtures for long prose, ordinary/long/tilde/unclosed fences and line-start inline code. After building, compare all article estimates in the emitted search index with pre-rendered search cards. Run in GitHub Quality and local Preflight.
+- **Guardrails:** No browser-side JS/CSS, new dependencies, route or authored-content changes, games or increased budgets. Merge only on fully passing latest PR Quality, then validate main Quality and Pages at the same merge SHA.
+
+## Completed: retain prose after inline Markdown code at line start (2026-10-31)
 
 - **Finding:** The search text helper mistakes a line-start inline backtick span such as `\`\`\`inline\`\`\`` for a fenced code opener, then drops all subsequent paragraphs if no closing fence appears. CommonMark disallows backticks in a backtick fence's info string, so this is inline code, not a fence.
 - **Change:** Reject invalid backtick fence openers containing backticks after the opening delimiter while retaining tilde fence info strings and the existing stripping of actual code fences.
