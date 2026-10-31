@@ -29,3 +29,13 @@ export function titleFromText(text: string, limit = 40): string {
   const body = first.replace(/[。！？!?]$/, '');
   return body.length > limit ? `${body.slice(0, limit)}…` : body;
 }
+
+/**
+ * 摘要应跳过完整的首句，不受标题 40 字截断或旧的 120 字匹配上限影响。
+ * 没有句末标点时沿用原行为：从正文开头取摘要。
+ */
+export function excerptFromText(text: string, limit = 90): string {
+  const first = text.match(/^[^。！？!?]+[。！？!?]/)?.[0];
+  const rest = first ? text.slice(first.length) : text;
+  return rest.replace(/^[。！？!?，、\s]+/, '').slice(0, limit);
+}

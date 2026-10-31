@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: search shortcut must close active mobile dialogs (2026-10-31)
+## Current iteration: avoid duplicate long-note openings in excerpts (2026-10-31)
+
+- **Finding:** Note titles truncate after 40 characters, but the preview helper only recognizes a sentence ending within the first 120 characters. A note whose first sentence is longer than 120 characters previews its opening from the start, repeating the visible title instead of describing what follows.
+- **Change:** Extract the note excerpt boundary logic into the pure text helper, then skip the entire first sentence when it has a sentence-ending mark, no matter how long it is. Keep punctuation-free notes, the 90-character preview limit, title rules and existing routes unchanged.
+- **Regression:** Add a deterministic Node 22 fixture for normal, 120+ character, punctuation-free and single-sentence notes, as well as length limits. Run it in both local preflight and Quality; retain all content, Astro type/build, accessibility, keyboard, games, CSS/JS size and first-visit budgets.
+- **Release:** Isolated branch based on successful main; merge only on fully successful latest-head PR Quality with a clean merge state. Verify resulting main Quality and Pages deployment on the same SHA.
+
+## Completed: search shortcut must close active mobile dialogs (2026-10-31)
 
 - **Finding:** Ctrl/⌘+K and / are documented to focus search on the search page, but the global handler tries to focus the search input while a modal navigation or shortcut-help dialog is still open. The browser's modal top layer keeps focus inside the dialog, so the shortcut does not take the user to search.
 - **Change:** When the target search input exists, close active dialogs before focusing and selecting the input. Preserve normal navigation to search from other routes, URL state, and standard dialog close events/aria-expanded updates.
