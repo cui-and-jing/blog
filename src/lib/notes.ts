@@ -1,7 +1,7 @@
 import { getCollection } from 'astro:content';
 import type { CollectionEntry } from 'astro:content';
 import { showDrafts } from './posts';
-import { plainNote, titleFromText } from './note-text';
+import { excerptFromText, plainNote, titleFromText } from './note-text';
 
 export type Note = CollectionEntry<'notes'>;
 
@@ -21,11 +21,7 @@ export const noteTitle = (note: Note, limit = 40): string => titleFromText(noteT
  * 摘要会从截断处接上，把那半句重复一遍。
  */
 export function noteExcerpt(note: Note, limit = 90): string {
-  const text = noteText(note);
-  const match = text.match(/^[^。！？!?]{1,120}[。！？!?]/);
-  const first = match ? match[0].replace(/[。！？!?]$/, '') : '';
-  const rest = first && text.startsWith(first) ? text.slice(first.length) : text;
-  return rest.replace(/^[。！？!?，、\s]+/, '').slice(0, limit);
+  return excerptFromText(noteText(note), limit);
 }
 
 /**
