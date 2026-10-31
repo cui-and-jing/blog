@@ -348,7 +348,7 @@ const check = (name, pass, detail = '') => {
     }));
     check('Malformed HTTP 200 search index uses visible article fallback',
       state.warned && state.count > 0 && !!state.firstTitle
-        && JSON.stringify(state.filters) === JSON.stringify([false, true, true]) && errors.length === 0,
+        && JSON.stringify(state.filters) === JSON.stringify([true, false, true]) && errors.length === 0,
       JSON.stringify({ state, errors }));
   }
   await page.close();
