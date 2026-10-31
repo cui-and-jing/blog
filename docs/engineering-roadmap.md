@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: validate emitted search records before release (2026-10-31)
+## Current iteration: retain prose after inline Markdown code at line start (2026-10-31)
+
+- **Finding:** The search text helper mistakes a line-start inline backtick span such as `\`\`\`inline\`\`\`` for a fenced code opener, then drops all subsequent paragraphs if no closing fence appears. CommonMark disallows backticks in a backtick fence's info string, so this is inline code, not a fence.
+- **Change:** Reject invalid backtick fence openers containing backticks after the opening delimiter while retaining tilde fence info strings and the existing stripping of actual code fences.
+- **Regression:** Extend the shared dependency-free search-plain contract with triple and longer inline spans at line start plus valid tilde fences; run in both GitHub Quality and preflight.
+- **Guardrails:** Server-side search helper, regression assertions and roadmap only; no client JS/CSS, authored content, games, dependencies or budget increases. Exact-head Quality must pass before Squash Merge and same-SHA main Quality/Pages must pass afterward.
+
+## Completed: validate emitted search records before release (2026-10-31)
 
 - **Finding:** The previous malformed HTTP 200 index fallback attempt (PR #65) failed the strict 12 KiB browser JavaScript gzip limit and was deliberately not merged. The build previously had no mandatory shape check for its own emitted records. A missing title or non-string tag in generated metadata could therefore ship and break the browser scorer.
 - **Change:** Validate the server-generated entries before JSON serialization, including string fields, tag array members, finite nonnegative reading minutes and unique paths. Fail the build rather than publish an invalid index. This does **not** claim to handle third-party/corrupted HTTP 200 responses at runtime; that remains separately scoped.
