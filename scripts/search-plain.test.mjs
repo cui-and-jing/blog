@@ -32,5 +32,15 @@ assert.equal(plain('intro\n````inline-code```` trailing prose\nnext-section'),
 assert.equal(plain('intro\n~~~lang`variant\nhidden-code\n~~~\noutro'),
   'intro outro',
   'tilde fences may include backticks in their info string');
+assert.equal(plain('C# 与 F#，以及 #Astro 话题'), 'C# 与 F#，以及 #Astro 话题',
+  'hash marks inside technical terms and normal prose must remain searchable');
+assert.equal(plain('# C# 入门\n第二段讲 F#'), 'C# 入门 第二段讲 F#',
+  'ATX heading syntax is removed without erasing a C# or F# title');
+assert.equal(plain('### C# 与 F# ###\n代码之外的说明'), 'C# 与 F# 代码之外的说明',
+  'optional trailing ATX heading markers must not leak into search terms');
+assert.equal(plain('#不是标题\n# 合法标题'), '#不是标题 合法标题',
+  'without a heading separator, a leading hash is literal text');
+assert.equal(plain('###\n正文'), '正文',
+  'an empty CommonMark ATX heading must not become search noise');
 assert.equal(plain(''), '', 'empty content stays empty');
 console.log('✓ Search plain text: hyphenated terms, list markers, rules, links and both code-fence styles');
