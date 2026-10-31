@@ -22,7 +22,14 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: preserve generic type syntax in technical search (2026-11-01)
+## Current iteration: ignore embedded HTML code blocks in search (2026-11-01)
+
+- **Finding:** The shared prose normalizer strips `<pre>`, `<script>` and `<style>` markup but leaves their bodies searchable, causing hidden code and CSS/JS to create false search hits and inflate reading-time estimates.
+- **Change:** Remove complete HTML preformatted/code, script and style blocks before the generic HTML-tag cleaner. Keep inline `<code>` text searchable and preserve the existing Markdown fenced-code and generic-type behavior.
+- **Regression:** Extend the existing Node fixtures for HTML pre blocks (multiline, attributes, case-insensitive), embedded script/style, and retained inline code. Verify reading-time ignores a long HTML code sample.
+- **Guardrails:** Server-side normalizer, tests and roadmap only; no browser JS/CSS, new dependencies or relaxed budgets. Require the full PR Quality, clean mergeability, and matching post-merge Quality + Pages SHA.
+
+## Completed: preserve generic type syntax in technical search (2026-11-01)
 
 - **Finding:** Markdown-to-search treats angle-bracket spans beginning with letters as HTML, even in TypeScript/C++ generic expressions (Map<string, number>, Array<Result<T>>, std::vector<int>). The full-text search index loses these technical terms.
 - **Change:** preserve angle-bracket arguments attached to preceding identifiers, including nested and Unicode examples, while retaining normal standalone HTML, comment and declaration removal.
