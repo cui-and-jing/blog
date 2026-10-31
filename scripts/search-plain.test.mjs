@@ -23,5 +23,14 @@ assert.equal(plain('before\n```ts\nsecret-token'), 'before',
   'an unclosed code fence must hide trailing code');
 assert.equal(plain('before ```secret-token``` after'), 'before after',
   'existing inline triple-backtick handling must remain unchanged');
+assert.equal(plain('intro\n```inline-code``` trailing prose\nnext-section'),
+  'intro trailing prose next-section',
+  'a line-start inline code span is not a fenced block that hides subsequent paragraphs');
+assert.equal(plain('intro\n````inline-code```` trailing prose\nnext-section'),
+  'intro trailing prose next-section',
+  'long inline backtick spans at line start must also preserve subsequent paragraphs');
+assert.equal(plain('intro\n~~~lang`variant\nhidden-code\n~~~\noutro'),
+  'intro outro',
+  'tilde fences may include backticks in their info string');
 assert.equal(plain(''), '', 'empty content stays empty');
 console.log('✓ Search plain text: hyphenated terms, list markers, rules, links and both code-fence styles');
