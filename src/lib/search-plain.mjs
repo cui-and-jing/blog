@@ -26,9 +26,10 @@ export function plain(markdown) {
     return true;
   }).join('\n');
 
+  // Match actual HTML elements/comments, not mathematical comparisons such as x < 10.
   return prose
     .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/<[^>]+>/g, ' ')
+    .replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][^>]*>|<![A-Za-z][^>]*>/g, ' ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     // CommonMark ATX headings need a space after 1–6 leading hashes.
@@ -37,7 +38,9 @@ export function plain(markdown) {
       (_line, heading) => heading.replace(/[ \t]+#+[ \t]*$/, ''))
     .replace(/(^|\n)[ \t]*-[ \t]+/g, '$1 ')
     .replace(/(^|\n)[ \t]*-{3,}(?=[ \t]*(?:\n|$))/g, '$1 ')
-    .replace(/[>*_~`|=]+/g, ' ')
+    // Only line-start blockquote markers are formatting; inline > is searchable.
+    .replace(/(^|\n)[ \t]{0,3}(?:>[ \t]?)+/g, '$1')
+    .replace(/[*_~`|=]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
