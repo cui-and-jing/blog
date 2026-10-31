@@ -22,7 +22,14 @@ _Last reviewed: 2026-10-31. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: synchronize recent searches across tabs (2026-10-31)
+## Current iteration: reset reading preferences after cross-tab storage clear (2026-10-31)
+
+- **Finding:** Reading preferences already synchronize when another tab writes or removes the `settings` key, but `localStorage.clear()` emits a storage event with a null key. The listener ignores it. Also, View Transition delays applying theme changes until after the synchronous `saveSettings()` call, so the new theme may not persist after reload.
+- **Change:** Treat null-key storage events as preference updates and repaint all controls. Save preferences *inside* the View Transition update callback, after the new selection is applied.
+- **Regression:** Use two real Chromium tabs to test custom theme/font/size/leading changes, `removeItem`, and `localStorage.clear()`; verify all defaults and `aria-pressed`. Test that the theme selected through the UI is saved after its transition.
+- **Release:** Isolated branch, no dependencies, routes, games or CSS changes; retain all size budgets. Merge only after full latest-head Quality success and clean PR, then verify main Quality and Pages deploy using the same merge SHA.
+
+## Completed: synchronize recent searches across tabs (2026-10-31)
 
 - **Finding:** Search history is read from localStorage when a search page loads or its input changes. A second tab can remove, clear, or add history without triggering a refresh in a currently open search tab, leaving stale visible suggestions.
 - **Change:** Listen for browser storage events on the existing search-history key (including storage.clear's null key) and re-render the existing history area. Preserve typed queries, focus, saved-search limit, and private-mode fallback.

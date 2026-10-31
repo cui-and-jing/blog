@@ -644,7 +644,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       /* Safari 还没有 requestIdleCallback，退化成一次短延时 */
       window.requestIdleCallback
         ? window.requestIdleCallback(enhanceProse, { timeout: 1500 })
-        : window.setTimeout(enhanceProse, 200);
+        : setTimeout(enhanceProse, 200);
 
       /* 只在正文有图时初始化灯箱；源码拆分，构建仍合并以遵守总体 JS 预算。 */
       if (document.querySelector('.prose img')) setupLightbox();
@@ -754,8 +754,8 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         withTransition(() => {
           settings = { ...settings, [key]: value };
           paintSettings();
+          saveSettings();
         }, origin);
-        saveSettings();
 
         /* 读屏文案直接取面板选项，避免 JS 再维护一套同义字典。 */
         const name = document.getElementById(`label-${key}`)?.textContent?.trim() ?? key;
@@ -772,9 +772,9 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         applyThemeColor();
       });
 
-      /* 同一个浏览器开着两个标签页时，一边改了另一边也要跟上 */
-      window.addEventListener('storage', (event) => {
-        if (event.key !== STORE) return;
+      /* 同步其他标签页的设置修改，也处理 localStorage.clear() 的 null key。 */
+      addEventListener('storage', (event) => {
+        if (event.key && event.key !== STORE) return;
         settings = readSettings();
         paintSettings();
       });
