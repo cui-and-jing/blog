@@ -333,6 +333,39 @@ const check = (name, pass, detail = '') => {
   await b.close();
 }
 
+/* ---------- Modal shortcut: keep one mobile dialog open at a time ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await page.goto(base + '/', { waitUntil: 'load' });
+  await page.waitForFunction(() => document.documentElement.dataset.booted === 'on');
+  await page.click('#menu-toggle');
+  const initial = await page.evaluate(() => ({
+    drawer: document.getElementById('nav-drawer')?.open,
+    expanded: document.getElementById('menu-toggle')?.getAttribute('aria-expanded'),
+  }));
+  await page.keyboard.type('?');
+  const opened = await page.evaluate(() => ({
+    drawer: document.getElementById('nav-drawer')?.open,
+    shortcuts: document.getElementById('shortcuts-panel')?.open,
+    expanded: document.getElementById('menu-toggle')?.getAttribute('aria-expanded'),
+    inside: document.getElementById('shortcuts-panel')?.contains(document.activeElement),
+  }));
+  check('Mobile ? shortcut closes navigation before opening shortcuts',
+    initial.drawer && initial.expanded === 'true'
+      && !opened.drawer && opened.shortcuts && opened.expanded === 'false' && opened.inside,
+    JSON.stringify({ initial, opened }));
+  await page.keyboard.press('Escape');
+  const closed = await page.evaluate(() => ({
+    drawer: document.getElementById('nav-drawer')?.open,
+    shortcuts: document.getElementById('shortcuts-panel')?.open,
+    expanded: document.getElementById('menu-toggle')?.getAttribute('aria-expanded'),
+  }));
+  check('Escape closes shortcuts without leaving a hidden navigation dialog',
+    !closed.drawer && !closed.shortcuts && closed.expanded === 'false', JSON.stringify(closed));
+  await page.close();
+}
+
 /* ---------- 1. 首页 Tab 顺序与焦点环 ---------- */
 {
   const page = await browser.newPage();
