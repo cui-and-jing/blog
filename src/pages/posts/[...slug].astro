@@ -486,7 +486,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
       }, '引用已复制'));
     });
 
-        /* ---------- 目录高亮：只改变化的两项，避免长目录反复遍历 ---------- */
+    /* ---------- 目录高亮：只改变化的两项，避免长目录反复遍历 ---------- */
     const linkById = new Map([...document.querySelectorAll<HTMLAnchorElement>('.sidebar .toc a')]
       .map((a) => [a.getAttribute('href')!.slice(1), a]));
     const sidebar = document.querySelector<HTMLElement>('.sidebar');
