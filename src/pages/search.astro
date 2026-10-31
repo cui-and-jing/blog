@@ -427,11 +427,11 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         try {
           const res = await fetch(`${baseUrl}/search-index.json`, { headers: { Accept: 'application/json' } });
           const data = res.ok ? await res.json() : null;
-          /* HTTP 200 may still contain a truncated or malformed index. Fall back before rendering it. */
-          if (!Array.isArray(data?.posts) || !data.posts.every((post: any) =>
-            post && (post.type === 'post' || post.type === 'note')
-            && 'title description date category href text'.split(' ').every((key) => typeof post[key] === 'string')
-            && Array.isArray(post.tags) && post.tags.every((tag: unknown) => typeof tag === 'string')
+          /* Reject broken HTTP 200 records before they can crash the scorer. */
+          if (!Array.isArray(data?.posts) || data.posts.some((p: any) =>
+            !['post', 'note'].includes(p?.type)
+            || !['title', 'description', 'category', 'text'].every((key) => typeof p[key] === 'string')
+            || !Array.isArray(p.tags) || p.tags.some((tag: any) => typeof tag !== 'string')
           )) throw new Error('index');
           posts = data.posts;
         } catch {
