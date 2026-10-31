@@ -3,6 +3,7 @@ import { url, formatDate, readingTime } from '../lib/site';
 import { getPosts } from '../lib/posts';
 import { getNotes, noteText, noteTitle, noteExcerpt } from '../lib/notes';
 import { activityDate } from '../lib/recent-date.mjs';
+import { uniqueSearchTags } from '../lib/search-tags.mjs';
 
 /** 把 Markdown 粗略压成可检索的纯文本，保留中文与英文词 */
 function plain(markdown: string): string {
@@ -40,7 +41,7 @@ export const GET: APIRoute = async () => {
       date: formatDate(post.data.date),
       updated: latest.getTime() > post.data.date.getTime() ? formatDate(latest) : undefined,
       category: post.data.category ?? '',
-      tags: post.data.tags,
+      tags: uniqueSearchTags(post.data.tags),
       minutes: readingTime(post.body ?? ''),
       href: url(`/posts/${post.id}/`),
       text: plain(post.body ?? '').slice(0, 6000),
@@ -58,7 +59,7 @@ export const GET: APIRoute = async () => {
       description: noteExcerpt(note, 120) || text.slice(0, 120),
       date: formatDate(note.data.date),
       category: '',
-      tags: note.data.tags,
+      tags: uniqueSearchTags(note.data.tags),
       minutes: 0,
       href: url(`/notes/${note.id}/`),
       text: text.slice(0, 2000),
