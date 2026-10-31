@@ -319,6 +319,55 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- Repeated query terms must not crowd out another keyword ---------- */
+{
+  const page = await browser.newPage();
+  let indexRequest = null;
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.setRequestInterception(true);
+  page.on('request', (request) => {
+    if (request.url().split('?')[0].endsWith('/search-index.json')) indexRequest = request;
+    else request.continue();
+  });
+  await page.goto(base + '/search/?q=Astro%20Astro%20Astro%20Astro%20Astro%20Astro%20CSS',
+    { waitUntil: 'load' });
+  if (!indexRequest) {
+    check('Repeated search terms fixture was intercepted', false, 'index request not observed');
+  } else {
+    const fixture = {
+      posts: [
+        {
+          type: 'post', title: 'Astro', description: '', text: '', category: '',
+          tags: [], date: '2026-11-01', minutes: 1, href: base + '/posts/partial-fixture/',
+        },
+        {
+          type: 'post', title: 'CSS', description: '', text: 'Astro', category: '',
+          tags: [], date: '2026-11-01', minutes: 1, href: base + '/posts/complete-fixture/',
+        },
+      ],
+    };
+    await indexRequest.respond({ status: 200, contentType: 'application/json',
+      body: JSON.stringify(fixture) });
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('#search-results .search-item')]
+        .some((item) => item.href.includes('/posts/complete-fixture/')),
+    { timeout: 4000 }).catch(() => {});
+    const state = await page.evaluate(() => ({
+      titles: [...document.querySelectorAll('#search-results .search-item h2')]
+        .map((item) => item.textContent),
+      links: [...document.querySelectorAll('#search-results .search-item')]
+        .map((item) => item.getAttribute('href')),
+      warned: !document.getElementById('search-index-warning').hidden,
+    }));
+    check('Duplicate search terms keep later keywords and rank complete matches first',
+      JSON.stringify(state.titles) === JSON.stringify(['CSS', 'Astro'])
+        && !state.warned && errors.length === 0,
+      JSON.stringify({ state, errors }));
+  }
+  await page.close();
+}
+
 /* ---------- HTTP 200 with broken search data must use the static article fallback ---------- */
 {
   const page = await browser.newPage();

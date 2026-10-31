@@ -177,7 +177,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       const historyClear = document.getElementById('search-history-clear') as HTMLButtonElement;
       type SearchType = 'all' | 'post' | 'note';
       const typeButtons = document.querySelectorAll<HTMLButtonElement>('[data-search-type]');
-      const navStatus = document.getElementById('search-nav-status');
+      const navStatus = document.getElementById('search-nav-status')!;
       const pageUrl = () => new URL(location.href);
       let posts: any[] = [];
       let active = -1;
@@ -189,8 +189,8 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
       /* 只放几乎没有检索价值的虚词。像「不」「有」「这」都可能出现在实词里，不能当停用词 */
-      /* 不过滤 in/as/by/it/on 等编程语境可检索的短词，避免误删技术关键词。 */
-      const STOP = '的 了 是 在 和 与 及 或 把 被 着 吗 呢 吧 啊 the a an of and or'.split(' ');
+      /* 不过滤 in/as/by/it/on 等编程短词；停用词表首项为空串，以过滤空查询拆出的空词。 */
+      const STOP = ' 的 了 是 在 和 与 及 或 把 被 着 吗 呢 吧 啊 the a an of and or'.split(' ');
 
       const highlight = (text: string, terms: string[]): DocumentFragment => {
         const frag = document.createDocumentFragment();
@@ -256,10 +256,8 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         active = Math.max(0, Math.min(nodes.length - 1, next));
         nodes.forEach((node, i) => node.classList.toggle('is-active', i === active));
         nodes[active].scrollIntoView({ block: 'nearest' });
-        if (navStatus) {
-          const heading = nodes[active].querySelector('h2')?.textContent ?? '';
-          navStatus.textContent = `第 ${active + 1} 条：${heading}`;
-        }
+        const heading = nodes[active].querySelector('h2')?.textContent ?? '';
+        navStatus.textContent = `第 ${active + 1} 条：${heading}`;
       };
 
       const element = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '') => {
@@ -275,7 +273,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
       const render = (items: { post: any; terms: string[] }[], querying: boolean) => {
         active = -1;
-        if (navStatus) navStatus.textContent = '';
+        navStatus.textContent = '';
         list.replaceChildren();
 
         items.forEach(({ post, terms }) => {
@@ -382,8 +380,8 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         const type = pageUrl().searchParams.get('type');
         selectedType = degraded ? 'post' : type === 'all' || type === 'post' || type === 'note'
           ? type : query ? 'all' : 'post';
-        /* 先过滤停用词再限制长度，避免前几个虚词占满所有检索位置。 */
-        const terms = query.toLowerCase().split(/\s+/).filter((word) => word && !STOP.includes(word)).slice(0, 6);
+        /* 停用词过滤、去重后再取前 6 个；重复词不能挤掉有效搜索词。 */
+        const terms = Array.from(new Set(query.toLowerCase().split(/\s+/).filter((word) => !STOP.includes(word)))).slice(0, 6);
         clearBtn!.hidden = query.length === 0;
 
         if (syncUrl) {
