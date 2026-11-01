@@ -45,6 +45,9 @@ jobs:
       - name: Series shared-tag distinct-article contract
         run: node scripts/series-tags.test.mjs
 
+      - name: CSS custom property resolution contract
+        run: npm run css:vars:check
+
       # 子集缺字不会报错，只会在线上悄悄回退成系统字体，必须显式比对
       - name: Font subset coverage
         run: npm run fonts:check

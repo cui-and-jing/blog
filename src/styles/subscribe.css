@@ -51,7 +51,6 @@
   border: 1px solid var(--line-soft);
   border-left: 3px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
 }
 
 .feed-card--post {

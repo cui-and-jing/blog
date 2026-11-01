@@ -12,6 +12,13 @@ const packageScripts = JSON.parse(read('../package.json')).scripts;
 
 const contracts = [
   {
+    label: '样式变量解析契约',
+    file: 'scripts/css-vars.test.mjs',
+    npm: 'css:vars:check',
+    previous: "run('系列共现标签去重'",
+    next: "run('字体子集校验'",
+  },
+  {
     label: '部署发布门禁',
     file: 'scripts/deploy-gate.test.mjs',
     npm: 'deploy:check',
