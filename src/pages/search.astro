@@ -428,7 +428,9 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           /* Reject broken HTTP 200 records before they can crash the scorer. */
           if (!Array.isArray(data?.posts) || data.posts.some((p: any) =>
             !['post', 'note'].includes(p?.type)
-            || !['title', 'description', 'category', 'text'].every((key) => typeof p[key] === 'string')
+            || !['title', 'description', 'category', 'text', 'date', 'href'].every((key) => typeof p[key] === 'string')
+            || !p.title.trim() || !p.date || !p.href.startsWith(`${baseUrl}/`)
+            || !Number.isFinite(p.minutes) || p.minutes < 0
             || !Array.isArray(p.tags) || p.tags.some((tag: any) => typeof tag !== 'string')
           )) throw new Error('index');
           posts = data.posts;
