@@ -22,7 +22,14 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Planned in this PR: mobile search keyboard and navigation regression (2026-11-01)
+## Completed: validate published search paths and formatted dates (2026-11-01)
+
+- **Finding:** The build-time search contract accepted any leading-slash path, including protocol-relative or traversal-style links, and allowed arbitrary nonempty date strings. The actual client expects base-relative routes while the API formats dates as `YYYY.MM.DD`; its old fixture incorrectly used `YYYY-MM-DD`.
+- **Change:** Check path type and site base for post/note entries, exclude malformed/encoded traversal and URL suffixes, and require the emitted publication/update date shape. Pass Astro's configured base into the contract; no browser JavaScript or CSS changes.
+- **Regression:** Add negative fixtures for cross-base and cross-type links, traversal, malformed encoding, query/fragment tails, malformed dates and updates; keep positive post/note and generated-index checks. The full unmodified Quality pipeline, 12 KiB JS gzip gate, game and accessibility checks remain mandatory.
+- **Release:** Merge only after the latest PR head completes Quality successfully, then verify main Quality and Pages publish the identical merge SHA.
+
+## Completed: mobile search keyboard and navigation regression (2026-11-01)
 
 - **Finding:** Search types use pushState, while query edits replace the current URL state. Desktop Back recovery is covered, but the mobile flow had no real Back/Forward assertion after changing the query on a later filter entry. The software keyboard's primary action was also left implicit.
 - **Change:** Set an explicit Search action hint on the search input, with no runtime JavaScript or CSS changes. Keep the existing filtering, shared query URL and six-entry local recent-search behavior intact.
