@@ -156,15 +156,6 @@
     gap: 18px;
   }
 
-  .search-suggest {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 22px;
-  }
-
-  .search-empty {
-    padding: 46px 6px 54px;
-  }
-
   /* 让开右下角的回到顶部按钮 */
   .resume-bar {
     bottom: 78px;
