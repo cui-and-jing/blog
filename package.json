@@ -24,6 +24,7 @@
     "og": "node scripts/og-cards.mjs",
     "icons": "node scripts/icons.mjs",
     "budget": "node scripts/budget.mjs",
+    "css:vars:check": "node scripts/css-vars.test.mjs",
     "budget:wire": "node scripts/budget-wire.mjs",
     "budget:wire:routes:check": "node scripts/budget-wire-routes.test.mjs",
     "perf": "node scripts/perf.mjs",
