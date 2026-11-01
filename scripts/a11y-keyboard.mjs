@@ -260,7 +260,7 @@ const check = (name, pass, detail = '') => {
     });
     const isMobile = width <= 720;
     check('Search local CSS and layout at ' + width + 'px',
-      styles.present && styles.flex === 'flex' && styles.radius === '18px' &&
+      styles.present && styles.flex === 'flex' && styles.radius === (isMobile ? '15px' : '18px') &&
         styles.emptyPaddingTop === (isMobile ? '46px' : '64px') &&
         !styles.overflow && Boolean(styles.columns),
       JSON.stringify(styles));
