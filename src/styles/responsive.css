@@ -183,7 +183,8 @@
     display: none;
   }
 
-  .sidebar {
+  .sidebar,
+  .reader-list ul {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -344,9 +345,6 @@
     flex-basis: 100%;
   }
 
-  .reader-list ul {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* 导航收进抽屉后，顶栏只剩「站名 + 三个 44px 圆形按钮」，
