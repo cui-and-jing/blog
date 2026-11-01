@@ -11,6 +11,12 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 - Deployment is chained to **completed successful main Quality** via `workflow_run` and pinned to the verified commit SHA. Stale SHA, failed Quality and PR checks cannot publish. The currently deployed SHA should still be checked after each merge.
 - The release workflow rechecks the current main SHA both before building and directly before publishing, so a delayed older successful Quality run cannot overwrite a newer release.
 
+## Latest audit: verify performance fixtures after removed games (2026-11-01)
+
+- A stale manual performance profile still targeted `/games/snake/`, a removed game, and did not check HTTP 404 responses before collecting metrics. Such runs could misleadingly report an LCP/TBT result for an error page.
+- Move route fixtures into a shared module, point the game profile at active Pixel Raid, reject unsuccessful navigation responses, and make Quality assert every profile route exists in `dist` after the site build.
+- This protects future performance measurements but **does not** recover the nearly exhausted JS/CSS gzip headroom. Keep the 12 KiB/21 KiB gates unchanged and continue a separate resource audit.
+
 ## Priorities
 
 | Order | Workstream | Acceptance criteria |
