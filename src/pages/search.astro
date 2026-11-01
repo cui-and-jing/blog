@@ -274,9 +274,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       const render = (items: { post: any; terms: string[] }[], querying: boolean) => {
         active = -1;
         navStatus.textContent = '';
-        list.replaceChildren();
-
-        items.forEach(({ post, terms }) => {
+        const rows = items.map(({ post, terms }) => {
           const li = element('li', 'search-result');
           li.dataset.searchResultType = post.type;
 
@@ -308,8 +306,10 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
           a.append(main, arrow);
           li.append(a);
-          list.append(li);
+          return li;
         });
+        /* Replace results in one DOM write, avoiding per-row live insertions. */
+        list.replaceChildren(...rows);
 
         /* 空查询时只列文章：笔记是碎片，混在「全部内容」里会喧宾夺主 */
         countEl.textContent = querying || selectedType !== 'post'
