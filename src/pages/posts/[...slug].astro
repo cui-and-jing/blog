@@ -297,6 +297,7 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
   }
 
   <script>
+    import { copyText } from '../../lib/copy-text';
     /* 视觉反馈之外，再给读屏留一条播报通道 */
     const announce = (message: string) => {
       const status = document.getElementById('a11y-status');
@@ -376,24 +377,6 @@ const seriesNext = series && seriesIndex < series.posts.length - 1 ? series.post
     }
 
     /* ---------- 标题锚点 ---------- */
-    const copyText = async (text: string) => {
-      try {
-        await navigator.clipboard.writeText(text);
-        return true;
-      } catch {
-        /* 非 https、页面没焦点或浏览器不给权限时，退回老办法 */
-        const box = document.createElement('textarea');
-        box.value = text;
-        box.setAttribute('readonly', '');
-        box.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
-        document.body.append(box);
-        box.select();
-        const ok = document.execCommand('copy');
-        box.remove();
-        return ok;
-      }
-    };
-
     /* ---------- 文末分享 ---------- */
     const shareBar = document.querySelector<HTMLElement>('[data-share]');
     if (shareBar) {
