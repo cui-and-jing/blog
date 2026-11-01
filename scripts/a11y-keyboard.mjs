@@ -1514,6 +1514,66 @@ const check = (name, pass, detail = '') => {
   await offline.close();
 }
 
+/* ---------- Mobile search: back/forward restores both the category and query ---------- */
+{
+  const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(base + '/search/?q=%E7%AC%94%E8%AE%B0', { waitUntil: 'networkidle2' });
+  await page.waitForFunction(() => document.getElementById('search-type-filters')?.hidden === false,
+    { timeout: 8000 });
+  const before = await page.evaluate(() => history.length);
+  const hint = await page.$eval('#search-input', (input) => input.enterKeyHint);
+  check('Mobile search input offers a Search action on the software keyboard', hint === 'search', hint);
+
+  await page.click('[data-search-type="note"]');
+  await page.click('[data-search-type="all"]');
+  await page.$eval('#search-input', (input) => {
+    input.value = 'Astro';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const edited = await page.evaluate(() => ({
+    length: history.length,
+    type: new URL(location.href).searchParams.get('type'),
+    query: new URL(location.href).searchParams.get('q'),
+    pressed: document.querySelector('[data-search-type="all"]')?.getAttribute('aria-pressed'),
+  }));
+  check('Changing mobile query replaces URL without adding another Back entry',
+    edited.length === before + 2 && edited.type === 'all'
+      && edited.query === 'Astro' && edited.pressed === 'true', JSON.stringify(edited));
+
+  await page.evaluate(() => history.back());
+  await page.waitForFunction(() => new URL(location.href).searchParams.get('type') === 'note'
+    && document.querySelector('[data-search-type="note"]')?.getAttribute('aria-pressed') === 'true',
+    { timeout: 5000 });
+  const back = await page.evaluate(() => ({
+    query: document.getElementById('search-input')?.value,
+    urlQuery: new URL(location.href).searchParams.get('q'),
+    results: [...document.querySelectorAll('#search-results .search-result')]
+      .map((item) => item.dataset.searchResultType),
+  }));
+  check('Mobile Back restores the earlier query and note-only results',
+    back.query === '笔记' && back.urlQuery === '笔记'
+      && back.results.length > 0 && back.results.every((type) => type === 'note'),
+    JSON.stringify(back));
+
+  await page.evaluate(() => history.forward());
+  await page.waitForFunction(() => new URL(location.href).searchParams.get('type') === 'all'
+    && new URL(location.href).searchParams.get('q') === 'Astro'
+    && document.querySelector('[data-search-type="all"]')?.getAttribute('aria-pressed') === 'true',
+    { timeout: 5000 });
+  const forward = await page.evaluate(() => ({
+    query: document.getElementById('search-input')?.value,
+    shown: document.querySelectorAll('#search-results .search-result').length,
+    overflow: document.documentElement.scrollWidth - innerWidth,
+  }));
+  check('Mobile Forward restores the revised query, results, and layout',
+    forward.query === 'Astro' && forward.shown > 0 && forward.overflow <= 0
+      && errors.length === 0, JSON.stringify({ forward, errors }));
+  await page.close();
+}
+
 /* ---------- Delayed search index: queries entered before readiness must reach the URL ---------- */
 {
   const page = await browser.newPage();
