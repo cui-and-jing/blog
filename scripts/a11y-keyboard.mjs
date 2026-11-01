@@ -238,6 +238,61 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- Shared clipboard fallback: article heading anchors ---------- */
+{
+  const page = await browser.newPage();
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async () => { throw new Error('clipboard denied'); } },
+    });
+    window.__allowLegacyCopy = true;
+    window.__legacyCopyAttempts = 0;
+    document.execCommand = () => {
+      window.__legacyCopyAttempts += 1;
+      return window.__allowLegacyCopy;
+    };
+  });
+  await page.goto(base + '/posts/hello-astro/', { waitUntil: 'load' });
+  await page.waitForSelector('.heading-anchor');
+  await page.click('.heading-anchor');
+  await page.waitForFunction(() =>
+    document.querySelector('.heading-anchor')?.textContent === '已复制',
+  { timeout: 2500 }).catch(() => null);
+  const recovered = await page.evaluate(() => ({
+    attempts: window.__legacyCopyAttempts,
+    focusRestored: document.activeElement === document.querySelector('.heading-anchor'),
+    status: document.getElementById('a11y-status')?.textContent,
+    label: document.querySelector('.heading-anchor')?.textContent,
+  }));
+  check('Article heading permalink uses shared clipboard fallback and restores focus',
+    recovered.attempts === 1 && recovered.focusRestored &&
+      recovered.label === '已复制' && recovered.status === '小节链接已复制',
+    JSON.stringify(recovered));
+
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForSelector('.heading-anchor');
+  await page.evaluate(() => {
+    window.__allowLegacyCopy = false;
+    history.replaceState(null, '', '#keep-current-anchor');
+  });
+  await page.click('.heading-anchor');
+  await page.waitForFunction(() =>
+    document.getElementById('a11y-status')?.textContent === '复制失败，请手动选择文字',
+  { timeout: 2500 }).catch(() => null);
+  const denied = await page.evaluate(() => ({
+    attempts: window.__legacyCopyAttempts,
+    focusRestored: document.activeElement === document.querySelector('.heading-anchor'),
+    status: document.getElementById('a11y-status')?.textContent,
+    hash: location.hash,
+  }));
+  check('Article heading permalink reports denied copy without navigating',
+    denied.attempts === 1 && denied.focusRestored &&
+      denied.status === '复制失败，请手动选择文字' && denied.hash === '#keep-current-anchor',
+    JSON.stringify(denied));
+  await page.close();
+}
+
 /* ---------- Search history: storage events from another tab ---------- */
 {
   const a = await browser.newPage();
