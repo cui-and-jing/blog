@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { url, formatDate, readingTime } from '../lib/site';
+import { url, formatDate, readingTime, base } from '../lib/site';
 import { getPosts } from '../lib/posts';
 import { getNotes, noteText, noteTitle, noteExcerpt } from '../lib/notes';
 import { activityDate } from '../lib/recent-date.mjs';
@@ -57,7 +57,7 @@ export const GET: APIRoute = async () => {
   });
 
   const entries = [...posts, ...notes];
-  assertSearchEntries(entries);
+  assertSearchEntries(entries, base);
   return new Response(JSON.stringify({ posts: entries }), {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
