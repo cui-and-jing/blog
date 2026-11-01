@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { launchBrowser } from './lib/browser.mjs';
+import { assertSuccessfulNavigation } from './lib/navigation-status.mjs';
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -103,7 +104,8 @@ const shoot = async (route, theme, viewport) => {
     } catch {}
   }, theme);
 
-  await page.goto(base + route, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  const navigation = await page.goto(base + route, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  assertSuccessfulNavigation(navigation, route, 'Visual regression route');
   /* giscus 走外网、加载时间不可控；打字机每帧都在变，换成静态文本再拍 */
   await page.evaluate(() => {
     document.querySelectorAll('.comments, .giscus, iframe[src*="giscus"]').forEach((el) => el.remove());
