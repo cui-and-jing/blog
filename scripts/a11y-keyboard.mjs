@@ -339,11 +339,11 @@ const check = (name, pass, detail = '') => {
       posts: [
         {
           type: 'post', title: 'Astro', description: '', text: '', category: '',
-          tags: [], date: '2026-11-01', minutes: 1, href: base + '/posts/partial-fixture/',
+          tags: [], date: '2026-11-01', minutes: 1, href: new URL(base).pathname.replace(/\/$/, '') + '/posts/partial-fixture/',
         },
         {
           type: 'post', title: 'CSS', description: '', text: 'Astro', category: '',
-          tags: [], date: '2026-11-01', minutes: 1, href: base + '/posts/complete-fixture/',
+          tags: [], date: '2026-11-01', minutes: 1, href: new URL(base).pathname.replace(/\/$/, '') + '/posts/complete-fixture/',
         },
       ],
     };
@@ -401,6 +401,52 @@ const check = (name, pass, detail = '') => {
       JSON.stringify({ state, errors }));
   }
   await page.close();
+}
+
+/* ---------- HTTP 200 metadata faults must not render broken links or labels ---------- */
+{
+  const original = {
+    type: 'post', title: 'Astro', description: '说明', text: 'Astro',
+    category: '', tags: [], date: '2026.11.01', minutes: 1,
+    href: new URL(base).pathname.replace(/\/$/, '') + '/posts/hello-astro/',
+  };
+  const broken = [
+    ['unsafe href', { href: 'javascript:alert(1)' }],
+    ['missing date', { date: null }],
+    ['invalid minutes', { minutes: 'unknown' }],
+  ];
+  for (const [name, override] of broken) {
+    const page = await browser.newPage();
+    const errors = [];
+    let indexRequest = null;
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      if (request.url().split('?')[0].endsWith('/search-index.json')) indexRequest = request;
+      else request.continue();
+    });
+    await page.goto(base + '/search/', { waitUntil: 'load' });
+    const before = await page.$eval('#search-results .search-item', (a) => a.href);
+    if (!indexRequest) {
+      check(`Malformed search metadata ${name} request intercepted`, false, 'index request not observed');
+    } else {
+      await indexRequest.respond({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ posts: [{ ...original, ...override }] }) });
+      await page.waitForFunction(() =>
+        !document.getElementById('search-index-warning').hidden, { timeout: 4000 }).catch(() => {});
+      const state = await page.evaluate(() => ({
+        warned: !document.getElementById('search-index-warning').hidden,
+        first: document.querySelector('#search-results .search-item')?.href,
+        count: document.querySelectorAll('#search-results .search-item').length,
+        filters: [...document.querySelectorAll('[data-search-type]')].map((el) => el.disabled),
+      }));
+      check(`Malformed HTTP 200 ${name} falls back without broken result links`,
+        state.warned && state.first === before && state.count > 0
+          && JSON.stringify(state.filters) === JSON.stringify([true, false, true])
+          && errors.length === 0, JSON.stringify({ state, errors }));
+    }
+    await page.close();
+  }
 }
 
 /* ---------- Reading settings: cross-tab deletion and clear must reset all controls ---------- */
