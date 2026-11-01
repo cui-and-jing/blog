@@ -194,18 +194,16 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
       const highlight = (text: string, terms: string[]): DocumentFragment => {
         const frag = document.createDocumentFragment();
-        if (!terms.length) {
-          frag.append(text);
-          return frag;
-        }
-        const re = new RegExp(`(${terms.map(escapeRe).join('|')})`, 'gi');
-        text.split(re).forEach((part, index) => {
-          if (index % 2) {
-            const mark = document.createElement('mark');
-            mark.textContent = part;
-            frag.append(mark);
-          } else if (part) frag.append(part);
-        });
+        if (terms.length) {
+          const re = new RegExp(`(${terms.map(escapeRe).join('|')})`, 'gi');
+          text.split(re).forEach((part, index) => {
+            if (index % 2) {
+              const mark = document.createElement('mark');
+              mark.textContent = part;
+              frag.append(mark);
+            } else if (part) frag.append(part);
+          });
+        } else frag.append(text);
         return frag;
       };
 
@@ -314,7 +312,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         /* 空查询时只列文章：笔记是碎片，混在「全部内容」里会喧宾夺主 */
         countEl.textContent = querying || selectedType !== 'post'
           ? `找到 ${items.length} 条` : `共 ${items.length} 篇`;
-        empty.hidden = items.length > 0;
+        empty.hidden = !!items.length;
         list.hidden = !items.length;
       };
 
@@ -342,9 +340,10 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       };
 
       const remember = (value: string) => {
-        const query = value.trim();
+        const query = value.trim().replace(/\s+/g, ' ');
         if (query.length < 2) return;
-        writeHistory([query, ...readHistory().filter((item) => item.toLowerCase() !== query.toLowerCase())]);
+        writeHistory([query, ...readHistory().filter((item) =>
+          item.trim().replace(/\s+/g, ' ').toLowerCase() !== query.toLowerCase())]);
       };
 
       const renderHistory = () => {
@@ -361,7 +360,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       historyList.addEventListener('click', (event) => {
         const button = (event.target as Element).closest('button');
         if (!button) return;
-        input.value = button.textContent ?? '';
+        input.value = button.textContent || '';
         apply();
         input.focus();
       });
@@ -386,8 +385,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
         if (syncUrl) {
           const next = pageUrl();
-          if (query) next.searchParams.set('q', query);
-          else next.searchParams.delete('q');
+          query ? next.searchParams.set('q', query) : next.searchParams.delete('q');
           history.replaceState(null, '', next);
         }
 
@@ -409,25 +407,25 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       };
 
       const fallback = () =>
-        Array.from(document.querySelectorAll<HTMLAnchorElement>('.search-item')).map((a) => ({
+        [...document.querySelectorAll<HTMLAnchorElement>('.search-item')].map((a) => ({
           type: 'post' as const,
-          title: a.dataset.title ?? '',
-          description: a.dataset.desc ?? '',
-          tags: JSON.parse(a.dataset.tags ?? '[]') as string[],
-          category: a.dataset.cat ?? '',
+          title: a.dataset.title || '',
+          description: a.dataset.desc || '',
+          tags: JSON.parse(a.dataset.tags || '[]') as string[],
+          category: a.dataset.cat || '',
           href: a.href,
-          date: a.querySelector('time')?.textContent ?? '',
-          minutes: Number(a.dataset.minutes ?? '0'),
-          text: a.dataset.desc ?? '',
+          date: a.querySelector('time')?.textContent || '',
+          minutes: +(a.dataset.minutes || '0'),
+          text: a.dataset.desc || '',
         }));
 
       const fetchIndex = async () => {
         try {
           const res = await fetch(`${baseUrl}/search-index.json`);
-          const data = res.ok ? await res.json() : null;
+          const data = res.ok && await res.json();
           /* Validate every scorer/render field: downstream code relies on these invariants. */
           if (!Array.isArray(data?.posts) || data.posts.some((p: any) =>
-            !['post', 'note'].includes(p?.type)
+            !['post', 'note'].includes(p.type)
             || !['title', 'description', 'category', 'text', 'date', 'href'].every((key) => typeof p[key] === 'string')
             || !p.title || !p.date || !p.href.startsWith(`${baseUrl}/`)
             || !Number.isFinite(p.minutes) || p.minutes < 0
@@ -459,7 +457,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       }));
 
       window.addEventListener('popstate', () => {
-        input.value = pageUrl().searchParams.get('q') ?? '';
+        input.value = pageUrl().searchParams.get('q') || '';
         apply(false);
       });
 

@@ -271,13 +271,13 @@ const check = (name, pass, detail = '') => {
 }
 
 
-/* ---------- Search history: changes in letter case should replace the old chip ---------- */
+/* ---------- Search history: equivalent case and whitespace should replace old chips ---------- */
 {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
   await page.goto(base + '/search/', { waitUntil: 'networkidle2' });
-  await page.evaluate(() => localStorage.setItem('search:history', JSON.stringify(['Astro', '笔记'])));
-  await page.goto(base + '/search/?q=astro', { waitUntil: 'networkidle2' });
+  await page.evaluate(() => localStorage.setItem('search:history', JSON.stringify(['Astro   Astro', '笔记'])));
+  await page.goto(base + '/search/?q=astro%20Astro', { waitUntil: 'networkidle2' });
   await page.waitForFunction(() => document.getElementById('search-type-filters')?.hidden === false,
     { timeout: 8000 });
   await Promise.all([
@@ -291,9 +291,9 @@ const check = (name, pass, detail = '') => {
     chips: [...document.querySelectorAll('#search-history-list button')].map((el) => el.textContent),
     query: document.getElementById('search-input')?.value,
   }));
-  check('Mixed-case duplicate search replaces the old chip and preserves other history',
-    JSON.stringify(stored.values) === JSON.stringify(['astro', '笔记'])
-      && JSON.stringify(stored.chips) === JSON.stringify(['astro', '笔记'])
+  check('Equivalent case and whitespace search replaces old chip and preserves other history',
+    JSON.stringify(stored.values) === JSON.stringify(['astro Astro', '笔记'])
+      && JSON.stringify(stored.chips) === JSON.stringify(['astro Astro', '笔记'])
       && stored.query === '',
     JSON.stringify(stored));
   await page.close();
