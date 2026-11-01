@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-// 页面专属 CSS 直接写入 HTML，避免所有页面为订阅页下载样式。
+// Page-local CSS stays in this HTML so other routes never download it.
 import subscribeCss from '../styles/subscribe.css?raw';
 import { SITE, url } from '../lib/site';
 
