@@ -29,11 +29,11 @@ function visibleMarkup(html) {
     .replace(/<style\b(?:[^"'>]|"[^"]*"|'[^']*')*>[\s\S]*?<\/style\s*>/gi, '');
 }
 
-function allHtml(root, folder = root, found = []) {
+function allFiles(root, extension, folder = root, found = []) {
   for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
     const file = path.join(folder, entry.name);
-    if (entry.isDirectory()) allHtml(root, file, found);
-    else if (entry.isFile() && entry.name.endsWith('.html')) found.push(file);
+    if (entry.isDirectory()) allFiles(root, extension, file, found);
+    else if (entry.isFile() && entry.name.endsWith(extension)) found.push(file);
   }
   return found;
 }
@@ -83,7 +83,7 @@ export function auditBuiltLinks({ dist, base = '/blog', site = 'https://cui-and-
   const origin = new URL(site);
   const errors = [];
   const cache = new Map();
-  const files = allHtml(root).filter((file) => !skip.has(path.relative(root, file).split(path.sep).join('/')));
+  const files = allFiles(root, '.html').filter((file) => !skip.has(path.relative(root, file).split(path.sep).join('/')));
   let references = 0;
 
   for (const file of files) {
@@ -140,5 +140,33 @@ export function auditBuiltLinks({ dist, base = '/blog', site = 'https://cui-and-
       }
     }
   }
+
+  /* CSS url(...) references are not HTML tags. Audit emitted stylesheets too:
+     a missing font/background asset must fail Quality even when every page link resolves.
+     Resolve relative URLs from the stylesheet path, not the HTML page path. */
+  for (const file of allFiles(root, '.css')) {
+    const name = path.relative(root, file).split(path.sep).join('/');
+    const stylesheetUrl = new URL(prefix + '/' + name, origin);
+    const css = fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const match of css.matchAll(/\burl\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\s*\)/gi)) {
+      const value = (match[1] ?? match[2] ?? match[3] ?? '').trim();
+      if (!value || value.startsWith('#') || /^(?:data|blob):/i.test(value)) continue;
+      references += 1;
+      let target;
+      try { target = new URL(value, stylesheetUrl); }
+      catch {
+        errors.push({ page: name, value, reason: 'invalid CSS asset URL' });
+        continue;
+      }
+      if (!['http:', 'https:'].includes(target.protocol) || target.origin !== origin.origin) continue;
+      if (!builtFile(root, target.pathname, prefix)) {
+        const reason = prefix && target.pathname !== prefix && !target.pathname.startsWith(prefix + '/')
+          ? 'CSS asset bypasses ' + prefix + '/ base'
+          : 'missing emitted CSS asset';
+        errors.push({ page: name, value, reason });
+      }
+    }
+  }
+
   return { pages: files.length, references, errors };
 }
