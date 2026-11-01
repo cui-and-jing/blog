@@ -44,7 +44,12 @@ export function plain(markdown) {
         }
         return ' ';
       })
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    // Reference destinations and image alt labels are not readable prose.
+    .replace(/^ {0,3}\[[^\]\n]+\]:[^\n]*$/gm, ' ')
+    .replace(/!\[[^\]\n]*\]\([^)]*\)/g, ' ')
+    .replace(/!\[[^\]\n]*\](?:\[[^\]\n]*\])?/g, ' ')
+    // Preserve link labels for full/collapsed reference-style Markdown links.
+    .replace(/\[([^\]\n]*)\]\[[^\]\n]*\]/g, '$1')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     // CommonMark ATX headings need a space after 1–6 leading hashes.
     // Keep inline hashes in technical terms like C# and F#.
