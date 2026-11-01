@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
 import { plain } from '../src/lib/search-plain.mjs';
 
+// Reference-style Markdown links should index the visible label, never the destination.
+assert.equal(plain('Read [TypeScript][ts] and [C#][] now.\n[ts]: https://example.com/secret-token\n[C#]: /docs/api_v2 "Guide"'),
+  'Read TypeScript and C# now.',
+  'full and collapsed reference links keep visible labels without leaking URLs or titles');
+assert.equal(plain('before ![private thumbnail][asset] after\n[asset]: /images/secret-diagram.png'),
+  'before after', 'reference-style images and their definitions must not become search hits');
+assert.equal(plain('before ![logo][] and ![badge] after\n[logo]: /logo.svg'),
+  'before and after', 'collapsed and shortcut reference images should also stay out of prose');
+assert.equal(plain('intro\n  [ref]: https://example.com/internal-id "title"\noutro'),
+  'intro outro', 'indented reference definitions must not pollute search content');
+
 assert.equal(plain('user_id get_user_name foo__bar'), 'user_id get_user_name foo__bar',
   'underscores within code identifiers must survive full-text indexing');
 assert.equal(plain('用户_编号 api_v2'), '用户_编号 api_v2',
