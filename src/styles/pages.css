@@ -756,11 +756,13 @@ html[data-theme='dark'] .about-banner-avatar {
   line-height: 1.35;
 }
 
-.series-card-main h2 a {
+.series-card-main h2 a,
+.series-step h2 a {
   transition: color 0.16s var(--ease);
 }
 
-.series-card-main h2 a:hover {
+.series-card-main h2 a:hover,
+.series-step h2 a:hover {
   color: var(--accent);
 }
 
@@ -911,13 +913,7 @@ html[data-theme='dark'] .about-banner-avatar {
   letter-spacing: -0.01em;
 }
 
-.series-step h2 a {
-  transition: color 0.16s var(--ease);
-}
 
-.series-step h2 a:hover {
-  color: var(--accent);
-}
 
 /* 空态：标签、系列、归档在没有内容时也有话说 */
 .empty-state {

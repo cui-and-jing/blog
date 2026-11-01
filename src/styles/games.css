@@ -344,7 +344,8 @@ html[data-theme='dark'] .game-tag {
 
 @media (max-width: 900px) {
   .game-card,
-  .game-card--mini {
+  .game-card--mini,
+  .game-notes {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -357,9 +358,6 @@ html[data-theme='dark'] .game-tag {
     padding: 30px 26px 34px;
   }
 
-  .game-notes {
-    grid-template-columns: minmax(0, 1fr);
-  }
 
   .game-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));

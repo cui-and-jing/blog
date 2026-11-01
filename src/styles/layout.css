@@ -66,12 +66,7 @@
   flex: none;
 }
 
-.nav {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
+.nav,
 .nav-links {
   display: flex;
   align-items: center;
@@ -86,7 +81,8 @@
   transition: color 0.18s var(--ease), background 0.18s var(--ease);
 }
 
-.nav-links a:hover {
+.nav-links a:hover,
+.mb-btn:hover {
   color: var(--text);
   background: var(--bg-soft);
 }
@@ -172,10 +168,6 @@
   height: 20px;
 }
 
-.mb-btn:hover {
-  color: var(--text);
-  background: var(--bg-soft);
-}
 
 .mb-btn[hidden] {
   display: none;

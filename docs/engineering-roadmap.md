@@ -476,6 +476,14 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 - **Regression:** Require existing search/history/Back-Forward/browser/axe/keyboard and exact JS/CSS asset-budget checks. Compare with the previous 12,280 / 21,486-byte baseline.
 - **Guardrails:** No dependencies, URLs, ranking, games, content, budget increases or layout redesign.
 
+## Completed: conservative CSS cascade consolidation (2026-11-01)
+
+- **Baseline:** main CSS gzip 21,486 / 21,504 bytes (18 bytes free), JS gzip 12,279 / 12,288 bytes (9 bytes free).
+- **Scope:** consolidate byte-for-byte equivalent declarations for desktop header nav, mobile bar hover, search history/suggestion flex layouts, responsive game cards/notes, series link states, and narrow-screen sidebar/reader-list columns. Keep selector specificity and media breakpoint scope unchanged; avoid any game logic, runtime JS, content or dependency changes.
+- **Measured result:** CSS gzip 21,483 / 21,504 bytes (21 bytes free) and JS remains 12,279 / 12,288 bytes (9 bytes free). This is only a **3-byte CSS gzip reduction**, **not** a resolution of the overall performance-budget pressure. The original source declarations were shortened, but gzip already compresses repeated CSS effectively.
+- **Required gate:** latest PR-head Quality must pass the existing build, full browser interactions, axe, keyboard, game smoke, wire and fixed-budget checks. Then squash-merge and validate main Quality followed by Pages on the exact merge SHA. Public HTTP remains a distinct verification gate.
+- **Next investigation:** prioritize measured removal of genuinely unused CSS or structural payload reduction instead of repeated micro-deduplication; preserve visuals and controls with browser regressions.
+
 ## Merge checklist for every iteration
 
 1. Branch from current `main`; avoid unreviewed dependency upgrades. `npm run deploy:check` verifies the release gate configuration.
