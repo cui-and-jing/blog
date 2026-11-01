@@ -1356,7 +1356,7 @@ const check = (name, pass, detail = '') => {
     await page.setViewport({ width, height: 900, isMobile: width === 390, hasTouch: width === 390 });
     const facts = await page.evaluate(() => ({
       columns: [...document.querySelectorAll('.game-card .game-facts')]
-        .map((list) => getComputedStyle(list).gridTemplateColumns.trim().split(/\\s+/).length),
+        .map((list) => getComputedStyle(list).gridTemplateColumns.trim().split(/\s+/).length),
       overflow: document.documentElement.scrollWidth - innerWidth,
     }));
     const expected = width <= 900 ? 2 : 4;
