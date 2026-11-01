@@ -497,6 +497,13 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 - **Regression:** accept February 29 in 2000 and 2024; reject impossible dates in leap and common years, non-leap centuries, and year zero. Require full PR Quality followed by same-SHA merged-main Quality and Pages deployment.
 - **Scope:** build-time contract and tests only. Do not touch client JavaScript/CSS, games, dependencies, or raise size budgets; substantial compressed-asset headroom remains a separate open task.
 
+## 2026-11-01 · First-visit budget route reliability
+
+- **Finding:** The first-visit transfer budget ran `page.goto()` without checking the returned HTTP status. A missing route could therefore pass a size check by returning a tiny 404 page, even after the manual perf profiler was fixed in #93.
+- **Change:** Share the nine route/limit fixtures between the browser profiler and a post-build route contract. Reject non-2xx and absent responses before recording any transfer data.
+- **Regression:** Assert all routes are emitted and limits are positive, test 200/204 success and 301/404/500/503/null rejection. Run the contract in both GitHub Quality and local preflight before browser checks.
+- **Scope:** Tooling only; no browser bundle, CSS, games, content, or size-budget limit changes. The 9 B JavaScript and 21 B CSS gzip headroom are still open problems.
+
 ## Merge checklist for every iteration
 
 1. Branch from current `main`; avoid unreviewed dependency upgrades. `npm run deploy:check` verifies the release gate configuration.

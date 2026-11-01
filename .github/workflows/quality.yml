@@ -71,6 +71,9 @@ jobs:
       - name: Performance profile route fixtures
         run: npm run perf:routes:check
 
+      - name: First-visit budget route and HTTP status contract
+        run: npm run budget:wire:routes:check
+
       # 构建后的真实导航和静态资源也要可达；Markdown lint 无法覆盖组件生成的链接
       - name: Emitted routes, assets and anchor links
         run: npm run links:check
