@@ -171,7 +171,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
     const resetBtn = document.getElementById('search-reset');
 
     if (shell && input && list && empty && countEl) {
-      const baseUrl = shell.dataset.base ?? '';
+      const baseUrl = shell.dataset.base!;
       const historyBox = document.getElementById('search-history')!;
       const historyList = document.getElementById('search-history-list')!;
       const historyClear = document.getElementById('search-history-clear') as HTMLButtonElement;
@@ -378,7 +378,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         if (!ready) return;
         const query = input.value.trim();
         const type = pageUrl().searchParams.get('type');
-        selectedType = degraded ? 'post' : ['all', 'post', 'note'].includes(type ?? '')
+        selectedType = degraded ? 'post' : ['all', 'post', 'note'].includes(type!)
           ? type as SearchType : query ? 'all' : 'post';
         /* 停用词过滤、去重后再取前 6 个；重复词不能挤掉有效搜索词。 */
         const terms = [...new Set(query.toLowerCase().split(/\s+/).filter((word) => !STOP.includes(word)))].slice(0, 6);
