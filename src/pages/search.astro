@@ -226,15 +226,15 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         const title = post.title.toLowerCase();
         const desc = post.description.toLowerCase();
         const category = post.category.toLowerCase();
-        const tags = post.tags.map((tag: string) => tag.toLowerCase());
+        const tags = post.tags.join(' ').toLowerCase();
         const body = post.text.toLowerCase();
         let total = 0;
         let hits = 0;
         for (const term of terms) {
-          /* 最多需要 12 次命中；有限 split 避免长文高频词产生大量临时数组项。 */
+          /* Cap text match weight at 12 occurrences without unbounded allocations. */
           const times = body.split(term, 13).length - 1;
           const weight = (title === term ? 40 : title.includes(term) ? 14 : 0)
-            + (tags.some((tag: string) => tag.includes(term)) ? 9 : 0)
+            + (tags.includes(term) ? 9 : 0)
             + (category.includes(term) ? 6 : 0)
             + (desc.includes(term) ? 5 : 0)
             + (times ? 1 + Math.log2(times) : 0);
