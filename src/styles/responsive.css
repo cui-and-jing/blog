@@ -183,8 +183,7 @@
     display: none;
   }
 
-  .sidebar,
-  .reader-list ul {
+  .sidebar {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -334,15 +333,6 @@
   .archive-note-title {
     max-width: 100%;
     white-space: normal;
-  }
-
-  /* 订阅页 */
-  .feed-card {
-    padding: 17px 17px 15px;
-  }
-
-  .feed-card-addr code {
-    flex-basis: 100%;
   }
 
 }
