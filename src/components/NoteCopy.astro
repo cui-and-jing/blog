@@ -8,6 +8,7 @@
 ---
 
 <script>
+  import { copyText } from '../lib/copy-text';
   const status = document.getElementById('a11y-status');
 
   /**
@@ -15,33 +16,6 @@
    * 退回 execCommand 能覆盖其中大部分情况（正文区的复制按钮也是这么做的），
    * 两条路都走不通才让地址栏承担「至少能手动复制」。
    */
-  const copyText = async (text: string): Promise<boolean> => {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      /* 选中临时 textarea 会把焦点从按钮上抢走，结束后要还回去，
-         否则键盘用户按完 Enter 就不知道自己在哪了 */
-      const previous = document.activeElement as HTMLElement | null;
-      const area = document.createElement('textarea');
-      area.value = text;
-      area.setAttribute('readonly', '');
-      area.style.position = 'fixed';
-      area.style.top = '-1000px';
-      document.body.append(area);
-      area.select();
-      let ok = false;
-      try {
-        ok = document.execCommand('copy');
-      } catch {
-        ok = false;
-      }
-      area.remove();
-      previous?.focus({ preventScroll: true });
-      return ok;
-    }
-  };
-
   document.addEventListener('click', async (event) => {
     const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-note-link]');
     if (!button) return;
