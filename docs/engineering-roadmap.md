@@ -22,6 +22,13 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
+## Completed: de-duplicate recent searches across letter case (2026-11-01)
+
+- **Finding:** Recent-search storage compared queries case-sensitively. Searching `Astro` and then `astro` produced duplicate suggestion chips despite the scorer treating them as the same query.
+- **Change:** Keep the latest original spelling, but remove older entries that match without regard to letter case; preserve the existing six-item cap, other entries, privacy-mode fallback and filter/URL behavior.
+- **Regression:** A narrow-screen Chromium flow seeds mixed-case history, searches via a real result link (the existing persistence trigger), returns to search and checks local storage and rendered chips. No new dependencies, design changes or increased performance caps.
+- **Release:** Gate on latest-head complete PR Quality, then verify post-merge main Quality and Pages deploy on the exact merge SHA.
+
 ## Completed: exclude Markdown reference destinations and image labels from search prose (2026-11-01)
 
 - **Finding:** The shared search/reading-time plain-text normalizer kept Markdown reference definitions (including URL destinations and optional titles) and image alt text, while treating reference-style link labels and IDs as separate tokens. This could create irrelevant search matches on hidden paths and identifiers.

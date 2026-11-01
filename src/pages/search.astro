@@ -315,7 +315,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         countEl.textContent = querying || selectedType !== 'post'
           ? `找到 ${items.length} 条` : `共 ${items.length} 篇`;
         empty.hidden = items.length > 0;
-        list.hidden = items.length === 0;
+        list.hidden = !items.length;
       };
 
       /* ---------- 搜索历史（只存本机，最多 6 条） ---------- */
@@ -344,7 +344,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       const remember = (value: string) => {
         const query = value.trim();
         if (query.length < 2) return;
-        writeHistory([query, ...readHistory().filter((item) => item !== query)]);
+        writeHistory([query, ...readHistory().filter((item) => item.toLowerCase() !== query.toLowerCase())]);
       };
 
       const renderHistory = () => {
@@ -382,7 +382,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           ? type as SearchType : query ? 'all' : 'post';
         /* 停用词过滤、去重后再取前 6 个；重复词不能挤掉有效搜索词。 */
         const terms = [...new Set(query.toLowerCase().split(/\s+/).filter((word) => !STOP.includes(word)))].slice(0, 6);
-        clearBtn!.hidden = query.length === 0;
+        clearBtn!.hidden = !query;
 
         if (syncUrl) {
           const next = pageUrl();
