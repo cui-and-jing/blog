@@ -385,8 +385,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
         if (syncUrl) {
           const next = pageUrl();
-          if (query) next.searchParams.set('q', query);
-          else next.searchParams.delete('q');
+          query ? next.searchParams.set('q', query) : next.searchParams.delete('q');
           history.replaceState(null, '', next);
         }
 
