@@ -314,7 +314,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         /* 空查询时只列文章：笔记是碎片，混在「全部内容」里会喧宾夺主 */
         countEl.textContent = querying || selectedType !== 'post'
           ? `找到 ${items.length} 条` : `共 ${items.length} 篇`;
-        empty.hidden = items.length > 0;
+        empty.hidden = !!items.length;
         list.hidden = !items.length;
       };
 
@@ -362,7 +362,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       historyList.addEventListener('click', (event) => {
         const button = (event.target as Element).closest('button');
         if (!button) return;
-        input.value = button.textContent ?? '';
+        input.value = button.textContent || '';
         apply();
         input.focus();
       });
@@ -460,7 +460,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       }));
 
       window.addEventListener('popstate', () => {
-        input.value = pageUrl().searchParams.get('q') ?? '';
+        input.value = pageUrl().searchParams.get('q') || '';
         apply(false);
       });
 
