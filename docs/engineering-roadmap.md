@@ -484,6 +484,13 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 - **Required gate:** latest PR-head Quality must pass the existing build, full browser interactions, axe, keyboard, game smoke, wire and fixed-budget checks. Then squash-merge and validate main Quality followed by Pages on the exact merge SHA. Public HTTP remains a distinct verification gate.
 - **Next investigation:** prioritize measured removal of genuinely unused CSS or structural payload reduction instead of repeated micro-deduplication; preserve visuals and controls with browser regressions.
 
+## Completed: enforce real calendar dates in the search index (2026-11-01)
+
+- **Audit finding:** the existing YYYY.MM.DD regex enforced the shape and day range 01–31, but still accepted nonexistent dates such as 2026.02.29 and 2026.04.31. These metadata strings then entered published search results.
+- **Change:** check actual Gregorian month lengths and leap-year rules (including 100/400-year boundaries), for both publication and update dates. Preserve the existing output format and valid dates.
+- **Regression:** accept February 29 in 2000 and 2024; reject impossible dates in leap and common years, non-leap centuries, and year zero. Require full PR Quality followed by same-SHA merged-main Quality and Pages deployment.
+- **Scope:** build-time contract and tests only. Do not touch client JavaScript/CSS, games, dependencies, or raise size budgets; substantial compressed-asset headroom remains a separate open task.
+
 ## Merge checklist for every iteration
 
 1. Branch from current `main`; avoid unreviewed dependency upgrades. `npm run deploy:check` verifies the release gate configuration.

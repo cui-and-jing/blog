@@ -5,7 +5,14 @@
  */
 export function assertSearchEntries(entries, base = '') {
   const siteBase = base.replace(/\/$/, '');
-  const validDate = (value) => /^\d{4}\.(?:0[1-9]|1[0-2])\.(?:0[1-9]|[12]\d|3[01])$/.test(value);
+  const validDate = (value) => {
+    if (!/^\d{4}\.(?:0[1-9]|1[0-2])\.(?:0[1-9]|[12]\d|3[01])$/.test(value)) return false;
+    const [year, month, day] = value.split('.').map(Number);
+    if (year === 0) return false;
+    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    return day <= days[month - 1];
+  };
   if (!Array.isArray(entries)) throw new Error('Search index needs an entries array');
   const seen = new Set();
   for (const [index, entry] of entries.entries()) {

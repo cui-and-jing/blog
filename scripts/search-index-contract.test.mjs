@@ -14,6 +14,8 @@ const note = {
 };
 assert.doesNotThrow(() => assertSearchEntries([sample, note], '/blog'));
 assert.doesNotThrow(() => assertSearchEntries([{ ...sample, updated: '2026.10.31' }], '/blog'));
+assert.doesNotThrow(() => assertSearchEntries([{ ...sample, date: '2024.02.29', updated: '2000.02.29' }], '/blog'));
+assert.doesNotThrow(() => assertSearchEntries([{ ...sample, date: '2026.12.31' }], '/blog'));
 const failures = [
   ['absent array', null, /entries array/],
   ['missing record', [null], /invalid type/],
@@ -27,6 +29,13 @@ const failures = [
   ['missing link', [{ ...sample, href: '' }], /missing title, date or path/],
   ['malformed publication date', [{ ...sample, date: '2026-10-31' }], /invalid publication date/],
   ['out-of-range publication month', [{ ...sample, date: '2026.13.01' }], /invalid publication date/],
+  ['non-leap February 29', [{ ...sample, date: '2026.02.29' }], /invalid publication date/],
+  ['February 31', [{ ...sample, date: '2026.02.31' }], /invalid publication date/],
+  ['leap-year February 30', [{ ...sample, date: '2024.02.30' }], /invalid publication date/],
+  ['April 31', [{ ...sample, date: '2026.04.31' }], /invalid publication date/],
+  ['century without leap day', [{ ...sample, date: '1900.02.29' }], /invalid publication date/],
+  ['year zero', [{ ...sample, date: '0000.01.01' }], /invalid publication date/],
+  ['impossible revision date', [{ ...sample, updated: '2026.02.30' }], /invalid updated date/],
   ['malformed revision', [{ ...sample, updated: 7 }], /invalid updated date/],
   ['malformed revision date', [{ ...sample, updated: 'yesterday' }], /invalid updated date/],
   ['protocol-relative link', [{ ...sample, href: '//evil.test/posts/astro/' }], /unsafe path/],
