@@ -186,13 +186,17 @@ export function setupLightbox(): void {
           if (event.target === lightbox) lightbox.close();
         });
         lightbox.addEventListener('keydown', (event) => {
-          const key = event.key;
-          if (!['ArrowLeft', 'ArrowRight', '+', '=', '-', '_', '0'].includes(key)) return;
+          switch (event.key) {
+            case 'ArrowLeft': show(index - 1); break;
+            case 'ArrowRight': show(index + 1); break;
+            case '0': reset(); break;
+            case '+':
+            case '=': zoomAt(zoom * 1.25, 0, 0); break;
+            case '-':
+            case '_': zoomAt(zoom / 1.25, 0, 0); break;
+            default: return;
+          }
           event.preventDefault();
-          if (key === 'ArrowLeft') show(index - 1);
-          else if (key === 'ArrowRight') show(index + 1);
-          else if (key === '0') reset();
-          else zoomAt(['+', '='].includes(key) ? zoom * 1.25 : zoom / 1.25, 0, 0);
         });
         lightbox.addEventListener('close', () => {
           document.documentElement.style.overflow = '';
