@@ -194,7 +194,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
       const highlight = (text: string, terms: string[]): DocumentFragment => {
         const frag = document.createDocumentFragment();
-        if (!terms.length || !text) {
+        if (!terms.length) {
           frag.append(text);
           return frag;
         }
@@ -278,7 +278,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
         items.forEach(({ post, terms }) => {
           const li = element('li', 'search-result');
-          li.dataset.searchResultType = post.type === 'note' ? 'note' : 'post';
+          li.dataset.searchResultType = post.type;
 
           const a = element('a', 'search-item');
           a.href = post.href;
@@ -381,7 +381,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         selectedType = degraded ? 'post' : type === 'all' || type === 'post' || type === 'note'
           ? type : query ? 'all' : 'post';
         /* 停用词过滤、去重后再取前 6 个；重复词不能挤掉有效搜索词。 */
-        const terms = Array.from(new Set(query.toLowerCase().split(/\s+/).filter((word) => !STOP.includes(word)))).slice(0, 6);
+        const terms = [...new Set(query.toLowerCase().split(/\s+/).filter((word) => !STOP.includes(word)))].slice(0, 6);
         clearBtn!.hidden = query.length === 0;
 
         if (syncUrl) {
@@ -429,7 +429,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           if (!Array.isArray(data?.posts) || data.posts.some((p: any) =>
             !['post', 'note'].includes(p?.type)
             || !['title', 'description', 'category', 'text', 'date', 'href'].every((key) => typeof p[key] === 'string')
-            || !p.title.trim() || !p.date || !p.href.startsWith(`${baseUrl}/`)
+            || !p.title || !p.date || !p.href.startsWith(`${baseUrl}/`)
             || !Number.isFinite(p.minutes) || p.minutes < 0
             || !Array.isArray(p.tags) || p.tags.some((tag: any) => typeof tag !== 'string')
           )) throw new Error('index');
