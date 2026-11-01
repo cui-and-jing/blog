@@ -1220,8 +1220,8 @@ const check = (name, pass, detail = '') => {
       image.getAttribute('tabindex') === '0';
   }, { timeout: 8000 });
   const images = await gallery.evaluate(() => document.querySelectorAll('.prose img').length);
-  check('有配图的排版样例页正确初始化可访问灯箱',
-    images >= 2 && !galleryScripts.some((url) => /\/lightbox[.-]/.test(url)),
+  check('有配图的排版样例页按需加载灯箱模块并初始化可访问交互',
+    images >= 2 && galleryScripts.some((url) => /\/lightbox[.-]/.test(url)),
     JSON.stringify({ images, scripts: galleryScripts.map((url) => url.split('/').pop()) }));
 
   await gallery.click('.prose img');
