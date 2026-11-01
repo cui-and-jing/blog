@@ -22,6 +22,13 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
+## Completed: omit multiline Markdown link-reference metadata from search (2026-11-01)
+
+- **Finding:** The shared Markdown prose normalizer removes one-line `[label]: destination` reference definitions but leaves destinations and optional titles when CommonMark wraps them onto indented following lines. Hidden paths and titles can then produce irrelevant search hits and inflate reading time.
+- **Change:** Exclude indented continuation destinations (including angle-bracket forms) and separately continued quoted/parenthesized titles. Preserve visible link labels and unindented following prose; keep normal one-line definitions and existing Markdown/HTML rules.
+- **Regression:** Four dependency-free cases for multi-line destinations, one-line destinations with next-line titles, angle destinations, and adjacent visible prose. Run through the existing search-plain contract in both Quality and local preflight.
+- **Guardrails:** No authored content, browser JavaScript/CSS, game, dependency or budget changes. Require latest PR SHA's complete Quality, clean mergeability, and post-merge main Quality + Pages publish on the exact merge SHA.
+
 ## Completed: de-duplicate recent searches across letter case (2026-11-01)
 
 - **Finding:** Recent-search storage compared queries case-sensitively. Searching `Astro` and then `astro` produced duplicate suggestion chips despite the scorer treating them as the same query.
