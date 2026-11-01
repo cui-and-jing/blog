@@ -50,6 +50,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       <input
         id="search-input"
         type="search"
+        enterkeyhint="search"
         placeholder="搜索标题、标签或正文…"
         autocomplete="off"
         spellcheck="false"
