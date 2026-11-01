@@ -504,6 +504,12 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 - **Regression:** Assert all routes are emitted and limits are positive, test 200/204 success and 301/404/500/503/null rejection. Run the contract in both GitHub Quality and local preflight before browser checks.
 - **Scope:** Tooling only; no browser bundle, CSS, games, content, or size-budget limit changes. The 9 B JavaScript and 21 B CSS gzip headroom are still open problems.
 
+## 2026-11-01 · CSS unresolved custom-property cleanup
+
+- **Audit:** two declarations used the nonexistent `--shadow-card` variable (notes sheet and RSS feed cards), with no fallback. Such `box-shadow` declarations are ignored by the browser, so deleting them is intentionally a no-visual-change cleanup.
+- **Contract:** scan stylesheet `var(--name)` calls without fallbacks and require a matching CSS or Astro/component declaration; allow explicit fallbacks and inline-provided dynamic tokens. Add negative/positive fixtures, and require both Quality and local preflight to run the contract.
+- **Bounds:** no new dependencies, CSS visuals, page routes, JS changes, budget increases or games touched. This removes ineffective CSS source but does not establish a substantial gzip reduction; retain the larger asset/headroom audit as open work.
+
 ## Merge checklist for every iteration
 
 1. Branch from current `main`; avoid unreviewed dependency upgrades. `npm run deploy:check` verifies the release gate configuration.
