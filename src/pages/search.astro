@@ -231,9 +231,8 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         let total = 0;
         let hits = 0;
         for (const term of terms) {
-          /* Count at most 12 non-overlapping hits without allocating split substrings. */
-          let times = 0;
-          for (let at = 0; times < 12 && (at = body.indexOf(term, at)) >= 0; at += term.length) times++;
+          /* Cap text match weight at 12 occurrences without unbounded allocations. */
+          const times = body.split(term, 13).length - 1;
           const weight = (title === term ? 40 : title.includes(term) ? 14 : 0)
             + (tags.includes(term) ? 9 : 0)
             + (category.includes(term) ? 6 : 0)
