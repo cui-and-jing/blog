@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import authorsPageStyles from '../styles/authors-page.css?raw';
 import AuthorAvatar from '../components/AuthorAvatar.astro';
 import { AUTHORS } from '../data/authors';
 import { SITE, url, formatDate, tagHue } from '../lib/site';
@@ -49,6 +50,7 @@ const personSchema = people.map(({ author, posts: own, notes: ownNotes }) => ({
 <BaseLayout title="作者" description={`${SITE.title} 的两位作者各自写什么，以及他们写过的文章与笔记。`}>
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(personSchema)} is:inline />
+    <style is:inline set:html={authorsPageStyles} />
   </Fragment>
 
   <div class="page-head page-head--narrow">
