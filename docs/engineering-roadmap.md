@@ -2,6 +2,13 @@
 
 _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 
+## Latest: batch search-result DOM replacement (2026-11-02)
+
+- **Problem:** The search page previously cleared its live result list, then appended every item individually. Larger result sets repeatedly mutated the live DOM.
+- **Change:** Build rows off-DOM using `map` and replace the result list in one operation. Keep scoring, stable tie order, result markup, filter state, empty state and accessibility announcements unchanged.
+- **Regression:** A Chromium test serves 64 matching articles and checks every title in original order, count, visibility and absence of runtime errors. Gate on actual built JavaScript gzip bytes; do not relax the 12 KiB limit for this optimization.
+- **Release:** Complete PR Quality before merge, followed by main Quality and Pages Deploy against the exact squash-merge SHA. This change by itself does not prove improved LCP/TBT.
+
 ## Latest: fail closed on visual-fixture HTTP errors (2026-11-01)
 
 - **Problem:** The visual screenshot runner accepted any resolved Puppeteer navigation, including HTTP 404/500 error pages. A missing route could therefore be captured and compared as if it were a valid page. Manual performance profiling already rejected these responses.
