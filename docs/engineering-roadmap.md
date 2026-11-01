@@ -406,6 +406,13 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 - **Regression:** Chromium covers composition before/after commit, stopword-only vs mixed queries, URL restoration, mobile clearing and pointer target dimensions. Preserve existing search index failure fallback and history.
 - **Constraints:** do not modify post/notes URLs, bookmarks, reader settings, games, CSS/JS size caps or dependency versions. Validate the latest PR SHA before merge and verify main Quality + Pages after merge.
 
+## Completed: malformed HTTP 200 search-index metadata fallback (2026-11-01)
+
+- **Finding:** the client's HTTP 200 index validation covered scorer fields (title, description, category, text and tags), but did not validate render metadata: href, date and minutes. A syntactically valid JSON response with a poisoned/missing href or invalid minutes could silently render broken/unsafe links and labels instead of using the static article fallback.
+- **Change:** require nonempty title/date, a site-base-relative href and finite nonnegative minutes before accepting an index response. Continue to show the existing degraded-search notice, restrict to articles and restore the server-rendered cards when any record is malformed. Preserve the original search scoring, type selection, history and URLs in a valid index.
+- **Regression:** Chromium intercepts HTTP 200 with an unsafe href, absent date and nonnumeric minutes; every case must show the visible fallback, keep real static article hrefs and avoid page errors. Existing valid-index ranking fixture now uses the same base-relative href format emitted by the real build.
+- **Guardrails:** no dependency, game, stylesheet or content changes. Keep JavaScript gzip ≤ 12,288 bytes; require full latest-head PR Quality success, then merged main Quality and same-SHA Pages success. Do not merge on a failing budget.
+
 ## Completed: mobile dialog test readiness and bounded diagnostics (2026-11-01)
 
 - **Finding:** After PR #79 was merged, main Quality attempt 1 timed out at `scripts/a11y-keyboard.mjs:865` waiting for `#settings-panel[open]` in the 320/390px touch test. The same SHA passed on rerun. That fixture navigated with `waitUntil: 'load'` and clicked the settings toggle immediately, without waiting for the shared client shell to finish binding handlers. This is a plausible race, not a proven production defect.

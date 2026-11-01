@@ -171,7 +171,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
     const resetBtn = document.getElementById('search-reset');
 
     if (shell && input && list && empty && countEl) {
-      const baseUrl = shell.dataset.base ?? '';
+      const baseUrl = shell.dataset.base!;
       const historyBox = document.getElementById('search-history')!;
       const historyList = document.getElementById('search-history-list')!;
       const historyClear = document.getElementById('search-history-clear') as HTMLButtonElement;
@@ -194,7 +194,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
       const highlight = (text: string, terms: string[]): DocumentFragment => {
         const frag = document.createDocumentFragment();
-        if (!terms.length || !text) {
+        if (!terms.length) {
           frag.append(text);
           return frag;
         }
@@ -210,7 +210,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       };
 
       const snippet = (post: any, terms: string[]): string => {
-        const text: string = post.text ?? '';
+        const text: string = post.text;
         const low = text.toLowerCase();
         let at = text.length;
         for (const term of terms) {
@@ -225,10 +225,10 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
       const score = (post: any, terms: string[]) => {
         const title = post.title.toLowerCase();
-        const desc = (post.description ?? '').toLowerCase();
-        const category = (post.category ?? '').toLowerCase();
-        const tags = (post.tags ?? []).map((tag: string) => tag.toLowerCase());
-        const body = (post.text ?? '').toLowerCase();
+        const desc = post.description.toLowerCase();
+        const category = post.category.toLowerCase();
+        const tags = post.tags.map((tag: string) => tag.toLowerCase());
+        const body = post.text.toLowerCase();
         let total = 0;
         let hits = 0;
         for (const term of terms) {
@@ -278,7 +278,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
         items.forEach(({ post, terms }) => {
           const li = element('li', 'search-result');
-          li.dataset.searchResultType = post.type === 'note' ? 'note' : 'post';
+          li.dataset.searchResultType = post.type;
 
           const a = element('a', 'search-item');
           a.href = post.href;
@@ -298,7 +298,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           meta.append(time);
           if (post.category) addSpan(meta, 'cat', post.category);
           if (post.type !== 'note') addSpan(meta, '', `约 ${post.minutes} 分钟`);
-          (post.tags ?? []).slice(0, 3).forEach((tag: string) => addSpan(meta, 'tag', `#${tag}`));
+          post.tags.slice(0, 3).forEach((tag: string) => addSpan(meta, 'tag', `#${tag}`));
 
           main.append(h2, p, meta);
 
@@ -378,10 +378,10 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         if (!ready) return;
         const query = input.value.trim();
         const type = pageUrl().searchParams.get('type');
-        selectedType = degraded ? 'post' : type === 'all' || type === 'post' || type === 'note'
-          ? type : query ? 'all' : 'post';
+        selectedType = degraded ? 'post' : ['all', 'post', 'note'].includes(type!)
+          ? type as SearchType : query ? 'all' : 'post';
         /* 停用词过滤、去重后再取前 6 个；重复词不能挤掉有效搜索词。 */
-        const terms = Array.from(new Set(query.toLowerCase().split(/\s+/).filter((word) => !STOP.includes(word)))).slice(0, 6);
+        const terms = [...new Set(query.toLowerCase().split(/\s+/).filter((word) => !STOP.includes(word)))].slice(0, 6);
         clearBtn!.hidden = query.length === 0;
 
         if (syncUrl) {
@@ -423,12 +423,14 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
       const fetchIndex = async () => {
         try {
-          const res = await fetch(`${baseUrl}/search-index.json`, { headers: { Accept: 'application/json' } });
+          const res = await fetch(`${baseUrl}/search-index.json`);
           const data = res.ok ? await res.json() : null;
-          /* Reject broken HTTP 200 records before they can crash the scorer. */
+          /* Validate every scorer/render field: downstream code relies on these invariants. */
           if (!Array.isArray(data?.posts) || data.posts.some((p: any) =>
             !['post', 'note'].includes(p?.type)
-            || !['title', 'description', 'category', 'text'].every((key) => typeof p[key] === 'string')
+            || !['title', 'description', 'category', 'text', 'date', 'href'].every((key) => typeof p[key] === 'string')
+            || !p.title || !p.date || !p.href.startsWith(`${baseUrl}/`)
+            || !Number.isFinite(p.minutes) || p.minutes < 0
             || !Array.isArray(p.tags) || p.tags.some((tag: any) => typeof tag !== 'string')
           )) throw new Error('index');
           posts = data.posts;
