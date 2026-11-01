@@ -341,11 +341,11 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         }
       };
 
-      const compact = (value: string) => value.trim().replace(/\s+/g, ' ');
       const remember = (value: string) => {
-        const query = compact(value);
+        const query = value.trim().replace(/\s+/g, ' ');
         if (query.length < 2) return;
-        writeHistory([query, ...readHistory().filter((item) => compact(item).toLowerCase() !== query.toLowerCase())]);
+        writeHistory([query, ...readHistory().filter((item) =>
+          item.trim().replace(/\s+/g, ' ').toLowerCase() !== query.toLowerCase())]);
       };
 
       const renderHistory = () => {
