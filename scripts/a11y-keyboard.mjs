@@ -1372,6 +1372,18 @@ const check = (name, pass, detail = '') => {
     spaceState.alt === spaceState.expectedAlt &&
     spaceState.original === spaceState.expectedOriginal, JSON.stringify(spaceState));
   await gallery.keyboard.press('Escape');
+  await gallery.waitForFunction(() => !document.getElementById('lightbox')?.open);
+  await gallery.evaluate(() => document.querySelectorAll('.prose img')[1]?.click());
+  await gallery.waitForFunction(() => document.getElementById('lightbox')?.open === true);
+  const secondClick = await gallery.evaluate(() => ({
+    src: document.getElementById('lightbox-img')?.getAttribute('src'),
+    origin: document.getElementById('lightbox-origin')?.href,
+    expected: document.querySelectorAll('.prose img')[1]?.src,
+  }));
+  check('Delegated click on second prose image opens its own original',
+    secondClick.src === enterSrc && secondClick.origin === secondClick.expected,
+    JSON.stringify(secondClick));
+  await gallery.keyboard.press('Escape');
   await gallery.close();
 }
 
