@@ -423,7 +423,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       const fetchIndex = async () => {
         try {
           const res = await fetch(`${baseUrl}/search-index.json`);
-          const data = res.ok ? await res.json() : null;
+          const data = res.ok && await res.json();
           /* Validate every scorer/render field: downstream code relies on these invariants. */
           if (!Array.isArray(data?.posts) || data.posts.some((p: any) =>
             !['post', 'note'].includes(p?.type)
