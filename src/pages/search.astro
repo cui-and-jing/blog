@@ -231,8 +231,13 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         let total = 0;
         let hits = 0;
         for (const term of terms) {
-          /* 最多需要 12 次命中；有限 split 避免长文高频词产生大量临时数组项。 */
-          const times = body.split(term, 13).length - 1;
+          /* Count at most 12 non-overlapping hits without allocating split substrings. */
+          let times = 0;
+          let from = 0;
+          while (times < 12 && (from = body.indexOf(term, from)) !== -1) {
+            times++;
+            from += term.length;
+          }
           const weight = (title === term ? 40 : title.includes(term) ? 14 : 0)
             + (tags.some((tag: string) => tag.includes(term)) ? 9 : 0)
             + (category.includes(term) ? 6 : 0)
