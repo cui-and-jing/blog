@@ -2399,6 +2399,40 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+
+/* ---------- Authors directory: page-scoped styles and mobile wrapping ---------- */
+{
+  const page = await browser.newPage();
+  await page.goto(`${base}/authors/`, { waitUntil: 'load' });
+  for (const width of [1280, 390, 320]) {
+    await page.setViewport({ width, height: 844, isMobile: width <= 390, hasTouch: width <= 390 });
+    const state = await page.evaluate(() => {
+      const block = document.querySelector('.author-block');
+      const head = document.querySelector('.author-block-head');
+      const avatar = document.querySelector('.author-avatar');
+      const count = document.querySelector('.author-block-count');
+      return {
+        blocks: document.querySelectorAll('.author-block').length,
+        padding: getComputedStyle(block).paddingTop,
+        wrapping: getComputedStyle(head).flexWrap,
+        avatar: Math.round(avatar.getBoundingClientRect().width),
+        countWidth: getComputedStyle(count).width,
+        blockWidth: Math.round(block.getBoundingClientRect().width),
+        overflow: document.documentElement.scrollWidth - innerWidth,
+      };
+    });
+    const mobile = width <= 640;
+    check(`${width}px authors directory scoped CSS and layout`,
+      state.blocks === 2 &&
+        state.padding === (mobile ? '24px' : '30px') &&
+        state.wrapping === (mobile ? 'wrap' : 'nowrap') &&
+        state.avatar === 56 &&
+        state.blockWidth > 0 &&
+        state.overflow <= 0, JSON.stringify(state));
+  }
+  await page.close();
+}
+
 await browser.close();
 const failed = results.filter((r) => !r.pass);
 console.log(`\n通过 ${results.length - failed.length}/${results.length}`);
