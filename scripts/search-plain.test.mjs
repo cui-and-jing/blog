@@ -14,6 +14,16 @@ assert.equal(plain('before ![multiline\ncaption](cover.png) after'),
 assert.equal(plain('intro\n  [ref]: https://example.com/internal-id "title"\noutro'),
   'intro outro', 'indented reference definitions must not pollute search content');
 
+// Multiline link-reference metadata is not visible prose and must not become a search hit.
+assert.equal(plain('Read [Guide][docs]\n[docs]:\n  /private/api_v2\n  "internal-only-title"\nAfter'),
+  'Read Guide After', 'indented reference destinations and titles stay out of the index');
+assert.equal(plain('Read [Guide][docs]\n[docs]: /private/api_v2\n  "internal-only-title"\nAfter'),
+  'Read Guide After', 'one-line reference destinations can have a continued title');
+assert.equal(plain('Read [Guide][docs]\n[docs]:\n  <https://example.com/private>\n  (internal title)\nAfter'),
+  'Read Guide After', 'angle-bracket reference destinations and parenthesized titles are excluded');
+assert.equal(plain('Read [Guide][docs]\n[docs]:\n  /private/api_v2\nVisible follow-up text'),
+  'Read Guide Visible follow-up text', 'visible unindented prose after a reference is retained');
+
 assert.equal(plain('user_id get_user_name foo__bar'), 'user_id get_user_name foo__bar',
   'underscores within code identifiers must survive full-text indexing');
 assert.equal(plain('用户_编号 api_v2'), '用户_编号 api_v2',
