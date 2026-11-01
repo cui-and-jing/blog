@@ -21,10 +21,9 @@ export function setupLightbox(): void {
         let hintTimer = 0;
 
         const clamp = () => {
-          const w = view.offsetWidth;
-          const h = view.offsetHeight;
-          const maxX = Math.max(0, (w * (zoom - 1)) / 2);
-          const maxY = Math.max(0, (h * (zoom - 1)) / 2);
+          /* zoom is always >= 1, so the pan bounds cannot be negative. */
+          const maxX = (view.offsetWidth * (zoom - 1)) / 2;
+          const maxY = (view.offsetHeight * (zoom - 1)) / 2;
           tx = Math.max(-maxX, Math.min(maxX, tx));
           ty = Math.max(-maxY, Math.min(maxY, ty));
         };
@@ -38,8 +37,7 @@ export function setupLightbox(): void {
 
         const reset = () => {
           zoom = 1;
-          tx = 0;
-          ty = 0;
+          tx = ty = 0;
           paint();
         };
 
@@ -51,10 +49,7 @@ export function setupLightbox(): void {
           tx = px - (px - tx) * ratio;
           ty = py - (py - ty) * ratio;
           zoom = nextZoom;
-          if (zoom === 1) {
-            tx = 0;
-            ty = 0;
-          }
+          if (zoom === 1) tx = ty = 0;
           clamp();
           paint();
         };
@@ -74,8 +69,7 @@ export function setupLightbox(): void {
         };
 
         if (lightboxImages.length < 2) {
-          prev.hidden = true;
-          next.hidden = true;
+          prev.hidden = next.hidden = true;
         }
 
         const show = (i: number) => {
@@ -91,8 +85,7 @@ export function setupLightbox(): void {
           /* 「原图」指向 img 的 src 而不是 currentSrc：后者是 srcset 选中的档位，放大后会糊 */
           origin.href = image.src;
           /* 有图注就显示图注，没有才退回 alt */
-          const figCaption = image.closest('figure')?.querySelector('figcaption')?.textContent?.trim();
-          const text = figCaption || image.alt || '';
+          const text = image.closest('figure')?.querySelector('figcaption')?.textContent?.trim() || image.alt || '';
           caption.textContent = text;
           caption.hidden = !text;
           reset();
@@ -186,16 +179,12 @@ export function setupLightbox(): void {
           if (event.target === lightbox) lightbox.close();
         });
         lightbox.addEventListener('keydown', (event) => {
-          switch (event.key) {
-            case 'ArrowLeft': show(index - 1); break;
-            case 'ArrowRight': show(index + 1); break;
-            case '0': reset(); break;
-            case '+':
-            case '=': zoomAt(zoom * 1.25, 0, 0); break;
-            case '-':
-            case '_': zoomAt(zoom / 1.25, 0, 0); break;
-            default: return;
-          }
+          const key = event.key;
+          if (key === 'ArrowLeft' || key === 'ArrowRight') show(index + (key === 'ArrowLeft' ? -1 : 1));
+          else if (key === '0') reset();
+          else if (key === '+' || key === '=' || key === '-' || key === '_') {
+            zoomAt(zoom * (key === '+' || key === '=' ? 1.25 : 0.8), 0, 0);
+          } else return;
           event.preventDefault();
         });
         lightbox.addEventListener('close', () => {
