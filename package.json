@@ -25,6 +25,7 @@
     "icons": "node scripts/icons.mjs",
     "budget": "node scripts/budget.mjs",
     "budget:wire": "node scripts/budget-wire.mjs",
+    "budget:wire:routes:check": "node scripts/budget-wire-routes.test.mjs",
     "perf": "node scripts/perf.mjs",
     "perf:routes:check": "node scripts/perf-routes.test.mjs",
     "preflight": "node scripts/preflight.mjs",
