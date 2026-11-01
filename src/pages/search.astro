@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import searchPageCssSource from '../styles/search-page.css?raw';
 import { url, formatDate, readingTime, base } from '../lib/site';
 import { getPosts } from '../lib/posts';
 import { getNotes, noteTitle } from '../lib/notes';
@@ -7,6 +8,8 @@ import { activityDate } from '../lib/recent-date.mjs';
 import { collectTags } from '../lib/tags';
 import { uniqueSearchTags } from '../lib/search-tags.mjs';
 
+// Keep search-only CSS in this HTML; it is not needed on other routes.
+const searchPageCss = searchPageCssSource.replace(/\/\*[\s\S]*?\*\//g, '');
 const posts = await getPosts();
 const notes = await getNotes();
 
@@ -34,6 +37,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 ---
 
 <BaseLayout title="搜索" description="在文章和笔记中按标题、标签或正文查找">
+  <style slot="head" is:inline set:html={searchPageCss} />
   <div class="page-head">
     <div class="shell">
       <h1>搜索</h1>
