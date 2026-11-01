@@ -194,18 +194,16 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
 
       const highlight = (text: string, terms: string[]): DocumentFragment => {
         const frag = document.createDocumentFragment();
-        if (!terms.length) {
-          frag.append(text);
-          return frag;
-        }
-        const re = new RegExp(`(${terms.map(escapeRe).join('|')})`, 'gi');
-        text.split(re).forEach((part, index) => {
-          if (index % 2) {
-            const mark = document.createElement('mark');
-            mark.textContent = part;
-            frag.append(mark);
-          } else if (part) frag.append(part);
-        });
+        if (terms.length) {
+          const re = new RegExp(`(${terms.map(escapeRe).join('|')})`, 'gi');
+          text.split(re).forEach((part, index) => {
+            if (index % 2) {
+              const mark = document.createElement('mark');
+              mark.textContent = part;
+              frag.append(mark);
+            } else if (part) frag.append(part);
+          });
+        } else frag.append(text);
         return frag;
       };
 
