@@ -348,7 +348,8 @@
   color: var(--accent);
 }
 
-.search-history-list {
+.search-history-list,
+.search-suggest-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -435,11 +436,6 @@
   color: var(--text-mute);
 }
 
-.search-suggest-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 
 .search-suggest-tags a {
   padding: 5px 11px;
