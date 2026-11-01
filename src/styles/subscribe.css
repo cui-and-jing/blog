@@ -265,3 +265,18 @@
   line-height: 1.9;
   color: var(--text-mute);
 }
+
+/* 订阅页独有的窄屏规则与本页样式一起内联，避免覆盖顺序变化。 */
+@media (max-width: 720px) {
+  .reader-list ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .feed-card {
+    padding: 17px 17px 15px;
+  }
+
+  .feed-card-addr code {
+    flex-basis: 100%;
+  }
+}
