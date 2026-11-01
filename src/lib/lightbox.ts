@@ -110,21 +110,27 @@ export function setupLightbox(): void {
           flashHint();
         };
 
-        lightboxImages.forEach((image, i) => {
-          /* 正文图片统一懒加载，长文首屏不必拉完全部配图 */
+        /* Keep image semantics per node, but only two event listeners per page,
+           rather than one click/keyboard closure per image on long articles. */
+        for (const image of lightboxImages) {
           image.loading = 'lazy';
           image.decoding = 'async';
           image.tabIndex = 0;
           image.setAttribute('role', 'button');
           image.setAttribute('aria-label', `放大图片：${image.alt || '正文图片'}`);
-          image.addEventListener('click', () => openLightbox(i));
-          image.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              openLightbox(i);
-            }
-          });
-        });
+        }
+
+        const activateImage = (event: MouseEvent | KeyboardEvent) => {
+          const i = lightboxImages.indexOf(event.target as HTMLImageElement);
+          if (i < 0) return;
+          if (event instanceof KeyboardEvent) {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+          }
+          openLightbox(i);
+        };
+        document.addEventListener('click', activateImage);
+        document.addEventListener('keydown', activateImage);
 
         /* 缩放：滚轮以指针为中心，双击在 1× 与 2.4× 之间切换 */
         stage.addEventListener(
