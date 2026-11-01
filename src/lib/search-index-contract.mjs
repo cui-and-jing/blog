@@ -6,7 +6,7 @@
 export function assertSearchEntries(entries, base = '') {
   const siteBase = base.replace(/\/$/, '');
   const validDate = (value) => {
-    if (!/^\\d{4}\\.(?:0[1-9]|1[0-2])\\.(?:0[1-9]|[12]\\d|3[01])$/.test(value)) return false;
+    if (!/^\d{4}\.(?:0[1-9]|1[0-2])\.(?:0[1-9]|[12]\d|3[01])$/.test(value)) return false;
     const [year, month, day] = value.split('.').map(Number);
     if (year === 0) return false;
     const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
