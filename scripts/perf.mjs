@@ -16,6 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { launchBrowser } from './lib/browser.mjs';
+import { assertSuccessfulNavigation } from './lib/navigation-status.mjs';
 import { ROUTES } from './lib/perf-routes.mjs';
 
 /* ---------- 被测页面 ----------
@@ -135,7 +136,7 @@ for (const route of routes) {
   await page.goto('about:blank');
   const started = Date.now();
   const navigation = await page.goto(base + route.path, { waitUntil: 'load', timeout: 60_000 });
-  if (!navigation?.ok()) throw new Error(`Performance route ${route.path}: HTTP ${navigation?.status() ?? 'no response'}`);
+  assertSuccessfulNavigation(navigation, route.path, 'Performance route');
   const loadMs = Date.now() - started;
   await new Promise((resolve) => setTimeout(resolve, SETTLE));
 

@@ -72,6 +72,7 @@ async function main() {
   /* 正文用了子集外的字，线上会悄悄回退成系统宋体，只有字形不一致这一条线索，容易漏 */
   run('字体子集校验', 'node', ['scripts/fonts.mjs', '--check']);
   // 本地发布体检与 CI 保持一致：失败的 Quality 不应触发 Pages。
+  run('浏览器导航状态契约', 'node', ['scripts/navigation-status.test.mjs']);
   run('部署发布门禁', 'node', ['scripts/deploy-gate.test.mjs']);
   run('类型检查', 'npx', ['astro', 'check']);
   run('像素突围战斗契约', 'node', ['scripts/pixelraid-mechanics.mjs']);

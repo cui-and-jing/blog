@@ -56,6 +56,9 @@ jobs:
       - name: Deployment release gate contract
         run: npm run deploy:check
 
+      - name: Browser navigation HTTP status contract
+        run: node scripts/navigation-status.test.mjs
+
       - name: Local preflight parity with CI
         run: npm run preflight:check
 
