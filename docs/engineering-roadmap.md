@@ -22,7 +22,14 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Current iteration: de-duplicate search query keywords (2026-11-01)
+## Completed: exclude Markdown reference destinations and image labels from search prose (2026-11-01)
+
+- **Finding:** The shared search/reading-time plain-text normalizer kept Markdown reference definitions (including URL destinations and optional titles) and image alt text, while treating reference-style link labels and IDs as separate tokens. This could create irrelevant search matches on hidden paths and identifiers.
+- **Change:** Drop line-level reference definitions and both inline/reference/shortcut image labels; retain only visible labels of full and collapsed reference-style links. Preserve existing inline link, technical punctuation and fenced-code handling.
+- **Regression:** Dependency-free fixtures cover full/collapsed references, image references, shortcut image syntax and indented definitions. No client JavaScript/CSS, dependencies, games, routes, article content or budget changes.
+- **Release criteria:** Require newest-head complete PR Quality, then Squash Merge only when clean and all checks pass. Verify post-merge main Quality and Pages Deploy at the exact merge SHA; never override a failing budget or test.
+
+## Completed: de-duplicate search query keywords (2026-11-01)
 
 - **Finding:** The browser currently scores identical query tokens repeatedly, so repeating the same word can unfairly increase its weight. With a six-keyword cap, six copies of one token can also discard a distinct later keyword entirely.
 - **Change:** Remove repeated tokens *after* stop-word filtering but *before* the six-keyword cap, retaining the first occurrence's order. Keep the existing scoring weights, query URL, keyboard navigation and result-type filters.
