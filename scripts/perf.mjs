@@ -16,18 +16,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { launchBrowser } from './lib/browser.mjs';
+import { ROUTES } from './lib/perf-routes.mjs';
 
 /* ---------- 被测页面 ----------
    一种页型挑一条代表，不追求全覆盖：
    同一个布局模板下的页面，渲染成本差不到需要分开看的程度。 */
-const ROUTES = [
-  { path: '/', name: '首页', type: 'home' },
-  { path: '/posts/hello-astro/', name: '文章页', type: 'post' },
-  { path: '/notes/', name: '笔记列表', type: 'list' },
-  { path: '/tags/Astro/', name: '标签聚合', type: 'list' },
-  { path: '/games/', name: '游戏大厅', type: 'list' },
-  { path: '/games/snake/', name: '游戏试玩', type: 'game' },
-];
+/* Routes are shared with post-build route validation. */
 
 /* ---------- 预算 ----------
    两套线，别混为一谈：
@@ -140,7 +134,8 @@ for (const route of routes) {
      否则第一个被测页永远背着冷启动的那几百毫秒 */
   await page.goto('about:blank');
   const started = Date.now();
-  await page.goto(base + route.path, { waitUntil: 'load', timeout: 60_000 });
+  const navigation = await page.goto(base + route.path, { waitUntil: 'load', timeout: 60_000 });
+  if (!navigation?.ok()) throw new Error(`Performance route ${route.path}: HTTP ${navigation?.status() ?? 'no response'}`);
   const loadMs = Date.now() - started;
   await new Promise((resolve) => setTimeout(resolve, SETTLE));
 
