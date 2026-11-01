@@ -6,12 +6,12 @@ export function setupLightbox(): void {
       if (lightbox && lightboxImages.length > 0) {
         const view = document.getElementById('lightbox-img') as HTMLImageElement;
         const stage = document.getElementById('lightbox-stage') as HTMLElement;
-        const caption = document.getElementById('lightbox-caption');
-        const zoomLabel = document.getElementById('lightbox-zoom');
-        const origin = document.getElementById('lightbox-origin') as HTMLAnchorElement | null;
-        const hint = document.getElementById('lightbox-hint');
-        const prev = lightbox.querySelector<HTMLButtonElement>('.lightbox-nav.prev');
-        const next = lightbox.querySelector<HTMLButtonElement>('.lightbox-nav.next');
+        const caption = document.getElementById('lightbox-caption')!;
+        const zoomLabel = document.getElementById('lightbox-zoom')!;
+        const origin = document.getElementById('lightbox-origin') as HTMLAnchorElement;
+        const hint = document.getElementById('lightbox-hint')!;
+        const prev = lightbox.querySelector<HTMLButtonElement>('.lightbox-nav.prev')!;
+        const next = lightbox.querySelector<HTMLButtonElement>('.lightbox-nav.next')!;
         let index = 0;
 
         /* zoom 是倍率，tx / ty 是相对舞台中心的平移量 */
@@ -32,10 +32,8 @@ export function setupLightbox(): void {
         const paint = () => {
           view.style.transform = `translate(${tx}px, ${ty}px) scale(${zoom})`;
           stage.classList.toggle('is-zoomed', zoom > 1);
-          if (zoomLabel) {
-            zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
-            zoomLabel.hidden = zoom <= 1;
-          }
+          zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+          zoomLabel.hidden = zoom <= 1;
         };
 
         const reset = () => {
@@ -70,15 +68,14 @@ export function setupLightbox(): void {
         };
 
         const flashHint = () => {
-          if (!hint) return;
           window.clearTimeout(hintTimer);
           hint.classList.add('is-on');
           hintTimer = window.setTimeout(() => hint.classList.remove('is-on'), 2600);
         };
 
         if (lightboxImages.length < 2) {
-          prev?.setAttribute('hidden', '');
-          next?.setAttribute('hidden', '');
+          prev.hidden = true;
+          next.hidden = true;
         }
 
         const show = (i: number) => {
@@ -92,14 +89,12 @@ export function setupLightbox(): void {
           view.src = image.currentSrc || image.src;
           view.alt = image.alt;
           /* 「原图」指向 img 的 src 而不是 currentSrc：后者是 srcset 选中的档位，放大后会糊 */
-          if (origin) origin.href = image.src;
-          if (caption) {
-            /* 有图注就显示图注，没有才退回 alt */
-            const figCaption = image.closest('figure')?.querySelector('figcaption')?.textContent?.trim();
-            const text = figCaption || image.alt || '';
-            caption.textContent = text;
-            caption.hidden = !text;
-          }
+          origin.href = image.src;
+          /* 有图注就显示图注，没有才退回 alt */
+          const figCaption = image.closest('figure')?.querySelector('figcaption')?.textContent?.trim();
+          const text = figCaption || image.alt || '';
+          caption.textContent = text;
+          caption.hidden = !text;
           reset();
         };
 
@@ -123,8 +118,8 @@ export function setupLightbox(): void {
         const activateImage = (event: MouseEvent | KeyboardEvent) => {
           const i = lightboxImages.indexOf(event.target as HTMLImageElement);
           if (i < 0) return;
-          if (event instanceof KeyboardEvent) {
-            if (event.key !== 'Enter' && event.key !== ' ') return;
+          if (event.type === 'keydown') {
+            if ((event as KeyboardEvent).key !== 'Enter' && (event as KeyboardEvent).key !== ' ') return;
             event.preventDefault();
           }
           openLightbox(i);
@@ -184,9 +179,9 @@ export function setupLightbox(): void {
           }
         });
 
-        lightbox.querySelector('.lightbox-close')?.addEventListener('click', () => lightbox.close());
-        prev?.addEventListener('click', () => show(index - 1));
-        next?.addEventListener('click', () => show(index + 1));
+        lightbox.querySelector('.lightbox-close')!.addEventListener('click', () => lightbox.close());
+        prev.addEventListener('click', () => show(index - 1));
+        next.addEventListener('click', () => show(index + 1));
         lightbox.addEventListener('click', (event) => {
           if (event.target === lightbox) lightbox.close();
         });
@@ -202,7 +197,7 @@ export function setupLightbox(): void {
         lightbox.addEventListener('close', () => {
           document.documentElement.style.overflow = '';
           reset();
-          hint?.classList.remove('is-on');
+          hint.classList.remove('is-on');
           window.clearTimeout(hintTimer);
         });
       }
