@@ -135,6 +135,11 @@ for (const row of rows) {
   console.log(`  ${over ? '✗' : '✓'} ${row.name.padEnd(16, ' ')} ${kb(row.current).padStart(6)} / ${kb(row.max)} KB  (${String(ratio).padStart(3)}%)${gz}`);
 }
 
+/* Rounded KiB values can hide the final few bytes of JS/CSS headroom. */
+for (const row of rows.filter((item) => item.name === 'CSS' || item.name === 'JS')) {
+  console.log(`    ${row.name} gzip exact: ${row.gzip} / ${row.gzipMax} bytes (${row.gzipMax - row.gzip} remaining)`);
+}
+
 /* ---------- 明细 ---------- */
 
 if (css.length) {

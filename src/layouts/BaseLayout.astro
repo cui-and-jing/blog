@@ -646,8 +646,8 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         ? window.requestIdleCallback(enhanceProse, { timeout: 1500 })
         : setTimeout(enhanceProse, 200);
 
-      /* 只在正文有图时初始化灯箱；源码拆分，构建仍合并以遵守总体 JS 预算。 */
-      if (document.querySelector('.prose img')) setupLightbox();
+      /* 灯箱内部已经检查正文图片；避免在有图的页面重复扫描 DOM。 */
+      setupLightbox();
 
       /* 搜索：⌘/Ctrl+K 或 / 直接聚焦，其他页面跳到搜索页 */
       const searchUrl = document.body.dataset.searchUrl || '/search/';
@@ -756,7 +756,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         const origin = key === 'theme' ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : undefined;
 
         withTransition(() => {
-          settings = { ...settings, [key]: value };
+          settings[key] = value;
           paintSettings();
           saveSettings();
         }, origin);
