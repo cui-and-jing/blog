@@ -226,7 +226,6 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         const title = post.title.toLowerCase();
         const desc = post.description.toLowerCase();
         const category = post.category.toLowerCase();
-        const tags = post.tags.map((tag: string) => tag.toLowerCase());
         const body = post.text.toLowerCase();
         let total = 0;
         let hits = 0;
@@ -235,7 +234,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           let times = 0;
           for (let at = 0; times < 12 && (at = body.indexOf(term, at)) >= 0; at += term.length) times++;
           const weight = (title === term ? 40 : title.includes(term) ? 14 : 0)
-            + (tags.some((tag: string) => tag.includes(term)) ? 9 : 0)
+            + (post.tags.some((tag: string) => tag.toLowerCase().includes(term)) ? 9 : 0)
             + (category.includes(term) ? 6 : 0)
             + (desc.includes(term) ? 5 : 0)
             + (times ? 1 + Math.log2(times) : 0);
