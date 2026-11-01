@@ -2358,6 +2358,35 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- 订阅页局部 CSS：桌面 / 手机样式与溢出回归 ---------- */
+{
+  const page = await browser.newPage();
+  await page.goto(`${base}/subscribe/`, { waitUntil: 'load' });
+  for (const width of [1280, 390, 320]) {
+    await page.setViewport({ width, height: 844, isMobile: width <= 390, hasTouch: width <= 390 });
+    const state = await page.evaluate(() => {
+      const feed = document.querySelector('.feed-card');
+      const readers = document.querySelector('.reader-list ul');
+      const code = document.querySelector('.feed-card-addr code');
+      const cardStyle = getComputedStyle(feed);
+      const readerStyle = getComputedStyle(readers);
+      return {
+        cols: readerStyle.gridTemplateColumns.split(' ').length,
+        feedPadding: cardStyle.paddingTop,
+        codeBasis: getComputedStyle(code).flexBasis,
+        overflow: document.documentElement.scrollWidth - innerWidth,
+      };
+    });
+    const mobile = width <= 720;
+    check(`${width}px 订阅页局部样式及网格布局正常`,
+      state.cols === (mobile ? 1 : 2)
+        && state.feedPadding === (mobile ? '17px' : '20px')
+        && (!mobile || state.codeBasis === '100%')
+        && state.overflow <= 0, JSON.stringify(state));
+  }
+  await page.close();
+}
+
 await browser.close();
 const failed = results.filter((r) => !r.pass);
 console.log(`\n通过 ${results.length - failed.length}/${results.length}`);
