@@ -2,6 +2,13 @@
 
 _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 
+## Latest: fail closed on visual-fixture HTTP errors (2026-11-01)
+
+- **Problem:** The visual screenshot runner accepted any resolved Puppeteer navigation, including HTTP 404/500 error pages. A missing route could therefore be captured and compared as if it were a valid page. Manual performance profiling already rejected these responses.
+- **Fix:** Use one explicit navigation-status guard in both visual and performance tools. Cover success, redirect/error responses, and missing responses in the CI and local preflight contract. Keep existing screenshot baselines, budget limits, and runtime behavior unchanged.
+- **CSS audit:** Remove widget-tag color declarations that were fully overridden later by same-specificity rules; preserve existing light/dark appearances. Check the built gzip budget rather than treating source-byte reduction as performance improvement.
+- **Follow-up:** Still prioritize meaningful CSS/JS gzip headroom. Do not claim this guard improves LCP/TBT or production website availability.
+
 ## Baseline and constraints
 
 - Astro 7 + Markdown/MDX, deployed to GitHub Pages.
