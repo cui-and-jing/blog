@@ -378,7 +378,9 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       const apply = (syncUrl = true) => {
         if (!ready) return;
         const query = input.value.trim();
-        const type = pageUrl().searchParams.get('type');
+        /* Reuse the URL object for filter selection and query synchronization. */
+        const url = pageUrl();
+        const type = url.searchParams.get('type');
         selectedType = degraded ? 'post' : ['all', 'post', 'note'].includes(type!)
           ? type as SearchType : query ? 'all' : 'post';
         /* 停用词过滤、去重后再取前 6 个；重复词不能挤掉有效搜索词。 */
@@ -386,9 +388,8 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
         clearBtn!.hidden = !query;
 
         if (syncUrl) {
-          const next = pageUrl();
-          query ? next.searchParams.set('q', query) : next.searchParams.delete('q');
-          history.replaceState(null, '', next);
+          query ? url.searchParams.set('q', query) : url.searchParams.delete('q');
+          history.replaceState(null, '', url);
         }
 
         /* sort() 自 ES2019 起稳定：同分保留 getPosts() 原始时间顺序。 */

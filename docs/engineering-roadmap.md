@@ -469,6 +469,13 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 - **Regression:** verify capped-count parity for empty, repeated and long-content samples, then require the existing entire search/browser, lightbox, settings, content, build, axe, keyboard, game, font and transfer-budget suites in PR Quality. Merge only when the latest PR commit is green; require main Quality followed by same-SHA Pages deployment.
 - **Guardrails:** no dependency, route, content, game, theme appearance or CSS changes; do not increase either size limit.
 
+## Completed: share search CSS rules and reuse the current search URL (2026-11-01)
+
+- **Finding:** On the previous green build, JS gzip had only 8 bytes and CSS gzip 18 bytes of headroom. The search page parsed the same URL twice during one input change. History/suggestion hover colors, search badge decoration and hidden-state CSS rules were repeated.
+- **Change:** Reuse one URL object inside `apply()` for selecting filters and synchronizing the query. Consolidate equivalent search result badge, hover and hidden-state CSS rules while preserving selected-state cascade precedence.
+- **Regression:** Require existing search/history/Back-Forward/browser/axe/keyboard/visual and exact JS/CSS asset-budget checks. Compare with the previous 12,280 / 21,486-byte baseline.
+- **Guardrails:** No dependencies, URLs, ranking, games, content, budget increases or layout redesign.
+
 ## Merge checklist for every iteration
 
 1. Branch from current `main`; avoid unreviewed dependency upgrades. `npm run deploy:check` verifies the release gate configuration.

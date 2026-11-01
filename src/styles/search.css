@@ -224,19 +224,20 @@
   letter-spacing: 0.02em;
 }
 
-.search-item-meta .cat {
+.search-item-meta :is(.cat, .search-type) {
   padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.search-item-meta .cat {
   color: var(--accent);
   background: var(--accent-soft);
-  border-radius: 999px;
 }
 
 /* 笔记混在文章结果里，需要一个不显眼但能分辨的标记 */
 .search-item-meta .search-type {
-  padding: 2px 8px;
   color: var(--accent-2);
   background: color-mix(in srgb, var(--accent-2) 12%, transparent);
-  border-radius: 999px;
 }
 
 .search-arrow {
@@ -306,10 +307,6 @@
   border-radius: 14px;
 }
 
-.search-history[hidden] {
-  display: none;
-}
-
 .search-history-head {
   display: flex;
   align-items: baseline;
@@ -342,10 +339,6 @@
   transition: color 0.18s var(--ease);
 }
 
-.search-history-clear:hover {
-  color: var(--accent);
-}
-
 .search-history-list {
   display: flex;
   flex-wrap: wrap;
@@ -366,10 +359,6 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   cursor: pointer;
-}
-
-.search-history-item:hover {
-  color: var(--accent);
 }
 
 /* ---------- 无结果时的建议 ---------- */
@@ -422,7 +411,6 @@
 }
 
 .search-suggest-group li a:hover {
-  color: var(--accent);
   border-bottom-color: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
@@ -450,12 +438,17 @@
 }
 
 .search-suggest-tags a:hover {
-  color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
 }
 
 /* 结果类型使用搜索历史的按钮样式 */
-.search-filters[hidden] { display: none; }
+.search-history-clear:hover,
+.search-history-item:hover,
+.search-suggest-group li a:hover,
+.search-suggest-tags a:hover {
+  color: var(--accent);
+}
+.search-history[hidden], .search-filters[hidden] { display: none; }
 .search-filters button { min-height: 44px; }
 .search-filters [aria-pressed='true'] {
   background: var(--accent-soft);
