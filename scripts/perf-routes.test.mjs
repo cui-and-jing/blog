@@ -10,7 +10,7 @@ assert.ok(ROUTES.some((route) => route.type === 'game'), 'No game fixture in per
 assert.equal(new Set(ROUTES.map((route) => route.path)).size, ROUTES.length, 'Duplicate perf routes');
 
 for (const route of ROUTES) {
-  assert.match(route.path, /^\\/(?:[^?#]+\\/)?$/, `Invalid route: ${route.path}`);
+  assert.ok(route.path.startsWith('/') && route.path.endsWith('/') && !/[?#]/.test(route.path), `Invalid route: ${route.path}`);
   assert.ok(route.name && route.type, `Missing route metadata: ${route.path}`);
   const file = path.join(output, route.path === '/' ? 'index.html' : route.path.slice(1) + 'index.html');
   assert.ok(fs.existsSync(file), `Performance route ${route.path} missing built page: ${file}`);
