@@ -347,6 +347,48 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- Search results: batch rendering preserves every row and stable order ---------- */
+{
+  const page = await browser.newPage();
+  const errors = [];
+  let indexRequest = null;
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.setRequestInterception(true);
+  page.on('request', (request) => {
+    if (request.url().split('?')[0].endsWith('/search-index.json')) indexRequest = request;
+    else request.continue();
+  });
+  await page.goto(base + '/search/?q=render', { waitUntil: 'load' });
+  if (!indexRequest) {
+    check('Search batch-render index fixture intercepted', false, 'index request not observed');
+  } else {
+    const prefix = new URL(base).pathname.replace(/\/$/, '');
+    const posts = Array.from({ length: 64 }, (_, i) => ({
+      type: 'post', title: `Render result ${i}`, description: 'Result description',
+      text: 'render', category: '测试', tags: ['render'], date: '2026.11.01',
+      minutes: 1, href: `${prefix}/posts/render-fixture-${i}/`,
+    }));
+    await indexRequest.respond({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ posts }),
+    });
+    await page.waitForFunction(
+      () => document.querySelectorAll('#search-results .search-result').length === 64,
+      { timeout: 6000 },
+    ).catch(() => {});
+    const actual = await page.evaluate(() => ({
+      titles: [...document.querySelectorAll('#search-results .search-result h2')].map((h) => h.textContent),
+      count: document.getElementById('search-count')?.textContent,
+      empty: document.getElementById('search-empty')?.hidden,
+      visible: !document.getElementById('search-results')?.hidden,
+    }));
+    check('Search batch render retains 64 sorted results, count and visibility',
+      JSON.stringify(actual.titles) === JSON.stringify(posts.map((p) => p.title))
+      && actual.count === '找到 64 条' && actual.empty && actual.visible && errors.length === 0,
+      JSON.stringify({ count: actual.titles.length, summary: actual.count, errors }));
+  }
+  await page.close();
+}
+
 /* ---------- Repeated query terms must not crowd out another keyword ---------- */
 {
   const page = await browser.newPage();
