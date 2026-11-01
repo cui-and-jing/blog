@@ -29,6 +29,12 @@ export function plain(markdown) {
   // Match actual HTML elements/comments, not mathematical comparisons such as x < 10.
   return prose
     .replace(/```[\s\S]*?```/g, ' ')
+    // Reference destinations and image alt labels are not readable prose.
+    // Reference definitions may continue with an indented destination and title.
+    // Exclude these invisible lines before stripping ordinary link markup.
+    .replace(/^ {0,3}\[[^\]\n]+\]:[ \t]*\n[ \t]+(?:<[^>\n]+>|\S+)(?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?(?:\n[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?[ \t]*$/gm, ' ')
+    .replace(/^ {0,3}\[[^\]\n]+\]:[^\n]*(?:\n[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))[ \t]*$/gm, ' ')
+    .replace(/^ {0,3}\[[^\]\n]+\]:[^\n]*$/gm, ' ')
     // HTML code and embedded scripts/styles are not article prose.
     .replace(/<(pre|script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
     .replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][^>]*>|<![A-Za-z][^>]*>/g,
@@ -44,12 +50,6 @@ export function plain(markdown) {
         }
         return ' ';
       })
-    // Reference destinations and image alt labels are not readable prose.
-    // Reference definitions may continue with an indented destination and title.
-    // Exclude these invisible lines before stripping ordinary link markup.
-    .replace(/^ {0,3}\[[^\]\n]+\]:[ \t]*\n[ \t]+(?:<[^>\n]+>|\S+)(?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?(?:\n[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?[ \t]*$/gm, ' ')
-    .replace(/^ {0,3}\[[^\]\n]+\]:[^\n]*(?:\n[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))[ \t]*$/gm, ' ')
-    .replace(/^ {0,3}\[[^\]\n]+\]:[^\n]*$/gm, ' ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/!\[[^\]\n]*\](?:\[[^\]\n]*\])?/g, ' ')
     // Preserve link labels for full/collapsed reference-style Markdown links.
