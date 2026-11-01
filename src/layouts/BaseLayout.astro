@@ -512,7 +512,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
     </dialog>
 
     <script>
-      import { setupLightbox } from '../lib/lightbox';
+      /* Defer the image viewer's JavaScript until a page actually has prose images. */
       /* 这段脚本跟首屏无关：主题、字体、字号已经在 head 的内联脚本里落定，
          正文能不能读也不依赖它。所以它等第一帧画完再接管。
 
@@ -646,8 +646,10 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         ? window.requestIdleCallback(enhanceProse, { timeout: 1500 })
         : setTimeout(enhanceProse, 200);
 
-      /* 灯箱内部已经检查正文图片；避免在有图的页面重复扫描 DOM。 */
-      setupLightbox();
+      /* 无正文图片的页面不下载灯箱模块。 */
+      if (document.querySelector('.prose img')) {
+        import('../lib/lightbox').then(({ setupLightbox }) => setupLightbox());
+      }
 
       /* 搜索：⌘/Ctrl+K 或 / 直接聚焦，其他页面跳到搜索页 */
       const searchUrl = document.body.dataset.searchUrl || '/search/';
