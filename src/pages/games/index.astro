@@ -1,12 +1,16 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCover from '../../components/GameCover.astro';
+import gamesCssSource from '../../styles/games.css?raw';
 import { GAMES, url, SITE } from '../../lib/site';
 
+// Inline only on the game hall; strip source comments to avoid shipping them in HTML.
+const gamesCss = gamesCssSource.replace(/\/\*[\s\S]*?\*\//g, '');
 const [featured, ...rest] = GAMES;
 ---
 
 <BaseLayout title="游戏" description="两款离线游戏，以派对竞技和像素动作玩法为主。">
+  <style slot="head" is:inline set:html={gamesCss} />
   <div class="page-head">
     <div class="shell">
       <h1>游戏</h1>
