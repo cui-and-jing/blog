@@ -1,5 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+// 页面专属 CSS 直接写入 HTML，避免所有页面为订阅页下载样式。
+import subscribeCss from '../styles/subscribe.css?raw';
 import { SITE, url } from '../lib/site';
 
 const origin = (Astro.site ?? new URL(SITE.github)).toString().replace(/\/$/, '');
@@ -29,6 +31,7 @@ const readers = [
 ---
 
 <BaseLayout title="订阅" description="用 RSS 订阅这个博客的文章与笔记，不经过任何推荐算法。">
+  <style slot="head" is:inline set:html={subscribeCss} />
   <div class="page-head">
     <div class="shell">
       <h1>订阅</h1>
