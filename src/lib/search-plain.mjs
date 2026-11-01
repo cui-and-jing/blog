@@ -45,6 +45,10 @@ export function plain(markdown) {
         return ' ';
       })
     // Reference destinations and image alt labels are not readable prose.
+    // Reference definitions may continue with an indented destination and title.
+    // Exclude these invisible lines before stripping ordinary link markup.
+    .replace(/^ {0,3}\[[^\]\n]+\]:[ \t]*\n[ \t]+(?:<[^>\n]+>|\S+)(?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?(?:\n[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?[ \t]*$/gm, ' ')
+    .replace(/^ {0,3}\[[^\]\n]+\]:[^\n]*(?:\n[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))[ \t]*$/gm, ' ')
     .replace(/^ {0,3}\[[^\]\n]+\]:[^\n]*$/gm, ' ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/!\[[^\]\n]*\](?:\[[^\]\n]*\])?/g, ' ')
