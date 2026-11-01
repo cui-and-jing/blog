@@ -29,6 +29,14 @@ try {
   write('assets/a.svg', '<svg/>');
   write('assets/b.svg', '<svg/>');
 
+  /* CSS assets may be relative to the emitted _astro bundle or absolute under /blog/. */
+  write('_astro/site.css', [
+    '.relative{background:url("../assets/a.svg")}',
+    '.absolute{mask:url("/blog/assets/b.svg#symbol")}',
+    '.inline{background:url(data:image/svg+xml,%3Csvg%3E)}',
+    '/* url("/blog/assets/ignored-comment.svg") */',
+  ].join('\n'));
+
   const config = { dist: root, base: '/blog', site: 'https://example.test' };
   const good = auditBuiltLinks(config);
   assert.equal(good.pages, 4, 'must inspect emitted pages including the 404 fallback');
@@ -49,7 +57,16 @@ try {
   assert.ok(broken.errors.some((e) => e.reason.includes('missing target fragment')));
   assert.ok(broken.errors.some((e) => e.reason.includes('bypasses')));
   assert.ok(broken.errors.some((e) => e.reason.includes('javascript')));
-  console.log('✓ Link-check fixtures: routes, UTF-8, fragments, srcset, external links, broken base and unsafe href');
+
+  write('_astro/site.css', [
+    '.missing{background:url("../assets/missing.svg")}',
+    '.wrong-base{mask:url("/assets/a.svg")}',
+  ].join('\n'));
+  const badCss = auditBuiltLinks(config);
+  assert.equal(badCss.errors.length, 7, 'must reject missing and out-of-base CSS resources');
+  assert.ok(badCss.errors.some((e) => e.page === '_astro/site.css' && e.reason.includes('missing emitted CSS asset')));
+  assert.ok(badCss.errors.some((e) => e.page === '_astro/site.css' && e.reason.includes('CSS asset bypasses')));
+  console.log('✓ Link-check fixtures: HTML routes, fragments, srcset, CSS asset URLs, data URLs, comments, missing files and base paths');
 } finally {
   fs.rmSync(root, { recursive: true, force: true });
 }
