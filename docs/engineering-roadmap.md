@@ -462,6 +462,13 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 - **Regression:** Keep the entire Chromium keyboard, mobile touch and accessibility Quality suite mandatory. Verify the final PR SHA, merged main Quality and Pages deployment SHA; a green run reduces but cannot eliminate intermittent-failure uncertainty.
 - **Guardrails:** test/docs only; no product JS/CSS, games, article content, dependencies, URLs or performance-budget changes.
 
+## Completed: bounded search scoring allocations and browser JS cleanup (2026-11-01)
+
+- **Finding:** search scoring used an unlimited `body.split(term)` for each keyword on each input change, although ranking only needs the first 12 occurrences. The base layout also checked for prose images before calling a lightbox function that independently queries and guards images, and reading-setting updates recreated the full settings object on every click.
+- **Change:** cap split output at 13 segments without altering the 12-hit score ceiling; call the lightbox's own guarded initializer once rather than scanning the DOM twice; update only the selected setting property. Expose exact JS/CSS gzip bytes and remaining headroom in the build budget logs (the hard limits remain unchanged).
+- **Regression:** verify capped-count parity for empty, repeated and long-content samples, then require the existing entire search/browser, lightbox, settings, content, build, axe, keyboard, game, font and transfer-budget suites in PR Quality. Merge only when the latest PR commit is green; require main Quality followed by same-SHA Pages deployment.
+- **Guardrails:** no dependency, route, content, game, theme appearance or CSS changes; do not increase either size limit.
+
 ## Merge checklist for every iteration
 
 1. Branch from current `main`; avoid unreviewed dependency upgrades. `npm run deploy:check` verifies the release gate configuration.
