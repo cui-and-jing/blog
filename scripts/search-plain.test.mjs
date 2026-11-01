@@ -9,7 +9,7 @@ assert.equal(plain('before ![private thumbnail][asset] after\n[asset]: /images/s
   'before after', 'reference-style images and their definitions must not become search hits');
 assert.equal(plain('before ![logo][] and ![badge] after\n[logo]: /logo.svg'),
   'before and after', 'collapsed and shortcut reference images should also stay out of prose');
-assert.equal(plain('before ![multiline\\ncaption](cover.png) after'),
+assert.equal(plain('before ![multiline\ncaption](cover.png) after'),
   'before after', 'existing inline image syntax with multiline alt text remains excluded');
 assert.equal(plain('intro\n  [ref]: https://example.com/internal-id "title"\noutro'),
   'intro outro', 'indented reference definitions must not pollute search content');
