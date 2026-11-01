@@ -22,6 +22,13 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
+## Planned in this PR: normalize whitespace in recent searches (2026-11-01)
+
+- **Finding:** The browser scorer treats repeated spaces, tabs and newlines as word separators, but local recent-search de-duplication compares raw trimmed strings. Queries such as `Astro   Astro` and `astro Astro` can create two history chips for equivalent terms.
+- **Change:** Collapse internal whitespace to one space when storing a recent search and when comparing it with prior entries. Keep recent spelling and existing entry order, six-entry cap, privacy-mode behavior, search results and shareable URL semantics.
+- **Regression:** Update the existing real-link navigation Chromium flow at 390px: seed a spaced mixed-case item, click a result after an equivalent query, and assert one normalized chip remains while an unrelated history item survives.
+- **Release gate:** Do not increase the 12 KiB gzip JavaScript cap or bypass any Quality check. Squash Merge only if complete PR Quality is green; then require main Quality and Pages Build/Deploy to succeed on the same merged SHA.
+
 ## Completed: omit multiline Markdown link-reference metadata from search (2026-11-01)
 
 - **Finding:** The shared Markdown prose normalizer removes one-line `[label]: destination` reference definitions but leaves destinations and optional titles when CommonMark wraps them onto indented following lines. Hidden paths and titles can then produce irrelevant search hits and inflate reading time.
