@@ -229,8 +229,10 @@ html[data-theme='dark'] .game-tag {
   overflow: hidden;
 }
 
+/* The base .game-facts tracks also switch to two columns below 900px.
+   Do not restate four columns here: a more specific mini-card selector
+   would override the responsive rule and squeeze facts on phones. */
 .game-card--mini .game-facts {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   padding: 12px 0;
 }

@@ -1349,6 +1349,21 @@ const check = (name, pass, detail = '') => {
   check('800px 游戏大厅两张游戏卡都采用单列布局',
     tablet.cards === 2 && tablet.columns.every((n) => n === 1) && tablet.overflow <= 0,
     JSON.stringify(tablet));
+
+  /* Mini-card specificity must not override the fact-grid media query.
+     Test the actual computed columns at both sides of the 900px breakpoint. */
+  for (const width of [390, 800, 1280]) {
+    await page.setViewport({ width, height: 900, isMobile: width === 390, hasTouch: width === 390 });
+    const facts = await page.evaluate(() => ({
+      columns: [...document.querySelectorAll('.game-card .game-facts')]
+        .map((list) => getComputedStyle(list).gridTemplateColumns.trim().split(/\s+/).length),
+      overflow: document.documentElement.scrollWidth - innerWidth,
+    }));
+    const expected = width <= 900 ? 2 : 4;
+    check(`${width}px 两张游戏卡的参数网格均为 ${expected} 列且无横向溢出`,
+      facts.columns.length === 2 && facts.columns.every((n) => n === expected) && facts.overflow <= 0,
+      JSON.stringify(facts));
+  }
   await page.close();
 }
 
