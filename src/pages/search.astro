@@ -344,7 +344,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
       const remember = (value: string) => {
         const query = value.trim();
         if (query.length < 2) return;
-        writeHistory([query, ...readHistory().filter((item) => item !== query)]);
+        writeHistory([query, ...readHistory().filter((item) => item.toLowerCase() !== query.toLowerCase())]);
       };
 
       const renderHistory = () => {
