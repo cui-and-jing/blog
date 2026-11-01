@@ -1,0 +1,413 @@
+.search-shell {
+  max-width: 880px;
+  padding-bottom: 80px;
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  height: 62px;
+  padding: 0 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-md);
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.search-box:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent), var(--shadow-md);
+}
+
+.search-icon {
+  width: 19px;
+  height: 19px;
+  flex: none;
+  color: var(--text-mute);
+}
+
+.search-box input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: 17px;
+  color: var(--text);
+  background: none;
+  border: 0;
+  outline: none;
+}
+
+.search-box input::placeholder {
+  color: var(--text-mute);
+}
+
+.search-box input::-webkit-search-cancel-button,
+.search-box input::-webkit-search-decoration {
+  display: none;
+}
+
+.search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--text-mute);
+  background: var(--bg-soft);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 0.18s var(--ease), background 0.18s var(--ease);
+}
+
+.search-clear[hidden] {
+  display: none;
+}
+
+.search-clear:hover {
+  color: var(--text);
+  background: var(--line);
+}
+
+.search-clear svg {
+  width: 13px;
+  height: 13px;
+}
+
+.search-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 4px 12px;
+  font-size: 12.5px;
+  color: var(--text-mute);
+}
+
+.search-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.search-keys kbd {
+  min-width: 20px;
+  padding: 2px 5px;
+  font-size: 10px;
+  background: var(--card);
+}
+
+.search-results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line-soft);
+}
+
+.search-result {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.search-item {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px 16px;
+  border-radius: 14px;
+  transition: background 0.18s var(--ease);
+}
+
+.search-item:hover,
+.search-result.is-active .search-item {
+  background: var(--bg-soft);
+}
+
+.search-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-item h2 {
+  margin: 0 0 6px;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+
+.search-item p {
+  display: -webkit-box;
+  margin: 0 0 10px;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-soft);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.search-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 11.5px;
+  color: var(--text-mute);
+}
+
+.search-item-meta time {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.search-item-meta .cat {
+  padding: 2px 8px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+}
+
+/* 笔记混在文章结果里，需要一个不显眼但能分辨的标记 */
+.search-item-meta .search-type {
+  padding: 2px 8px;
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 12%, transparent);
+  border-radius: 999px;
+}
+
+.search-arrow {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--text-mute);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  transition: color 0.18s var(--ease), border-color 0.18s var(--ease),
+    transform 0.18s var(--ease);
+}
+
+.search-item:hover .search-arrow,
+.search-suggest-tags a:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+
+.search-item:hover .search-arrow { transform: translateX(2px); }
+
+.search-results mark {
+  padding: 0 2px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-radius: 3px;
+}
+
+.search-noscript {
+  margin: 18px 0 0;
+  padding: 14px 18px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-mute);
+  background: var(--bg-soft);
+  border-radius: 12px;
+}
+
+.search-noscript a {
+  color: var(--accent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.search-empty {
+  padding: 64px 20px 70px;
+  text-align: center;
+}
+
+.search-empty-title {
+  margin: 0 0 6px;
+  font-family: var(--font-serif);
+  font-size: 21px;
+}
+
+.search-empty-hint {
+  margin: 0 0 22px;
+  font-size: 13.5px;
+  color: var(--text-mute);
+}
+
+/* ---------- 搜索历史 ---------- */
+.search-history {
+  margin: 6px 0 2px;
+  padding: 14px 16px 16px;
+  background: var(--bg-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+}
+
+.search-history[hidden] {
+  display: none;
+}
+
+.search-history-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+  text-transform: uppercase;
+}
+
+.search-history-head span {
+  font-family: var(--font-mono);
+}
+
+.search-history-clear {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 11.5px;
+  letter-spacing: 0;
+  color: var(--text-mute);
+  text-transform: none;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.18s var(--ease);
+}
+
+.search-history-clear:hover {
+  color: var(--accent);
+}
+
+.search-history-list,
+.search-suggest-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.search-history-item {
+  max-width: 100%;
+  min-height: 44px;
+  padding: 7px 13px;
+  overflow: hidden;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-soft);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.search-history-item:hover {
+  color: var(--accent);
+}
+
+/* ---------- 无结果时的建议 ---------- */
+.search-suggest {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 26px;
+  max-width: 660px;
+  margin: 44px auto 0;
+  padding-top: 28px;
+  text-align: left;
+  border-top: 1px solid var(--line-soft);
+}
+
+.search-suggest-group h2 {
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+  text-transform: uppercase;
+}
+
+.search-suggest-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-suggest-group li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--line-soft);
+}
+
+.search-suggest-group li:last-child {
+  border-bottom: 0;
+}
+
+.search-suggest-group li a {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+  border-bottom: 1px solid transparent;
+  transition: color 0.18s var(--ease), border-color 0.18s var(--ease);
+}
+
+.search-suggest-group li a:hover {
+  color: var(--accent);
+  border-bottom-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.search-suggest-group li time {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-mute);
+}
+
+
+.search-suggest-tags a {
+  padding: 5px 11px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  transition: color 0.18s var(--ease), border-color 0.18s var(--ease);
+}
+
+
+/* 结果类型使用搜索历史的按钮样式 */
+.search-filters[hidden] { display: none; }
+.search-filters button { min-height: 44px; }
+.search-filters [aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+@media (max-width: 720px) {
+  .search-suggest {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+
+  .search-empty {
+    padding: 46px 6px 54px;
+  }
+}

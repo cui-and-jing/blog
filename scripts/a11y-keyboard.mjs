@@ -238,6 +238,36 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- Search page-local CSS and 320/390/1280px layouts ---------- */
+{
+  const page = await browser.newPage();
+  for (const width of [320, 390, 1280]) {
+    await page.setViewport({ width, height: 850 });
+    await page.goto(base + '/search/', { waitUntil: 'load' });
+    const styles = await page.evaluate(() => {
+      const box = document.querySelector('.search-box');
+      const empty = document.querySelector('.search-empty');
+      const shell = document.querySelector('.search-shell');
+      const suggestion = document.querySelector('.search-suggest');
+      return {
+        present: Boolean(box && empty && shell && suggestion),
+        flex: box ? getComputedStyle(box).display : '',
+        radius: box ? getComputedStyle(box).borderRadius : '',
+        emptyPaddingTop: empty ? getComputedStyle(empty).paddingTop : '',
+        columns: suggestion ? getComputedStyle(suggestion).gridTemplateColumns : '',
+        overflow: document.documentElement.scrollWidth > innerWidth + 1,
+      };
+    });
+    const isMobile = width <= 720;
+    check('Search local CSS and layout at ' + width + 'px',
+      styles.present && styles.flex === 'flex' && styles.radius === (isMobile ? '15px' : '18px') &&
+        styles.emptyPaddingTop === (isMobile ? '46px' : '64px') &&
+        !styles.overflow && Boolean(styles.columns),
+      JSON.stringify(styles));
+  }
+  await page.close();
+}
+
 /* ---------- Search history: storage events from another tab ---------- */
 {
   const a = await browser.newPage();
