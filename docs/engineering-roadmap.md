@@ -22,7 +22,14 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 | P4 | Improve content discovery | Consider navigation feedback and reading-list/search improvements after P0-P3, measured against small-screen usability. |
 | Separate | Game playability | Keep Bean Rush / Pixel Raid work in focused PRs with real game smoke and deterministic combat tests. |
 
-## Planned in this PR: normalize whitespace in recent searches (2026-11-01)
+## Planned in this PR: mobile search keyboard and navigation regression (2026-11-01)
+
+- **Finding:** Search types use pushState, while query edits replace the current URL state. Desktop Back recovery is covered, but the mobile flow had no real Back/Forward assertion after changing the query on a later filter entry. The software keyboard's primary action was also left implicit.
+- **Change:** Set an explicit Search action hint on the search input, with no runtime JavaScript or CSS changes. Keep the existing filtering, shared query URL and six-entry local recent-search behavior intact.
+- **Regression:** At 390px, use the actual filter buttons to create history entries, edit the query, then navigate Back and Forward. Assert that query input, URL, selected button, result types/count and viewport agree, with no browser errors or duplicate entries.
+- **Release gate:** Run the complete unchanged Quality pipeline, including 12 KiB gzip JS, CSS, games and a11y. Squash-merge only on green PR CI, then check Quality and Pages deployment against the exact merged SHA.
+
+## Completed: normalize whitespace in recent searches (2026-11-01)
 
 - **Finding:** The browser scorer treats repeated spaces, tabs and newlines as word separators, but local recent-search de-duplication compares raw trimmed strings. Queries such as `Astro   Astro` and `astro Astro` can create two history chips for equivalent terms.
 - **Change:** Collapse internal whitespace to one space when storing a recent search and when comparing it with prior entries. Keep recent spelling and existing entry order, six-entry cap, privacy-mode behavior, search results and shareable URL semantics.
