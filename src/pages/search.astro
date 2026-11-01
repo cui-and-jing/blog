@@ -415,7 +415,7 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           category: a.dataset.cat || '',
           href: a.href,
           date: a.querySelector('time')?.textContent || '',
-          minutes: Number(a.dataset.minutes || '0'),
+          minutes: +(a.dataset.minutes || '0'),
           text: a.dataset.desc || '',
         }));
 
