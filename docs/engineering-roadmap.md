@@ -471,9 +471,9 @@ _Last reviewed: 2026-11-01. Scope: `cui-and-jing/blog`._
 
 ## Completed: share search CSS rules and reuse the current search URL (2026-11-01)
 
-- **Finding:** On the previous green build, JS gzip had only 8 bytes and CSS gzip 18 bytes of headroom. The search page parsed the same URL twice during one input change. History/suggestion hover colors, search badge decoration and hidden-state CSS rules were repeated.
-- **Change:** Reuse one URL object inside `apply()` for selecting filters and synchronizing the query. Consolidate equivalent search result badge, hover and hidden-state CSS rules while preserving selected-state cascade precedence.
-- **Regression:** Require existing search/history/Back-Forward/browser/axe/keyboard/visual and exact JS/CSS asset-budget checks. Compare with the previous 12,280 / 21,486-byte baseline.
+- **Finding:** On the previous green build, JS gzip had only 8 bytes and CSS gzip 18 bytes of headroom. The search page parsed the same URL twice during one input change. The search-arrow and suggestion-tag hover rules repeated the same border/color declarations; the bounded search scorer retained a redundant Math.min after limiting split results.
+- **Change:** Reuse one URL object inside `apply()` for selecting filters and synchronizing the query. Consolidate the identical search-arrow and suggestion-tag hover colors/borders while preserving other cascade-sensitive rules. Remove redundant Math.min in bounded keyword counting.
+- **Regression:** Require existing search/history/Back-Forward/browser/axe/keyboard and exact JS/CSS asset-budget checks. Compare with the previous 12,280 / 21,486-byte baseline.
 - **Guardrails:** No dependencies, URLs, ranking, games, content, budget increases or layout redesign.
 
 ## Merge checklist for every iteration
