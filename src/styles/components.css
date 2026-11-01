@@ -357,15 +357,7 @@ html[data-theme='dark'] a.tag-pill:hover {
   background: hsl(var(--h, 28) 32% 32%);
 }
 
-/* widget 侧栏标签也上色 */
-.widget-tags a {
-  color: hsl(var(--h, 28) 30% 34%);
-}
-
-html[data-theme='dark'] .widget-tags a {
-  color: hsl(var(--h, 28) 34% 72%);
-}
-
+/* Widget tag text colors are defined together with their backgrounds below. */
 /* ---------- widgets ---------- */
 .widget {
   padding: 18px 20px 20px;
