@@ -46,7 +46,7 @@ export function plain(markdown) {
       })
     // Reference destinations and image alt labels are not readable prose.
     .replace(/^ {0,3}\[[^\]\n]+\]:[^\n]*$/gm, ' ')
-    .replace(/!\[[^\]\n]*\]\([^)]*\)/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/!\[[^\]\n]*\](?:\[[^\]\n]*\])?/g, ' ')
     // Preserve link labels for full/collapsed reference-style Markdown links.
     .replace(/\[([^\]\n]*)\]\[[^\]\n]*\]/g, '$1')
