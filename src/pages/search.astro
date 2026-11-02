@@ -396,20 +396,22 @@ const topTags = collectTags(posts, notes).slice(0, 6).map(({ tag }) => tag);
           history.replaceState(null, '', url);
         }
 
+        /* Filter types before scoring so a notes-only search never scans article bodies. */
+        const candidates = selectedType === 'all' ? posts : posts.filter((post) => post.type === selectedType);
         /* sort() 自 ES2019 起稳定：同分保留 getPosts() 原始时间顺序。 */
         const ranked = terms.length
-          ? posts.map((post) => ({ post, score: score(post, terms) }))
+          ? candidates.map((post) => ({ post, score: score(post, terms) }))
               .filter((item) => item.score > 0)
               .sort((a, b) => b.score - a.score)
               .map(({ post }) => ({ post, terms }))
-          : query ? [] : posts.map((post) => ({ post, terms: [] }));
+          : query ? [] : candidates.map((post) => ({ post, terms: [] }));
         typeButtons.forEach((button) => {
           const type = button.dataset.searchType as SearchType;
           button.disabled = degraded && type !== 'post';
           button.ariaPressed = String(type === selectedType);
         });
         document.getElementById('search-type-filters')!.hidden = false;
-        render(ranked.filter(({ post }) => selectedType === 'all' || post.type === selectedType), Boolean(query));
+        render(ranked, Boolean(query));
         renderHistory();
       };
 
