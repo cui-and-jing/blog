@@ -238,6 +238,76 @@ const check = (name, pass, detail = '') => {
   await page.close();
 }
 
+/* ---------- Article copy: denied modern API and all legacy outcomes ---------- */
+{
+  const page = await browser.newPage();
+  // Paragraph anchors are intentionally hidden at <=900px; exercise their desktop UI.
+  await page.setViewport({ width: 1280, height: 900 });
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async () => { throw new Error('clipboard denied'); } },
+    });
+    window.__legacyMode = 'success';
+    window.__copiedText = '';
+    document.execCommand = () => {
+      window.__copiedText = document.activeElement?.value || '';
+      if (window.__legacyMode === 'throw') throw new Error('legacy copy denied');
+      return window.__legacyMode === 'success';
+    };
+  });
+  await page.goto(base + '/posts/hello-astro/', { waitUntil: 'load' });
+  const controls = ['[data-share-copy]', '.heading-anchor', '.para-anchor'];
+  for (const selector of controls) {
+    // A later successful attempt must still work after both kinds of failure.
+    for (const mode of ['success', 'false', 'throw', 'success']) {
+      await page.evaluate(({ selector, mode }) => {
+        history.replaceState(null, '', '#keep-copy-location');
+        window.__legacyMode = mode;
+        window.__copiedText = '';
+        const control = document.querySelector(selector);
+        delete control.dataset.copied;
+        document.getElementById('a11y-status').textContent = '';
+        control.focus({ preventScroll: true });
+        if (document.activeElement !== control) throw new Error(`Copy control not focusable: ${selector}`);
+      }, { selector, mode });
+      const before = await page.evaluate(() => ({
+        url: location.href,
+        textareas: document.querySelectorAll('textarea').length,
+        scroll: scrollY,
+      }));
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(({ selector, mode }) => {
+        const control = document.querySelector(selector);
+        return mode === 'success' ? control.dataset.copied === '1'
+          : selector === '[data-share-copy]'
+            ? document.querySelector('[data-share-copy-label]')?.textContent === '复制失败'
+            : document.getElementById('a11y-status')?.textContent === '复制失败，请手动选择文字';
+      }, { timeout: 2500 }, { selector, mode }).catch(() => null);
+      const after = await page.evaluate((selector) => ({
+        focused: document.activeElement === document.querySelector(selector),
+        url: location.href,
+        textareas: document.querySelectorAll('textarea').length,
+        scroll: scrollY,
+        copied: document.querySelector(selector).dataset.copied === '1',
+        failed: selector === '[data-share-copy]'
+          ? document.querySelector('[data-share-copy-label]')?.textContent === '复制失败'
+          : document.getElementById('a11y-status')?.textContent === '复制失败，请手动选择文字',
+        text: window.__copiedText,
+      }), selector);
+      check(`Article copy ${selector}: legacy ${mode}`,
+        after.focused && after.url === before.url && after.textareas === before.textareas
+          && Math.abs(after.scroll - before.scroll) <= 1
+          && (mode === 'success' ? after.copied : after.failed && !after.copied)
+          && after.text.includes('/posts/hello-astro/'), JSON.stringify(after));
+    }
+  }
+  check('Article copy fallback has no unhandled errors', errors.length === 0, errors.join('; '));
+  await page.close();
+}
+
 /* ---------- Search page-local CSS and 320/390/1280px layouts ---------- */
 {
   const page = await browser.newPage();
