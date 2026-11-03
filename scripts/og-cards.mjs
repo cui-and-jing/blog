@@ -13,6 +13,7 @@ import sharp from 'sharp';
 import { parse as parseYaml } from 'yaml';
 import { coverStyle } from '../src/lib/cover.ts';
 import { plainNote, titleFromText } from '../src/lib/note-text.ts';
+import { formatDate as fmtDate } from '../src/lib/content-date.mjs';
 import { AUTHORS } from '../src/data/authors.ts';
 import { launchBrowser } from './lib/browser.mjs';
 
@@ -51,7 +52,6 @@ for (const file of files) {
 posts.sort((a, b) => b.date.valueOf() - a.date.valueOf());
 
 /* ---------- 模板 ---------- */
-const fmtDate = (d) => `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 const hueOf = (tag) => {
   let h = 5381;
   for (let i = 0; i < tag.length; i += 1) h = (h * 33) ^ tag.charCodeAt(i);

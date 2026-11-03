@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { url, formatDate, readingTime } from '../lib/site';
+import { contentDateParts, shortDate } from '../lib/content-date.mjs';
 import { getPosts } from '../lib/posts';
 import { getNotes, noteTitle, noteExcerpt } from '../lib/notes';
 
@@ -8,7 +9,7 @@ const [posts, notes] = await Promise.all([getPosts(), getNotes()]);
 
 const byYear = new Map<string, typeof posts>();
 for (const post of posts) {
-  const year = String(post.data.date.getFullYear());
+  const year = String(contentDateParts(post.data.date).year);
   if (!byYear.has(year)) byYear.set(year, []);
   byYear.get(year)!.push(post);
 }
@@ -16,7 +17,7 @@ for (const post of posts) {
 /* 笔记也按年归位：归档是「全部内容」的时间线，不该只有长文 */
 const notesByYear = new Map<string, typeof notes>();
 for (const note of notes) {
-  const year = String(note.data.date.getFullYear());
+  const year = String(contentDateParts(note.data.date).year);
   if (!notesByYear.has(year)) notesByYear.set(year, []);
   notesByYear.get(year)!.push(note);
 }
@@ -26,7 +27,7 @@ const totalMinutes = posts.reduce((sum, post) => sum + readingTime(post.body ?? 
 
 /* 每月一格：文章和笔记一起数，才看得出这一年的写作节奏 */
 function monthsOf(items: { data: { date: Date } }[]) {
-  return Array.from({ length: 12 }, (_, month) => items.filter((item) => item.data.date.getMonth() === month).length);
+  return Array.from({ length: 12 }, (_, month) => items.filter((item) => contentDateParts(item.data.date).month === month + 1).length);
 }
 
 function topCategories(list: typeof posts) {
@@ -38,8 +39,6 @@ function topCategories(list: typeof posts) {
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2);
 }
 
-const shortDate = (date: Date) =>
-  `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
 ---
 
 <BaseLayout title="归档" description="按年份归档的全部文章与笔记">

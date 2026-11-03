@@ -8,6 +8,7 @@
     "build": "astro build && node scripts/games.mjs",
     "preview": "astro preview",
     "check": "astro check",
+    "dates:check": "node scripts/content-dates.test.mjs",
     "settings:check": "node scripts/reading-settings.test.mjs",
     "bookmarks:check": "node scripts/bookmarks.test.mjs",
     "games": "node scripts/games.mjs",

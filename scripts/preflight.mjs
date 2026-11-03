@@ -92,6 +92,7 @@ async function main() {
     console.log('· 跳过构建（--skip-build），直接检查现有 dist');
   }
 
+  run('内容日期时区一致性', 'node', ['scripts/content-dates.test.mjs']);
   run('首访预算路由及 HTTP 状态契约', 'node', ['scripts/budget-wire-routes.test.mjs']);
   run('构建链接和资源完整性', 'node', ['scripts/built-links.test.mjs']);
   run('站点路由、资源和章节锚点', 'node', ['scripts/built-links-check.mjs']);

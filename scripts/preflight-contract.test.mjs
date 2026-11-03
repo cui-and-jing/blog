@@ -12,6 +12,13 @@ const packageScripts = JSON.parse(read('../package.json')).scripts;
 
 const contracts = [
   {
+    label: '内容日期时区一致性',
+    file: 'scripts/content-dates.test.mjs',
+    npm: 'dates:check',
+    previous: "run('构建'",
+    next: "run('体积预算'",
+  },
+  {
     label: '样式变量解析契约',
     file: 'scripts/css-vars.test.mjs',
     npm: 'css:vars:check',
@@ -93,4 +100,11 @@ assert.throws(() => checkParity(
   preflight, quality.replace('run: npm run bookmarks:check', 'run: npm run check'),
 ), /CI missing bookmarks:check/);
 
-console.log('✓ Local preflight and CI share release, settings, bookmarks and RSS contracts, with fail-closed regressions');
+assert.throws(() => checkParity(
+  preflight.replace("run('内容日期时区一致性', 'node', ['scripts/content-dates.test.mjs']);", ''), quality,
+), /Local preflight missing 内容日期时区一致性/);
+assert.throws(() => checkParity(
+  preflight, quality.replace('run: npm run dates:check', 'run: npm run check'),
+), /CI missing dates:check/);
+
+console.log('✓ Local preflight and CI share dates, release, settings, bookmarks and RSS contracts, with fail-closed regressions');
