@@ -9,6 +9,7 @@
     "preview": "astro preview",
     "check": "astro check",
     "settings:check": "node scripts/reading-settings.test.mjs",
+    "bookmarks:check": "node scripts/bookmarks.test.mjs",
     "games": "node scripts/games.mjs",
     "games:smoke": "node scripts/games-smoke.mjs",
     "raid:test": "node scripts/pixelraid-mechanics.mjs",

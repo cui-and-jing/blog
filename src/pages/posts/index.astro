@@ -102,7 +102,7 @@ const authorCount = new Map(authors.map((author) => [
     if (savedRow) savedRow.hidden = false;
 
     const linksFor = (key: FilterKey) =>
-      links.filter((link) => link.closest('[data-post-filter]')?.getAttribute('data-post-filter') === key);
+      links.filter((link) => link.closest<HTMLElement>('[data-post-filter]')?.dataset.postFilter === key);
 
     const readUrl = () => {
       const params = new URLSearchParams(window.location.search);
@@ -119,23 +119,21 @@ const authorCount = new Map(authors.map((author) => [
       for (const card of cards) {
         const match = (!state.category || card.dataset.category === state.category)
           && (!state.author || card.dataset.author === state.author)
-          && (!savedOnly || saved.has(card.dataset.postId ?? ''));
+          && (!savedOnly || saved.has(card.dataset.postId!));
+        /* Return focus before hiding a removed saved card, including cross-tab updates. */
+        if (!match && card.contains(document.activeElement)) savedFilter?.focus();
         card.hidden = !match;
         if (match) visible += 1;
       }
-      if (savedCount) savedCount.textContent = String(cards.filter((card) => saved.has(card.dataset.postId ?? '')).length);
-      if (savedFilter) {
-        if (savedOnly) savedFilter.setAttribute('aria-current', 'true');
-        else savedFilter.removeAttribute('aria-current');
-      }
+      if (savedCount) savedCount.textContent = String(cards.filter((card) => saved.has(card.dataset.postId!)).length);
+      if (savedFilter) savedFilter.ariaCurrent = savedOnly ? 'true' : null;
       if (emptyText) emptyText.textContent = savedOnly
         ? '这里没有收藏的文章。'
         : '这里没有这样的文章。换个分类或作者。';
 
       for (const key of keys) {
         for (const link of linksFor(key)) {
-          if ((link.dataset.filterValue ?? '') === state[key]) link.setAttribute('aria-current', 'true');
-          else link.removeAttribute('aria-current');
+          link.ariaCurrent = (link.dataset.filterValue ?? '') === state[key] ? 'true' : null;
         }
       }
 
@@ -156,7 +154,7 @@ const authorCount = new Map(authors.map((author) => [
 
     links.forEach((link) => link.addEventListener('click', (event) => {
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      const key = link.closest('[data-post-filter]')?.getAttribute('data-post-filter') as FilterKey | null;
+      const key = link.closest<HTMLElement>('[data-post-filter]')?.dataset.postFilter as FilterKey | null;
       if (!key || !keys.includes(key)) return;
       event.preventDefault();
       state[key] = link.dataset.filterValue ?? '';

@@ -33,6 +33,13 @@ const contracts = [
     next: "run('类型检查'",
   },
   {
+    label: '收藏存储容错',
+    file: 'scripts/bookmarks.test.mjs',
+    npm: 'bookmarks:check',
+    previous: "run('阅读设置容错'",
+    next: "run('类型检查'",
+  },
+  {
     label: 'RSS 全文与永久链接校验',
     file: 'scripts/rss-check.mjs',
     npm: 'rss:check',
@@ -79,4 +86,11 @@ assert.throws(() => checkParity(
   quality.replace('run: npm run settings:check', 'run: npm run check'),
 ), /CI missing settings:check/);
 
-console.log('✓ Local preflight and CI share release, settings and RSS contracts, with fail-closed regressions');
+assert.throws(() => checkParity(
+  preflight.replace("run('收藏存储容错', 'node', ['scripts/bookmarks.test.mjs']);", ''), quality,
+), /Local preflight missing 收藏存储容错/);
+assert.throws(() => checkParity(
+  preflight, quality.replace('run: npm run bookmarks:check', 'run: npm run check'),
+), /CI missing bookmarks:check/);
+
+console.log('✓ Local preflight and CI share release, settings, bookmarks and RSS contracts, with fail-closed regressions');

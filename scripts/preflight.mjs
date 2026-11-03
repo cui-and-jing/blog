@@ -75,6 +75,7 @@ async function main() {
   run('浏览器导航状态契约', 'node', ['scripts/navigation-status.test.mjs']);
   run('部署发布门禁', 'node', ['scripts/deploy-gate.test.mjs']);
   run('阅读设置容错', 'node', ['scripts/reading-settings.test.mjs']);
+  run('收藏存储容错', 'node', ['scripts/bookmarks.test.mjs']);
   run('类型检查', 'npx', ['astro', 'check']);
   run('像素突围战斗契约', 'node', ['scripts/pixelraid-mechanics.mjs']);
 
