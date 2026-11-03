@@ -676,16 +676,26 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       /* 四项偏好存在同一个 settings 对象里，首帧脚本读同一份数据，
          所以无论从顶栏面板改、还是从文章页的 A− A A+ 改，刷新后都是同一套结果 */
       type Settings = { theme: string; font: string; size: string; leading: string };
-      const DEFAULTS: Settings = { theme: 'auto', font: 'serif', size: 'normal', leading: 'normal' };
-      const fields = Object.entries({
-        theme: 'themeChoice', font: 'font', size: 'reading', leading: 'leading',
-      }) as [keyof Settings, string][];
+      /* Preference key, default choice, and matching <html> data attribute. */
+      const fields = [
+        ['theme', 'auto', 'themeChoice'], ['font', 'serif', 'font'],
+        ['size', 'normal', 'reading'], ['leading', 'normal', 'leading'],
+      ] as const;
       const settingButtons = [...document.querySelectorAll<HTMLElement>('[data-setting]')];
 
-      /* The head already resolved storage and legacy migration for the first paint.
-         Keep that same choice if storage is readable but writes are blocked. */
-      let settings = {} as Settings;
-      for (const [key, attribute] of fields) settings[key] = root.dataset[attribute] ?? '';
+      /* Read again at deferred boot: another tab may have changed preferences
+         since the first paint. Legacy reads must also survive failed migration. */
+      const readSettings = (): Settings => {
+        let next = {} as Settings;
+        try {
+          try { next = { ...JSON.parse(localStorage.getItem('settings') ?? '{}') }; }
+          catch {}
+          next.theme ||= localStorage.getItem('theme') ?? '';
+          next.size ||= localStorage.getItem('reading') ?? '';
+        } catch {}
+        return next;
+      };
+      let settings = readSettings();
       const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
       const announce = (message: string) => {
@@ -696,12 +706,12 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const paintSettings = () => {
         /* Only actual controls are valid choices; malformed storage cannot leave
            a whole group unselected or leak arbitrary values into CSS attributes. */
-        for (const [key, attribute] of fields) {
+        for (const [key, fallback, attribute] of fields) {
           if (!settingButtons.some((button) => button.dataset.setting === key && button.dataset.value === settings[key])) {
-            settings[key] = DEFAULTS[key];
+            settings[key] = fallback;
           }
           /* Missing attributes mean defaults, except the explicitly exposed theme choice. */
-          if (key !== 'theme' && settings[key] === DEFAULTS[key]) delete root.dataset[attribute];
+          if (key !== 'theme' && settings[key] === fallback) delete root.dataset[attribute];
           else root.dataset[attribute] = settings[key];
         }
         root.dataset.theme = settings.theme === 'auto' ? (darkQuery.matches ? 'dark' : 'light') : settings.theme;
@@ -724,14 +734,13 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       /* 主题切换用 View Transition 的圆形扩散，以点击的按钮为圆心铺开。
          面板本身在 top layer，会一起被拍进快照，所以看起来是整屏同步变色 */
       const withTransition = (apply: () => void, button?: HTMLElement) => {
-        const transition = (document as any).startViewTransition;
-        if (reduceMotion.matches || !transition || !button) return apply();
+        if (reduceMotion.matches || !button || !document.startViewTransition) return apply();
         /* Only theme animations need a layout measurement. */
         const rect = button.getBoundingClientRect();
         const x = rect.left + rect.width / 2;
         const y = rect.top + rect.height / 2;
         const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-        transition.call(document, apply).ready.then(() => {
+        document.startViewTransition(apply).ready.then(() => {
           root.animate(
             { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
             { duration: 540, easing: 'ease-in-out', pseudoElement: '::view-transition-new(root)' }
@@ -770,8 +779,7 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       /* 同步其他标签页的设置修改，也处理 localStorage.clear() 的 null key。 */
       addEventListener('storage', (event) => {
         if (event.key && event.key !== 'settings') return;
-        try { settings = { ...JSON.parse(event.newValue ?? '{}') }; }
-        catch { settings = {} as Settings; }
+        settings = readSettings();
         paintSettings();
       });
 
@@ -781,9 +789,6 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const settingsPanel = document.getElementById('settings-panel') as HTMLDialogElement | null;
       const shortcutsPanel = document.getElementById('shortcuts-panel') as HTMLDialogElement | null;
       const navDrawer = document.getElementById('nav-drawer') as HTMLDialogElement | null;
-      const settingsToggle = document.getElementById('settings-toggle');
-      const menuToggle = document.getElementById('menu-toggle');
-      const shortcutsOpen = document.getElementById('shortcuts-open');
 
       const openPanel = (panel: HTMLDialogElement | null) => {
         if (panel && !panel.open) panel.showModal();
@@ -796,11 +801,11 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         });
         panel?.addEventListener('close', () => button?.setAttribute('aria-expanded', 'false'));
       };
-      bindPanel(settingsToggle, settingsPanel);
-      bindPanel(menuToggle, navDrawer);
+      bindPanel(document.getElementById('settings-toggle'), settingsPanel);
+      bindPanel(document.getElementById('menu-toggle'), navDrawer);
 
       /* 从设置里点进快捷键，先收起当前面板，避免两个 dialog 叠在一起 */
-      shortcutsOpen?.addEventListener('click', () => {
+      document.getElementById('shortcuts-open')?.addEventListener('click', () => {
         settingsPanel?.close();
         openPanel(shortcutsPanel);
       });

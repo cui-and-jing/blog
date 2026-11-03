@@ -17,7 +17,7 @@ const choices = [...source.matchAll(/<button\b[^>]*data-setting="([^"]+)"[^>]*da
 assert.equal(choices.length, 11, 'All four actual settings groups are represented');
 const defaults = { theme: 'auto', font: 'serif', size: 'normal', leading: 'normal' };
 
-function boot(values = {}, { denyRead = false, denyWrite = false, dark = false } = {}) {
+function boot(values = {}, { denyRead = false, denyWrite = false, dark = false, beforeDeferred } = {}) {
   const saved = new Map(Object.entries(values));
   const dataset = {};
   const meta = { content: '', setAttribute(_name, value) { this.content = value; } };
@@ -54,6 +54,7 @@ function boot(values = {}, { denyRead = false, denyWrite = false, dark = false }
   });
   vm.runInContext(head, context);
   const firstPaint = { ...dataset };
+  beforeDeferred?.(saved);
   vm.runInContext(deferred, context);
   return {
     dataset, firstPaint, saved, meta, darkQuery,
@@ -172,3 +173,22 @@ test('System theme changes apply only to the auto choice', () => {
   assert.equal(page.dataset.theme, 'light');
   assert.equal(page.meta.content, '#f2f0e9');
 });
+
+for (const operation of ['replace', 'remove', 'clear', 'malformed']) {
+  test('Deferred boot sees a cross-tab ' + operation + ' after first paint', () => {
+    const page = boot({ settings: '{"theme":"dark","font":"kai","size":"large"}' }, {
+      beforeDeferred(saved) {
+        if (operation === 'replace') saved.set('settings', '{"theme":"light","font":"sans","size":"small","leading":"loose"}');
+        if (operation === 'remove') saved.delete('settings');
+        if (operation === 'clear') saved.clear();
+        if (operation === 'malformed') saved.set('settings', '{broken');
+      },
+    });
+    assert.equal(page.firstPaint.themeChoice, 'dark');
+    const expected = operation === 'replace'
+      ? { theme: 'light', font: 'sans', size: 'small', leading: 'loose' }
+      : defaults;
+    assert.deepEqual(page.state(), expected);
+    page.assertSelected(expected);
+  });
+}
