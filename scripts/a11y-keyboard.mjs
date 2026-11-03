@@ -619,6 +619,75 @@ const check = (name, pass, detail = '') => {
   }
 }
 
+/* ---------- Reading settings: malformed data and blocked legacy migration ---------- */
+{
+  const defaults = { theme: 'auto', font: 'serif', size: 'normal', leading: 'normal' };
+  const scenarios = [
+    { name: 'invalid fields', stored: '{"theme":"sepia","font":{},"size":["large"],"leading":false}', expected: defaults },
+    { name: 'malformed JSON', stored: '{broken', expected: defaults },
+    { name: 'null data', stored: 'null', expected: defaults },
+    { name: 'array data', stored: '["dark"]', expected: defaults },
+    { name: 'mixed valid fields', stored: '{"theme":"dark","font":null,"size":"small","leading":1}',
+      expected: { ...defaults, theme: 'dark', size: 'small' } },
+    { name: 'blocked migration', legacy: true, denyWrite: true,
+      expected: { ...defaults, theme: 'dark', size: 'large' } },
+    { name: 'blocked storage', denyRead: true, denyWrite: true, expected: defaults },
+  ];
+  for (const scenario of scenarios) {
+    const page = await browser.newPage();
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.emulateMediaFeatures([
+      { name: 'prefers-reduced-motion', value: 'reduce' },
+      { name: 'prefers-color-scheme', value: 'light' },
+    ]);
+    await page.evaluateOnNewDocument((fixture) => {
+      localStorage.clear();
+      if (fixture.stored !== undefined) localStorage.setItem('settings', fixture.stored);
+      if (fixture.legacy) {
+        localStorage.setItem('theme', 'dark');
+        localStorage.setItem('reading', 'large');
+      }
+      if (fixture.denyWrite) {
+        Storage.prototype.setItem = () => { throw new DOMException('Storage full', 'QuotaExceededError'); };
+      }
+      if (fixture.denyRead) {
+        Storage.prototype.getItem = () => { throw new DOMException('Storage denied', 'SecurityError'); };
+      }
+    }, scenario);
+    await page.goto(base + '/posts/hello-astro/', { waitUntil: 'load' });
+    await page.waitForFunction(() => document.documentElement.dataset.booted === 'on');
+    const read = () => page.evaluate(() => {
+      const data = document.documentElement.dataset;
+      return {
+        values: { theme: data.themeChoice, font: data.font ?? 'serif', size: data.reading ?? 'normal', leading: data.leading ?? 'normal' },
+        pressed: Object.fromEntries(['theme', 'font', 'size', 'leading'].map((key) => [key,
+          [...document.querySelectorAll(`#settings-panel [data-setting="${key}"][aria-pressed="true"]`)]
+            .map((button) => button.dataset.value)])),
+        articleSize: document.querySelector('.size-switch [aria-pressed="true"]')?.dataset.value,
+      };
+    });
+    const state = await read();
+    check('Reading settings recover ' + scenario.name,
+      Object.entries(scenario.expected).every(([key, value]) => state.values[key] === value
+        && state.pressed[key].length === 1 && state.pressed[key][0] === value)
+        && state.articleSize === scenario.expected.size && errors.length === 0,
+      JSON.stringify({ ...state, errors }));
+    await page.click('#settings-toggle');
+    await page.waitForSelector('#settings-panel[open]');
+    await page.click('#settings-panel [data-setting="font"][data-value="sans"]');
+    const changed = await read();
+    check('Recovered settings remain editable: ' + scenario.name,
+      changed.values.font === 'sans' && changed.pressed.font.join() === 'sans', JSON.stringify(changed));
+    await page.click('#settings-reset');
+    const reset = await read();
+    check('Recovered settings can reset: ' + scenario.name,
+      Object.entries(defaults).every(([key, value]) => reset.values[key] === value && reset.pressed[key].join() === value)
+        && reset.articleSize === 'normal' && errors.length === 0, JSON.stringify(reset));
+    await page.close();
+  }
+}
+
 /* ---------- Reading settings: cross-tab deletion and clear must reset all controls ---------- */
 {
   const a = await browser.newPage();
@@ -660,6 +729,16 @@ const check = (name, pass, detail = '') => {
   const chosen = await read();
   check('Settings changes from a second tab synchronize', chosen.theme === 'dark'
     && chosen.font === 'sans' && chosen.size === 'large' && chosen.leading === 'loose', JSON.stringify(chosen));
+
+  await a.evaluate(() => localStorage.setItem('settings',
+    '{"theme":false,"font":{},"size":null,"leading":[]}'));
+  await b.waitForFunction(() => document.documentElement.dataset.themeChoice === 'auto'
+    && !document.documentElement.dataset.font && !document.documentElement.dataset.reading,
+  { timeout: 4000 }).catch(() => {});
+  const malformed = await read();
+  check('Malformed settings from another tab restore valid choices and aria-pressed',
+    defaults(malformed), JSON.stringify(malformed));
+  await choose();
 
   for (const method of ['removeItem', 'clear']) {
     await a.evaluate((action) => {

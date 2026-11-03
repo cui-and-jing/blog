@@ -74,6 +74,7 @@ async function main() {
   // 本地发布体检与 CI 保持一致：失败的 Quality 不应触发 Pages。
   run('浏览器导航状态契约', 'node', ['scripts/navigation-status.test.mjs']);
   run('部署发布门禁', 'node', ['scripts/deploy-gate.test.mjs']);
+  run('阅读设置容错', 'node', ['scripts/reading-settings.test.mjs']);
   run('类型检查', 'npx', ['astro', 'check']);
   run('像素突围战斗契约', 'node', ['scripts/pixelraid-mechanics.mjs']);
 
