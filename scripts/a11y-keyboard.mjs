@@ -241,6 +241,8 @@ const check = (name, pass, detail = '') => {
 /* ---------- Article copy: denied modern API and all legacy outcomes ---------- */
 {
   const page = await browser.newPage();
+  // Paragraph anchors are intentionally hidden at <=900px; exercise their desktop UI.
+  await page.setViewport({ width: 1280, height: 900 });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.evaluateOnNewDocument(() => {
@@ -269,6 +271,7 @@ const check = (name, pass, detail = '') => {
         delete control.dataset.copied;
         document.getElementById('a11y-status').textContent = '';
         control.focus({ preventScroll: true });
+        if (document.activeElement !== control) throw new Error(`Copy control not focusable: ${selector}`);
       }, { selector, mode });
       const before = await page.evaluate(() => ({
         url: location.href,
