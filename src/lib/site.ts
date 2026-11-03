@@ -88,13 +88,7 @@ export function mediaUrl(path: string): string {
   return url(path);
 }
 
-export function formatDate(date: Date): string {
-  const d = new Date(date);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}.${m}.${day}`;
-}
+export { formatDate } from './content-date.mjs';
 
 export { readingTime } from './reading-time.mjs';
 

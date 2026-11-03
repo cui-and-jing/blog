@@ -3,6 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import NoteCopy from '../../components/NoteCopy.astro';
 import { render } from 'astro:content';
 import { url, formatDate } from '../../lib/site';
+import { contentDateParts, shortDate } from '../../lib/content-date.mjs';
 import { getNotes, noteAnchor } from '../../lib/notes';
 
 const notes = await getNotes();
@@ -15,19 +16,17 @@ const rendered = await Promise.all(
 /* 按年月分组，组内保持时间倒序 */
 const groups: { key: string; label: string; items: typeof rendered }[] = [];
 for (const item of rendered) {
-  const date = item.note.data.date;
-  const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+  const { year, month } = contentDateParts(item.note.data.date);
+  const key = `${year}-${month}`;
   let group = groups.find((entry) => entry.key === key);
   if (!group) {
-    group = { key, label: `${date.getFullYear()} 年 ${date.getMonth() + 1} 月`, items: [] };
+    group = { key, label: `${year} 年 ${month} 月`, items: [] };
     groups.push(group);
   }
   group.items.push(item);
 }
 
 const latest = notes[0]?.data.date;
-const shortDate = (date: Date) =>
-  `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
 ---
 
 <BaseLayout

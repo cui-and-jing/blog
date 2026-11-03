@@ -79,6 +79,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Content calendar timezone contract
+        run: npm run dates:check
+
       # 性能脚本不能指向已移除游戏或不存在的页面：404 也可能产出看似正常的性能数字。
       - name: Performance profile route fixtures
         run: npm run perf:routes:check
