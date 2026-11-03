@@ -2049,6 +2049,12 @@ for (const width of [390, 1280]) {
   await page.waitForSelector('#bookmark-filter-row:not([hidden])');
   const ids = await page.$$eval('#post-grid .card', (cards) => cards.map((card) => card.dataset.postId));
   const bookmark = (id) => `#post-grid button[data-bookmark-id="${id}"]`;
+  const focus = async (selector) => {
+    await page.focus(selector);
+    if (!(await page.$eval(selector, (node) => document.activeElement === node))) {
+      throw new Error(`Bookmark keyboard target is not focusable: ${selector}`);
+    }
+  };
   const read = () => page.evaluate(() => ({
     selected: [...document.querySelectorAll('#post-grid button[aria-pressed="true"]')]
       .map((button) => button.dataset.bookmarkId),
@@ -2057,13 +2063,24 @@ for (const width of [390, 1280]) {
     count: document.getElementById('bookmark-count').textContent,
     empty: !document.getElementById('post-filter-empty').hidden,
     focused: document.activeElement?.id,
+    focusedBookmark: document.activeElement?.getAttribute('data-bookmark-id'),
     stored: JSON.parse(localStorage.getItem('cui-jing:saved-posts:v1') ?? '[]'),
     query: new URL(location.href).searchParams.get('saved'),
   }));
 
-  await page.click(bookmark(ids[0]));
-  await page.click(bookmark(ids[1]));
-  await page.click('#bookmark-filter');
+  /* Build the keyboard fixture without pointer coordinates during card entrance motion. */
+  for (const id of ids.slice(0, 2)) {
+    await focus(bookmark(id));
+    await page.keyboard.press('Enter');
+  }
+  await focus('#bookmark-filter');
+  await page.keyboard.press('Enter');
+  const seeded = await read();
+  check(`${width}px keyboard fixture has two persisted bookmarks and saved-only mode`,
+    seeded.selected.join() === ids.slice(0, 2).join()
+      && seeded.stored.join() === ids.slice(0, 2).join()
+      && seeded.visible.join() === ids.slice(0, 2).join() && seeded.query === '1',
+    JSON.stringify(seeded));
   /* Only persistence fails. Reads still return the old, valid saved collection. */
   await page.evaluate(() => {
     window.restoreBookmarkWrites = Storage.prototype.setItem;
@@ -2072,7 +2089,7 @@ for (const width of [390, 1280]) {
       return window.restoreBookmarkWrites.call(this, key, value);
     };
   });
-  await page.focus(bookmark(ids[0]));
+  await focus(bookmark(ids[0]));
   await page.keyboard.press('Enter');
   const removed = await read();
   check(`${width}px failed bookmark write removes the focused card without losing keyboard focus`,
@@ -2081,7 +2098,7 @@ for (const width of [390, 1280]) {
       && removed.stored.join() === ids.slice(0, 2).join() && removed.query === '1',
     JSON.stringify(removed));
 
-  await page.focus(bookmark(ids[1]));
+  await focus(bookmark(ids[1]));
   await page.keyboard.press('Space');
   const empty = await read();
   check(`${width}px removing the last saved item keeps an empty pending list and visible focus`,
@@ -2091,7 +2108,7 @@ for (const width of [390, 1280]) {
 
   /* The recovered focus remains operable: Enter leaves saved-only and restores all cards. */
   await page.keyboard.press('Enter');
-  await page.focus(bookmark(ids[2]));
+  await focus(bookmark(ids[2]));
   await page.keyboard.press('Enter');
   const added = await read();
   check(`${width}px adding after failed removals uses the current session, not stale saved articles`,
@@ -2099,8 +2116,9 @@ for (const width of [390, 1280]) {
       && added.count === '1' && added.stored.join() === ids.slice(0, 2).join(),
     JSON.stringify(added));
 
-  await page.click('#bookmark-filter');
-  await page.focus(bookmark(ids[2]));
+  await focus('#bookmark-filter');
+  await page.keyboard.press('Enter');
+  await focus(bookmark(ids[2]));
   /* An unrelated storage key must not discard this tab's pending bookmark changes. */
   const other = await context.newPage();
   await other.goto(`${base}/posts/`, { waitUntil: 'load' });
@@ -2109,7 +2127,7 @@ for (const width of [390, 1280]) {
   const unrelated = await read();
   check(`${width}px unrelated cross-tab storage change leaves pending selection and focus alone`,
     unrelated.selected.join() === ids[2] && unrelated.visible.join() === ids[2]
-      && unrelated.focused !== 'bookmark-filter', JSON.stringify(unrelated));
+      && unrelated.focusedBookmark === ids[2], JSON.stringify(unrelated));
 
   await other.evaluate(() => localStorage.setItem('cui-jing:saved-posts:v1', '[]'));
   await page.waitForFunction(() => document.getElementById('bookmark-count').textContent === '0',
@@ -2120,9 +2138,9 @@ for (const width of [390, 1280]) {
       && refreshed.focused === 'bookmark-filter' && refreshed.empty, JSON.stringify(refreshed));
 
   await page.evaluate(() => { Storage.prototype.setItem = window.restoreBookmarkWrites; });
-  await page.focus('#bookmark-filter');
+  await focus('#bookmark-filter');
   await page.keyboard.press('Enter');
-  await page.focus(bookmark(ids[0]));
+  await focus(bookmark(ids[0]));
   await page.keyboard.press('Enter');
   await page.reload({ waitUntil: 'load' });
   const recovered = await read();
