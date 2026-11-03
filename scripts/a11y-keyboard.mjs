@@ -2038,6 +2038,100 @@ const check = (name, pass, detail = '') => {
   }
 }
 
+/* ---------- Saved reading: write failures and disappearing keyboard targets ---------- */
+for (const width of [390, 1280]) {
+  const context = await browser.createBrowserContext();
+  const page = await context.newPage();
+  await page.setViewport({ width, height: 900 });
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`${base}/posts/`, { waitUntil: 'load' });
+  await page.waitForSelector('#bookmark-filter-row:not([hidden])');
+  const ids = await page.$$eval('#post-grid .card', (cards) => cards.map((card) => card.dataset.postId));
+  const bookmark = (id) => `#post-grid button[data-bookmark-id="${id}"]`;
+  const read = () => page.evaluate(() => ({
+    selected: [...document.querySelectorAll('#post-grid button[aria-pressed="true"]')]
+      .map((button) => button.dataset.bookmarkId),
+    visible: [...document.querySelectorAll('#post-grid .card:not([hidden])')]
+      .map((card) => card.dataset.postId),
+    count: document.getElementById('bookmark-count').textContent,
+    empty: !document.getElementById('post-filter-empty').hidden,
+    focused: document.activeElement?.id,
+    stored: JSON.parse(localStorage.getItem('cui-jing:saved-posts:v1') ?? '[]'),
+    query: new URL(location.href).searchParams.get('saved'),
+  }));
+
+  await page.click(bookmark(ids[0]));
+  await page.click(bookmark(ids[1]));
+  await page.click('#bookmark-filter');
+  /* Only persistence fails. Reads still return the old, valid saved collection. */
+  await page.evaluate(() => {
+    window.restoreBookmarkWrites = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'cui-jing:saved-posts:v1') throw new DOMException('Quota exceeded', 'QuotaExceededError');
+      return window.restoreBookmarkWrites.call(this, key, value);
+    };
+  });
+  await page.focus(bookmark(ids[0]));
+  await page.keyboard.press('Enter');
+  const removed = await read();
+  check(`${width}px failed bookmark write removes the focused card without losing keyboard focus`,
+    removed.selected.join() === ids[1] && removed.visible.join() === ids[1]
+      && removed.count === '1' && removed.focused === 'bookmark-filter'
+      && removed.stored.join() === ids.slice(0, 2).join() && removed.query === '1',
+    JSON.stringify(removed));
+
+  await page.focus(bookmark(ids[1]));
+  await page.keyboard.press('Space');
+  const empty = await read();
+  check(`${width}px removing the last saved item keeps an empty pending list and visible focus`,
+    empty.selected.length === 0 && empty.visible.length === 0 && empty.count === '0'
+      && empty.empty && empty.focused === 'bookmark-filter' && empty.query === '1',
+    JSON.stringify(empty));
+
+  /* The recovered focus remains operable: Enter leaves saved-only and restores all cards. */
+  await page.keyboard.press('Enter');
+  await page.focus(bookmark(ids[2]));
+  await page.keyboard.press('Enter');
+  const added = await read();
+  check(`${width}px adding after failed removals uses the current session, not stale saved articles`,
+    added.selected.join() === ids[2] && added.visible.length === ids.length
+      && added.count === '1' && added.stored.join() === ids.slice(0, 2).join(),
+    JSON.stringify(added));
+
+  await page.click('#bookmark-filter');
+  await page.focus(bookmark(ids[2]));
+  /* An unrelated storage key must not discard this tab's pending bookmark changes. */
+  const other = await context.newPage();
+  await other.goto(`${base}/posts/`, { waitUntil: 'load' });
+  await other.evaluate(() => localStorage.setItem('bookmark-test-unrelated', 'changed'));
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const unrelated = await read();
+  check(`${width}px unrelated cross-tab storage change leaves pending selection and focus alone`,
+    unrelated.selected.join() === ids[2] && unrelated.visible.join() === ids[2]
+      && unrelated.focused !== 'bookmark-filter', JSON.stringify(unrelated));
+
+  await other.evaluate(() => localStorage.setItem('cui-jing:saved-posts:v1', '[]'));
+  await page.waitForFunction(() => document.getElementById('bookmark-count').textContent === '0',
+    { timeout: 3000 });
+  const refreshed = await read();
+  check(`${width}px external bookmark update supersedes failed writes and recovers hidden-card focus`,
+    refreshed.selected.length === 0 && refreshed.visible.length === 0
+      && refreshed.focused === 'bookmark-filter' && refreshed.empty, JSON.stringify(refreshed));
+
+  await page.evaluate(() => { Storage.prototype.setItem = window.restoreBookmarkWrites; });
+  await page.focus('#bookmark-filter');
+  await page.keyboard.press('Enter');
+  await page.focus(bookmark(ids[0]));
+  await page.keyboard.press('Enter');
+  await page.reload({ waitUntil: 'load' });
+  const recovered = await read();
+  check(`${width}px restored storage persists later clicks across reload without page errors`,
+    recovered.selected.join() === ids[0] && recovered.stored.join() === ids[0]
+      && errors.length === 0, JSON.stringify({ recovered, errors }));
+  await context.close();
+}
+
 /* ---------- 3.5. 阅读收藏：跨页、组合筛选与旧链接找回 ---------- */
 {
   const page = await browser.newPage();
