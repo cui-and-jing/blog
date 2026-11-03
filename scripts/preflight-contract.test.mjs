@@ -26,6 +26,13 @@ const contracts = [
     next: "run('类型检查'",
   },
   {
+    label: '阅读设置容错',
+    file: 'scripts/reading-settings.test.mjs',
+    npm: 'settings:check',
+    previous: "run('部署发布门禁'",
+    next: "run('类型检查'",
+  },
+  {
     label: 'RSS 全文与永久链接校验',
     file: 'scripts/rss-check.mjs',
     npm: 'rss:check',
@@ -63,4 +70,13 @@ assert.throws(() => checkParity(
   quality.replace('run: npm run rss:check', 'run: npm run check'),
 ), /CI missing rss:check/);
 
-console.log('✓ Local preflight and CI share release and RSS contracts, with fail-closed regressions');
+assert.throws(() => checkParity(
+  preflight.replace("run('阅读设置容错', 'node', ['scripts/reading-settings.test.mjs']);", ''),
+  quality,
+), /Local preflight missing 阅读设置容错/);
+assert.throws(() => checkParity(
+  preflight,
+  quality.replace('run: npm run settings:check', 'run: npm run check'),
+), /CI missing settings:check/);
+
+console.log('✓ Local preflight and CI share release, settings and RSS contracts, with fail-closed regressions');

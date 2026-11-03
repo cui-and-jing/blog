@@ -62,6 +62,9 @@ jobs:
       - name: Local preflight parity with CI
         run: npm run preflight:check
 
+      - name: Reading settings recovery contract
+        run: npm run settings:check
+
       - name: Type check
         run: npm run check
 

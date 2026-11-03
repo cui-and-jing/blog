@@ -172,10 +172,13 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       (function () {
         var d = document.documentElement;
         var s = {};
+        try { s = JSON.parse(localStorage.getItem('settings') || '{}') || {}; }
+        catch (e) {}
+        if (typeof s !== 'object' || Array.isArray(s)) s = {};
+
+        /* Read and apply old preferences even when migration cannot be persisted.
+           A failed write must not erase a valid choice for this page. */
         try {
-          s = JSON.parse(localStorage.getItem('settings') || '{}') || {};
-          /* 旧版本把主题与字号分开存（theme / reading），这里迁移到统一的 settings，
-             迁完立刻删旧键，避免两套偏好互相打架 */
           var legacyTheme = localStorage.getItem('theme');
           var legacySize = localStorage.getItem('reading');
           if (legacyTheme && !s.theme) s.theme = legacyTheme;
@@ -185,17 +188,15 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
             localStorage.removeItem('theme');
             localStorage.removeItem('reading');
           }
-        } catch (e) {
-          s = {};
-        }
+        } catch (e) {}
 
         var choice = s.theme === 'light' || s.theme === 'dark' ? s.theme : 'auto';
         var dark = window.matchMedia('(prefers-color-scheme: dark)');
         d.dataset.themeChoice = choice;
         d.dataset.theme = choice === 'auto' ? (dark.matches ? 'dark' : 'light') : choice;
 
-        if (s.font && s.font !== 'serif') d.dataset.font = s.font;
-        if (s.size && s.size !== 'normal') d.dataset.reading = s.size;
+        if (s.font === 'sans' || s.font === 'kai') d.dataset.font = s.font;
+        if (s.size === 'small' || s.size === 'large') d.dataset.reading = s.size;
         if (s.leading === 'loose') d.dataset.leading = 'loose';
 
         var metaColor = document.getElementById('theme-color');
@@ -675,14 +676,25 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       /* 四项偏好存在同一个 settings 对象里，首帧脚本读同一份数据，
          所以无论从顶栏面板改、还是从文章页的 A− A A+ 改，刷新后都是同一套结果 */
       type Settings = { theme: string; font: string; size: string; leading: string };
-      const STORE = 'settings';
-      const DEFAULTS: Settings = { theme: 'auto', font: 'serif', size: 'normal', leading: 'normal' };
+      /* Preference key, default choice, and matching <html> data attribute. */
+      const fields = [
+        ['theme', 'auto', 'themeChoice'], ['font', 'serif', 'font'],
+        ['size', 'normal', 'reading'], ['leading', 'normal', 'leading'],
+      ] as const;
+      const settingButtons = [...document.querySelectorAll<HTMLElement>('[data-setting]')];
 
+      /* Read again at deferred boot: another tab may have changed preferences
+         since the first paint. Legacy reads must also survive failed migration. */
       const readSettings = (): Settings => {
-        try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORE) ?? '{}') }; }
-        catch { return { ...DEFAULTS }; }
+        let next = {} as Settings;
+        try {
+          try { next = { ...JSON.parse(localStorage.getItem('settings') ?? '{}') }; }
+          catch {}
+          next.theme ||= localStorage.getItem('theme') ?? '';
+          next.size ||= localStorage.getItem('reading') ?? '';
+        } catch {}
+        return next;
       };
-
       let settings = readSettings();
       const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
@@ -691,51 +703,44 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         if (status) status.textContent = message;
       };
 
-      const resolveTheme = (choice: string) =>
-        choice === 'light' || choice === 'dark' ? choice : darkQuery.matches ? 'dark' : 'light';
-
-      /* 移动端地址栏的颜色也要跟着主题走，否则深色页面顶着一条浅色栏 */
-      const applyThemeColor = () => {
-        const meta = document.getElementById('theme-color');
-        if (meta) meta.setAttribute('content', root.dataset.theme === 'dark' ? '#131311' : '#f2f0e9');
-      };
-
       const paintSettings = () => {
-        root.dataset.themeChoice = settings.theme;
-        root.dataset.theme = resolveTheme(settings.theme);
+        /* Only actual controls are valid choices; malformed storage cannot leave
+           a whole group unselected or leak arbitrary values into CSS attributes. */
+        for (const [key, fallback, attribute] of fields) {
+          if (!settingButtons.some((button) => button.dataset.setting === key && button.dataset.value === settings[key])) {
+            settings[key] = fallback;
+          }
+          /* Missing attributes mean defaults, except the explicitly exposed theme choice. */
+          if (key !== 'theme' && settings[key] === fallback) delete root.dataset[attribute];
+          else root.dataset[attribute] = settings[key];
+        }
+        root.dataset.theme = settings.theme === 'auto' ? (darkQuery.matches ? 'dark' : 'light') : settings.theme;
 
-        /* 属性不存在就是默认值，这样 CSS 里不用为「默认」再单独写一套规则 */
-        if (settings.font === 'serif') delete root.dataset.font;
-        else root.dataset.font = settings.font;
-
-        if (settings.size === 'normal') delete root.dataset.reading;
-        else root.dataset.reading = settings.size;
-
-        if (settings.leading === 'loose') root.dataset.leading = 'loose';
-        else delete root.dataset.leading;
-
-        document.querySelectorAll<HTMLElement>('[data-setting]').forEach((btn) => {
-          const key = btn.dataset.setting as keyof Settings;
-          btn.setAttribute('aria-pressed', String(settings[key] === btn.dataset.value));
+        settingButtons.forEach((btn) => {
+          btn.setAttribute('aria-pressed', String(settings[btn.dataset.setting as keyof Settings] === btn.dataset.value));
         });
 
-        applyThemeColor();
+        /* Keep the mobile browser chrome in sync with the resolved theme. */
+        document.getElementById('theme-color')?.setAttribute('content', root.dataset.theme === 'dark' ? '#131311' : '#f2f0e9');
       };
 
-      const saveSettings = () => {
+      const commitSettings = () => {
+        paintSettings();
         try {
-          localStorage.setItem(STORE, JSON.stringify(settings));
+          localStorage.setItem('settings', JSON.stringify(settings));
         } catch (e) {}
       };
 
       /* 主题切换用 View Transition 的圆形扩散，以点击的按钮为圆心铺开。
          面板本身在 top layer，会一起被拍进快照，所以看起来是整屏同步变色 */
-      const withTransition = (apply: () => void, origin?: { x: number; y: number }) => {
-        const transition = (document as any).startViewTransition;
-        if (reduceMotion.matches || !transition || !origin) return apply();
-        const { x, y } = origin;
+      const withTransition = (apply: () => void, button?: HTMLElement) => {
+        if (reduceMotion.matches || !button || !document.startViewTransition) return apply();
+        /* Only theme animations need a layout measurement. */
+        const rect = button.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
         const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-        transition.call(document, apply).ready.then(() => {
+        document.startViewTransition(apply).ready.then(() => {
           root.animate(
             { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
             { duration: 540, easing: 'ease-in-out', pseudoElement: '::view-transition-new(root)' }
@@ -752,14 +757,10 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         const value = btn.dataset.value;
         if (!key || !value || settings[key] === value) return;
 
-        const rect = btn.getBoundingClientRect();
-        const origin = key === 'theme' ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : undefined;
-
         withTransition(() => {
           settings[key] = value;
-          paintSettings();
-          saveSettings();
-        }, origin);
+          commitSettings();
+        }, key === 'theme' ? btn : undefined);
 
         /* 读屏文案直接取面板选项，避免 JS 再维护一套同义字典。 */
         const name = document.getElementById(`label-${key}`)?.textContent?.trim() ?? key;
@@ -772,13 +773,12 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       /* 选了「跟随系统」之后，用户在系统里切深浅色，这里要跟着变 */
       darkQuery.addEventListener('change', () => {
         if (settings.theme !== 'auto') return;
-        root.dataset.theme = darkQuery.matches ? 'dark' : 'light';
-        applyThemeColor();
+        paintSettings();
       });
 
       /* 同步其他标签页的设置修改，也处理 localStorage.clear() 的 null key。 */
       addEventListener('storage', (event) => {
-        if (event.key && event.key !== STORE) return;
+        if (event.key && event.key !== 'settings') return;
         settings = readSettings();
         paintSettings();
       });
@@ -789,10 +789,6 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
       const settingsPanel = document.getElementById('settings-panel') as HTMLDialogElement | null;
       const shortcutsPanel = document.getElementById('shortcuts-panel') as HTMLDialogElement | null;
       const navDrawer = document.getElementById('nav-drawer') as HTMLDialogElement | null;
-      const settingsToggle = document.getElementById('settings-toggle');
-      const menuToggle = document.getElementById('menu-toggle');
-      const shortcutsOpen = document.getElementById('shortcuts-open');
-      const settingsReset = document.getElementById('settings-reset');
 
       const openPanel = (panel: HTMLDialogElement | null) => {
         if (panel && !panel.open) panel.showModal();
@@ -805,19 +801,18 @@ const schema = [websiteSchema, articleSchema, breadcrumbSchema].filter(Boolean);
         });
         panel?.addEventListener('close', () => button?.setAttribute('aria-expanded', 'false'));
       };
-      bindPanel(settingsToggle, settingsPanel);
-      bindPanel(menuToggle, navDrawer);
+      bindPanel(document.getElementById('settings-toggle'), settingsPanel);
+      bindPanel(document.getElementById('menu-toggle'), navDrawer);
 
       /* 从设置里点进快捷键，先收起当前面板，避免两个 dialog 叠在一起 */
-      shortcutsOpen?.addEventListener('click', () => {
+      document.getElementById('shortcuts-open')?.addEventListener('click', () => {
         settingsPanel?.close();
         openPanel(shortcutsPanel);
       });
 
-      settingsReset?.addEventListener('click', () => {
-        settings = { ...DEFAULTS };
-        paintSettings();
-        saveSettings();
+      document.getElementById('settings-reset')?.addEventListener('click', () => {
+        settings = {} as Settings;
+        commitSettings();
         announce('已恢复默认外观');
       });
 
