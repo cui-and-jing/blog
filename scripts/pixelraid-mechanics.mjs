@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { survivalTactics } from './lib/raid-survival-tactics.mjs';
+import { recoveryTactics } from './lib/raid-recovery-tactics.mjs';
 
 const source = fs.readFileSync(new URL('../public/games/pixelraid.html', import.meta.url), 'utf8');
 const inline = source.match(/<script>\s*([\s\S]*?)<\/script>/i)?.[1];
@@ -2077,6 +2078,388 @@ test('nearly capped rerolls change recovery options and fully capped builds disa
   const g=defense();g.run('for(const key of MODULES)upgrades[key]=2;');finishDefenseWave(g);
   eq(g.state().supplyOffers,['heal','ammo','boost']);eq(g.state().supplyRerolls,0);assert(g.nodes.get('supply-reroll').disabled);
   eq(g.nodes.get('supply-reroll').textContent,'已展示全部补给');const before=g.state();g.run('rerollSupplies();');eq(g.state(),before);
+});
+
+// Tactical recovery fixtures arrange collision boundaries only. Accepting a
+// commission, starting its wave and touching nodes still use production code.
+function recoveryDefense({ wave = 2, ...options } = {}) {
+  assert(wave > 1 && wave % 3 !== 0, 'Recovery fixture needs an eligible ordinary wave');
+  const g = defense(options);
+  if (wave !== 2) g.run(`survivalWave=${wave - 2};startWave();`);
+  finishDefenseWave(g);
+  g.click('contract-recovery'); g.click('supply-0'); g.click('start');
+  eq(g.state().survivalWave, wave); eq(g.state().fieldContract?.status, 'active');
+  return g;
+}
+function isolateRecoveryCombat(g) {
+  // Keep one harmless but living enemy so collection itself cannot clear.
+  g.run(`spawnTime=0;pickups=[];bullets=[];bombs=[];player.inv=100;clearInput();
+    enemies=[{...makeEnemy(480,'turret'),y:50,hp:999,maxHp:999,shot:100000}];`);
+}
+function touchRecoveryNode(g, index) {
+  const node = g.state().fieldContract.nodes[index];
+  g.run(`player.x=${node.x - 13.5};player.y=${node.y - 22};player.h=44;
+    player.crouch=false;player.vx=0;player.vy=0;player.ground=false;player.dashTime=0;`);
+  tick(g);
+}
+const collectedRecovery = g => g.state().fieldContract.nodes.filter(node => node.done).length;
+
+test('recovery is opt-in only at eligible intermissions and never replaces required supply selection', () => {
+  const g = createGame(), original = g.state().progress;
+  g.click('contract-recovery'); eq(g.state().selectedContract, 'hold'); eq(g.state().fieldContract, null);
+  g.click('mode-survival'); g.click('contract-recovery'); g.click('start');
+  eq(g.state().survivalWave, 1); eq(g.state().fieldContract, null);
+  assert(g.nodes.get('contract-hud').hidden); g.click('contract-recovery'); eq(g.state().selectedContract, 'hold');
+  finishDefenseWave(g);
+  eq(g.state().selectedContract, 'hold'); eq(g.nodes.get('contract-hold').getAttribute('aria-pressed'), 'true');
+  assert(!g.nodes.get('contract-choices').hidden && !g.nodes.get('contract-recovery').disabled);
+  const before = g.state();
+  for (let i = 0; i < 4; i++) g.click('contract-recovery');
+  const chosen = g.state();
+  for (const key of Object.keys(before)) if (key !== 'selectedContract') eq(chosen[key], before[key], key + ' changed on selection');
+  eq(chosen.selectedContract, 'recovery'); assert(g.nodes.get('start').disabled);
+  eq(g.nodes.get('contract-recovery').getAttribute('aria-pressed'), 'true');
+  eq(g.nodes.get('contract-hold').getAttribute('aria-pressed'), 'false');
+  assert(g.nodes.get('contract-selection').textContent.includes('已接取'));
+  g.click('start'); eq(g.state().phase, 'waveClear'); eq(g.state().fieldContract, null);
+  g.click('contract-hold'); eq(g.state(), before);
+  g.run("chooseContract('unknown');chooseContract(null);"); eq(g.state(), before);
+  g.click('supply-0'); const supply = g.state().selectedSupply;
+  g.click('contract-recovery'); eq(g.state().selectedSupply, supply); assert(!g.nodes.get('start').disabled);
+  g.click('start'); eq(g.state().survivalWave, 2); eq(g.state().selectedContract, 'hold');
+  eq(g.state().fieldContract.status, 'active'); assert(!g.nodes.get('contract-hud').hidden);
+  assert(g.nodes.get('contract-objective').textContent.includes('尚未启用'));
+  const started = g.state();
+  g.click('contract-hold'); g.click('contract-recovery'); g.click('start'); eq(g.state(), started);
+  eq(nonDefenseRecords(g), (({ survival, ...rest }) => rest)(original));
+});
+
+test('default hold waves and boss transitions have no nodes, hidden HUD and no inherited commission', () => {
+  const g = defense(); finishDefenseWave(g); g.click('supply-0'); g.click('start');
+  eq(g.state().survivalWave, 2); eq(g.state().fieldContract, null); assert(g.nodes.get('contract-hud').hidden);
+  finishDefenseWave(g);
+  eq(g.state().selectedContract, 'hold'); assert(g.nodes.get('contract-choices').hidden);
+  assert(g.nodes.get('contract-hold').disabled && g.nodes.get('contract-recovery').disabled);
+  assert(g.nodes.get('contract-summary').textContent.includes('首领战'));
+  const before = g.state(); g.click('contract-recovery'); g.run("chooseContract('recovery');"); eq(g.state(), before);
+  g.click('supply-0'); g.click('start'); eq(g.state().bossWave, true); eq(g.state().fieldContract, null);
+  finishDefenseWave(g); assert(!g.nodes.get('contract-choices').hidden);
+  eq(g.state().selectedContract, 'hold'); g.click('supply-0'); g.click('start');
+  eq(g.state().survivalWave, 4); eq(g.state().fieldContract, null);
+});
+
+test('recovery selection survives rerolls and repeated restart or home cancellation without granting resources', () => {
+  const g = defense(); finishDefenseWave(g); g.click('contract-recovery'); g.click('supply-1');
+  const before = g.state(); g.click('supply-reroll'); const rolled = g.state();
+  eq(rolled.selectedContract, 'recovery'); eq(rolled.selectedSupply, null); eq(rolled.fieldContract, null);
+  for (const key of Object.keys(before)) if (!['selectedSupply', 'supplyOffers', 'supplyRerolls'].includes(key)) eq(rolled[key], before[key]);
+  assert(g.nodes.get('start').disabled); eq(g.nodes.get('contract-recovery').getAttribute('aria-pressed'), 'true');
+  for (const selected of [false, true]) {
+    if (selected) g.click('supply-0');
+    const saved = g.state();
+    for (const action of ['restart', 'menu-home', 'restart']) {
+      g.click(action); eq(g.state().phase, 'confirmRestart');
+      g.click('contract-hold'); tick(g, 60); g.click('cancel-restart'); eq(g.state(), saved);
+      eq(g.nodes.get('contract-recovery').getAttribute('aria-pressed'), 'true');
+      eq(g.nodes.get('start').disabled, !selected);
+    }
+  }
+  g.click('start'); eq(g.state().fieldContract.status, 'active'); eq(g.state().supplyRerolls, 0);
+});
+
+test('recovery details keyboard controls cannot start a selected wave or inject gameplay input', () => {
+  const g = defense(); finishDefenseWave(g); g.click('supply-0'); g.click('contract-recovery');
+  const before = g.state();
+  for (const id of ['contract-summary', 'contract-hold', 'contract-recovery']) {
+    g.nodes.get(id).focus();
+    for (const key of ['Enter', ' ', 'a', 'w']) { g.key(key); g.key(key, false); }
+    tick(g, 30); eq(g.state(), before);
+  }
+  g.click('start'); eq(g.state().survivalWave, 2); eq(g.state().jumpBuffer, 0); eq(g.state().ground, true);
+});
+
+test('recovery geometry has two reachable ground nodes and an alternating supported high node', () => {
+  for (const wave of [2, 4, 5, 7, 8, 11]) {
+    const g = recoveryDefense({ wave }), nodes = g.state().fieldContract.nodes;
+    eq(nodes.length, 3); eq(new Set(nodes.map(node => `${node.x},${node.y}`)).size, 3);
+    assert(nodes.every(node => !node.done && Number.isFinite(node.x) && Number.isFinite(node.y)));
+    assert(nodes[0].x >= 30 && nodes[0].x < 160 && nodes[1].x > 800 && nodes[1].x <= 930);
+    eq(nodes[0].y, 401); eq(nodes[1].y, 401);
+    const top = nodes[2]; eq(top.x, wave % 2 ? 285 : 715); eq(top.y, 301);
+    const platforms = g.read('stage.platforms');
+    assert(platforms.some(([x, y, w]) => top.x > x + 20 && top.x < x + w - 20 && y - top.y === 24));
+    for (const node of nodes) for (const pickup of g.read('pickups')) {
+      assert(Math.hypot(node.x - pickup.x, node.y - pickup.y) > 33, 'Data marker must not overlap a medical or weapon pickup');
+    }
+    assert(top.y + 17 < 381, 'Ground standing body must not collect the high node');
+    isolateRecoveryCombat(g); g.run(`player.x=${top.x - 13.5};player.y=G-44;player.vy=0;`); tick(g);
+    eq(collectedRecovery(g), 0);
+    for (let index = 0; index < 3; index++) { touchRecoveryNode(g, index); eq(collectedRecovery(g), index + 1); }
+    eq(g.state().phase, 'playing');
+  }
+});
+
+test('recovery uses actual circular body contact including misses, high ledges and crouching', () => {
+  for (const crouch of [false, true]) {
+    const g = recoveryDefense(); isolateRecoveryCombat(g);
+    const node = g.state().fieldContract.nodes[0];
+    g.run(`player.x=${node.x - 27 - 17 - .1};player.y=G-44;player.vy=0;player.ground=true;`);
+    if (crouch) g.key('s');
+    tick(g); eq(collectedRecovery(g), 0, 'Body outside circular pickup radius must miss');
+    g.run('player.x+=.2;'); tick(g); eq(collectedRecovery(g), 1, 'Body entering circular pickup radius must collect');
+    eq(g.state().crouch, crouch); g.key('s', false);
+    touchRecoveryNode(g, 2); eq(collectedRecovery(g), 2);
+  }
+});
+
+test('recovery nodes cannot be taken during ingress and activate on the first live simulation tick', () => {
+  for (const index of [0, 1, 2]) {
+    const g = recoveryDefense(); isolateRecoveryCombat(g); g.run('spawnTime=.25;');
+    touchRecoveryNode(g, index); eq(collectedRecovery(g), 0);
+    assert(g.nodes.get('contract-objective').textContent.includes('尚未启用'));
+    const before = g.state();
+    g.key('p'); tick(g, 90); near(g.state().spawnTime, before.spawnTime); eq(collectedRecovery(g), 0);
+    g.click('start'); g.run('spawnTime=DT/2;'); touchRecoveryNode(g, index);
+    eq(g.state().spawnTime, 0); eq(collectedRecovery(g), 1); eq(g.state().fieldContract.status, 'active');
+  }
+});
+
+test('collection is idempotent, has no timer and grants no health, ammunition, points or records before clear', () => {
+  const g = recoveryDefense(); isolateRecoveryCombat(g); g.run('player.hp=2;player.grenades=1;');
+  const before = g.state(), stored = g.values.get(STORE);
+  for (let index = 0; index < 3; index++) {
+    touchRecoveryNode(g, index); touchRecoveryNode(g, index); eq(collectedRecovery(g), index + 1);
+    for (const key of ['score', 'hp', 'grenades', 'progress']) eq(g.state()[key], before[key]);
+  }
+  eq(g.state().fieldContract.status, 'active');
+  assert(g.nodes.get('contract-objective').textContent.includes('已收齐 3 / 3'));
+  assert(g.nodes.get('contract-objective').textContent.includes('活着清场'));
+  tick(g, 2400); eq(collectedRecovery(g), 3); eq(g.state().fieldContract.status, 'active');
+  for (const key of ['score', 'hp', 'grenades', 'progress']) eq(g.state()[key], before[key]);
+  eq(g.values.get(STORE), stored); eq(g.state().phase, 'playing');
+});
+
+test('recovery progress freezes in pause, background and confirmation and cannot be changed by menu buttons', () => {
+  const g = recoveryDefense(); isolateRecoveryCombat(g); touchRecoveryNode(g, 0);
+  const progress = g.state().fieldContract;
+  for (const pause of ['keyboard', 'visibility', 'blur']) {
+    if (pause === 'keyboard') g.key('p'); else if (pause === 'visibility') g.visibility(true); else g.event('blur');
+    eq(g.state().phase, 'pause'); const before = g.state(); tick(g, 120); g.frames(30);
+    g.click('contract-hold'); g.click('contract-recovery'); eq(g.state(), before);
+    if (pause === 'visibility') g.visibility(false);
+    g.click('start'); eq(g.state().fieldContract, progress);
+  }
+  for (const action of ['restart', 'menu-home']) {
+    g.key('p'); const before = g.state(); g.click(action); tick(g, 120); g.click('cancel-restart');
+    eq(g.state(), before); g.click('start'); eq(g.state().fieldContract, progress);
+  }
+});
+
+test('living recovery clear adds exactly 350 points and one extra health and grenade before saving', () => {
+  const g = recoveryDefense(); isolateRecoveryCombat(g); g.run('player.hp=2;player.grenades=2;');
+  for (let index = 0; index < 3; index++) touchRecoveryNode(g, index);
+  const before = g.state(); finishDefenseWave(g); const settled = g.state();
+  eq(settled.fieldContract.status, 'success'); eq(settled.score, before.score + 300 + 350);
+  eq(settled.hp, 4); eq(settled.grenades, 4); eq(settled.survivalCleared, 2);
+  eq(settled.progress.survival, { wave: 2, best: settled.score });
+  eq(JSON.parse(g.values.get(STORE)).survival, settled.progress.survival);
+  assert(g.nodes.get('result-details').textContent.includes('回收委托完成'));
+  assert(g.nodes.get('contract-hud').hidden); eq(settled.selectedContract, 'hold');
+  for (let repeat = 0; repeat < 3; repeat++) { g.run('finishWave();'); tick(g, 60); g.frames(10); eq(g.state(), settled); }
+  g.click('restart'); g.click('cancel-restart'); eq(g.state(), settled);
+});
+
+test('recovery rewards respect health and seven-grenade caps across all loadouts and armor ranks', () => {
+  for (const loadout of ['assault', 'counter', 'demolition']) for (const armor of [0, 2]) {
+    const g = recoveryDefense({ loadout }); isolateRecoveryCombat(g);
+    g.run(`upgrades.armor=${armor};player.hp=maxHealth()-1;player.grenades=6;`);
+    for (let index = 0; index < 3; index++) touchRecoveryNode(g, index);
+    const max = g.state().maxHp, score = g.state().score; finishDefenseWave(g);
+    eq(g.state().hp, max); eq(g.state().grenades, 7); eq(g.state().score, score + 650);
+    eq(g.state().fieldContract.status, 'success');
+  }
+});
+
+test('clearing with zero, one or two recovered nodes never waits, fails the run or awards extra resources', () => {
+  for (const count of [0, 1, 2]) {
+    const g = recoveryDefense(); isolateRecoveryCombat(g); g.run('player.hp=2;player.grenades=2;');
+    for (let index = 0; index < count; index++) touchRecoveryNode(g, index);
+    const before = g.state(); finishDefenseWave(g);
+    eq(g.state().phase, 'waveClear'); eq(g.state().fieldContract.status, 'missed');
+    eq(g.state().score, before.score + 300); eq(g.state().hp, 3); eq(g.state().grenades, 3);
+    eq(g.state().progress.survival, { wave: 2, best: g.state().score });
+    assert(g.nodes.get('result-details').textContent.includes(`未完成 · ${count} / 3`));
+    assert(g.nodes.get('result-details').textContent.includes('正常清场奖励保留'));
+    g.click('supply-0'); g.click('start'); eq(g.state().survivalWave, 3); eq(g.state().fieldContract, null);
+  }
+});
+
+test('last node and last enemy may resolve together only when the player survives that tick', () => {
+  const g = recoveryDefense(); isolateRecoveryCombat(g); touchRecoveryNode(g, 0); touchRecoveryNode(g, 1);
+  const node = g.state().fieldContract.nodes[2], before = g.state();
+  g.run(`player.x=${node.x - 13.5};player.y=${node.y - 22};player.vy=0;
+    enemies=[{...makeEnemy(150,'turret'),hp:1,shot:100}];
+    projectile(enemies[0].x+15,enemies[0].y+18,0,0,'p');`);
+  tick(g); eq(g.state().phase, 'waveClear'); eq(collectedRecovery(g), 3);
+  eq(g.state().fieldContract.status, 'success'); eq(g.state().score, before.score + 160 + 300 + 350);
+});
+
+test('death after gathering all nodes never pays or saves the unfinished recovery wave', () => {
+  const g = recoveryDefense(); isolateRecoveryCombat(g);
+  for (let index = 0; index < 3; index++) touchRecoveryNode(g, index);
+  const before = g.state(), stored = g.values.get(STORE);
+  g.run("player.hp=1;player.inv=0;projectile(player.x+12,player.y+20,0,0,'e');"); tick(g);
+  eq(g.state().phase, 'survivalOver'); eq(g.state().fieldContract.status, 'missed');
+  eq(g.state().hp, 0); eq(g.state().lives, 0); eq(g.state().score, before.score); eq(g.state().grenades, before.grenades);
+  eq(g.state().progress, before.progress); eq(g.values.get(STORE), stored);
+  assert(g.nodes.get('result-details').textContent.includes('回收委托未结算'));
+  assert(g.nodes.get('contract-hud').hidden); const terminal = g.state();
+  tick(g, 120); g.run('finishWave();'); eq(g.state(), terminal);
+});
+
+test('same-frame lethal trades beat the last node and recovery settlement in either projectile order', () => {
+  for (const gathered of [false, true]) for (const killFirst of [false, true]) {
+    const g = recoveryDefense(); isolateRecoveryCombat(g);
+    for (let index = 0; index < (gathered ? 3 : 2); index++) touchRecoveryNode(g, index);
+    const node = g.state().fieldContract.nodes[2], before = g.state(), stored = g.values.get(STORE);
+    const hitPlayer = "projectile(player.x+12,player.y+20,0,0,'e');";
+    const killEnemy = "projectile(enemies[0].x+15,enemies[0].y+18,0,0,'p');";
+    g.run(`player.x=${node.x - 13.5};player.y=${node.y - 22};player.vy=0;player.hp=1;player.inv=0;bullets=[];
+      enemies=[{...makeEnemy(150,'turret'),hp:1,shot:100}];
+      ${killFirst ? hitPlayer + killEnemy : killEnemy + hitPlayer}`);
+    tick(g); eq(g.state().phase, 'survivalOver'); eq(g.state().fieldContract.status, 'missed');
+    eq(collectedRecovery(g), gathered ? 3 : 2); eq(g.state().score, before.score + (killFirst ? 160 : 0));
+    eq(g.state().progress, before.progress); eq(g.state().grenades, before.grenades); eq(g.values.get(STORE), stored);
+    eq(g.state().survivalCleared, 1); eq(g.state().hp, 0);
+  }
+});
+
+test('each new intermission defaults to hold and a later accepted commission gets fresh nodes', () => {
+  const g = recoveryDefense({ wave: 4 }); isolateRecoveryCombat(g); touchRecoveryNode(g, 0); finishDefenseWave(g);
+  eq(g.state().selectedContract, 'hold'); eq(g.nodes.get('contract-hold').getAttribute('aria-pressed'), 'true');
+  eq(g.nodes.get('contract-options').open, false);
+  const prior = g.state().fieldContract; eq(prior.status, 'missed');
+  g.click('supply-0'); g.click('start'); eq(g.state().survivalWave, 5); eq(g.state().fieldContract, null);
+  finishDefenseWave(g); g.click('supply-0'); g.click('start'); eq(g.state().survivalWave, 6); eq(g.state().fieldContract, null);
+  finishDefenseWave(g); eq(g.state().selectedContract, 'hold');
+  g.click('contract-recovery'); g.click('supply-0'); g.click('start'); eq(g.state().survivalWave, 7);
+  eq(g.state().fieldContract.status, 'active'); eq(collectedRecovery(g), 0); eq(prior.nodes.filter(node => node.done).length, 1);
+});
+
+test('recovery snapshots cannot mutate nested nodes or selection and never expose a mutable API', () => {
+  const g = recoveryDefense(), before = g.state(); const snapshot = g.win.__raidState;
+  try { snapshot.selectedContract = 'recovery'; snapshot.fieldContract.status = 'success';
+    snapshot.fieldContract.nodes[0].done = true; snapshot.fieldContract.nodes[1].x = -999;
+    snapshot.fieldContract.nodes.push({ x: 0, y: 0, done: true }); } catch {}
+  eq(g.state(), before); assert(!source.includes('__raidQA'));
+});
+
+test('restart and death retry remove selected commissions, active progress and pending rewards', () => {
+  for (const at of ['intermission', 'active', 'gathered', 'dead']) {
+    const g = at === 'intermission' ? defense() : recoveryDefense();
+    if (at === 'intermission') { finishDefenseWave(g); g.click('contract-recovery'); }
+    else {
+      isolateRecoveryCombat(g); touchRecoveryNode(g, 0);
+      if (at === 'gathered' || at === 'dead') { touchRecoveryNode(g, 1); touchRecoveryNode(g, 2); }
+      if (at === 'dead') { g.run('player.inv=0;hurt(99);'); eq(g.state().phase, 'survivalOver'); }
+    }
+    const records = g.state().progress;
+    if (at !== 'dead') g.click('restart');
+    g.click('start'); eq(g.state().survivalWave, 1); eq(g.state().selectedContract, 'hold');
+    eq(g.state().fieldContract, null); eq(g.state().score, 0); eq(g.state().phase, 'playing');
+    eq(g.state().progress, records); assert(g.nodes.get('contract-hud').hidden);
+  }
+});
+
+test('leaving recovery for campaign, practice or operations cannot collect nodes or apply rewards', () => {
+  for (const target of ['campaign', 'practice', 'sprint', 'counter', 'bosses']) {
+    const g = recoveryDefense(); isolateRecoveryCombat(g); touchRecoveryNode(g, 0);
+    g.key('p'); g.click('menu-home'); g.click('start'); eq(g.state().phase, 'title');
+    eq(g.state().fieldContract, null); eq(g.state().selectedContract, 'hold');
+    assert(g.nodes.get('contract-hud').hidden); const records = g.state().progress;
+    if (target === 'campaign') { g.click('mode-campaign'); g.click('start'); }
+    else if (target === 'practice') { g.click('mode-campaign'); g.click('stage-1'); }
+    else { g.click('mode-challenges'); g.click('challenge-' + target); }
+    assert(!g.nodes.get('survival-options') || g.nodes.get('survival-options').hidden);
+    assert(g.nodes.get('contract-hud').hidden); const field = g.state().fieldContract; eq(field, null);
+    g.click('contract-recovery'); g.run('pickups=[];player.inv=100;'); tick(g, 30);
+    eq(g.state().score, 0); eq(g.state().fieldContract, field); eq(g.state().progress, records);
+    eq(g.state().maxHp, target === 'bosses' ? 7 : 5);
+  }
+});
+
+test('reload drops pending recovery while completed rewards keep the original persistence schema', () => {
+  for (const complete of [false, true]) {
+    const g = recoveryDefense(); isolateRecoveryCombat(g);
+    for (let index = 0; index < 3; index++) touchRecoveryNode(g, index);
+    if (complete) finishDefenseWave(g);
+    const saved = JSON.parse(g.values.get(STORE)), reloaded = createGame({ storage: Object.fromEntries(g.values) });
+    eq(Object.keys(saved.survival).sort(), ['best', 'wave']);
+    assert(!/fieldContract|selectedContract|nodes|recovery/.test(JSON.stringify(saved)));
+    eq(reloaded.state().progress, g.state().progress); eq(saved.survival.wave, complete ? 2 : 1);
+    eq(reloaded.state().phase, 'title'); eq(reloaded.state().fieldContract, null); eq(reloaded.state().selectedContract, 'hold');
+    reloaded.click('mode-survival'); reloaded.click('start');
+    eq(reloaded.state().survivalWave, 1); eq(reloaded.state().fieldContract, null); eq(reloaded.state().score, 0);
+  }
+});
+
+test('blocked storage still settles recovery once in memory without changing unrelated records', () => {
+  const g = recoveryDefense({ blocked: true }), other = nonDefenseRecords(g);
+  isolateRecoveryCombat(g); for (let index = 0; index < 3; index++) touchRecoveryNode(g, index);
+  const score = g.state().score; finishDefenseWave(g);
+  eq(g.state().score, score + 650); eq(g.state().fieldContract.status, 'success');
+  eq(g.state().progress.survival, { wave: 2, best: g.state().score }); eq(g.values.size, 0);
+  eq(nonDefenseRecords(g), other); eq(g.state().storageAvailable, false);
+  const before = g.state(); g.run('finishWave();'); tick(g, 30); eq(g.state(), before);
+});
+
+test('all loadouts recover three real nodes and clear using only genuine inputs across seeds and cadences', () => {
+  for (const randomSeed of [1, 42, 16437, 71901]) for (const loadout of ['assault', 'counter', 'demolition']) {
+    for (const cadence of [5, 12]) {
+      const g = defense({ randomSeed, loadout }), tap = key => { g.key(key); g.key(key, false); };
+      const records = nonDefenseRecords(g);
+      for (let wave = 1; wave <= 2; wave++) {
+        const decide = wave === 2 ? recoveryTactics() : survivalTactics();
+        const seenCounts = new Set(); let duration = 0, decisions = 0, sawGatheredBeforeClear = false;
+        // Only the fixture seed is configured before game creation. All movement,
+        // jumping, shooting, defensive dashes and menu choices are real inputs;
+        // the private evaluator below advances time, never rewrites gameplay.
+        while (g.state().phase === 'playing' && duration < 3600) {
+          if (duration % cadence === 0) {
+            const state = g.state(), untouched = JSON.stringify(state), input = decide(state);
+            eq(JSON.stringify(state), untouched, 'Read-only recovery controller mutated its snapshot');
+            decisions++;
+            if (wave === 2) {
+              const count = state.fieldContract.nodes.filter(node => node.done).length;
+              seenCounts.add(count);
+              if (count === 3) { sawGatheredBeforeClear = true; eq(state.fieldContract.status, 'active'); }
+            }
+            g.key('a', input.move === 'a'); g.key('d', input.move === 'd'); g.key('j', input.fire !== false);
+            if (input.jump && state.ground) { g.key('w', false); g.key('w'); }
+            else if (!input.jump) g.key('w', false);
+            if (input.dash) tap('l'); if (input.grenade) tap('k');
+          }
+          tick(g); duration++;
+        }
+        for (const key of ['a', 'd', 'w', 'j']) g.key(key, false);
+        const state = g.state();
+        eq(state.phase, 'waveClear', `Recovery loadout ${loadout}, seed ${randomSeed}, cadence ${cadence}, wave ${wave}: ` + JSON.stringify(state));
+        eq(state.survivalCleared, wave); eq(state.lives, 1); eq(state.stageDeaths, 0); assert(state.hp > 0);
+        assert(duration > 132 && duration < 3600 && decisions > 10, 'Recovery must use real ingress and finish within one active minute');
+        eq(nonDefenseRecords(g), records); eq(state.progress.survival, { wave, best: state.score });
+        if (wave === 1) {
+          eq(state.fieldContract, null);
+          let choice = state.supplyOffers.indexOf('armor');
+          if (choice < 0) choice = state.hp < 4 ? state.supplyOffers.indexOf('heal') : 0;
+          g.click('supply-' + Math.max(0, choice)); g.click('contract-recovery'); g.click('start');
+        } else {
+          eq(state.fieldContract.status, 'success'); eq(collectedRecovery(g), 3);
+          eq([...seenCounts].sort(), [0, 1, 2, 3]); assert(sawGatheredBeforeClear);
+          eq(state.selectedContract, 'hold'); assert(g.nodes.get('result-details').textContent.includes('回收委托完成'));
+        }
+      }
+    }
+  }
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);

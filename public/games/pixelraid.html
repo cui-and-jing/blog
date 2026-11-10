@@ -54,6 +54,12 @@
     .build-panel{width:100%;max-width:1200px;margin:0 auto;padding:9px 12px;border:1px solid #527587;border-radius:8px;background:#142c3d;font-size:12px;line-height:1.7}
     .build-panel summary{cursor:pointer;color:#ffe097;font-weight:700;overflow-wrap:anywhere}.build-panel summary:focus-visible{outline:3px solid #fbd46d;outline-offset:3px}
     .build-panel p{margin:7px 0;color:#c5d7e9}.build-panel ul{margin:6px 0;padding-left:20px;color:#bdd0e4}.build-panel li[data-active="true"]{color:#a9f2e4}
+    .contract-panel{width:100%;padding:12px;border:1px solid #598a95;border-radius:10px;background:#14333d}
+    .contract-panel summary{cursor:pointer;color:#a9f2e4;font-size:13px;font-weight:700;line-height:1.7}
+    .contract-panel summary:focus-visible{outline:3px solid #fbd46d;outline-offset:3px}
+    .contract-panel .choice-grid{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:10px}
+    .contract-panel .small{margin-top:9px}.contract-hud{border-color:#66baa9;background:#143a3b}
+    @media(max-width:480px){.contract-panel .choice-grid{grid-template-columns:1fr}}
     .legend{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;color:#b9cce1;font-size:12px;line-height:1.6;max-width:1100px;margin:0 auto}
     kbd{display:inline-block;border:1px solid #61758e;border-bottom-width:2px;padding:0 5px;background:#213750;border-radius:4px;color:#fff7da}
     .controls{display:none;justify-content:space-between;align-items:center;gap:12px;max-width:1200px;width:100%;margin:0 auto;touch-action:none;user-select:none}
@@ -114,6 +120,9 @@
   <section class="mission" id="mission-hud" aria-label="当前挑战目标" hidden>
     <strong id="mission-name"></strong><span id="mission-objective"></span><b id="mission-time"></b>
   </section>
+  <section class="mission contract-hud" id="contract-hud" aria-label="战地回收委托" hidden>
+    <strong>战地回收</strong><span id="contract-objective"></span><b>清场奖励 +350 分 / +1 体力 / +1 手雷</b>
+  </section>
   <details class="build-panel" id="build-panel" hidden>
     <summary id="build-summary">本局构筑 · 展开查看组合配方</summary>
     <p id="build-loadout"></p>
@@ -145,7 +154,7 @@
           <p class="small">点任务即开始。成功奖励 500 分；突袭剩余整秒 ×10 分，连战保留体力 ×100 分、手雷 ×25 分。最高分与最快用时独立记录。暂停与整备不计时；刷新页面会结束当前挑战。</p>
         </section>
         <section id="survival-menu" class="menu-section" aria-label="防线生存规则" hidden>
-          <p class="survival-summary">一条命，守住自己的纪录。双向增援与每三波首领战交替，清场后选择补给，配对模组点亮三种组合效果。</p>
+          <p class="survival-summary">一条命，守住自己的纪录。双向增援与每三波首领战交替，搭配模组；还可自选战地回收，在火线中抢回数据换取额外补给。</p>
           <div class="choice-grid survival-grid">
             <div class="choice"><strong>守住防线</strong><span>开局装具决定体力与手雷，固定标准难度。敌人出现前预警 2.2 秒；步兵追击，盾卫转向防守。</span></div>
             <div class="choice"><strong>选择构筑</strong><span>六种永久模组，每种最多两级。两种模组各 1 级即可点亮组合：贯穿火力、反击回流、爆破回收。</span></div>
@@ -171,6 +180,15 @@
             <button id="supply-2" type="button" class="choice" aria-pressed="false"><strong id="supply-name-2"></strong><span id="supply-description-2"></span></button>
           </div>
           <button id="supply-reroll" type="button" class="secondary" aria-disabled="true" disabled hidden>免费重抽 · 1 次</button>
+          <details class="contract-panel" id="contract-options">
+            <summary id="contract-summary">下一波 · 稳守防线（可选战地回收委托）</summary>
+            <div class="choice-grid survival-grid" id="contract-choices" role="group" aria-label="选择下一波委托">
+              <button id="contract-hold" type="button" class="choice" aria-pressed="true"><strong>稳守防线</strong><span>只需清敌，保留原有清场奖励。每波默认，不自动接取委托。</span></button>
+              <button id="contract-recovery" type="button" class="choice" aria-pressed="false"><strong>战地回收 · 可选</strong><span>敌人抵达后，清场前收齐左右两侧和高台的 3 个数据节点。活着清场额外 +350 分、+1 体力、+1 手雷。</span></button>
+            </div>
+            <p id="contract-selection" class="small" role="status"></p>
+            <p class="small">委托仅下一波有效。未收齐或阵亡不获额外奖励，不影响正常清场；体力与手雷不超过上限。首领波不开放委托。</p>
+          </details>
         </section>
         <div id="difficulty-options" class="menu-section" role="group" aria-label="远征难度">
           <div class="option-row">
@@ -292,6 +310,7 @@
       let titleView='campaign',challengeId=null,challengeTime=0,challengeReflections=0,bossWins=0;
       let survivalWave=0,survivalCleared=0,survivalTime=0,spawnTime=0,supplyOffers=[],selectedSupply=null;
       let refluxCooldown=0,selectedLoadout='assault',loadout='assault',supplyRerolls=0;
+      let selectedContract='hold',fieldContract=null;
       const kit=()=>LOADOUTS[survival()?loadout:'assault'];
       const survival=()=>mode==='survival';
       const bossWave=()=>survival()&&survivalWave>0&&survivalWave%3===0;
@@ -442,8 +461,30 @@
         if(titleOpen){
           kicker.textContent=defense?'SURVIVAL / BUILD YOUR RUN':challenges?'OPERATIONS / 01—03':'EXPEDITION / 01—03';
           action.textContent=defense?'开始防线生存':'开始三章远征';
-          message.textContent=defense?'每三波迎战一位首领。搭配模组点亮贯穿火力、反击回流或爆破回收，把每次胜利变成下一波的战术。':challenges?'挑一项短程任务：竞速、反击或首领连战。固定规则、独立纪录，随时重试。':'潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化；冲刺反弹敌弹，绕后击破盾卫，连击争取高分。';
+          message.textContent=defense?'每三波迎战一位首领。搭配模组点亮贯穿火力、反击回流或爆破回收，还可接取回收委托，在交火中争取额外补给。':challenges?'挑一项短程任务：竞速、反击或首领连战。固定规则、独立纪录，随时重试。':'潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化；冲刺反弹敌弹，绕后击破盾卫，连击争取高分。';
         }
+      }
+      function renderContract(){
+        const available=survival()&&phase==='waveClear'&&(survivalWave+1)%3!==0;
+        $('contract-choices').hidden=!available;
+        for(const key of ['hold','recovery']){
+          $('contract-'+key).disabled=!available;
+          $('contract-'+key).setAttribute('aria-pressed',String(selectedContract===key));
+        }
+        $('contract-summary').textContent=!available?'下一波 · 首领战，专注迎战':
+          selectedContract==='recovery'?'下一波 · 已接取战地回收委托':'下一波 · 稳守防线（可选战地回收委托）';
+        $('contract-selection').textContent=!available?'下一波没有回收委托，正常选择补给即可。':
+          selectedContract==='recovery'?'已接取：清场前收齐 3 个节点，再活着清场领取额外奖励。':'已选稳守防线。可展开并自选委托，未完成不会结束本局。';
+        $('contract-hud').hidden=!survival()||!fieldContract||fieldContract.status!=='active'||phase==='title';
+        if(fieldContract){
+          const count=fieldContract.nodes.filter(node=>node.done).length;
+          $('contract-objective').textContent=spawnTime>0?'等待增援抵达 · 节点尚未启用':
+            count===3?'已收齐 3 / 3 · 活着清场领取奖励':'已回收 '+count+' / 3 · 清场前收齐，留意两侧与高台';
+        }
+      }
+      function chooseContract(key){
+        if(!survival()||phase!=='waveClear'||(survivalWave+1)%3===0||!['hold','recovery'].includes(key))return;
+        selectedContract=key;renderContract();announce($('contract-selection').textContent);
       }
       function selectLoadout(key){
         if(phase!=='title'||titleView!=='survival'||!Object.hasOwn(LOADOUTS,key))return;
@@ -456,7 +497,7 @@
       function showMenu(head,sub,label,tag){
         clearInput();lag=0;phase=tag;title.textContent=head;message.textContent=sub;action.textContent=label;action.disabled=false;
         kicker.textContent=tag==='title'?'EXPEDITION / 01—03':tag==='pause'?'PAUSED':tag==='stageClear'?'TACTICAL UPGRADE':tag==='victory'?'ALL CLEAR':tag==='confirmRestart'?'CONFIRM':tag==='practiceClear'?'PRACTICE COMPLETE':tag==='challengeClear'?'OPERATION COMPLETE':tag==='bossBreak'?'NEXT TARGET':'TRY AGAIN';
-        renderTitleView();renderBuild();
+        renderTitleView();renderBuild();renderContract();
         $('upgrade-options').hidden=tag!=='stageClear';
         $('survival-options').hidden=tag!=='waveClear';
         $('supply-reroll').hidden=tag!=='waveClear';
@@ -495,7 +536,7 @@
         $('dash-status').textContent=player?.dashCooldown>0?player.dashCooldown.toFixed(1)+'s':'就绪';
         $('combo-status').textContent=combo.count?combo.count+' 连 · ×'+comboMultiplier()+' · '+combo.timer.toFixed(1)+'s':'待命';
         $('run-label').textContent=(difficulty==='relaxed'?'轻松':'标准')+' · '+(survival()?'防线 · '+kit().name:mode==='challenge'?'挑战':mode==='practice'?'练习':'远征');
-        renderBuild();
+        renderBuild();renderContract();
         const mission=currentChallenge();$('mission-hud').hidden=!mission&&!survival();
         if(survival()){
           $('mission-name').textContent='防线生存 · 第 '+survivalWave+' 波'+(bossWave()?' · 首领战':'');
@@ -514,6 +555,7 @@
         updateSaveStatus();
       }
       function resetStage(index,carry){
+        fieldContract=null;selectedContract='hold';$('contract-options').open=false;
         stageIndex=index;stage=STAGES[index];
         if(gauntlet())stage={...stage,name:'首领竞技场',width:W,gaps:[],checkpoints:[],
           platforms:[[260,320,170],[500,310,150]],intel:[],enemies:[],pickups:[]};
@@ -541,7 +583,7 @@
         mode='survival';titleView='survival';difficulty='standard';challengeId=null;loadout=selectedLoadout;
         challengeTime=0;challengeReflections=0;bossWins=0;points=0;shotsFired=0;runStars=[];
         upgrades=Object.fromEntries(MODULES.map(key=>[key,0]));
-        survivalWave=0;survivalCleared=0;survivalTime=0;supplyOffers=[];selectedSupply=null;refluxCooldown=0;supplyRerolls=0;
+        survivalWave=0;survivalCleared=0;survivalTime=0;supplyOffers=[];selectedSupply=null;refluxCooldown=0;supplyRerolls=0;selectedContract='hold';fieldContract=null;
         best=progress.survival.best;resetStage(0,{hp:kit().hp,lives:1,grenades:kit().grenades});startWave();
       }
       function startWave(){
@@ -565,6 +607,11 @@
         pickups=[{x:480,y:260,kind:'spread',done:false,age:0},
           {x:survivalWave%2?65:bossWave()?700:895,y:G-25,kind:'heal',done:false,age:0}];
         bullets=[];bombs=[];sparks=[];intel=[];spawnTime=2.2;cam=0;shake=0;
+        // A fresh, explicit choice for one ordinary wave. Never create nodes in
+        // a boss arena or persist an unfinished commission across attempts.
+        fieldContract=selectedContract==='recovery'&&!bossWave()?{status:'active',nodes:
+          [[120,G-24],[840,G-24],[survivalWave%2?285:715,301]].map(([x,y])=>({x,y,done:false}))}:null;
+        selectedContract='hold';
         combo={count:0,timer:0,best:0};combatText='';combatTime=0;selectedSupply=null;
         clearInput();lag=0;phase='playing';hideMenu();frameLast=performance.now();hud();
         announce('第 '+survivalWave+' 波，'+(bossWave()?stage.bossName+'。首领 2.2 秒后抵达，右侧为竞技场边界。':count+' 名敌人。增援 2.2 秒后抵达，留意两侧。'));
@@ -579,6 +626,14 @@
       }
       function finishWave(){
         if(!survival()||phase!=='playing'||spawnTime>0||activeEnemies()>0||!boss.dead)return;
+        let contractReward='';
+        if(fieldContract?.status==='active'){
+          const count=fieldContract.nodes.filter(node=>node.done).length;
+          fieldContract.status=count===3?'success':'missed';
+          if(count===3){points+=350;player.hp=Math.min(maxHealth(),player.hp+1);player.grenades=Math.min(7,player.grenades+1);}
+          contractReward=count===3?'\n回收委托完成 · 额外 +350 分、+1 体力、+1 手雷（不超过上限）':
+            '\n回收委托未完成 · '+count+' / 3 · 无额外奖励，正常清场奖励保留';
+        }
         survivalCleared=survivalWave;points+=200+Math.min(1000,survivalWave*50)+(bossWave()?500:0);
         progress.survival.wave=Math.max(progress.survival.wave,bounded(survivalCleared,9999));
         progress.survival.best=Math.max(progress.survival.best,bounded(points,9999999));
@@ -586,7 +641,8 @@
         player.hp=Math.min(maxHealth(),player.hp+(bossWave()?2:1));player.grenades=Math.min(7,player.grenades+(bossWave()?2:1));
         bullets=[];bombs=[];spawnTime=0;
         supplyRerolls=MODULES.some(key=>upgrades[key]<2)?1:0;rollSupplies();
-        $('result-details').textContent='已守住 '+survivalCleared+' 波 · 清场得分 '+points+'\n体力 '+player.hp+' / '+maxHealth()+' · 手雷 '+player.grenades+' · 用时 '+formatTime(survivalTime);
+        selectedContract='hold';$('contract-options').open=false;
+        $('result-details').textContent='已守住 '+survivalCleared+' 波 · 清场得分 '+points+'\n体力 '+player.hp+' / '+maxHealth()+' · 手雷 '+player.grenades+' · 用时 '+formatTime(survivalTime)+contractReward;
         hud();showWaveMenu();
       }
       function rollSupplies(){
@@ -640,7 +696,8 @@
       }
       function finishSurvival(){
         if(!survival()||phase!=='playing')return;
-        $('result-details').textContent='本次守住 '+survivalCleared+' 波 · 倒在第 '+survivalWave+' 波\n最高守住 '+progress.survival.wave+' 波 · 最高清场分 '+progress.survival.best+'\n用时 '+formatTime(survivalTime)+' · 本波未计入纪录';
+        if(fieldContract)fieldContract.status='missed';
+        $('result-details').textContent='本次守住 '+survivalCleared+' 波 · 倒在第 '+survivalWave+' 波\n最高守住 '+progress.survival.wave+' 波 · 最高清场分 '+progress.survival.best+'\n用时 '+formatTime(survivalTime)+' · 本波未计入纪录'+(fieldContract?'\n回收委托未结算 · 需要活着清场，无额外奖励':'');
         hud();showMenu('防线行动结束','已守住的波数与清场得分已保留。换一套构筑，再突破自己的纪录。','再次守住防线','survivalOver');
       }
       function beginRun(index,kind){
@@ -1082,6 +1139,15 @@
             announce('获得情报，已收集 '+collected()+' / 3。');
           }
         }
+        if(survival()&&spawnTime===0&&fieldContract?.status==='active'){
+          for(const node of fieldContract.nodes){
+            if(!node.done&&circRect(node.x,node.y,17,player)){
+              node.done=true;spark(node.x,node.y,'#85f4d0',16);beep(1040,.1,'triangle');
+              const count=fieldContract.nodes.filter(item=>item.done).length;
+              combatNotice('回收 '+count+' / 3'+(count===3?' · 活着清场领取奖励':' · 清场前收齐'));hud();
+            }
+          }
+        }
         for(let i=sparks.length-1;i>=0;i--){
           const s=sparks[i];s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=680*dt;s.life-=dt;
           if(s.life<=0)sparks.splice(i,1);
@@ -1264,6 +1330,16 @@
           terrain();
           for(const p of pickups)drawPickup(p);
           for(const item of intel)drawIntel(item);
+          if(survival()&&fieldContract?.status==='active')for(const [index,node] of fieldContract.nodes.entries()){
+            if(node.done)continue;
+            c.save();c.globalAlpha=spawnTime>0?.4:1;
+            const y=node.y+(reducedMotion?0:Math.sin(clock*3+index)*3);
+            for(let dy=20;dy<54;dy+=9)rect(node.x-1,y-dy,3,5,'#85f4d0');
+            rect(node.x-13,y-13,26,26,'#103d3d');rect(node.x-10,y-10,20,20,'#8aefcf');
+            rect(node.x-6,y-7,12,14,'#1c5051');rect(node.x-3,y-4,6,3,'#c5fff0');rect(node.x-3,y+2,6,3,'#c5fff0');
+            c.font='bold 12px system-ui';c.fillStyle='#b9ffe9';c.textAlign='center';
+            c.fillText('数据 '+(index+1),node.x,y+29);c.restore();
+          }
           if(survival()&&spawnTime>0)c.globalAlpha=.4;
           for(const e of enemies){
             c.save();if(e.arrival>0)c.globalAlpha=.4;drawEnemy(e);
@@ -1385,6 +1461,7 @@
       for(const view of ['campaign','challenges','survival'])$('mode-'+view).addEventListener('click',()=>selectTitleView(view));
       for(const key of Object.keys(LOADOUTS))$('loadout-'+key).addEventListener('click',()=>selectLoadout(key));
       $('supply-reroll').addEventListener('click',rerollSupplies);
+      for(const key of ['hold','recovery'])$('contract-'+key).addEventListener('click',()=>chooseContract(key));
       for(let i=0;i<3;i++)$('supply-'+i).addEventListener('click',()=>chooseSupply(i));
       for(const key of Object.keys(CHALLENGES))$('challenge-'+key).addEventListener('click',()=>{if(phase==='title')beginChallenge(key);});
       for(const key of Object.keys(UPGRADES))$('upgrade-'+key).addEventListener('click',()=>chooseUpgrade(key));
@@ -1454,6 +1531,7 @@
         turretCharge:Math.max(0,...enemies.map(e=>e.dead?0:e.windup)),shieldCount:enemies.filter(e=>!e.dead&&e.type==='shield').length,
         combo:combo.count,comboTime:combo.timer,comboBest:combo.best,combatText:combatTime>0?combatText:'',reflections,
         survivalWave,survivalCleared,survivalTime,spawnTime,bossWave:bossWave(),bossMaxHp:boss?.maxHp??0,bossX:boss?.x??0,synergies:activeSynergies(),refluxCooldown,loadout,selectedLoadout,supplyRerolls,supplyOffers:[...supplyOffers],selectedSupply,
+        selectedContract,fieldContract:fieldContract?{status:fieldContract.status,nodes:fieldContract.nodes.map(node=>({...node}))}:null,
         enemies:enemies.filter(e=>!e.dead).map(e=>({x:e.x,y:e.y,w:e.w,h:e.h,hp:e.hp,type:e.type,face:e.face,arrival:e.arrival||0})),
         clock,runStars:[...runStars],progress:JSON.parse(JSON.stringify(progress))
       })});

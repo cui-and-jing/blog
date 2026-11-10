@@ -1,6 +1,7 @@
 /** Published Survival mode: ordinary DOM controls and genuine keyboard input only. */
 import path from 'node:path';
 import { survivalTactics } from './raid-survival-tactics.mjs';
+import { recoveryTactics } from './raid-recovery-tactics.mjs';
 
 export async function checkRaidSurvival(page, problems) {
   const read = () => page.evaluate(() => ({ ...window.__raidState }));
@@ -64,22 +65,23 @@ export async function checkRaidSurvival(page, problems) {
 
   // Drive the same controls a player uses. Snapshots only choose the next input;
   // never replace enemies, move the player, change HP, seed RNG or skip a wave.
-  const fight = async (wave, { bossScreenshot = false } = {}) => {
+  const fight = async (wave, { bossScreenshot = false, recovery = false } = {}) => {
     const deadline = Date.now() + 45000;
-    const decide = survivalTactics();
-    let moving = '', jumping = false, captured = false;
+    const decide = recovery ? recoveryTactics() : survivalTactics();
+    let moving = '', jumping = false, captured = false, firing = false;
     const move = async direction => {
       if (moving === direction) return;
       if (moving) await page.keyboard.up(moving);
       if (direction) await page.keyboard.down(direction);
       moving = direction;
     };
-    await page.keyboard.down('j');
     try {
       while (Date.now() < deadline) {
         const state = await read();
         if (state.phase !== 'playing' || state.survivalWave !== wave) break;
         const input = decide(state);
+        const shoot = input.fire !== false;
+        if (shoot !== firing) { await page.keyboard[shoot ? 'down' : 'up']('j'); firing = shoot; }
         await move(input.move);
         if (input.jump && state.ground) {
           if (jumping) await page.keyboard.up('w');
@@ -92,15 +94,21 @@ export async function checkRaidSurvival(page, problems) {
         if (bossScreenshot && !captured && state.spawnTime === 0 && state.bossHp > 0 && state.bossHp < state.bossMaxHp) {
           await shot('boss-combat'); captured = true;
         }
+        if (recovery && !captured && state.fieldContract?.nodes.every(node => node.done)) {
+          await shot('recovery-collected-' + page.viewport().width); captured = true;
+        }
         await wait(80);
       }
     } finally {
       for (const key of ['j', 'a', 'd', 'w']) await page.keyboard.up(key);
     }
     const state = await read();
-    check(state.phase === 'waveClear' && state.survivalCleared === wave && state.progress.survival.wave === wave &&
+    check(state.phase === 'waveClear' && state.survivalCleared === wave && state.progress.survival.wave >= wave &&
       state.hp > 0 && state.lives === 1 && state.stageDeaths === 0, '真实键盘战斗未完成第 ' + wave + ' 波', state);
     if (bossScreenshot) check(captured, '未观察到可截图的真实首领交战');
+    if (recovery) check(captured && state.fieldContract?.status === 'success' &&
+      state.fieldContract.nodes.every(node => node.done) && state.progress.survival.best >= state.score,
+    '真实移动未收齐节点并兑现回收委托', state);
     return state;
   };
 
@@ -183,6 +191,20 @@ export async function checkRaidSurvival(page, problems) {
   check((await page.$eval('#overlay-text', element => element.textContent)).includes('下一波：双向增援 · 第 2 波'), '首波未预告第二波增援');
   check(state.supplyRerolls === 1 && await visible('#supply-reroll') &&
     await page.$eval('#supply-reroll', element => element.getAttribute('aria-disabled') === 'false'), '首波没有可用的免费补给重抽', state);
+  check(state.selectedContract === 'hold' && state.fieldContract === null &&
+    await page.$eval('#contract-options', element => !element.open), '首轮不是默认稳守，或委托面板未默认折叠');
+  await page.focus('#contract-summary'); await page.keyboard.press('Space');
+  check(await page.$eval('#contract-options', element => element.open) && (await read()).phase === 'waveClear',
+    '原生键盘未展开委托或提前开波');
+  for (const [key, input] of [['recovery', 'Enter'], ['hold', 'Space'], ['recovery', 'Space']]) {
+    const previous = await read();
+    await page.focus('#contract-' + key); await page.keyboard.press(input);
+    state = await read();
+    check(state.selectedContract === key && unchanged(state, previous, ['selectedContract']) &&
+      await page.$eval('#contract-' + key, element => element.getAttribute('aria-pressed') === 'true') &&
+      await page.$eval('#start', element => element.disabled), '委托选择提前开始、授予资源或接受了未选补给', state);
+  }
+  await shot('recovery-choice');
   const beforeReroll = state;
   await page.focus('#supply-0'); await page.keyboard.press('Space');
   check((await read()).selectedSupply === beforeReroll.supplyOffers[0] &&
@@ -218,7 +240,7 @@ export async function checkRaidSurvival(page, problems) {
   // real touch entry is exercised separately after the reload below.
   for (const width of [320, 390]) {
     await page.setViewport({ width, height: 844, isMobile: false, hasTouch: false });
-    for (const selector of ['#supply-0', '#supply-1', '#supply-2', '#supply-reroll']) {
+    for (const selector of ['#supply-0', '#supply-1', '#supply-2', '#supply-reroll', '#contract-hold', '#contract-recovery']) {
       await page.$eval(selector, element => element.scrollIntoView({ block: 'center' }));
       const box = await page.$eval(selector, element => {
         const r = element.getBoundingClientRect(); return { x: r.x, right: r.right, w: r.width, h: r.height };
@@ -245,6 +267,10 @@ export async function checkRaidSurvival(page, problems) {
     state.loadout === 'assault' && state.upgrades[selected.selectedSupply] === 1 && state.shots === intermission.shots,
     '第二波类型、补给效果或整备输入隔离错误', state);
   check(!await visible('#supply-reroll'), '新波战斗仍显示补给重抽');
+  check(state.fieldContract?.status === 'active' && state.fieldContract.nodes.length === 3 &&
+    state.fieldContract.nodes.every(node => !node.done) && state.selectedContract === 'hold' &&
+    await visible('#contract-hud'), '回收委托没有在第二波独立启用或预警中提前取得节点', state);
+  await shot('recovery-warning');
 
   // Native details/summary keyboard operation must work without Space jumping
   // in play, or Enter accidentally resuming the game while it is paused.
@@ -274,8 +300,14 @@ export async function checkRaidSurvival(page, problems) {
   }
   await page.setViewport({ width: 1280, height: 960, isMobile: false, hasTouch: false });
   await page.click('#start'); await phase('playing');
-  state = await fight(2);
+  state = await fight(2, { recovery: true });
   if (state.phase !== 'waveClear') return;
+  check((await page.$eval('#result-details', element => element.textContent)).includes('回收委托完成') &&
+    !await visible('#contract-hud') && state.selectedContract === 'hold', '回收成功未展示结算或下一波自动接取');
+  await page.focus('#contract-summary'); await page.keyboard.press('Enter');
+  check(await page.$eval('#contract-choices', element => element.hidden) &&
+    (await page.$eval('#contract-summary', element => element.textContent)).includes('首领战'),
+    '首领波前仍提供回收委托');
   check(state.supplyRerolls === 1 && await visible('#supply-reroll') &&
     await page.$eval('#supply-reroll', element => element.getAttribute('aria-disabled') === 'false'), '下一波清场没有恢复免费重抽', state);
   checkComplement(state);
@@ -289,7 +321,7 @@ export async function checkRaidSurvival(page, problems) {
   await page.click('#start'); await phase('playing');
   state = await read();
   check(state.survivalWave === 3 && state.bossWave && state.bossMaxHp === 32 && state.bossHp === 32 &&
-    state.enemies.length === 0 && state.survivalCleared === 2 && state.progress.survival.wave === 2,
+    state.enemies.length === 0 && state.survivalCleared === 2 && state.progress.survival.wave === 2 && state.fieldContract === null,
     '第三波不是首位独立首领，或首领未死便记入清场', state);
   check(state.spawnTime > 0 && state.spawnTime <= 2.2 &&
     Math.abs(state.survivalTime - beforeBoss.survivalTime + state.spawnTime - 2.2) < .04,
@@ -325,7 +357,7 @@ export async function checkRaidSurvival(page, problems) {
     '首领补给未显示强化恢复和第四波预告');
   check(await page.$eval('#start', element => element.disabled), '首领清场后未选补给即可继续');
   await shot('boss-supply');
-  const record = state.progress.survival;
+  let record = state.progress.survival;
   await page.click('#menu-home'); await phase('confirmRestart'); await page.click('#start'); await phase('title');
   state = await read();
   check(state.difficulty === 'relaxed' && state.titleView === 'survival', '返回后没有恢复远征难度与玩法入口');
@@ -357,6 +389,38 @@ export async function checkRaidSurvival(page, problems) {
     await checkLoadoutStart(key);
     await tap('#pause'); await phase('pause');
     await shot('touch-loadout-' + key + '-' + viewport.width);
+    if (key === 'counter') {
+      await tap('#start'); await phase('playing');
+      state = await fight(1);
+      if (state.phase !== 'waveClear') return;
+      await tap('#contract-summary');
+      for (const choice of ['recovery', 'hold', 'recovery', 'recovery']) {
+        const before = await read(); await tap('#contract-' + choice);
+        check((await read()).selectedContract === choice && unchanged(await read(), before, ['selectedContract']),
+          '触屏委托选择或重复点击改变资源、计时或提前开波');
+        const box = await page.$eval('#contract-' + choice, element => {
+          const r = element.getBoundingClientRect(); return { x: r.x, right: r.right, w: r.width, h: r.height };
+        });
+        check(box.w >= 80 && box.h >= 44 && box.x >= 0 && box.right <= viewport.width + 1,
+          '触屏委托按钮不可完整操作', box);
+      }
+      let choice = state.supplyOffers.indexOf('armor');
+      if (choice < 0) choice = state.hp < 4 ? state.supplyOffers.indexOf('heal') : 0;
+      await tap('#supply-' + Math.max(0, choice));
+      const selected = await read();
+      await tap('#restart'); await phase('confirmRestart');
+      await tap('#cancel-restart'); await phase('waveClear');
+      check(unchanged(await read(), selected), '触屏取消重开丢失委托与补给选择');
+      await page.$eval('#contract-options', element => element.scrollIntoView({ block: 'center' }));
+      await shot('touch-recovery-choice');
+      await tap('#start'); await phase('playing');
+      state = await fight(2, { recovery: true });
+      if (state.phase !== 'waveClear') return;
+      check(state.progress.survival.wave >= record.wave && state.progress.survival.best >= record.best,
+        '触屏回收降低历史纪录', state);
+      record = state.progress.survival;
+      await shot('touch-recovery-result');
+    }
     await tap('#menu-home'); await phase('confirmRestart'); await tap('#start'); await phase('title');
     await checkSelection(key);
   }
