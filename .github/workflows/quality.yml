@@ -201,6 +201,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: a11y-report
+          # All paths below are explicit QA outputs; include the hidden .shots folder.
+          include-hidden-files: true
           path: |
             .shots/a11y.json
             .shots/a11y.log
