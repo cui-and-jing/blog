@@ -139,6 +139,11 @@ jobs:
 
       # 四项检查拆成四个 step：合成一条时只知道「整块失败」，
       # 分开放才能从红色叉号直接看出是游戏冒烟、axe、键盘实测还是传输预算挂了
+      # Canvas games use OS fonts, so screenshots need Chinese glyphs as well.
+      # This changes the QA runner only; no font payload is added to the game.
+      - name: Install Chinese fonts for browser screenshots
+        run: sudo apt-get update -qq && sudo apt-get install --no-install-recommends -y fonts-noto-cjk
+
       - name: Start preview server
         run: |
           npx astro preview --port 4321 > /tmp/preview.log 2>&1 &
