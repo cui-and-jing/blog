@@ -68,7 +68,9 @@ export async function checkPlatformDescent(page, { read, check, shot, phase, wai
       await page.waitForFunction(() => window.__raidState.dropTime > 0, { timeout: 1200, polling: 'raf' });
       await page.keyboard.press('p'); await phase('pause');
       const paused = await read();
-      check(paused.dropTime > 0 && !paused.ground && paused.y + paused.playerHeight > 325,
+      // The positive drop was observed above. Protocol latency may let it finish
+      // before Pause arrives, so do not require a second 200ms-window hit.
+      check(paused.y + paused.playerHeight > 325 && paused.y + paused.playerHeight <= 425,
         '下蹲加跳跃未从平台向下穿越：' + (touch ? 'touch' : 'keyboard'), paused);
       await release(); await wait(280);
       const frozen = await read();
