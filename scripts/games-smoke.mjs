@@ -124,11 +124,14 @@ async function checkGame(browser, file) {
   const missing = [];
   let webgl2 = null;
   let page = null;
+  let gameContext = null;
   let retryable = false;
   let reason = '';
 
   try {
-    page = await browser.newPage();
+    /* 每次 Pixel Raid 冒烟独立存档，避免上一轮合法解锁样本污染重试。 */
+    if (file === 'pixelraid.html') gameContext = await browser.createBrowserContext();
+    page = gameContext ? await gameContext.newPage() : await browser.newPage();
 
     page.on('pageerror', (error) => errors.push(`页面异常：${error.message}`));
     page.on('console', (message) => {
@@ -180,9 +183,43 @@ async function checkGame(browser, file) {
     } else if (file === 'pixelraid.html') {
       /* 横版动作游戏要真正按键：只验证能画出菜单无法发现移动和跳跃断掉 */
       await page.waitForFunction(() => window.__raidReady === true, { timeout: 10000 });
+      fs.mkdirSync(path.join(process.cwd(), '.shots'), { recursive: true });
+      await page.screenshot({ path: path.join(process.cwd(), '.shots', 'pixelraid-desktop-title.png'), fullPage: true });
       const boot = await page.evaluate(() => ({ ...window.__raidState }));
       if (boot.phase !== 'title' || boot.stage !== 1) {
         problems.push('Pixel Raid 初始界面或关卡不正确：' + JSON.stringify(boot));
+      }
+      const titleControls = await page.evaluate(() => ({
+        locked: [2, 3].every((index) => document.getElementById('stage-' + index)?.disabled),
+        stageOne: !document.getElementById('stage-1')?.disabled,
+        mutableTestHook: typeof window.__raidQA !== 'undefined',
+      }));
+      if (!titleControls.locked || !titleControls.stageOne || titleControls.mutableTestHook) {
+        problems.push('Pixel Raid 初始选关解锁或只读调试边界错误：' + JSON.stringify(titleControls));
+      }
+      /* 真正的键盘原生按钮激活：Space/Enter 应选择难度，不能偷偷开始或排队跳跃。 */
+      await page.focus('#difficulty-relaxed');
+      await page.keyboard.press('Space');
+      const relaxedMenu = await page.evaluate(() => ({ ...window.__raidState }));
+      if (relaxedMenu.phase !== 'title' || relaxedMenu.difficulty !== 'relaxed') {
+        problems.push('Pixel Raid 难度按钮键盘操作错误：' + JSON.stringify(relaxedMenu));
+      }
+      await page.click('#start');
+      await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 4000 });
+      const relaxed = await page.evaluate(() => ({ ...window.__raidState }));
+      if (relaxed.hp !== 6 || relaxed.maxHp !== 6 || relaxed.lives !== 4) {
+        problems.push('Pixel Raid 轻松模式资源错误：' + JSON.stringify(relaxed));
+      }
+      await page.keyboard.press('p');
+      await page.click('#menu-home');
+      await page.waitForFunction(() => window.__raidState?.phase === 'confirmRestart', { timeout: 3000 });
+      await page.click('#start');
+      await page.waitForFunction(() => window.__raidState?.phase === 'title', { timeout: 3000 });
+      await page.focus('#difficulty-standard');
+      await page.keyboard.press('Enter');
+      const standardMenu = await page.evaluate(() => ({ ...window.__raidState }));
+      if (standardMenu.phase !== 'title' || standardMenu.difficulty !== 'standard') {
+        problems.push('Pixel Raid Enter 激活难度时误触开始：' + JSON.stringify(standardMenu));
       }
       await page.click('#start');
       await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 4000 });
@@ -196,6 +233,7 @@ async function checkGame(browser, file) {
       await page.keyboard.up('d');
       const moved = await page.evaluate(() => ({ ...window.__raidState }));
       if (!(moved.x > start.x + 30)) problems.push('Pixel Raid 按 D 后角色没有向右移动');
+      await page.screenshot({ path: path.join(process.cwd(), '.shots', 'pixelraid-desktop-play.png'), fullPage: true });
 
       await page.keyboard.down('j');
       await new Promise((resolve) => setTimeout(resolve, 320));
@@ -217,11 +255,29 @@ async function checkGame(browser, file) {
         problems.push('Pixel Raid 手雷没有正确扣除：' + JSON.stringify(thrown));
       }
 
+      await page.keyboard.press('l');
+      await page.waitForFunction(() => window.__raidState?.dashCooldown > 0, { timeout: 2000 });
+      await page.keyboard.down('d');
+      await page.keyboard.down('j');
       await page.keyboard.press('p');
       await page.waitForFunction(() => window.__raidState?.phase === 'pause', { timeout: 3000 });
+      const frozen = await page.evaluate(() => ({ ...window.__raidState }));
+      await new Promise((resolve) => setTimeout(resolve, 240));
+      const stillFrozen = await page.evaluate(() => ({ ...window.__raidState }));
+      if (frozen.x !== stillFrozen.x || frozen.shots !== stillFrozen.shots ||
+          frozen.weaponTime !== stillFrozen.weaponTime || frozen.dashCooldown !== stillFrozen.dashCooldown) {
+        problems.push('Pixel Raid 暂停时位置、武器或冲刺计时仍然变化');
+      }
+      await page.keyboard.up('d');
+      await page.keyboard.up('j');
       await page.keyboard.press('p');
       await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 3000 });
       await page.click('#restart');
+      await page.waitForFunction(() => window.__raidState?.phase === 'confirmRestart', { timeout: 3000 });
+      await page.click('#cancel-restart');
+      await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 3000 });
+      await page.click('#restart');
+      await page.click('#start');
       const restarted = await page.evaluate(() => ({ ...window.__raidState }));
       if (restarted.phase !== 'playing' || restarted.stage !== 1 || restarted.shots !== 0 ||
           restarted.grenades !== 3) {
@@ -259,6 +315,23 @@ async function checkGame(browser, file) {
 
       /* 同页切成手机视口；按住屏幕右箭头，断言实际位置改变，不止检查控件是否存在 */
       await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+      await page.waitForFunction(() => window.__raidReady === true, { timeout: 10000 });
+      /* 改变模拟设备参数有时触发 window.blur，游戏会主动暂停；
+         先确认正在游玩，之后用真实 touchStart / touchEnd 而不是鼠标事件测试触屏。 */
+      const mobileState = await page.evaluate(() => ({ ...window.__raidState }));
+      if (mobileState.phase === 'title') {
+        /* Puppeteer 将 isMobile / hasTouch 从 false 切成 true 会触发自动重载。
+           重载后游戏回到标题页，要再次点击开始才能测实际移动。 */
+        await page.click('#start');
+        await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 3000 });
+      } else if (mobileState.phase === 'pause') {
+        await page.click('#pause');
+        await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 3000 });
+      } else if (mobileState.phase !== 'playing') {
+        problems.push('Pixel Raid 手机视口未进入游玩状态：' + JSON.stringify(mobileState));
+      }
+      /* 菜单关闭会改变 frame 高度；必须在进入游戏后再取触屏坐标。 */
+      await page.$eval('[data-action="right"]', (button) => button.scrollIntoView({ block: 'center' }));
       const target = await page.evaluate(() => {
         const btn = document.querySelector('[data-action="right"]');
         const controls = document.querySelector('.controls');
@@ -273,20 +346,6 @@ async function checkGame(browser, file) {
       if (!target.visible || target.width < 42 || target.height < 42) {
         problems.push('Pixel Raid 手机触屏按钮太小或被隐藏：' + JSON.stringify(target));
       } else {
-        /* 改变模拟设备参数有时触发 window.blur，游戏会主动暂停；
-           先确认正在游玩，之后用真实 touchStart / touchEnd 而不是鼠标事件测试触屏。 */
-        const mobileState = await page.evaluate(() => ({ ...window.__raidState }));
-        if (mobileState.phase === 'title') {
-          /* Puppeteer 将 isMobile / hasTouch 从 false 切成 true 会触发自动重载。
-             重载后游戏回到标题页，要再次点击开始才能测实际移动。 */
-          await page.click('#start');
-          await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 3000 });
-        } else if (mobileState.phase === 'pause') {
-          await page.click('#pause');
-          await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 3000 });
-        } else if (mobileState.phase !== 'playing') {
-          problems.push('Pixel Raid 手机视口未进入游玩状态：' + JSON.stringify(mobileState));
-        }
         const beforeTouch = await page.evaluate(() => ({ ...window.__raidState }));
         await page.touchscreen.touchStart(target.x, target.y);
         await new Promise((resolve) => setTimeout(resolve, 340));
@@ -297,7 +356,60 @@ async function checkGame(browser, file) {
             JSON.stringify({ mobileState, beforeTouch, duringTouch }));
         }
       }
+      /* 触屏冲刺要扣冷却；松手/取消不能留住方向，窄屏也不能横向溢出。 */
+      const dashButton = await page.$('[data-action="dash"]');
+      if (!dashButton) problems.push('Pixel Raid 缺少手机冲刺按钮');
+      else {
+        await dashButton.tap();
+        await page.waitForFunction(() => window.__raidState?.dashCooldown > 0, { timeout: 2000 });
+      }
+      await page.keyboard.press('p');
+      await page.waitForFunction(() => window.__raidState?.phase === 'pause', { timeout: 3000 });
+      await page.click('#menu-home');
+      await page.click('#start');
+      await page.waitForFunction(() => window.__raidState?.phase === 'title', { timeout: 3000 });
+      for (const viewport of [{ width: 320, height: 740 }, { width: 844, height: 390 }]) {
+        await page.setViewport({ ...viewport, isMobile: true, hasTouch: true });
+        if (viewport.width === 320) {
+          await page.screenshot({ path: path.join(process.cwd(), '.shots', 'pixelraid-mobile-title.png'), fullPage: true });
+        }
+        const layout = await page.evaluate(() => ({
+          viewport: innerWidth, width: document.documentElement.scrollWidth,
+          start: document.getElementById('start').getBoundingClientRect().width,
+          controls: [...document.querySelectorAll('[data-action]')].map((button) => ({
+            width: button.getBoundingClientRect().width, height: button.getBoundingClientRect().height,
+            name: button.getAttribute('aria-label'),
+          })),
+        }));
+        if (layout.width > layout.viewport + 1 || layout.start < 90 ||
+            layout.controls.some((control) => control.width < 36 || control.height < 44 || !control.name)) {
+          problems.push('Pixel Raid 手机菜单溢出或触屏控件不可用：' + JSON.stringify({ viewport, layout }));
+        }
+      }
       await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+      /* 载入合法的已完成记录，再通过真实选关按钮验证持久化和练习入口。 */
+      await page.evaluate(() => localStorage.setItem('pixel-raid.progress.v1', JSON.stringify({
+        version: 1, unlocked: 3, selectedDifficulty: 'standard',
+        campaign: { standard: { best: 12345, stars: [7, 5, 1] }, relaxed: { best: 0, stars: [0, 0, 0] } },
+        practice: { standard: { best: 0, stars: [0, 0, 0] }, relaxed: { best: 0, stars: [0, 0, 0] } },
+      })));
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => window.__raidReady === true, { timeout: 10000 });
+      const records = await page.evaluate(() => ({
+        ...window.__raidState,
+        thirdLocked: document.getElementById('stage-3').disabled,
+        firstRecord: document.getElementById('record-1').textContent,
+      }));
+      if (records.unlocked !== 3 || records.thirdLocked || !records.firstRecord.includes('★★★')) {
+        problems.push('Pixel Raid 重载后的星级/选关记录不正确：' + JSON.stringify(records));
+      }
+      await page.click('#stage-3');
+      await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 3000 });
+      const practice = await page.evaluate(() => ({ ...window.__raidState }));
+      if (practice.stage !== 3 || practice.mode !== 'practice' || practice.maxHp !== 5 ||
+          Object.values(practice.upgrades).some(Boolean)) {
+        problems.push('Pixel Raid 第三章练习初始化错误：' + JSON.stringify(practice));
+      }
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
@@ -331,6 +443,7 @@ async function checkGame(browser, file) {
   } finally {
     /* 渲染进程崩掉时 close() 自己也会抛，吞掉即可——反正这个标签页已经不在了 */
     if (page) await page.close().catch(() => {});
+    if (gameContext) await gameContext.close().catch(() => {});
   }
 
   for (const message of errors) problems.push(`${file} ${message}`);
@@ -378,7 +491,9 @@ async function main() {
   const failures = [];
 
   try {
-    for (const file of games) {
+    const only = getArg('--only', '');
+    if (only && !games.includes(only)) throw new Error('未知游戏：' + only);
+    for (const file of games.filter((name) => !only || name === only)) {
       let result = await checkGame(browser, file);
 
       if (result.retryable) {
