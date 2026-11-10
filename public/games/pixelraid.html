@@ -25,7 +25,7 @@
     canvas{display:block;width:100%;height:100%;max-height:calc(100dvh - 185px);object-fit:contain;aspect-ratio:16/9;image-rendering:pixelated}
     .overlay{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding:26px;text-align:center;background:linear-gradient(140deg,#0a1728f5,#1d3458f5);z-index:2;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
     .menu-content{width:min(100%,800px);margin:auto;display:grid;justify-items:center;gap:15px}
-    .frame.menu-open{min-height:570px}
+    .frame.menu-open{min-height:600px}
     [hidden]{display:none!important}
     .overlay .eyebrow{margin:0;color:#ffde81;font:700 12px/1.3 ui-monospace,monospace;letter-spacing:.2em}
     .overlay h1{margin:0;font-size:clamp(28px,5vw,50px);line-height:1.1;color:#f6f5ec;text-shadow:3px 4px 0 #405b7b}
@@ -44,6 +44,10 @@
     .menu-section{display:grid;gap:10px;width:100%}.overlay .small{font-size:11px;color:#b8cbdf;line-height:1.65}
     .overlay .section-label{font-size:12px;color:#b8cbdf}.overlay .result-details{color:#ffe093;font-size:15px;white-space:pre-line}
     #save-status{font-weight:400;color:#b8cbdf}.controls button[data-action="dash"]{background:#674d8b;border-color:#b89ed9}
+    .mission{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;max-width:1200px;width:100%;margin:0 auto;padding:9px 12px;border:1px solid #649caf;border-radius:8px;background:#173447;font-size:12px;line-height:1.5}
+    .mission strong{color:#a9f2e4}.mission b{color:#ffe097;font-variant-numeric:tabular-nums}.mission[data-urgent="true"]{border-color:#ffae88;background:#492e36}
+    .challenge-grid .choice{align-content:start;gap:9px}.challenge-grid .record{color:#a9f2e4}.mode-options{padding:5px;border:1px solid #4c6680;border-radius:12px}
+    @media(max-width:480px){.challenge-grid{grid-template-columns:1fr}.challenge-grid .choice{padding:12px 14px}.challenge-grid .choice strong{font-size:14px}.challenge-grid .choice span{font-size:12px}}
     .legend{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;color:#b9cce1;font-size:12px;line-height:1.6;max-width:1100px;margin:0 auto}
     kbd{display:inline-block;border:1px solid #61758e;border-bottom-width:2px;padding:0 5px;background:#213750;border-radius:4px;color:#fff7da}
     .controls{display:none;justify-content:space-between;align-items:center;gap:12px;max-width:1200px;width:100%;margin:0 auto;touch-action:none;user-select:none}
@@ -68,7 +72,7 @@
       .top-actions button{padding:6px 9px}
       .controls button{min-width:44px;min-height:49px;font-size:12px;padding:6px}
       .controls .cluster{gap:5px}
-      .overlay{padding:17px 12px}.menu-content{gap:13px}.frame.menu-open{min-height:570px}.choice-grid{gap:6px}.overlay .choice{padding:10px 7px}.choice strong{font-size:11px}.choice span{font-size:10px}
+      .overlay{padding:17px 12px}.menu-content{gap:13px}.frame.menu-open{min-height:600px}.choice-grid{gap:6px}.overlay .choice{padding:10px 7px}.choice strong{font-size:11px}.choice span{font-size:10px}
       .overlay h1{font-size:25px}
       .overlay p{font-size:12px;line-height:1.6}.overlay .small{font-size:11px}
       .overlay button{font-size:13px;padding:7px 18px;min-height:41px}
@@ -80,7 +84,7 @@
 </head>
 <body>
   <header class="top">
-    <div class="brand"><strong>PIXEL RAID / 像素突围</strong><span>原创横版动作 · 三章远征</span></div>
+    <div class="brand"><strong>PIXEL RAID / 像素突围</strong><span>三章远征 · 作战挑战</span></div>
     <div class="top-actions">
       <button id="pause" type="button">暂停 P</button>
       <button id="sound" type="button" aria-pressed="false">音效 关</button>
@@ -101,6 +105,9 @@
     <span id="run-label">标准 · 远征</span>
     <span id="save-status" role="status">记录保存在本机</span>
   </section>
+  <section class="mission" id="mission-hud" aria-label="当前挑战目标" hidden>
+    <strong id="mission-name"></strong><span id="mission-objective"></span><b id="mission-time"></b>
+  </section>
   <main class="frame menu-open" id="game-frame">
     <canvas id="field" width="960" height="540" role="img" aria-label="像素突围游戏画面：横向移动、跳跃、射击，消灭基地首领后抵达终点"></canvas>
     <div class="overlay" id="overlay" role="group" aria-labelledby="overlay-title">
@@ -108,6 +115,19 @@
         <p class="eyebrow" id="overlay-kicker">EXPEDITION / 01—03</p>
         <h1 id="overlay-title">像素突围</h1>
         <p id="overlay-text">潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化；冲刺反弹敌弹，绕后击破盾卫，连击争取高分。</p>
+        <div class="option-row mode-options" id="mode-options" role="group" aria-label="选择玩法">
+          <button id="mode-campaign" type="button" class="secondary" aria-pressed="true">三章远征</button>
+          <button id="mode-challenges" type="button" class="secondary" aria-pressed="false">作战挑战 · 3 项任务</button>
+        </div>
+        <section id="challenge-menu" class="menu-section" aria-label="作战挑战" hidden>
+          <p>固定标准难度与装具，无需解锁。挑战纪录独立，不影响远征星章。</p>
+          <div class="choice-grid challenge-grid">
+            <button id="challenge-sprint" type="button" class="choice"><strong>01 · 闪电突袭 →</strong><span>90 秒内突破暮色边境并抵达出口。预装闪步模组，冲刺冷却 1.8 秒。</span><span class="record" id="challenge-record-sprint">尚未完成</span></button>
+            <button id="challenge-counter" type="button" class="choice"><strong>02 · 反击专线 →</strong><span>在机械要塞反弹至少 5 枚敌弹，然后击败首领并抵达出口。冲刺冷却 1.2 秒，无限时。</span><span class="record" id="challenge-record-counter">尚未完成</span></button>
+            <button id="challenge-bosses" type="button" class="choice"><strong>03 · 首领连战 →</strong><span>独立竞技场连续击败 3 位强化首领。7 体力、1 条命、5 枚手雷；关间恢复 2 体力与 2 手雷。</span><span class="record" id="challenge-record-bosses">尚未完成</span></button>
+          </div>
+          <p class="small">点任务即开始。成功奖励 500 分；突袭剩余整秒 ×10 分，连战保留体力 ×100 分、手雷 ×25 分。最高分与最快用时独立记录。暂停与整备不计时；刷新页面会结束当前挑战。</p>
+        </section>
         <div id="difficulty-options" class="menu-section" role="group" aria-label="远征难度">
           <div class="option-row">
             <button id="difficulty-standard" type="button" class="secondary" aria-pressed="true">标准 · 原味挑战</button>
@@ -189,6 +209,11 @@
           enemies:[[330,'walker'],[590,'drone'],[1010,'turret'],[1400,'shield'],[1870,'drone'],[2240,'turret'],[2680,'shield'],[2890,'drone'],[3250,'turret']],
           pickups:[[245,'spread'],[900,'grenade'],[1340,'heal'],[2160,'boost'],[2800,'heal'],[3310,'grenade']]}
       ];
+      const CHALLENGES={
+        sprint:{name:'闪电突袭',stage:0,limit:90,goal:'90 秒内击败首领并抵达出口',upgrades:{rapid:0,dash:1,armor:0}},
+        counter:{name:'反击专线',stage:1,limit:0,goal:'反弹至少 5 枚敌弹，再击败首领并抵达出口',upgrades:{rapid:0,dash:2,armor:0}},
+        bosses:{name:'首领连战',stage:0,limit:0,goal:'一条命连续击败三位首领',upgrades:{rapid:1,dash:1,armor:2}}
+      };
       const UPGRADES={rapid:'疾速弹匣',dash:'闪步模组',armor:'战地装甲'};
       const STORAGE_KEY='pixel-raid.progress.v1';
       const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches??false;
@@ -198,11 +223,19 @@
       let points=0,best=0,shotsFired=0,jumpQueued=false,grenadeQueued=false,dashQueued=false,clock=0,shake=0,soundOn=false,audio=null;
       let frameLast=0,lag=0,bombPadLast=false,jumpPadLast=false,dashPadLast=false,pausePadLast=false,padBlocked=true;
       let mode='campaign',difficulty='standard',upgrades={rapid:0,dash:0,armor:0},selectedUpgrade=null;
+      let titleView='campaign',challengeId=null,challengeTime=0,challengeReflections=0,bossWins=0;
+      const currentChallenge=()=>mode==='challenge'?CHALLENGES[challengeId]:null;
+      const gauntlet=()=>mode==='challenge'&&challengeId==='bosses';
+      const formatTime=seconds=>seconds.toFixed(1)+' 秒';
       let stageDeaths=0,stageStars=0,runStars=[],storageAvailable=true,returnPhase='playing',confirmAction='restart';
       const bounded=(v,max)=>typeof v==='number'&&Number.isFinite(v)?Math.max(0,Math.min(max,Math.floor(v))):0;
       const cleanRecord=value=>({best:bounded(value?.best,9999999),stars:[0,1,2].map(i=>{
         const n=bounded(value?.stars?.[i],7);return n&1?n:0;
       })});
+      function cleanChallenge(value){
+        const clears=bounded(value?.clears,9999),time=bounded(value?.bestTime,36000000);
+        return clears&&time?{clears,best:bounded(value?.best,9999999),bestTime:time}:{clears:0,best:0,bestTime:0};
+      }
       function loadProgress(){
         let raw=null,legacy=0;
         try{
@@ -216,7 +249,8 @@
         const record={version:1,unlocked:Math.max(1,bounded(raw?.unlocked,3)),
           selectedDifficulty:raw?.selectedDifficulty==='relaxed'?'relaxed':'standard',
           campaign:{standard:cleanRecord(raw?.campaign?.standard),relaxed:cleanRecord(raw?.campaign?.relaxed)},
-          practice:{standard:cleanRecord(raw?.practice?.standard),relaxed:cleanRecord(raw?.practice?.relaxed)}};
+          practice:{standard:cleanRecord(raw?.practice?.standard),relaxed:cleanRecord(raw?.practice?.relaxed)},
+          challenges:Object.fromEntries(Object.keys(CHALLENGES).map(key=>[key,cleanChallenge(raw?.challenges?.[key])]))};
         if(!raw)record.campaign.standard.best=legacy;
         return record;
       }
@@ -276,47 +310,78 @@
             '通关'+STAGES[i-1].name+'后解锁';
         }
         for(const value of ['standard','relaxed'])$('difficulty-'+value).setAttribute('aria-pressed',String(value===difficulty));
+        for(const key of Object.keys(CHALLENGES)){
+          const record=progress.challenges[key];
+          $('challenge-record-'+key).textContent=record.clears?'完成 '+record.clears+' 次 · 最高 '+record.best+' 分 · 最快 '+formatTime(record.bestTime/100):'尚未完成 · 挑战自己的纪录';
+        }
+      }
+      function renderTitleView(){
+        const titleOpen=phase==='title',challenges=titleView==='challenges';
+        $('mode-options').hidden=!titleOpen;
+        $('difficulty-options').hidden=!titleOpen||challenges;$('stage-menu').hidden=!titleOpen||challenges;
+        $('challenge-menu').hidden=!titleOpen||!challenges;action.hidden=titleOpen&&challenges;
+        for(const name of ['campaign','challenges'])$('mode-'+name).setAttribute('aria-pressed',String(titleView===name));
+        if(titleOpen){
+          kicker.textContent=challenges?'OPERATIONS / 01—03':'EXPEDITION / 01—03';
+          message.textContent=challenges?'挑一项短程任务：竞速、反击或首领连战。固定规则、独立纪录，随时重试。':'潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化；冲刺反弹敌弹，绕后击破盾卫，连击争取高分。';
+        }
+      }
+      function selectTitleView(view){
+        if(phase!=='title'||!['campaign','challenges'].includes(view))return;
+        titleView=view;renderTitleView();
       }
       function showMenu(head,sub,label,tag){
         clearInput();lag=0;phase=tag;title.textContent=head;message.textContent=sub;action.textContent=label;action.disabled=false;
-        kicker.textContent=tag==='title'?'EXPEDITION / 01—03':tag==='pause'?'PAUSED':tag==='stageClear'?'TACTICAL UPGRADE':tag==='victory'?'ALL CLEAR':tag==='confirmRestart'?'CONFIRM':tag==='practiceClear'?'PRACTICE COMPLETE':'TRY AGAIN';
-        $('difficulty-options').hidden=tag!=='title';$('stage-menu').hidden=tag!=='title';
+        kicker.textContent=tag==='title'?'EXPEDITION / 01—03':tag==='pause'?'PAUSED':tag==='stageClear'?'TACTICAL UPGRADE':tag==='victory'?'ALL CLEAR':tag==='confirmRestart'?'CONFIRM':tag==='practiceClear'?'PRACTICE COMPLETE':tag==='challengeClear'?'OPERATION COMPLETE':tag==='bossBreak'?'NEXT TARGET':'TRY AGAIN';
+        renderTitleView();
         $('upgrade-options').hidden=tag!=='stageClear';
-        $('result-details').hidden=!['stageClear','victory','practiceClear'].includes(tag);
-        $('menu-home').hidden=!['pause','stageClear','victory','gameOver','practiceClear'].includes(tag);
+        $('result-details').hidden=!['stageClear','victory','practiceClear','challengeClear','challengeFailed','bossBreak'].includes(tag);
+        $('menu-home').hidden=!['pause','stageClear','victory','gameOver','practiceClear','challengeClear','challengeFailed','bossBreak'].includes(tag);
         $('cancel-restart').hidden=tag!=='confirmRestart';
         if(tag==='stageClear')action.disabled=!selectedUpgrade;
-        overlay.hidden=false;$('game-frame').classList.add('menu-open');
+        overlay.hidden=false;overlay.scrollTop=0;$('game-frame').classList.add('menu-open');
         $('pause').textContent=tag==='pause'?'继续 P':'暂停 P';
         refreshRecords();announce(head+'。'+sub);
         // Keep keyboard focus in the menu, while leaving Space/Enter native to buttons.
-        (tag==='stageClear'?$('upgrade-rapid'):tag==='confirmRestart'?$('cancel-restart'):action).focus?.({preventScroll:true});
+        (tag==='stageClear'?$('upgrade-rapid'):tag==='confirmRestart'?$('cancel-restart'):tag==='title'&&titleView==='challenges'?$('challenge-sprint'):action).focus?.({preventScroll:true});
       }
       function hideMenu(){
         overlay.hidden=true;$('game-frame').classList.remove('menu-open');
         $('pause').textContent='暂停 P';document.activeElement?.blur?.();
       }
       function saveBest(){
+        if(mode==='challenge'){best=progress.challenges[challengeId].best;return;}
         const record=progress[mode][difficulty];
         if(points>record.best){record.best=bounded(points,9999999);saveProgress();}
         best=record.best;
       }
       function hud(){
-        $('level').textContent=(stageIndex+1)+' / '+STAGES.length+' · '+stage.name;
+        $('level').textContent=(gauntlet()?'首领 ':'')+(stageIndex+1)+' / '+STAGES.length+' · '+stage.name;
         $('lives').textContent=String(player?.lives??3);
         const hp=player?.hp??maxHealth();
         $('hp').textContent=('♥ '.repeat(hp)+'♡ '.repeat(maxHealth()-hp)).trim();
         $('ammo').textContent=String(player?.grenades??3);
         $('weapon').textContent=player?.weaponTime>0?'散弹 '+Math.ceil(player.weaponTime)+'s':(player?.boost>0?'步枪 · 连射':'步枪');
         $('score').textContent=String(points).padStart(5,'0');$('best').textContent=String(best).padStart(5,'0');
-        $('intel').textContent=collected()+' / 3';
+        $('intel').textContent=gauntlet()?'—':collected()+' / 3';
         $('dash-status').textContent=player?.dashCooldown>0?player.dashCooldown.toFixed(1)+'s':'就绪';
         $('combo-status').textContent=combo.count?combo.count+' 连 · ×'+comboMultiplier()+' · '+combo.timer.toFixed(1)+'s':'待命';
-        $('run-label').textContent=(difficulty==='relaxed'?'轻松':'标准')+' · '+(mode==='practice'?'练习':'远征');
+        $('run-label').textContent=(difficulty==='relaxed'?'轻松':'标准')+' · '+(mode==='challenge'?'挑战':mode==='practice'?'练习':'远征');
+        const mission=currentChallenge();$('mission-hud').hidden=!mission;
+        if(mission){
+          $('mission-name').textContent=mission.name;
+          $('mission-objective').textContent=gauntlet()?'已击败 '+bossWins+' / 3 · '+(bossWins===3?'任务完成':boss.dead?'等待整备':stage.bossName):
+            challengeId==='counter'?'反弹 '+challengeReflections+' / 5 · '+(boss.dead?'前往出口': '击败首领后撤离'):(boss.dead?'首领已击败 · 前往出口':'击败首领后抵达出口');
+          const remaining=Math.max(0,mission.limit-challengeTime);
+          $('mission-time').textContent=mission.limit?'剩余 '+formatTime(remaining):'用时 '+formatTime(challengeTime);
+          $('mission-hud').setAttribute('data-urgent',String(mission.limit>0&&remaining<=15));
+        }
         updateSaveStatus();
       }
       function resetStage(index,carry){
         stageIndex=index;stage=STAGES[index];
+        if(gauntlet())stage={...stage,name:'首领竞技场',width:W,gaps:[],checkpoints:[],
+          platforms:[[260,320,170],[500,310,150]],intel:[],enemies:[],pickups:[]};
         player={x:64,y:G-44,w:27,h:44,vx:0,vy:0,face:1,hp:clamp(carry?.hp??maxHealth(),1,maxHealth()),
           lives:carry?.lives??(difficulty==='relaxed'?4:3),grenades:carry?.grenades??3,ground:true,inv:1.2,shoot:0,boost:0,
           weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashDir:1,coyote:.1,jumpBuffer:0,crouch:false};
@@ -326,18 +391,55 @@
           face:-1,windup:0,burst:0,burstTimer:0,aimX:0,aimY:0,flash:0,blockFlash:0}));
         pickups=stage.pickups.map(([x,kind])=>({x,y:kind==='spread'?G-45:G-93,kind,done:false,age:0}));
         intel=stage.intel.map(([x,y])=>({x,y,done:false}));
-        const bossHp=[24,34,44][stageIndex];
-        boss={x:stage.width-345,y:G-104,w:105,h:104,hp:bossHp,maxHp:bossHp,
-          shot:1.3,phase:0,windup:0,chargeDuration:.72,attacks:0,lastVolley:0,warned:false,dead:false,
+        const bossHp=Math.ceil([24,34,44][stageIndex]*(gauntlet()?2.75:1));
+        boss={x:gauntlet()?790:stage.width-345,y:G-104,w:105,h:104,hp:bossHp,maxHp:bossHp,
+          shot:gauntlet()?.35:1.3,phase:0,windup:0,chargeDuration:.72,attacks:0,lastVolley:0,warned:false,dead:false,
           attackType:'volley',beamTime:0,beamY:G-22,flash:0};
         combo={count:0,timer:0,best:0};combatText='';combatTime=0;reflections=0;
         bullets=[];bombs=[];sparks=[];cam=0;clock=0;shake=0;stageDeaths=0;stageStars=0;selectedUpgrade=null;
         clearInput();lag=0;hud();
       }
       function beginRun(index,kind){
-        clearInput();mode=kind;points=0;shotsFired=0;runStars=[];upgrades={rapid:0,dash:0,armor:0};
+        clearInput();mode=kind;challengeId=null;challengeTime=0;challengeReflections=0;bossWins=0;points=0;shotsFired=0;runStars=[];upgrades={rapid:0,dash:0,armor:0};
         best=progress[mode][difficulty].best;resetStage(index,null);phase='playing';hideMenu();frameLast=performance.now();
         announce((kind==='practice'?'单章练习':'三章远征')+'开始，'+stage.name+'。');
+      }
+      function beginChallenge(key){
+        if(!Object.hasOwn(CHALLENGES,key))return;
+        mode='challenge';challengeId=key;difficulty='standard';titleView='challenges';
+        challengeTime=0;challengeReflections=0;bossWins=0;points=0;shotsFired=0;runStars=[];
+        upgrades={...CHALLENGES[key].upgrades};best=progress.challenges[key].best;
+        resetStage(CHALLENGES[key].stage,key==='bosses'?{hp:7,lives:1,grenades:5}:null);
+        phase='playing';hideMenu();frameLast=performance.now();hud();
+        announce(CHALLENGES[key].name+'开始。'+CHALLENGES[key].goal+'。固定标准难度。');
+      }
+      function retryRun(){
+        if(mode==='challenge')beginChallenge(challengeId);
+        else if(mode==='practice')beginRun(stageIndex,'practice');else startNew();
+      }
+      function finishChallenge(success,reason){
+        if(phase!=='playing'||mode!=='challenge')return;
+        const record=progress.challenges[challengeId],time=Math.max(1,Math.ceil(challengeTime*100));
+        let newBest=false;
+        if(success){
+          points+=500+(challengeId==='sprint'?Math.floor(Math.max(0,90-challengeTime))*10:gauntlet()?player.hp*100+player.grenades*25:0);
+          newBest=!record.clears||time<record.bestTime;
+          record.clears=Math.min(9999,record.clears+1);record.best=Math.max(record.best,bounded(points,9999999));
+          record.bestTime=record.bestTime?Math.min(record.bestTime,time):time;best=record.best;saveProgress();
+        }
+        $('result-details').textContent='用时 '+formatTime(challengeTime)+' · 得分 '+points+
+          (challengeId==='counter'?'\n反弹敌弹 '+challengeReflections+' / 5':gauntlet()?'\n击败首领 '+bossWins+' / 3':'')+
+          (success?'\n'+(newBest?'刷新最快用时！':'挑战完成，纪录已保留。'):'\n未完成，不计入挑战纪录。');
+        hud();showMenu(success?'挑战完成 · '+CHALLENGES[challengeId].name:'挑战未完成',reason,'重试本项挑战',success?'challengeClear':'challengeFailed');
+      }
+      function showBossBreak(){
+        showMenu('首领 '+bossWins+' / 3 · 已击败','整备时间不计时。继续后恢复 2 点体力、补充 2 枚手雷（最多 7 枚）；生命与装具保持不变。','迎战'+STAGES[stageIndex+1].bossName,'bossBreak');
+      }
+      function nextBoss(){
+        if(phase!=='bossBreak'||!gauntlet()||stageIndex>=2)return;
+        const carry={hp:Math.min(maxHealth(),player.hp+2),lives:player.lives,grenades:Math.min(7,player.grenades+2)};
+        resetStage(stageIndex+1,carry);phase='playing';hideMenu();frameLast=performance.now();hud();
+        announce('第 '+(stageIndex+1)+' 位首领：'+stage.bossName+'。');
       }
       function startNew(){beginRun(0,'campaign');}
       function startPractice(index){if(phase==='title'&&index>=0&&index<progress.unlocked)beginRun(index,'practice');}
@@ -357,6 +459,16 @@
       }
       function finishStage(){
         if(phase!=='playing')return;
+        if(mode==='challenge'){
+          if(gauntlet()){
+            bossWins++;
+            if(bossWins===3){finishChallenge(true,'三位首领全部击败。试试保留更多手雷，或挑战更短用时。');return;}
+            $('result-details').textContent='已击败 '+bossWins+' / 3 · 用时 '+formatTime(challengeTime)+'\n剩余体力 '+player.hp+' / '+maxHealth()+' · 手雷 '+player.grenades;
+            hud();showBossBreak();return;
+          }
+          const success=challengeId!=='counter'||challengeReflections>=5;
+          finishChallenge(success,success?'任务目标达成。可以再次挑战自己的得分和用时。':'已撤离，但反弹不足 5 枚。下次先借炮塔三连射与冲刺积累反弹，再击败首领。');return;
+        }
         stageStars=1|(collected()===3?2:0)|(stageDeaths===0?4:0);runStars[stageIndex]=stageStars;
         const record=progress[mode][difficulty];
         if(starCount(stageStars)>starCount(record.stars[stageIndex]))record.stars[stageIndex]=stageStars;
@@ -377,25 +489,26 @@
         }
       }
       function openTitle(){
-        clearInput();mode='campaign';best=progress.campaign[difficulty].best;
+        clearInput();mode='campaign';challengeId=null;challengeTime=0;challengeReflections=0;bossWins=0;difficulty=progress.selectedDifficulty;best=progress.campaign[difficulty].best;
         upgrades={rapid:0,dash:0,armor:0};points=0;shotsFired=0;runStars=[];resetStage(0,null);
         showMenu('像素突围','潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化；冲刺反弹敌弹，绕后击破盾卫，连击争取高分。','开始三章远征','title');hud();
       }
       function resume(){clearInput();phase='playing';hideMenu();frameLast=performance.now();lag=0;announce('继续游戏。');}
       function togglePause(){
-        if(phase==='playing')showMenu('任务暂停','体力、弹药和强化已保留。冲刺触碰敌弹可反弹；盾卫可用手雷或绕后击破。','继续行动','pause');
+        if(phase==='playing')showMenu('任务暂停',currentChallenge()?currentChallenge().goal+'。挑战计时已暂停，体力与弹药保留。':'体力、弹药和强化已保留。冲刺触碰敌弹可反弹；盾卫可用手雷或绕后击破。','继续行动','pause');
         else if(phase==='pause')resume();
         else if(phase==='confirmRestart')cancelConfirm();
       }
       function requestConfirm(kind){
-        if(phase==='title'){if(kind==='restart')startNew();return;}
+        if(phase==='title'){if(kind==='restart'&&titleView==='campaign')startNew();return;}
         if(phase==='confirmRestart')return;
-        if(['victory','gameOver','practiceClear'].includes(phase)){kind==='home'?openTitle():(mode==='practice'?beginRun(stageIndex,'practice'):startNew());return;}
+        if(['victory','gameOver','practiceClear','challengeClear','challengeFailed'].includes(phase)){kind==='home'?openTitle():retryRun();return;}
         returnPhase=phase;confirmAction=kind;
         showMenu(kind==='home'?'返回指挥部？':'重新开始？','本次未完成的行程、弹药与强化将重置，已保存的星章和解锁关卡不会丢失。',kind==='home'?'确认返回':'确认重新开始','confirmRestart');
       }
       function cancelConfirm(){
         if(returnPhase==='playing'){resume();return;}
+        if(returnPhase==='bossBreak'){showBossBreak();return;}
         if(returnPhase==='stageClear'){
           showMenu(stage.name+' · 完成','选择一项强化后继续远征。',selectedUpgrade?'携带'+UPGRADES[selectedUpgrade]+'，继续':'先选择战术强化','stageClear');return;
         }
@@ -424,6 +537,7 @@
         if(player.hp===0){
           player.lives--;stageDeaths++;
           if(player.lives<=0){
+            if(mode==='challenge'){finishChallenge(false,'生命耗尽。重试会从本项挑战起点开始，已完成的挑战纪录不会丢失。');return;}
             saveBest();hud();showMenu('行动失败','本次得分 '+points+'。试试冲刺穿过弹幕，或回指挥部切换轻松模式。','再试一次','gameOver');
             return;
           }
@@ -483,7 +597,7 @@
         boss.hp=Math.max(0,boss.hp-d);boss.flash=.12;spark(boss.x+rng(10,90),boss.y+rng(10,85),'#f9cb65',5);
         if(boss.hp===0){
           boss.dead=true;boss.beamTime=0;boss.windup=0;addPoints(1300);spark(boss.x+50,boss.y+45,'#ffc65c',60);
-          announce('首领已击败，向右前往终点。');beep(620,.35,'triangle');
+          announce(gauntlet()?'首领已击败，准备结算。':'首领已击败，向右前往终点。');beep(620,.35,'triangle');
         }
       }
       function hitEnemy(e,b){
@@ -496,8 +610,8 @@
       function reflectBullet(b){
         const dx=b.sourceX-b.x,dy=b.sourceY-b.y,len=Math.hypot(dx,dy);
         b.vx=len>1?dx/len*650:player.face*650;b.vy=len>1?dy/len*650:0;
-        b.owner='p';b.reflected=true;b.damage=2;b.life=1.7;reflections++;
-        spark(b.x,b.y,'#9eeaff',8);beep(820,.05,'triangle');combatNotice('冲刺反弹 · 双倍伤害 / 穿透盾牌');
+        b.owner='p';b.reflected=true;b.damage=2;b.life=1.7;reflections++;if(mode==='challenge')challengeReflections++;
+        spark(b.x,b.y,'#9eeaff',8);beep(820,.05,'triangle');combatNotice(mode==='challenge'&&challengeId==='counter'?'反弹 '+challengeReflections+' / 5'+(challengeReflections>=5?' · 可击败首领并撤离':' · 继续积累'):'冲刺反弹 · 双倍伤害 / 穿透盾牌');
       }
       function updateTurret(e,dt){
         // A fixed aim line gives the player time to choose crouch, jump or reflection.
@@ -526,6 +640,13 @@
       function update(dt){
         if(phase!=='playing')return;
         clock+=dt;
+        if(mode==='challenge'){
+          challengeTime+=dt;
+          if(currentChallenge().limit&&challengeTime+1e-7>=currentChallenge().limit){
+            challengeTime=currentChallenge().limit;finishChallenge(false,'90 秒已到。利用冲刺加速前进，击败首领后记得继续向右撤离。');return;
+          }
+          if(gauntlet()&&boss.dead){finishStage();return;}
+        }
         combo.timer=Math.max(0,combo.timer-dt);if(combo.timer===0)combo.count=0;
         combatTime=Math.max(0,combatTime-dt);boss.flash=Math.max(0,boss.flash-dt);
         const left=pressed('left'),right=pressed('right'),down=pressed('down');
@@ -550,7 +671,7 @@
         player.weaponTime=Math.max(0,player.weaponTime-dt);
         if(grenadeQueued){grenadeQueued=false;throwBomb();}
         if(pressed('fire'))fire();
-        player.x=clamp(player.x+player.vx*dt,8,stage.width-player.w-6);
+        player.x=clamp(player.x+player.vx*dt,8,gauntlet()?boss.x-player.w-14:stage.width-player.w-6);
         const oldBottom=player.y+player.h;
         if(player.dashTime>0){player.vy=0;}else player.vy=clamp(player.vy+GRAV*dt,-800,MAX_FALL);
         player.y+=player.vy*dt;player.ground=false;
@@ -593,7 +714,7 @@
           if(!boss.dead&&hit(player,{x:boss.x-760,y:boss.beamY-5,w:760,h:10}))hurt(1);
           if(phase!=='playing')return;
         }
-        if(!boss.dead&&Math.abs(boss.x-player.x)<780){
+        if(!boss.dead&&(gauntlet()||Math.abs(boss.x-player.x)<780)){
           if(boss.windup>0){
             boss.windup=Math.max(0,boss.windup-dt);
             if(boss.windup===0){
@@ -733,6 +854,10 @@
           c.font='bold 11px system-ui';c.fillStyle=active?'#c2ffe1':'#c3d4e7';
           c.fillText(active?'已激活':'检查点',checkpoint-12,G-76);
         }
+        if(gauntlet()){
+          rect(boss.x-14,G-150,4,150,'#80d6e6');
+          c.font='bold 11px system-ui';c.fillStyle='#bcecff';c.fillText('竞技场边界',boss.x-100,G-158);return;
+        }
         rect(stage.width-125,G-110,14,110,boss.dead?'#97d6a0':'#b47863');
         rect(stage.width-162,G-118,51,12,boss.dead?'#97d6a0':'#b47863');
         if(boss.dead){rect(stage.width-154,G-156,32,32,'#9de5a7');}
@@ -856,7 +981,7 @@
           }
           for(const b of bombs){rect(b.x-7,b.y-7,14,14,'#c3d0a4');rect(b.x-3,b.y-9,7,5,'#eabd65');}
           for(const s of sparks)rect(s.x,s.y,s.r,s.r,s.color);
-          if(!boss.dead&&Math.abs(boss.x-player.x)<750){
+          if(!boss.dead&&(gauntlet()||Math.abs(boss.x-player.x)<750)){
             rect(cam+W/2-150,15,300,10,'#172338');
             rect(cam+W/2-147,18,294*boss.hp/boss.maxHp,4,'#f0ac73');
             c.font='bold 14px system-ui';c.fillStyle='#fff0d6';c.fillText(stage.bossName,cam+W/2-150,47);
@@ -865,14 +990,14 @@
               c.fillText(boss.beamY>G-20?'低位激光蓄力 · 跳跃 / 冲刺':'高位激光蓄力 · 下蹲 / 冲刺',cam+W/2-150,85);
             }
           }
-          if(boss.dead){c.font='bold 15px system-ui';c.fillStyle='#d7f5c4';c.fillText('EXIT →',stage.width-218,G-181);}
+          if(boss.dead&&!gauntlet()){c.font='bold 15px system-ui';c.fillStyle='#d7f5c4';c.fillText('EXIT →',stage.width-218,G-181);}
         }
         c.restore();
         if(stage&&phase==='playing'){
           rect(0,H-5,W,5,'#21374a');
           rect(0,H-5,W*clamp(player.x/(stage.width-110),0,1),5,'#f3be6b');
           c.font='bold 14px system-ui';c.fillStyle='#e4effa';
-          c.fillText((boss.dead?'前往出口 →':'目标：击败'+stage.bossName)+'  /  情报 '+collected()+'/3',18,28);
+          c.fillText(gauntlet()?'首领连战 '+(stageIndex+1)+'/3':(boss.dead?'前往出口 →':'目标：击败'+stage.bossName)+'  /  情报 '+collected()+'/3',18,28);
           const loadout=Object.keys(UPGRADES).filter(key=>upgrades[key]>0).map(key=>UPGRADES[key]+' ×'+upgrades[key]).join('  ·  ');
           if(loadout){c.font='12px system-ui';c.fillStyle='#ffe0a5';c.fillText(loadout,18,H-20);}
           if(combatTime>0){
@@ -932,18 +1057,21 @@
         btn.addEventListener('pointerup',release);btn.addEventListener('pointercancel',release);btn.addEventListener('lostpointercapture',release);
       });
       function activate(){
-        if(action.disabled)return;
+        if(action.disabled||action.hidden)return;
         if(phase==='title'||phase==='victory')startNew();
-        else if(phase==='gameOver'||phase==='practiceClear')mode==='practice'?beginRun(stageIndex,'practice'):startNew();
+        else if(['gameOver','practiceClear','challengeClear','challengeFailed'].includes(phase))retryRun();
         else if(phase==='pause')resume();
         else if(phase==='stageClear')nextStage();
-        else if(phase==='confirmRestart')confirmAction==='home'?openTitle():(mode==='practice'?beginRun(stageIndex,'practice'):startNew());
+        else if(phase==='bossBreak')nextBoss();
+        else if(phase==='confirmRestart')confirmAction==='home'?openTitle():retryRun();
       }
       action.addEventListener('click',activate);
       $('pause').addEventListener('click',togglePause);
       $('restart').addEventListener('click',()=>requestConfirm('restart'));
       $('menu-home').addEventListener('click',()=>requestConfirm('home'));
       $('cancel-restart').addEventListener('click',cancelConfirm);
+      for(const view of ['campaign','challenges'])$('mode-'+view).addEventListener('click',()=>selectTitleView(view));
+      for(const key of Object.keys(CHALLENGES))$('challenge-'+key).addEventListener('click',()=>{if(phase==='title')beginChallenge(key);});
       for(const key of Object.keys(UPGRADES))$('upgrade-'+key).addEventListener('click',()=>chooseUpgrade(key));
       for(let i=0;i<STAGES.length;i++)$('stage-'+(i+1)).addEventListener('click',()=>startPractice(i));
       for(const value of ['standard','relaxed'])$('difficulty-'+value).addEventListener('click',()=>{
@@ -972,7 +1100,7 @@
         const neutral=!left&&!right&&!down&&!jump&&!bomb&&!fire&&!burst&&!pause;
         if(padBlocked){if(neutral)padBlocked=false;return;}
         if(pause&&!pausePadLast){
-          if(phase==='title')startNew();else togglePause();
+          if(phase==='title'&&titleView==='campaign')startNew();else if(phase!=='title')togglePause();
           pausePadLast=pause;return;
         }
         pausePadLast=pause;
@@ -997,12 +1125,13 @@
       Object.defineProperty(window,'__raidState',{get:()=>({
         ready:true,phase,stage:stageIndex+1,stageName:stage?.name??'',x:player?.x??0,y:player?.y??0,hp:player?.hp??0,
         lives:player?.lives??0,score:points,shots:shotsFired,bullets:bullets.length,
+        hostiles:bullets.filter(b=>b.owner==='e').map(b=>({x:b.x,y:b.y})),
         grenades:player?.grenades??0,bossHp:boss?.hp??0,ground:player?.ground??false,
         cam,worldWidth:stage?.width??0,touchCount:touch.size,
         weapon:player?.weaponTime>0?'spread':'rifle',weaponTime:player?.weaponTime??0,
         lastVolley:player?.lastVolley??0,bossCharge:boss?.windup??0,
         bossAttacks:boss?.attacks??0,bossLastVolley:boss?.lastVolley??0,bossRage:!!boss&&boss.hp<=boss.maxHp*.5,
-        mode,difficulty,intel:collected(),intelTotal:3,stageDeaths,stageStars,unlocked:progress.unlocked,
+        mode,difficulty,intel:collected(),intelTotal:intel.length,challengeId,challengeTime,challengeReflections,bossWins,titleView,stageDeaths,stageStars,unlocked:progress.unlocked,
         upgrades:{...upgrades},dashCooldown:player?.dashCooldown??0,dashTime:player?.dashTime??0,
         checkpoint:player?.checkpoint??64,maxHp:maxHealth(),selectedUpgrade,storageAvailable,
         crouch:player?.crouch??false,playerHeight:player?.h??44,coyote:player?.coyote??0,jumpBuffer:player?.jumpBuffer??0,

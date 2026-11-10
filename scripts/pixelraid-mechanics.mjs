@@ -813,4 +813,516 @@ test('combat feedback never covers the reactor beam dodge warning', () => {
   assert(feedback[1] >= warning[1] + warning[3], 'Hit feedback must sit below the critical dodge instruction');
 });
 
-console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition and combat contracts passed`);
+// Operations share the production loop and storage schema. Fixtures below only
+// arrange boundary conditions; collisions, input dispatch and transitions always
+// run through the game's real implementation.
+const operationIds = ['sprint', 'counter', 'bosses'];
+const emptyOperationRecord = () => ({ clears: 0, best: 0, bestTime: 0 });
+function operation(id, options) {
+  const g = createGame(options);
+  g.click('mode-challenges'); g.click('challenge-' + id);
+  eq(g.state().phase, 'playing'); eq(g.state().challengeId, id);
+  return g;
+}
+function reflectShots(g, count) {
+  // The dash moves right before bullet collision. These stationary hostile
+  // projectiles overlap that next hitbox and retain a genuine source position.
+  g.run(`enemies.forEach(e=>e.dead=true); boss.shot=100;
+    player.face=1; player.dashTime=0; player.dashCooldown=0;
+    for(let i=0;i<${count};i++){
+      projectile(player.x+24,player.y+20,0,0,'e');
+      bullets[bullets.length-1].sourceX=player.x+200;
+    }`);
+  g.key('l'); tick(g); g.key('l', false);
+}
+function finishOperation(g) {
+  g.exit(); g.run('player.dashTime=0; damageBoss(boss.hp);'); tick(g);
+}
+function finishArena(g) { g.run('damageBoss(boss.hp);'); tick(g); }
+function savedOtherModes(g) {
+  return g.read('({unlocked:progress.unlocked,selectedDifficulty:progress.selectedDifficulty,campaign:progress.campaign,practice:progress.practice})');
+}
+
+test('operation menu exposes three independent missions and fixed standard loadouts', () => {
+  const expected = {
+    sprint: { stage: 1, hp: 5, lives: 3, grenades: 3, upgrades: { rapid: 0, dash: 1, armor: 0 } },
+    counter: { stage: 2, hp: 5, lives: 3, grenades: 3, upgrades: { rapid: 0, dash: 2, armor: 0 } },
+    bosses: { stage: 1, hp: 7, lives: 1, grenades: 5, upgrades: { rapid: 1, dash: 1, armor: 2 } },
+  };
+  for (const id of operationIds) {
+    const g = createGame(); g.click('difficulty-relaxed'); g.click('mode-challenges');
+    assert(!g.nodes.get('challenge-menu').hidden && g.nodes.get('difficulty-options').hidden);
+    assert(g.nodes.get('stage-menu').hidden && g.nodes.get('start').hidden);
+    eq(g.nodes.get('mode-challenges').getAttribute('aria-pressed'), 'true');
+    g.click('start'); g.document.activeElement = null; g.key('Enter');
+    eq(g.state().phase, 'title', 'The hidden campaign action must not start a run from the operation menu');
+    g.key('r'); eq(g.state().phase, 'title', 'R must not launch a campaign from the operation menu');
+    g.click('restart'); eq(g.state().phase, 'title', 'The top restart button must not launch a campaign from the operation menu');
+    eq(g.state().titleView, 'challenges'); eq(g.state().challengeId, null);
+    g.run("beginChallenge('__proto__');beginChallenge('missing');"); eq(g.state().phase, 'title');
+    g.click('challenge-' + id);
+    const state = g.state(), loadout = expected[id];
+    eq(state.mode, 'challenge'); eq(state.difficulty, 'standard');
+    for (const key of ['stage', 'hp', 'lives', 'grenades', 'upgrades']) eq(state[key], loadout[key], `${id} ${key}`);
+    eq(state.maxHp, loadout.hp); eq(state.challengeTime, 0); eq(state.challengeReflections, 0); eq(state.bossWins, 0);
+    eq(state.progress.selectedDifficulty, 'relaxed'); assert(!g.nodes.get('mission-hud').hidden);
+    g.click('challenge-' + (id === 'sprint' ? 'counter' : 'sprint')); g.click('difficulty-relaxed');
+    eq(g.state().challengeId, id, 'Hidden mission buttons must not replace an active run');
+    eq(g.state().difficulty, 'standard');
+  }
+  for (const action of ['r', 'restart', 'Enter']) {
+    const g = createGame(); g.click('mode-challenges'); g.click('mode-campaign'); g.document.activeElement = null;
+    if (action === 'restart') g.click(action); else g.key(action);
+    eq(g.state().phase, 'playing', `Campaign title must retain its ${action} shortcut`);
+    eq(g.state().mode, 'campaign'); eq(g.state().challengeId, null);
+  }
+});
+
+test('returning from any operation restores the saved campaign difficulty and title choice', () => {
+  for (const id of operationIds) {
+    const saved = storedProgress({ selectedDifficulty: 'relaxed', unlocked: 2 });
+    const g = operation(id, { storage: { [STORE]: JSON.stringify(saved) } });
+    g.key('p'); g.click('menu-home'); eq(g.state().phase, 'confirmRestart');
+    g.click('start'); eq(g.state().phase, 'title'); eq(g.state().difficulty, 'relaxed');
+    eq(g.state().mode, 'campaign'); eq(g.state().challengeId, null); eq(g.state().titleView, 'challenges');
+    assert(g.nodes.get('mission-hud').hidden);
+    g.click('mode-campaign'); assert(!g.nodes.get('difficulty-options').hidden);
+    g.click('start'); eq(g.state().hp, 6); eq(g.state().lives, 4); eq(g.state().upgrades, { rapid: 0, dash: 0, armor: 0 });
+    eq(g.state().unlocked, 2);
+  }
+});
+
+test('legacy saves gain empty operation records without losing prior campaign or practice scores', () => {
+  const saved = storedProgress({ selectedDifficulty: 'relaxed', unlocked: 3 });
+  saved.campaign.standard = { best: 12000, stars: [7, 5, 1] };
+  saved.practice.relaxed = { best: 6400, stars: [1, 7, 5] };
+  const g = createGame({ storage: { [STORE]: JSON.stringify(saved) } });
+  eq(savedOtherModes(g), { unlocked: 3, selectedDifficulty: 'relaxed', campaign: saved.campaign, practice: saved.practice });
+  eq(g.state().progress.challenges, Object.fromEntries(operationIds.map(id => [id, emptyOperationRecord()])));
+  const legacy = createGame({ storage: { 'pixel-raid.best': '1234' } });
+  eq(legacy.state().progress.campaign.standard.best, 1234);
+  eq(legacy.state().progress.challenges, g.state().progress.challenges);
+});
+
+test('hostile operation records are bounded, normalized and cannot grow the storage schema', () => {
+  const cases = [
+    { input: null, expected: emptyOperationRecord() },
+    { input: { clears: 1, best: 99, bestTime: 0 }, expected: emptyOperationRecord() },
+    { input: { clears: 0, best: 99, bestTime: 200 }, expected: emptyOperationRecord() },
+    { input: { clears: -1, best: -5, bestTime: -20 }, expected: emptyOperationRecord() },
+    { input: { clears: '8', best: 'Infinity', bestTime: '30' }, expected: emptyOperationRecord() },
+    { input: { clears: 2.9, best: 991.8, bestTime: 204.9 }, expected: { clears: 2, best: 991, bestTime: 204 } },
+    { input: { clears: 1e100, best: 1e100, bestTime: 1e100, extra: { injected: true } }, expected: { clears: 9999, best: 9999999, bestTime: 36000000 } },
+    { input: { clears: 1, best: {}, bestTime: 100 }, expected: { clears: 1, best: 0, bestTime: 100 } },
+  ];
+  for (const { input, expected } of cases) {
+    const raw = storedProgress({ challenges: Object.fromEntries([...operationIds.map(id => [id, input]), ['unknown', input]]) });
+    const g = createGame({ storage: { [STORE]: JSON.stringify(raw) } });
+    eq(g.state().progress.challenges, Object.fromEntries(operationIds.map(id => [id, expected])));
+    g.click('mode-challenges'); g.click('challenge-sprint');
+    assert(Number.isFinite(g.read('best')));
+  }
+  for (const raw of [
+    '{"version":1,"challenges":{"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}},"sprint":{"clears":1,"best":1e309,"bestTime":1e309}}}',
+    JSON.stringify(storedProgress({ challenges: { sprint: { clears: 1, best: 2, bestTime: 3 } }, padding: 'x'.repeat(12000) })),
+  ]) {
+    const g = createGame({ storage: { [STORE]: raw } });
+    eq(g.state().progress.challenges, Object.fromEntries(operationIds.map(id => [id, emptyOperationRecord()])));
+  }
+  eq({}.polluted, undefined);
+});
+
+test('operation snapshots cannot mutate challenge counters, nested records or loadouts', () => {
+  const g = operation('counter'); reflectShots(g, 2);
+  g.run("projectile(400,250,-100,0,'e');");
+  const before = g.state(), snapshot = g.win.__raidState;
+  eq(snapshot.hostiles.length, 1); eq(Object.keys(snapshot.hostiles[0]).sort(), ['x', 'y']);
+  try {
+    snapshot.challengeId = 'bosses'; snapshot.challengeTime = 900; snapshot.challengeReflections = 99; snapshot.bossWins = 3;
+    snapshot.upgrades.dash = 99; snapshot.progress.challenges.counter.clears = 999;
+    snapshot.progress.challenges.counter.bestTime = 1; snapshot.progress.challenges.injected = { clears: 100 };
+    snapshot.progress.campaign.standard.stars.push(7); snapshot.runStars.push(7);
+    snapshot.hostiles[0].x = -999; snapshot.hostiles[0].y = -999; snapshot.hostiles.push({ x: 0, y: 0 });
+  } catch {}
+  eq(g.state(), before, 'Every published nested object must be detached from live state');
+});
+
+test('operation points and successful records remain isolated from campaign, practice and unlocks', () => {
+  for (const id of operationIds) {
+    const saved = storedProgress({ selectedDifficulty: 'relaxed' });
+    saved.campaign.standard = { best: 4321, stars: [5, 0, 0] };
+    saved.practice.relaxed = { best: 3456, stars: [7, 0, 0] };
+    const g = operation(id, { storage: { [STORE]: JSON.stringify(saved) } }), untouched = savedOtherModes(g);
+    g.run('rewardKill(100);'); eq(savedOtherModes(g), untouched);
+    eq(g.state().progress.challenges[id], emptyOperationRecord(), 'Unfinished scores must not become records');
+    if (id === 'counter') reflectShots(g, 5);
+    if (id === 'bosses') {
+      for (let index = 0; index < 3; index++) { finishArena(g); if (index < 2) g.click('start'); }
+    } else finishOperation(g);
+    eq(g.state().phase, 'challengeClear'); eq(savedOtherModes(g), untouched);
+    const record = JSON.parse(g.values.get(STORE));
+    eq(record.campaign, saved.campaign); eq(record.practice, saved.practice); eq(record.unlocked, 1); eq(record.selectedDifficulty, 'relaxed');
+    eq(record.challenges[id].clears, 1); assert(record.challenges[id].best > 0 && record.challenges[id].bestTime > 0);
+    for (const other of operationIds.filter(other => other !== id)) eq(record.challenges[other], emptyOperationRecord());
+  }
+});
+
+test('operation success commits one award once and fastest time and best score improve independently', () => {
+  const g = operation('sprint'); g.run('challengeTime=40; points=2000;'); finishOperation(g);
+  eq(g.state().phase, 'challengeClear'); eq(g.state().score, 4290);
+  const first = g.state(), persisted = g.values.get(STORE);
+  tick(g, 180); g.frames(120); g.run("finishStage();finishChallenge(true,'duplicate');finishChallenge(false,'late');damageBoss(99);");
+  eq(g.state(), first); eq(g.values.get(STORE), persisted);
+  g.click('start'); g.run('challengeTime=30; points=0;'); finishOperation(g);
+  const faster = g.state().progress.challenges.sprint;
+  eq(faster.clears, 2); eq(faster.best, first.score); assert(faster.bestTime < first.progress.challenges.sprint.bestTime);
+  g.click('start'); g.run('challengeTime=60; points=8000;'); finishOperation(g);
+  const richer = g.state().progress.challenges.sprint;
+  eq(richer.clears, 3); assert(richer.best > faster.best); eq(richer.bestTime, faster.bestTime);
+});
+
+test('operation failure never overwrites completed records or awards twice', () => {
+  for (const id of operationIds) {
+    const saved = storedProgress({ challenges: Object.fromEntries(operationIds.map(key => [key, { clears: 2, best: 9000, bestTime: 1234 }])) });
+    const raw = JSON.stringify(saved), g = operation(id, { storage: { [STORE]: raw } });
+    g.run('points=99999;player.lives=1;player.hp=1;player.inv=0;hurt(1);');
+    eq(g.state().phase, 'challengeFailed'); eq(g.state().lives, 0); eq(g.state().stageDeaths, 1);
+    const terminal = g.state();
+    tick(g, 120); g.frames(60); g.run("finishChallenge(true,'late');finishChallenge(false,'duplicate');finishStage();hurt(1);");
+    eq(g.state(), terminal); eq(g.values.get(STORE), raw);
+    eq(g.state().progress.challenges, saved.challenges);
+  }
+});
+
+test('sprint must exit strictly before 90 seconds, with timeout preceding exit and pending hits', () => {
+  for (const offset of [-0.001, 0, 0.001]) {
+    const g = operation('sprint'); g.exit(); g.run(`damageBoss(boss.hp);challengeTime=90-DT+${offset};`); tick(g);
+    eq(g.state().phase, offset < 0 ? 'challengeClear' : 'challengeFailed', `deadline offset ${offset}`);
+    if (offset < 0) { assert(g.state().challengeTime < 90); eq(g.state().progress.challenges.sprint.clears, 1); }
+    else { eq(g.state().challengeTime, 90); eq(g.state().progress.challenges.sprint.clears, 0); eq(g.state().score, 1300); }
+    const terminal = g.state(); tick(g, 30); eq(g.state(), terminal);
+  }
+  const pending = operation('sprint'); pending.run(`enemies=[];player.inv=0;player.hp=1;player.lives=1;boss.hp=1;
+    challengeTime=90-DT;projectile(boss.x+30,boss.y+30,0,0,'p');projectile(player.x+12,player.y+20,0,0,'e');`);
+  tick(pending); eq(pending.state().phase, 'challengeFailed'); eq(pending.state().bossHp, 1);
+  eq(pending.state().hp, 1); eq(pending.state().lives, 1); eq(pending.state().score, 0);
+});
+
+test('operation elapsed time advances only while playing, including interrupted and canceled menus', () => {
+  for (const interrupt of ['pause', 'blur', 'hidden', 'restart', 'home']) {
+    const g = operation('counter'); g.safe(); tick(g, 12);
+    if (interrupt === 'pause') g.key('p');
+    else if (interrupt === 'blur') g.event('blur');
+    else if (interrupt === 'hidden') g.visibility(true);
+    else if (interrupt === 'restart') g.key('r');
+    else { g.key('p'); g.click('menu-home'); }
+    const time = g.state().challengeTime, clock = g.state().clock;
+    tick(g, 300); g.frames(300); near(g.state().challengeTime, time); near(g.state().clock, clock);
+    if (g.state().phase === 'confirmRestart') g.click('cancel-restart');
+    if (interrupt === 'hidden') g.visibility(false);
+    if (g.state().phase === 'pause') g.click('start');
+    tick(g, 3); near(g.state().challengeTime, time + 3 / 60);
+  }
+  const g = operation('bosses'); tick(g, 10); finishArena(g);
+  const time = g.state().challengeTime; eq(g.state().phase, 'bossBreak');
+  tick(g, 300); g.frames(300); near(g.state().challengeTime, time);
+  g.click('start'); tick(g, 2); near(g.state().challengeTime, time + 2 / 60);
+  g.run('player.inv=0;hurt(player.hp);'); const failed = g.state().challengeTime;
+  g.frames(300); tick(g, 300); near(g.state().challengeTime, failed);
+});
+
+test('counter and gauntlet remain playable beyond the sprint deadline', () => {
+  for (const id of ['counter', 'bosses']) {
+    const g = operation(id); g.run('challengeTime=89.99;player.inv=100;enemies.forEach(e=>e.dead=true);boss.shot=100;');
+    tick(g, 120); eq(g.state().phase, 'playing'); near(g.state().challengeTime, 91.99);
+    eq(g.state().progress.challenges[id], emptyOperationRecord());
+    assert(g.nodes.get('mission-time').textContent.startsWith('用时 '));
+    if (id === 'counter') { reflectShots(g, 5); finishOperation(g); }
+    else for (let index = 0; index < 3; index++) { finishArena(g); if (index < 2) g.click('start'); }
+    eq(g.state().phase, 'challengeClear'); assert(g.state().progress.challenges[id].bestTime > 9000);
+  }
+});
+
+test('completed operation records reload with centisecond precision and bounded clear and score totals', () => {
+  const saved = storedProgress({ selectedDifficulty: 'relaxed', challenges: {
+    sprint: { clears: 9999, best: 9999999, bestTime: 126 },
+    counter: { clears: 4, best: 3200, bestTime: 9001 },
+    bosses: { clears: 3, best: 5100, bestTime: 1820 },
+  } });
+  const g = operation('sprint', { storage: { [STORE]: JSON.stringify(saved) } });
+  g.run('challengeTime=1.231;points=10000000;'); finishOperation(g);
+  const record = g.state().progress.challenges.sprint;
+  eq(record, { clears: 9999, best: 9999999, bestTime: 125 });
+  eq(g.state().progress.challenges.counter, saved.challenges.counter); eq(g.state().progress.challenges.bosses, saved.challenges.bosses);
+  const reloaded = createGame({ storage: { [STORE]: g.values.get(STORE) } });
+  eq(reloaded.state().difficulty, 'relaxed'); eq(reloaded.state().progress.challenges, g.state().progress.challenges);
+  reloaded.click('mode-challenges');
+  for (const id of operationIds) {
+    const text = reloaded.nodes.get('challenge-record-' + id).textContent;
+    assert(text.includes('完成 ') && text.includes('最高 ') && text.includes('最快 '));
+  }
+  reloaded.click('challenge-sprint'); eq(reloaded.read('best'), 9999999);
+  eq(reloaded.state().difficulty, 'standard'); eq(reloaded.state().challengeTime, 0); eq(reloaded.state().score, 0);
+});
+
+test('counter completion requires real reflected collisions at the 4, 5 and 6 shot boundaries', () => {
+  for (const count of [4, 5, 6]) {
+    const g = operation('counter'); reflectShots(g, count);
+    eq(g.state().challengeReflections, count); eq(g.state().reflections, count);
+    assert(g.read("bullets.every(b=>b.owner==='p'&&b.reflected&&b.damage===2)"));
+    eq(g.state().hp, 5, 'Reflected impacts must not cost health');
+    finishOperation(g);
+    eq(g.state().phase, count < 5 ? 'challengeFailed' : 'challengeClear');
+    eq(g.state().progress.challenges.counter.clears, count < 5 ? 0 : 1);
+    assert(g.nodes.get('result-details').textContent.includes(`反弹敌弹 ${count} / 5`));
+  }
+});
+
+test('a reflected projectile counts once, normal invulnerability does not count, and respawn retains mission totals', () => {
+  const g = operation('counter'); reflectShots(g, 5);
+  g.run('bullets.forEach(b=>{b.vx=0;b.vy=0;});'); tick(g, 5);
+  eq(g.state().challengeReflections, 5, 'Converted player bullets overlapping the dash cannot count twice');
+  g.run("player.dashTime=0;player.inv=2;projectile(player.x+12,player.y+20,0,0,'e');"); tick(g);
+  eq(g.state().challengeReflections, 5); eq(g.state().hp, 5);
+  g.run('player.inv=0;player.checkpoint=1170;hurt(player.hp);');
+  eq(g.state().lives, 2); eq(g.state().x, 1170); eq(g.state().challengeReflections, 5);
+  eq(g.state().reflections, 5); eq(g.state().stageDeaths, 1);
+  finishOperation(g); eq(g.state().phase, 'challengeClear');
+  g.click('start'); eq(g.state().challengeReflections, 0); eq(g.state().reflections, 0);
+});
+
+test('gauntlet uses three ordered 960px arenas with no campaign routes, pickups or patrols', () => {
+  const g = operation('bosses'), campaign = createGame();
+  for (let index = 0; index < 3; index++) {
+    const shape = g.read('({width:stage.width,gaps:stage.gaps,checkpoints:stage.checkpoints,platforms:stage.platforms,enemies:enemies.length,pickups:pickups.length,intel:intel.length,bossX:boss.x,bossW:boss.w,bossName:stage.bossName,maxHp:boss.maxHp})');
+    eq(g.state().stage, index + 1); eq(g.state().bossWins, index); eq(shape.width, 960);
+    eq(shape.gaps, []); eq(shape.checkpoints, []); eq(shape.enemies, 0); eq(shape.pickups, 0); eq(shape.intel, 0);
+    eq(shape.platforms, [[260, 320, 170], [500, 310, 150]]);
+    eq(shape.bossX, 790); assert(shape.bossX + shape.bossW < shape.width);
+    eq(shape.maxHp, [66, 94, 121][index]); eq(shape.bossName, g.read(`STAGES[${index}].bossName`));
+    near(g.read('boss.shot'), .35);
+    campaign.run(`resetStage(${index},null);`);
+    eq(campaign.read('boss.maxHp'), [24, 34, 44][index], 'Arena balance must not raise campaign boss health');
+    near(campaign.read('boss.shot'), 1.3, 'Arena balance must not shorten campaign opening warnings');
+    g.run('player.inv=100;boss.shot=100;'); g.key('a'); tick(g, 30); g.key('a', false); eq(g.state().x, 8);
+    g.key('d'); tick(g, 200); g.key('d', false); eq(g.state().x, 749); eq(g.state().cam, 0);
+    eq(g.state().hp, 7); eq(g.state().stageDeaths, 0);
+    finishArena(g);
+    eq(g.state().phase, index === 2 ? 'challengeClear' : 'bossBreak');
+    if (index < 2) g.click('start');
+  }
+  eq(g.state().bossWins, 3); eq(g.state().score, 5275); eq(g.state().progress.challenges.bosses.clears, 1);
+});
+
+test('gauntlet bosses activate at the left wall and cannot be disabled by the firing safe-zone exploit', () => {
+  const g = operation('bosses');
+  for (let index = 0; index < 3; index++) {
+    // Real inputs recreate the exploit: walk fully left, then one crouched
+    // right step changes facing without entering the old 780px activation area.
+    g.key('a'); tick(g, 30); g.key('a', false); eq(g.state().x, 8);
+    g.key('s'); g.key('d'); tick(g); g.key('d', false); g.key('s', false);
+    near(g.state().x, 8 + 110 / 60); eq(g.read('player.face'), 1);
+    assert(g.read('boss.x-player.x>=780'), 'The fixture must remain outside the campaign activation range');
+    tickUntil(g, 'boss.attacks>0', 240);
+    assert(g.state().bossAttacks > 0); near(g.state().x, 8 + 110 / 60);
+    eq(g.state().phase, 'playing'); assert(g.state().hp > 0);
+    finishArena(g); if (index < 2) g.click('start');
+  }
+});
+
+test('arena bosses retain distinct normal, enraged and alternating reactor attack patterns', () => {
+  const g = operation('bosses');
+  for (let index = 0; index < 3; index++) {
+    g.run('player.inv=100;'); tickUntil(g, 'boss.attacks===1');
+    eq(g.state().bossLastVolley, [1, 3, 0][index]);
+    eq(g.state().bossAttackType, index === 2 ? 'beam' : 'volley');
+    if (index === 2) {
+      near(g.state().bossBeamY, 413); tickUntil(g, 'boss.attacks===2'); eq(g.state().bossLastVolley, 3);
+      tickUntil(g, 'boss.attacks===3'); eq(g.state().bossAttackType, 'beam'); near(g.state().bossBeamY, 389);
+    }
+    g.run('boss.hp=Math.floor(boss.maxHp*.4);');
+    const attacks = g.state().bossAttacks; tickUntil(g, `boss.attacks>${attacks}`);
+    eq(g.state().bossLastVolley, index === 0 ? 3 : 5); assert(g.state().bossRage);
+    finishArena(g); if (index < 2) g.click('start');
+  }
+});
+
+test('boss defeat transitions only at the next update boundary and each boundary is awarded once', () => {
+  const g = operation('bosses');
+  for (let index = 0; index < 3; index++) {
+    g.run("boss.hp=1;boss.shot=100;projectile(boss.x+30,boss.y+30,0,0,'p');");
+    tick(g); eq(g.state().bossHp, 0); eq(g.state().phase, 'playing'); eq(g.state().bossWins, index);
+    eq(g.state().score, 1300 * (index + 1));
+    tick(g); eq(g.state().bossWins, index + 1); eq(g.state().phase, index < 2 ? 'bossBreak' : 'challengeClear');
+    const terminal = g.state(); tick(g, 30); g.frames(30); eq(g.state(), terminal);
+    if (index < 2) { g.click('start'); g.click('start'); eq(g.state().stage, index + 2); eq(g.state().bossWins, index + 1); }
+  }
+  eq(g.state().score, 5275); eq(g.state().progress.challenges.bosses.clears, 1);
+});
+
+test('gauntlet continuation carries totals and capped supplies while clearing transient combat and input', () => {
+  const g = operation('bosses');
+  g.run(`player.hp=3;player.grenades=6;player.weaponTime=9;player.boost=8;
+    player.dashCooldown=1;combo={count:4,timer:4,best:4};challengeReflections=6;reflections=6;
+    challengeTime=12;shotsFired=20;points=321;projectile(100,100,0,0,'e');
+    bombs.push({x:200,y:200,vx:0,vy:0,timer:5,r:8});combatNotice('pending');`);
+  g.key('j'); g.key('k'); g.key('l'); g.key('d'); finishArena(g);
+  const carried = g.state(); eq(carried.phase, 'bossBreak'); eq(carried.hp, 3); eq(carried.grenades, 6);
+  assert(g.read('bullets.length>0 && bombs.length>0'));
+  g.click('start'); const next = g.state();
+  eq(next.hp, 5); eq(next.maxHp, 7); eq(next.lives, 1); eq(next.grenades, 7); eq(next.score, carried.score);
+  eq(next.shots, 20); near(next.challengeTime, carried.challengeTime); eq(next.challengeReflections, 6); eq(next.bossWins, 1);
+  eq(next.upgrades, { rapid: 1, dash: 1, armor: 2 }); eq(next.weaponTime, 0); eq(next.dashCooldown, 0);
+  eq(next.combo, 0); eq(next.comboBest, 0); eq(next.reflections, 0); eq(next.combatText, '');
+  eq(g.read('({bullets:bullets.length,bombs:bombs.length,sparks:sparks.length,boost:player.boost,shoot:player.shoot,clock})'), { bullets: 0, bombs: 0, sparks: 0, boost: 0, shoot: 0, clock: 0 });
+  assert(g.read('held.size===0&&touch.size===0&&!jumpQueued&&!grenadeQueued&&!dashQueued'));
+  tick(g, 3); eq(g.state().x, 64); eq(g.state().shots, 20); eq(g.state().grenades, 7);
+  g.run('player.hp=6;player.grenades=0;'); finishArena(g); g.click('start');
+  eq(g.state().hp, 7); eq(g.state().grenades, 2); eq(g.state().lives, 1);
+});
+
+test('operation retry works from playing, pause, confirmation, boss break, success and failure', () => {
+  for (const targetPhase of ['playing', 'pause', 'confirmRestart', 'bossBreak', 'challengeClear', 'challengeFailed']) {
+    const g = operation('bosses'); g.run('challengeTime=10;challengeReflections=2;points=123;shotsFired=8;player.grenades=1;');
+    if (targetPhase === 'pause') g.key('p');
+    else if (targetPhase === 'confirmRestart') g.key('r');
+    else if (targetPhase === 'bossBreak') finishArena(g);
+    else if (targetPhase === 'challengeClear') {
+      for (let index = 0; index < 3; index++) { finishArena(g); if (index < 2) g.click('start'); }
+    } else if (targetPhase === 'challengeFailed') g.run('player.inv=0;hurt(player.hp);');
+    eq(g.state().phase, targetPhase); const records = g.state().progress.challenges;
+    if (targetPhase === 'confirmRestart') {
+      g.click('restart'); eq(g.state().phase, 'confirmRestart'); g.click('start');
+    } else if (['challengeClear', 'challengeFailed'].includes(targetPhase)) g.click('start');
+    else { g.click('restart'); eq(g.state().phase, 'confirmRestart'); g.click('start'); }
+    const fresh = g.state();
+    eq(fresh.phase, 'playing'); eq(fresh.challengeId, 'bosses'); eq(fresh.stage, 1); eq(fresh.bossWins, 0);
+    eq(fresh.challengeTime, 0); eq(fresh.challengeReflections, 0); eq(fresh.score, 0); eq(fresh.shots, 0);
+    eq(fresh.hp, 7); eq(fresh.lives, 1); eq(fresh.grenades, 5); eq(fresh.bullets, 0);
+    eq(fresh.progress.challenges, records); eq(fresh.upgrades, { rapid: 1, dash: 1, armor: 2 });
+  }
+});
+
+test('canceling restart or home preserves boss breaks and paused missions without stale menu input', () => {
+  for (const sourcePhase of ['playing', 'pause', 'bossBreak']) for (const action of ['restart', 'home']) {
+    const g = operation('bosses'); tick(g, 6);
+    if (sourcePhase === 'pause') g.key('p');
+    if (sourcePhase === 'bossBreak') finishArena(g);
+    const before = g.state();
+    g.click(action === 'home' ? 'menu-home' : 'restart'); eq(g.state().phase, 'confirmRestart');
+    for (const key of ['j', 'k', 'l', 'w', 'd']) g.key(key);
+    g.frames(90); g.click('cancel-restart');
+    const restored = g.state();
+    eq(restored.phase, sourcePhase); eq(restored.challengeTime, before.challengeTime); eq(restored.bossWins, before.bossWins);
+    eq(restored.hp, before.hp); eq(restored.grenades, before.grenades); eq(restored.score, before.score);
+    if (sourcePhase === 'pause') g.click('start');
+    if (sourcePhase === 'bossBreak') g.click('start');
+    const resumed = g.state(); tick(g, 3);
+    eq(g.state().x, resumed.x); eq(g.state().shots, resumed.shots); eq(g.state().grenades, resumed.grenades);
+    eq(g.state().dashTime, 0); assert(g.state().ground);
+  }
+});
+
+test('same-frame player and boss lethal bullets have a stable failure result without dual completion', () => {
+  for (const playerShotFirst of [false, true]) {
+    const g = operation('bosses'); finishArena(g); g.click('start'); finishArena(g); g.click('start');
+    // Projectile iteration is reverse insertion order. Exercise both orders so
+    // a boss killed earlier in this update cannot also grant a posthumous win.
+    const hitPlayer = "projectile(player.x+12,player.y+20,0,0,'e');";
+    const hitBoss = "projectile(boss.x+30,boss.y+30,0,0,'p');";
+    g.run(`boss.hp=1;boss.shot=100;player.hp=1;player.inv=0;bullets=[];${playerShotFirst ? hitPlayer + hitBoss : hitBoss + hitPlayer}`);
+    tick(g);
+    eq(g.state().phase, 'challengeFailed'); eq(g.state().lives, 0); eq(g.state().bossWins, 2);
+    eq(g.state().bossHp, playerShotFirst ? 0 : 1); eq(g.state().score, playerShotFirst ? 3900 : 2600);
+    eq(g.state().progress.challenges.bosses, emptyOperationRecord());
+    const terminal = g.state(); tick(g, 120); g.frames(60); eq(g.state(), terminal);
+  }
+});
+
+test('same-frame grenade kills finish next update while lethal fire stops pending grenade awards', () => {
+  for (const lethal of [false, true]) {
+    const g = operation('bosses');
+    g.run(`boss.hp=7;boss.shot=100;player.hp=1;player.inv=${lethal ? 0 : 100};
+      bombs.push({x:boss.x+50,y:boss.y+52,vx:0,vy:0,timer:0,r:8});
+      projectile(player.x+12,player.y+20,0,0,'e');`);
+    tick(g);
+    if (lethal) {
+      eq(g.state().phase, 'challengeFailed'); eq(g.state().bossHp, 7); eq(g.state().score, 0); eq(g.state().bossWins, 0);
+      tick(g, 30); eq(g.state().score, 0); eq(g.state().progress.challenges.bosses, emptyOperationRecord());
+    } else {
+      eq(g.state().phase, 'playing'); eq(g.state().bossHp, 0); eq(g.state().score, 1300); eq(g.state().bossWins, 0);
+      eq(g.read('bombs.length'), 0); tick(g); eq(g.state().phase, 'bossBreak'); eq(g.state().bossWins, 1);
+    }
+  }
+});
+
+test('blocked storage supports challenge completion, retry and independent in-memory records', () => {
+  for (const id of operationIds) {
+    const g = operation(id, { blocked: true }); eq(g.state().storageAvailable, false);
+    const otherModes = savedOtherModes(g);
+    if (id === 'counter') reflectShots(g, 5);
+    if (id === 'bosses') {
+      for (let index = 0; index < 3; index++) { finishArena(g); if (index < 2) g.click('start'); }
+    } else finishOperation(g);
+    eq(g.state().phase, 'challengeClear'); eq(g.state().progress.challenges[id].clears, 1); eq(g.values.size, 0);
+    eq(savedOtherModes(g), otherModes); const record = g.state().progress.challenges[id];
+    g.click('start'); g.run('player.inv=0;player.lives=1;hurt(player.hp);');
+    eq(g.state().phase, 'challengeFailed'); eq(g.state().progress.challenges[id], record); eq(g.values.size, 0);
+    g.click('start'); eq(g.state().phase, 'playing'); eq(g.state().challengeId, id);
+  }
+});
+
+test('stationary held fire alone cannot complete the unmodified three-boss gauntlet', () => {
+  const g = operation('bosses');
+  for (let index = 0; index < 3; index++) {
+    eq(g.state().bossHp, [66, 94, 121][index]);
+    g.key('j'); until(g, () => g.state().phase !== 'playing', 1800); g.key('j', false);
+    if (g.state().phase !== 'bossBreak') break;
+    g.click('start');
+  }
+  eq(g.state().phase, 'challengeFailed'); eq(g.state().lives, 0);
+  eq(g.state().stage, 3); eq(g.state().bossWins, 2); eq(g.state().stageDeaths, 1);
+  eq(g.state().progress.challenges.bosses, emptyOperationRecord());
+});
+
+test('active movement, reflected fire and beam dodges win the full gauntlet at human-scale input cadences', () => {
+  for (const cadence of [6, 12, 18]) for (const offset of [0, 3, 5]) {
+    const g = operation('bosses');
+    let polls = 0;
+    const tap = key => { g.key(key); g.key(key, false); };
+    // Read-only observations and genuine key events only. The bot cannot alter
+    // HP, positions, projectiles, cooldowns, timers, boss state or randomness.
+    for (let index = 0; index < 3; index++) {
+      eq(g.state().bossHp, [66, 94, 121][index]);
+      let frame = 0, dodgedThisBeam = false;
+      g.key('j');
+      while (g.state().phase === 'playing' && frame < 2400) {
+        if ((frame + offset) % cadence === 0) {
+          const s = g.state(); polls++;
+          g.key('d', s.x < 680);
+          const threatened = s.hostiles.some(b => b.x > s.x && b.x < s.x + 27 + 100 &&
+            b.y > s.y - 15 && b.y < s.y + s.playerHeight + 15);
+          if (s.dashCooldown === 0 && threatened) tap('l');
+          if (s.bossAttackType === 'beam' && s.bossCharge > 0 && s.bossCharge <= .38 && !dodgedThisBeam) {
+            if (s.bossBeamY > 405) tap('w'); else g.key('s');
+            dodgedThisBeam = true;
+          }
+          if (s.bossCharge === 0 && s.bossBeamTime === 0) { g.key('s', false); dodgedThisBeam = false; }
+        }
+        tick(g); frame++;
+      }
+      for (const key of ['j', 'd', 's']) g.key(key, false);
+      const s = g.state(), context = `${cadence * 1000 / 60}ms cadence, offset ${offset}, boss ${index + 1}`;
+      eq(s.phase, index < 2 ? 'bossBreak' : 'challengeClear', context);
+      eq(s.bossWins, index + 1, context); assert(s.hp > 0, context); eq(s.lives, 1, context);
+      eq(s.stageDeaths, 0, context);
+      if (index < 2) g.click('start');
+    }
+    const s = g.state();
+    eq(s.score, 4400 + s.hp * 100 + s.grenades * 25); eq(s.progress.challenges.bosses.clears, 1);
+    assert(s.challengeReflections > 0 && polls > 10);
+    assert(s.challengeTime > 20 && s.challengeTime < 60);
+  }
+});
+
+console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat and operation contracts passed`);
