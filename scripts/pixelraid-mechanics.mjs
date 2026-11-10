@@ -803,4 +803,14 @@ test('reduced-motion rendering suppresses enemy and boss hit flashes while keepi
   }
 });
 
+test('combat feedback never covers the reactor beam dodge warning', () => {
+  const g = createGame();
+  g.run(`resetStage(2,null);phase='playing';player.x=boss.x-300;cam=player.x-290;
+    boss.attackType='beam';boss.windup=.5;combatNotice('冲刺反弹');
+    window.drawRects=[];c.fillRect=(...coords)=>window.drawRects.push({coords,fill:c.fillStyle});draw();`);
+  const warning = g.read("window.drawRects.find(rect=>rect.fill==='#241d31').coords");
+  const feedback = g.read("window.drawRects.find(rect=>rect.fill==='#14283c').coords");
+  assert(feedback[1] >= warning[1] + warning[3], 'Hit feedback must sit below the critical dodge instruction');
+});
+
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition and combat contracts passed`);

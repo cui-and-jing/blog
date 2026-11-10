@@ -876,10 +876,11 @@
           const loadout=Object.keys(UPGRADES).filter(key=>upgrades[key]>0).map(key=>UPGRADES[key]+' ×'+upgrades[key]).join('  ·  ');
           if(loadout){c.font='12px system-ui';c.fillStyle='#ffe0a5';c.fillText(loadout,18,H-20);}
           if(combatTime>0){
-            rect(16,62,360,31,'#14283c');c.font='bold 13px system-ui';c.fillStyle='#b9efff';c.fillText(combatText,26,83);
+            // Keep combat feedback below the boss beam warning at y=63..97.
+            rect(16,108,360,31,'#14283c');c.font='bold 13px system-ui';c.fillStyle='#b9efff';c.fillText(combatText,26,129);
           }
           if(combo.count>0){
-            rect(18,101,150,4,'#29425a');rect(18,101,150*combo.timer/5,4,'#ffe093');
+            rect(18,147,150,4,'#29425a');rect(18,147,150*combo.timer/5,4,'#ffe093');
           }
           if(player.dashCooldown>0){rect(18,40,90,5,'#29425a');rect(18,40,90*(1-player.dashCooldown/(2.4-upgrades.dash*.6)),5,'#a8d9ff');}
 
