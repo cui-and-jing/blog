@@ -21,6 +21,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { launchBrowser } from './lib/browser.mjs';
 import { checkRaidChallenges } from './lib/raid-challenges-browser.mjs';
+import { checkRaidSurvival } from './lib/raid-survival-browser.mjs';
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -450,6 +451,7 @@ async function checkGame(browser, file) {
         problems.push('Pixel Raid 暂停未冻结新增战斗计时');
       }
       await checkRaidChallenges(page, problems);
+      await checkRaidSurvival(page, problems);
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
