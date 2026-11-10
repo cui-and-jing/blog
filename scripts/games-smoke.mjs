@@ -390,7 +390,7 @@ async function checkGame(browser, file) {
         const layout = await page.evaluate(() => ({
           viewport: innerWidth, width: document.documentElement.scrollWidth,
           start: document.getElementById('start').getBoundingClientRect().width,
-          controls: [...document.querySelectorAll('[data-action]')].map((button) => ({
+          controls: [...document.querySelectorAll('.controls [data-action]')].map((button) => ({
             width: button.getBoundingClientRect().width, height: button.getBoundingClientRect().height,
             name: button.getAttribute('aria-label'),
           })),

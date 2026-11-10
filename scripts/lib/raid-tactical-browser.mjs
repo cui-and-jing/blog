@@ -16,10 +16,13 @@ export async function checkRaidTactical(page, problems) {
     await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__raidReady===true);
     await activate('#mode-survival');await activate('#loadout-'+kit);await activate('#start');await phase('playing');
     const records=(await read()).progress;
+    check((await read()).mode==='survival'&&await page.$eval('#tactical-hud',e=>!e.hidden),'技能测试没有进入防线生存');
     await page.keyboard.press('e');await wait(80);
     check((await read()).tacticalUses===0,'增援预告提前释放技能');
     await page.keyboard.press('p');await phase('pause');
-    for(const w of [320,360,375,390,844]) {
+    // Changing isMobile/hasTouch reloads Chromium. Inspect all touch sizes
+    // on the already-touch-enabled run, preserving its live paused state.
+    for(const w of kit==='counter'?[320,360,375,390,844]:[]) {
       await page.setViewport({width:w,height:w===844?390:844,isMobile:true,hasTouch:true});
       const boxes=await page.evaluate(()=>({
         width:innerWidth,scroll:document.documentElement.scrollWidth,
