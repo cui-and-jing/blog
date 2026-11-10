@@ -1325,4 +1325,381 @@ test('active movement, reflected fire and beam dodges win the full gauntlet at h
   }
 });
 
-console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat and operation contracts passed`);
+// Survival uses the same production script. Private setup below arranges exact
+// collision/storage boundaries; menus, rewards and simulation use real code.
+const defenseModules = ['rapid', 'dash', 'armor', 'pierce', 'reflect', 'blast'];
+function defense(options) {
+  const g = createGame(options);
+  g.click('mode-survival'); g.click('start');
+  eq(g.state().mode, 'survival'); eq(g.state().phase, 'playing');
+  return g;
+}
+function finishDefenseWave(g) {
+  g.run('spawnTime=0; enemies.forEach(e=>e.dead=true);'); tick(g);
+  eq(g.state().phase, 'waveClear');
+}
+function supplyModule(g, key) {
+  finishDefenseWave(g);
+  // Arrange the offered card, not its effect. Selection/confirmation still run
+  // through the exact public buttons and production nextWave implementation.
+  g.run(`supplyOffers=[${JSON.stringify(key)},'heal','ammo'];selectedSupply=null;`);
+  g.click('supply-0'); g.click('start');
+}
+function nonDefenseRecords(g) {
+  const { survival, ...other } = g.state().progress;
+  return other;
+}
+
+test('survival title tab and start use an independent fixed standard loadout', () => {
+  const g = createGame(); g.click('difficulty-relaxed');
+  const other = nonDefenseRecords(g);
+  g.click('mode-survival');
+  eq(g.state().phase, 'title'); eq(g.state().titleView, 'survival');
+  eq(g.nodes.get('mode-survival').getAttribute('aria-pressed'), 'true');
+  assert(!g.nodes.get('survival-menu').hidden && !g.nodes.get('start').hidden);
+  for (const id of ['challenge-menu', 'difficulty-options', 'stage-menu', 'survival-options']) {
+    assert(g.nodes.get(id).hidden, id + ' must not leak into survival title');
+  }
+  g.click('start'); const s = g.state();
+  eq(s.mode, 'survival'); eq(s.difficulty, 'standard'); eq(s.survivalWave, 1);
+  eq(s.hp, 6); eq(s.maxHp, 6); eq(s.lives, 1); eq(s.grenades, 3);
+  eq(s.upgrades, Object.fromEntries(defenseModules.map(key => [key, 0])));
+  eq(s.worldWidth, 960); eq(s.cam, 0); eq(s.intelTotal, 0); eq(s.bossHp, 0);
+  eq(g.read('stage.gaps'), []); eq(g.read('stage.checkpoints'), []);
+  eq(nonDefenseRecords(g), other); assert(!g.nodes.get('mission-hud').hidden);
+  g.key('p'); g.click('menu-home'); g.click('start');
+  eq(g.state().phase, 'title'); eq(g.state().difficulty, 'relaxed'); eq(nonDefenseRecords(g), other);
+});
+
+test('survival telegraphs prevent damage, contact, shots and premature empty-wave clears', () => {
+  const g = defense();
+  g.run(`player.x=enemies[0].x;player.y=G-player.h;player.inv=0;
+    enemies.forEach(e=>e.shot=0);projectile(enemies[0].x+15,enemies[0].y+18,0,0,'p',99);
+    boom(enemies[0].x+15,enemies[0].y+18);`);
+  const original = g.read('enemies.map(e=>({x:e.x,y:e.y,hp:e.hp}))');
+  tick(g, 60);
+  eq(g.state().hp, 6); eq(g.state().score, 0); assert(g.state().spawnTime > 1);
+  eq(g.read('enemies.map(e=>({x:e.x,y:e.y,hp:e.hp}))'), original);
+  eq(g.state().hostiles, []); eq(g.state().survivalCleared, 0);
+  g.run('enemies=[];finishWave();'); eq(g.state().phase, 'playing');
+  tick(g, 10); eq(g.state().phase, 'playing'); eq(g.state().progress.survival.wave, 0);
+});
+
+test('survival occupied spawns relocate once with a bounded invulnerable arrival warning', () => {
+  for (const side of ['left', 'right']) {
+    const g = defense(), origin = side === 'left' ? 140 : 790, destination = side === 'left' ? 820 : 100;
+    g.run(`enemies=[makeEnemy(${origin},'walker')];player.x=${origin};player.inv=0;spawnTime=DT/2;`);
+    tick(g); eq(g.read('enemies[0].x'), destination); eq(g.read('enemies[0].home'), destination);
+    assert(g.state().enemies[0].arrival > .5 && g.state().enemies[0].arrival <= .6);
+    eq(g.state().hp, 6); eq(g.state().hostiles, []); eq(g.state().phase, 'playing');
+    g.run(`player.x=${destination};projectile(enemies[0].x+15,enemies[0].y+18,0,0,'p',99);
+      boom(enemies[0].x+15,enemies[0].y+18);`);
+    tick(g, 12); eq(g.state().hp, 6); eq(g.read('enemies[0].hp'), 3); eq(g.state().hostiles, []);
+    eq(g.read('enemies[0].x'), destination, 'Arrival must not chase or repeatedly relocate');
+    g.run('player.x=480;bullets=[];'); tick(g, 30);
+    eq(g.state().enemies[0].arrival, 0); assert(g.read('enemies[0].x') !== destination);
+    eq(g.state().phase, 'playing'); eq(g.state().survivalCleared, 0);
+  }
+});
+
+test('survival distant enemies stay active and shields leave a real flank window', () => {
+  for (const type of ['walker', 'turret']) {
+    const g = defense();
+    g.run(`spawnTime=0;player.x=8;player.inv=100;enemies=[makeEnemy(820,${JSON.stringify(type)})];enemies[0].shot=0;`);
+    tick(g);
+    assert(g.read('enemies[0].x-player.x') > 570);
+    if (type === 'walker') {
+      assert(g.read('enemies[0].x') < 820); eq(g.state().hostiles.length, 1);
+      near(g.read('Math.hypot(bullets[0].vx,bullets[0].vy)'), 235);
+    } else {
+      near(g.state().turretCharge, .8); eq(g.state().hostiles.length, 0);
+      tickUntil(g, 'bullets.length>0', 60); near(g.read('Math.hypot(bullets[0].vx,bullets[0].vy)'), 315);
+    }
+  }
+  const g = defense();
+  g.run(`spawnTime=0;player.x=450;player.inv=100;enemies=[{...makeEnemy(300,'shield'),shot:100,face:-1}];
+    projectile(324,G-18,-650,0,'p');`);
+  tick(g); eq(g.read('enemies[0].face'), -1); eq(g.read('enemies[0].hp'), 4);
+  tick(g, 24); eq(g.read('enemies[0].face'), -1, 'A newly flanked shield must not instantly rotate');
+  tick(g, 18); eq(g.read('enemies[0].face'), 1, 'The flank window must also end');
+});
+
+test('survival arena boundaries do not trigger a campaign exit or change the camera', () => {
+  const g = defense(); g.run('player.inv=100;spawnTime=100;');
+  for (const [key, target] of [['a', 8], ['d', 927]]) {
+    g.key(key); tick(g, 250); g.key(key, false);
+    eq(g.state().x, target); eq(g.state().cam, 0); eq(g.state().phase, 'playing');
+    eq(g.state().survivalCleared, 0); eq(g.state().stageStars, 0);
+  }
+  eq(g.state().progress.survival, { wave: 0, best: 0 }); eq(g.state().unlocked, 1);
+});
+
+test('survival clear saves once, removes hazards and requires exactly one confirmed supply', () => {
+  const g = defense(); const other = nonDefenseRecords(g);
+  g.run(`spawnTime=0;enemies.forEach(e=>e.dead=true);player.hp=2;player.grenades=6;points=100;
+    projectile(850,100,0,0,'e');bombs.push({x:850,y:100,vx:0,vy:0,timer:10,r:8});`);
+  tick(g);
+  eq(g.state().phase, 'waveClear'); eq(g.state().survivalCleared, 1); eq(g.state().score, 350);
+  eq(g.state().hp, 3); eq(g.state().grenades, 7); eq(g.state().progress.survival, { wave: 1, best: 350 });
+  eq(g.state().bullets, 0); eq(g.read('bombs.length'), 0); eq(nonDefenseRecords(g), other);
+  const offers = g.state().supplyOffers;
+  eq(offers.length, 3); eq(new Set(offers).size, 3); eq(offers[2], 'heal');
+  assert(offers.slice(0, 2).every(key => defenseModules.includes(key)));
+  const cleared = g.state(); g.run('finishWave();finishWave();'); tick(g, 240); eq(g.state(), cleared);
+  g.click('start'); eq(g.state(), cleared, 'Unselected Continue must be inert');
+  for (const invalid of [-1, 3, 1.5, '0', null]) g.run(`chooseSupply(${JSON.stringify(invalid)})`);
+  eq(g.state().selectedSupply, null);
+  g.click('supply-0'); g.click('supply-0');
+  eq(g.state().upgrades[offers[0]], 0, 'Selecting a card must not apply it');
+  g.click('start'); g.click('start');
+  eq(g.state().survivalWave, 2); eq(g.state().phase, 'playing'); eq(g.state().upgrades[offers[0]], 1);
+  eq(g.state().score, 350); eq(g.state().progress.survival, { wave: 1, best: 350 });
+});
+
+test('survival confirmation cancellation preserves the exact offers and selected reward', () => {
+  for (const selected of [false, true]) for (const action of ['restart', 'menu-home']) {
+    const g = defense(); finishDefenseWave(g);
+    if (selected) g.click('supply-1');
+    const before = g.state();
+    for (let repeat = 0; repeat < 3; repeat++) {
+      g.click(action); eq(g.state().phase, 'confirmRestart');
+      tick(g, 90); g.click('cancel-restart');
+      eq(g.state(), before); eq(g.nodes.get('start').disabled, !selected);
+      eq(g.nodes.get('supply-1').getAttribute('aria-pressed'), String(selected));
+    }
+  }
+});
+
+test('survival last-enemy kill never saves a posthumous clear in either projectile order', () => {
+  for (const killFirst of [false, true]) {
+    const g = defense();
+    const hitPlayer = "projectile(player.x+12,player.y+20,0,0,'e');";
+    const killEnemy = "projectile(enemies[0].x+15,enemies[0].y+18,0,0,'p');";
+    g.run(`spawnTime=0;player.hp=1;player.inv=0;player.x=500;bullets=[];
+      enemies=[makeEnemy(150,'turret')];enemies[0].hp=1;enemies[0].shot=100;
+      ${killFirst ? hitPlayer + killEnemy : killEnemy + hitPlayer}`);
+    tick(g); eq(g.state().phase, 'survivalOver'); eq(g.state().lives, 0);
+    eq(g.state().survivalCleared, 0); eq(g.state().progress.survival, { wave: 0, best: 0 });
+    eq(g.state().score, killFirst ? 160 : 0);
+    const terminal = g.state(); tick(g, 120); g.frames(30); eq(g.state(), terminal);
+  }
+  const grenade = defense();
+  grenade.run(`spawnTime=0;player.hp=1;player.inv=0;player.x=500;
+    enemies=[makeEnemy(150,'turret')];enemies[0].shot=100;
+    bombs.push({x:165,y:G-17,vx:0,vy:0,timer:0,r:8});projectile(player.x+12,player.y+20,0,0,'e');`);
+  tick(grenade); eq(grenade.state().phase, 'survivalOver'); eq(grenade.state().score, 0);
+  eq(grenade.state().progress.survival, { wave: 0, best: 0 });
+});
+
+test('survival modules apply once, stop at rank two and are omitted from capped offers', () => {
+  for (const key of defenseModules) {
+    const g = defense();
+    for (let rank = 1; rank <= 3; rank++) {
+      g.run('player.hp=1;'); supplyModule(g, key);
+      eq(g.state().upgrades[key], Math.min(2, rank));
+      if (key === 'armor') {
+        eq(g.state().maxHp, 6 + Math.min(2, rank)); eq(g.state().hp, g.state().maxHp);
+      }
+    }
+    finishDefenseWave(g); assert(!g.state().supplyOffers.includes(key), key + ' must not be offered at cap');
+  }
+});
+
+test('survival rapid and dash ranks change actual cooldowns without reaching zero', () => {
+  for (const rank of [0, 1, 2]) {
+    const g = defense();
+    for (let level = 0; level < rank; level++) supplyModule(g, 'rapid');
+    g.run('fire();'); near(g.read('player.shoot'), .15 * .8 ** rank);
+    g.run(`upgrades.dash=${rank};dash();`); near(g.state().dashCooldown, 2.4 - .6 * rank);
+    eq(g.read('player.dashTime'), .18);
+  }
+  const g = defense(); g.run('upgrades.dash=999;dash();'); near(g.state().dashCooldown, 1.2);
+});
+
+test('survival piercing has a finite target budget and never hits the same enemy twice', () => {
+  for (const rank of [0, 1, 2]) {
+    const g = defense();
+    g.run(`spawnTime=0;player.inv=100;player.x=600;upgrades.pierce=${rank};
+      enemies=Array.from({length:4},()=>({...makeEnemy(300,'turret'),hp:20,maxHp:20,shot:100}));
+      projectile(310,G-17,0,0,'p');`);
+    tick(g); eq(g.read('enemies.map(e=>e.hp)'), Array.from({ length: 4 }, (_, i) => i <= rank ? 19 : 20));
+    eq(g.state().bullets, 0);
+  }
+  const g = defense();
+  g.run(`spawnTime=0;player.inv=100;player.x=600;upgrades.pierce=2;
+    enemies=[{...makeEnemy(300,'turret'),hp:20,maxHp:20,shot:100}];projectile(310,G-17,0,0,'p');`);
+  tick(g, 30); eq(g.read('enemies[0].hp'), 19); eq(g.read('bullets[0].pierce'), 1);
+  eq(g.read('bullets[0].hitEnemies.length'), 1);
+});
+
+test('survival piercing is stopped by a frontal shield while reflected damage bypasses it', () => {
+  for (const rank of [0, 1, 2]) {
+    const g = defense();
+    g.run(`spawnTime=0;player.inv=100;player.x=100;upgrades.pierce=2;upgrades.reflect=${rank};
+      enemies=[{...makeEnemy(300,'shield'),shot:100},{...makeEnemy(325,'turret'),shot:100}];
+      projectile(296,G-18,650,0,'p');`);
+    tick(g); eq(g.read('enemies[0].hp'), 5); eq(g.read('enemies[1].hp'), 4); eq(g.state().bullets, 0);
+    g.run(`projectile(296,G-18,0,0,'e');bullets[0].sourceX=600;reflectBullet(bullets[0]);`);
+    eq(g.read('bullets[0].damage'), 2 + rank); eq(g.read('bullets[0].pierce'), 0);
+    tick(g); eq(g.read('enemies[0].hp'), 3 - rank); eq(g.state().reflections, 1);
+    eq(g.state().challengeReflections, 0); eq(g.state().bullets, 0);
+  }
+});
+
+test('survival blast ranks extend radius and damage, removing only nearby hostile shots', () => {
+  for (const rank of [0, 1, 2]) {
+    const g = defense(), radius = 112 + 24 * rank;
+    g.run(`spawnTime=0;upgrades.blast=${rank};
+      enemies=[0,${radius - 1},${radius + 1}].map(dx=>({...makeEnemy(100+dx-15,'turret'),y:200,hp:50,maxHp:50,shot:100}));
+      bullets=[];projectile(100,218,0,0,'p');projectile(100,218,0,0,'e');projectile(${100 + radius + 1},218,0,0,'e');
+      boom(100,218);`);
+    eq(g.read('enemies.map(e=>e.hp)'), [44 - 2 * rank, 44 - 2 * rank, 50]);
+    eq(g.read("bullets.filter(b=>b.owner==='p').length"), 1);
+    eq(g.read("bullets.filter(b=>b.owner==='e').length"), rank ? 1 : 2);
+  }
+});
+
+test('survival capped builds still offer three distinct usable recovery choices', () => {
+  for (const lastUncapped of [null, 'blast']) for (const choice of ['heal', 'ammo', 'boost']) {
+    const g = defense();
+    g.run(`for(const key of MODULES)upgrades[key]=2;${lastUncapped ? "upgrades.blast=1;" : ''}
+      player.hp=1;player.grenades=0;`);
+    finishDefenseWave(g);
+    const expected = lastUncapped ? ['blast', 'heal', 'ammo'] : ['heal', 'ammo', 'boost'];
+    eq(g.state().supplyOffers, expected); eq(new Set(g.state().supplyOffers).size, 3);
+    if (!expected.includes(choice)) continue;
+    g.click('supply-' + expected.indexOf(choice)); g.click('start');
+    eq(g.state().phase, 'playing'); eq(g.state().survivalWave, 2);
+    if (choice === 'heal') eq(g.state().hp, 8);
+    if (choice === 'ammo') { eq(g.state().grenades, 4); eq(g.state().weaponTime, 20); }
+    if (choice === 'boost') { eq(g.read('player.boost'), 20); eq(g.state().weaponTime, 20); }
+  }
+  const full = defense(); full.run('for(const key of MODULES)upgrades[key]=2;player.hp=8;player.grenades=7;');
+  finishDefenseWave(full); full.click('supply-2'); full.click('start');
+  eq(full.read('player.boost'), 20); eq(full.state().hp, 8); eq(full.state().grenades, 7);
+});
+
+test('survival pause, background and confirmation freeze gameplay and clear held inputs', () => {
+  for (const interrupt of ['pause', 'blur', 'visibility', 'confirm']) {
+    const g = defense(); g.key('j'); g.key('d'); g.key('l'); tick(g, 12);
+    if (interrupt === 'pause') g.key('p');
+    else if (interrupt === 'blur') g.event('blur');
+    else if (interrupt === 'visibility') g.visibility(true);
+    else g.click('restart');
+    const paused = g.state(); tick(g, 300); g.frames(120); eq(g.state(), paused);
+    eq(g.read('held.size'), 0); eq(g.read('padHeld.size'), 0); eq(g.state().touchCount, 0);
+    if (interrupt === 'visibility') g.visibility(false);
+    g.click(interrupt === 'confirm' ? 'cancel-restart' : 'start');
+    const shots = g.state().shots; tick(g); eq(g.state().shots, shots); eq(g.state().phase, 'playing');
+    assert(g.state().spawnTime < paused.spawnTime && g.state().survivalTime > paused.survivalTime);
+  }
+});
+
+test('survival records persist completed waves only and leave every other mode unchanged', () => {
+  const seeded = {
+    version: 1, unlocked: 3, selectedDifficulty: 'relaxed', survival: { wave: 1, best: 100 },
+    campaign: { standard: { best: 321, stars: [7, 5, 1] }, relaxed: { best: 654, stars: [5, 7, 7] } },
+    practice: { standard: { best: 222, stars: [1, 5, 7] }, relaxed: { best: 333, stars: [7, 1, 5] } },
+    challenges: Object.fromEntries(operationIds.map((id, i) => [id, { clears: i + 1, best: 500 + i, bestTime: 1000 + i }])),
+  };
+  const g = defense({ storage: { [STORE]: JSON.stringify(seeded) } }); const other = nonDefenseRecords(g);
+  g.run('addPoints(600);'); eq(g.state().progress.survival, seeded.survival);
+  finishDefenseWave(g); const saved = g.state().progress.survival;
+  eq(saved, { wave: 1, best: 850 }); eq(JSON.parse(g.values.get(STORE)).survival, saved);
+  g.click('supply-2'); g.click('start'); g.run('addPoints(5000);player.inv=0;hurt(player.hp);');
+  eq(g.state().phase, 'survivalOver'); eq(g.state().progress.survival, saved); eq(nonDefenseRecords(g), other);
+  eq(JSON.parse(g.values.get(STORE)).survival, saved);
+  const reloaded = createGame({ storage: Object.fromEntries(g.values) });
+  eq(reloaded.state().phase, 'title'); eq(reloaded.state().progress.survival, saved); eq(nonDefenseRecords(reloaded), other);
+  g.click('start'); eq(g.state().survivalWave, 1); eq(g.state().score, 0); eq(g.state().hp, 6);
+  eq(g.state().upgrades, Object.fromEntries(defenseModules.map(key => [key, 0])));
+});
+
+test('survival malformed and blocked storage never prevent starting or clearing a wave', () => {
+  const cases = [
+    ['{broken', { wave: 0, best: 0 }],
+    [JSON.stringify({ version: 1 }), { wave: 0, best: 0 }],
+    [JSON.stringify({ version: 1, survival: { wave: -2, best: '900', extra: true } }), { wave: 0, best: 0 }],
+    [JSON.stringify({ version: 1, survival: { wave: 3.9, best: 222.9 } }), { wave: 3, best: 222 }],
+    [JSON.stringify({ version: 1, survival: { wave: 1e9, best: 1e20 } }), { wave: 9999, best: 9999999 }],
+    [JSON.stringify({ version: 5, survival: { wave: 50, best: 9000 } }), { wave: 0, best: 0 }],
+    [' '.repeat(12001), { wave: 0, best: 0 }],
+  ];
+  for (const [raw, expected] of cases) {
+    const g = defense({ storage: { [STORE]: raw } }); eq(g.state().progress.survival, expected);
+    finishDefenseWave(g); eq(g.state().phase, 'waveClear');
+    eq(Object.keys(g.state().progress.survival).sort(), ['best', 'wave']);
+  }
+  const blocked = defense({ blocked: true }); const other = nonDefenseRecords(blocked);
+  finishDefenseWave(blocked); eq(blocked.state().storageAvailable, false); eq(blocked.values.size, 0);
+  eq(blocked.state().progress.survival, { wave: 1, best: 250 }); eq(nonDefenseRecords(blocked), other);
+  blocked.click('supply-2'); blocked.click('start'); blocked.run('player.inv=0;hurt(player.hp);');
+  blocked.click('start'); eq(blocked.state().phase, 'playing'); eq(blocked.state().survivalWave, 1);
+  eq(blocked.state().progress.survival, { wave: 1, best: 250 }); eq(blocked.values.size, 0);
+});
+
+test('survival long runs keep enemy and offer arrays bounded and introduce every enemy type', () => {
+  const g = defense();
+  for (let wave = 1; wave <= 60; wave++) {
+    eq(g.state().survivalWave, wave); const enemies = g.state().enemies;
+    eq(enemies.length, Math.min(8, 3 + Math.floor(wave / 2)));
+    if (wave === 1) assert(enemies.every(e => e.type === 'walker'));
+    if (wave === 2) assert(enemies.some(e => e.type === 'drone'));
+    if (wave === 3) for (const type of ['turret', 'shield']) assert(enemies.some(e => e.type === type));
+    assert(enemies.every(e => e.x >= 60 && e.x + e.w <= 900 && e.hp <= 11));
+    eq(g.state().bullets, 0); eq(g.read('bombs.length'), 0);
+    eq(g.read('pickups.length'), 2); eq(g.read('sparks.length'), 0);
+    finishDefenseWave(g);
+    eq(g.state().supplyOffers.length, 3); eq(new Set(g.state().supplyOffers).size, 3);
+    g.click('supply-0'); g.click('start');
+    assert(Object.values(g.state().upgrades).every(rank => rank >= 0 && rank <= 2));
+  }
+  eq(g.state().progress.survival.wave, 60); eq(g.state().survivalWave, 61);
+});
+
+test('genuine keyboard tactics clear survival waves one through three at a human input cadence', () => {
+  const g = defense(), cadence = 12, tap = key => { g.key(key); g.key(key, false); };
+  const encountered = new Set(); let facing = 1, frame = 0, decisions = 0;
+  // Only detached observations, normal key events and menu clicks. No HP,
+  // enemy, position, damage, cooldown, projectile or RNG mutation is allowed.
+  for (let wave = 1; wave <= 3; wave++) {
+    eq(g.state().survivalWave, wave); g.key('j');
+    let duration = 0;
+    while (g.state().phase === 'playing' && duration < 6000) {
+      if (frame % cadence === 0) {
+        decisions++;
+        const s = g.state(); s.enemies.forEach(enemy => encountered.add(enemy.type));
+        const target = s.enemies.sort((a, b) => Math.abs(a.x - s.x) - Math.abs(b.x - s.x))[0];
+        if (target) {
+          const direction = target.x + target.w / 2 > s.x + 13 ? 1 : -1;
+          const distance = Math.abs(target.x - s.x), airborne = target.type === 'drone';
+          const threatened = s.hostiles.some(b => Math.abs(b.x - s.x - 13) < 100 &&
+            b.y > s.y - 15 && b.y < s.y + s.playerHeight + 15);
+          if (threatened && s.dashCooldown === 0) tap('l');
+          const move = distance > (airborne ? 170 : 210) || direction !== facing;
+          g.key('a', move && direction < 0); g.key('d', move && direction > 0);
+          if (move) facing = direction;
+          if (airborne && s.ground) { g.key('w', false); g.key('w'); }
+          else if (!airborne) g.key('w', false);
+          if (target.type === 'shield' && distance > 150 && distance < 300 && s.grenades > 0 && frame % 60 === 0) tap('k');
+          if (target.type === 'shield' && distance < 110 && s.ground) { g.key('w', false); g.key('w'); }
+        }
+      }
+      tick(g); duration++; frame++;
+    }
+    for (const key of ['a', 'd', 'w', 'j']) g.key(key, false);
+    const s = g.state(); eq(s.phase, 'waveClear', 'Wave ' + wave + ': ' + JSON.stringify(s));
+    eq(s.survivalCleared, wave); eq(s.lives, 1); assert(s.hp > 0); eq(s.stageDeaths, 0);
+    assert(duration > 132 && duration < 3600, 'Opening waves must resolve in under one active minute');
+    if (wave < 3) {
+      let choice = s.supplyOffers.indexOf('armor');
+      if (choice < 0) choice = s.hp < 4 ? s.supplyOffers.indexOf('heal') : 0;
+      g.click('supply-' + Math.max(0, choice)); g.click('start');
+    }
+  }
+  eq([...encountered].sort(), ['drone', 'shield', 'turret', 'walker']);
+  assert(g.state().reflections > 0 && decisions > 20); eq(g.state().progress.survival.wave, 3);
+  eq(g.state().progress.survival.best, g.state().score);
+});
+
+console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);

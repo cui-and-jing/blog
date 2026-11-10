@@ -58,11 +58,11 @@ export const GAMES: Game[] = [
     title: 'PIXEL RAID',
     subtitle: '像素突围',
     description:
-      '三章远征与三项作战挑战：限时突袭、弹幕反击、首领连战。冲刺、收集情报、选择战术升级；支持键盘与触屏，本机保存成绩。',
+      '三章远征、三项作战挑战与防线生存。逐波迎战双向增援，选择穿透、反击、爆破等六种模组，打造自己的构筑；支持键盘与触屏，本机保存成绩。',
     tags: ['横版动作', '像素', '离线单机'],
     facts: [
       { value: '3', label: '关卡' },
-      { value: '9', label: '颗星' },
+      { value: '6', label: '种模组' },
       { value: '3', label: '项挑战' },
       { value: '键盘', label: '触屏' },
     ],

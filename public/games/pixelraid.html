@@ -48,6 +48,8 @@
     .mission strong{color:#a9f2e4}.mission b{color:#ffe097;font-variant-numeric:tabular-nums}.mission[data-urgent="true"]{border-color:#ffae88;background:#492e36}
     .challenge-grid .choice{align-content:start;gap:9px}.challenge-grid .record{color:#a9f2e4}.mode-options{padding:5px;border:1px solid #4c6680;border-radius:12px}
     @media(max-width:480px){.challenge-grid{grid-template-columns:1fr}.challenge-grid .choice{padding:12px 14px}.challenge-grid .choice strong{font-size:14px}.challenge-grid .choice span{font-size:12px}}
+    .survival-grid .choice{min-height:110px}.overlay .survival-grid .choice span{font-size:12px}.survival-summary{padding:12px;border:1px solid #668e9e;border-radius:10px;background:#143447}
+    @media(max-width:480px){.survival-grid{grid-template-columns:1fr}.survival-grid .choice{min-height:88px}.survival-grid .choice strong{font-size:14px}}
     .legend{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;color:#b9cce1;font-size:12px;line-height:1.6;max-width:1100px;margin:0 auto}
     kbd{display:inline-block;border:1px solid #61758e;border-bottom-width:2px;padding:0 5px;background:#213750;border-radius:4px;color:#fff7da}
     .controls{display:none;justify-content:space-between;align-items:center;gap:12px;max-width:1200px;width:100%;margin:0 auto;touch-action:none;user-select:none}
@@ -84,7 +86,7 @@
 </head>
 <body>
   <header class="top">
-    <div class="brand"><strong>PIXEL RAID / 像素突围</strong><span>三章远征 · 作战挑战</span></div>
+    <div class="brand"><strong>PIXEL RAID / 像素突围</strong><span>三章远征 · 防线生存</span></div>
     <div class="top-actions">
       <button id="pause" type="button">暂停 P</button>
       <button id="sound" type="button" aria-pressed="false">音效 关</button>
@@ -118,6 +120,7 @@
         <div class="option-row mode-options" id="mode-options" role="group" aria-label="选择玩法">
           <button id="mode-campaign" type="button" class="secondary" aria-pressed="true">三章远征</button>
           <button id="mode-challenges" type="button" class="secondary" aria-pressed="false">作战挑战 · 3 项任务</button>
+          <button id="mode-survival" type="button" class="secondary" aria-pressed="false">防线生存 · 波次构筑</button>
         </div>
         <section id="challenge-menu" class="menu-section" aria-label="作战挑战" hidden>
           <p>固定标准难度与装具，无需解锁。挑战纪录独立，不影响远征星章。</p>
@@ -127,6 +130,24 @@
             <button id="challenge-bosses" type="button" class="choice"><strong>03 · 首领连战 →</strong><span>独立竞技场连续击败 3 位强化首领。7 体力、1 条命、5 枚手雷；关间恢复 2 体力与 2 手雷。</span><span class="record" id="challenge-record-bosses">尚未完成</span></button>
           </div>
           <p class="small">点任务即开始。成功奖励 500 分；突袭剩余整秒 ×10 分，连战保留体力 ×100 分、手雷 ×25 分。最高分与最快用时独立记录。暂停与整备不计时；刷新页面会结束当前挑战。</p>
+        </section>
+        <section id="survival-menu" class="menu-section" aria-label="防线生存规则" hidden>
+          <p class="survival-summary">一条命，守住自己的纪录。双向增援逐波加压，清场后从三项补给中选一项，打造连射、穿透或反击流派。</p>
+          <div class="choice-grid survival-grid">
+            <div class="choice"><strong>守住防线</strong><span>6 体力、3 手雷，固定标准难度。敌人出现前预警 2.2 秒；步兵追击，盾卫转向防守。</span></div>
+            <div class="choice"><strong>选择构筑</strong><span>六种永久模组，每种最多两级。每波清场恢复 1 体力与 1 手雷，再选升级或即时补给。</span></div>
+            <div class="choice"><strong>不断突破</strong><span>每波敌人组合不同，数量与强度逐步增加。高台散弹、侧翼医疗包帮助你改变战局。</span></div>
+          </div>
+          <p id="survival-record" class="result-details">最高守住 0 波 · 最高 0 分</p>
+          <p class="small">没有终点。已守住的波数与对应清场得分自动记录；未清场的当前波不计入纪录。暂停和整备不计时。刷新会结束本局，不影响远征或挑战记录。</p>
+        </section>
+        <section id="survival-options" class="menu-section" role="group" aria-label="选择防线补给" hidden>
+          <p>选择一项，再进入下一波。永久模组仅本局有效，每种最多两级。</p>
+          <div class="choice-grid survival-grid">
+            <button id="supply-0" type="button" class="choice" aria-pressed="false"><strong id="supply-name-0"></strong><span id="supply-description-0"></span></button>
+            <button id="supply-1" type="button" class="choice" aria-pressed="false"><strong id="supply-name-1"></strong><span id="supply-description-1"></span></button>
+            <button id="supply-2" type="button" class="choice" aria-pressed="false"><strong id="supply-name-2"></strong><span id="supply-description-2"></span></button>
+          </div>
         </section>
         <div id="difficulty-options" class="menu-section" role="group" aria-label="远征难度">
           <div class="option-row">
@@ -215,6 +236,18 @@
         bosses:{name:'首领连战',stage:0,limit:0,goal:'一条命连续击败三位首领',upgrades:{rapid:1,dash:1,armor:2}}
       };
       const UPGRADES={rapid:'疾速弹匣',dash:'闪步模组',armor:'战地装甲'};
+      const SUPPLIES={
+        rapid:{name:'疾速弹匣',description:'永久：射击间隔再缩短 20%。'},
+        dash:{name:'闪步模组',description:'永久：冲刺冷却缩短 0.6 秒，最低 1.2 秒。'},
+        armor:{name:'战地装甲',description:'永久：体力上限 +1，并补满体力。'},
+        pierce:{name:'穿透弹芯',description:'永久：普通子弹可多穿透 1 个敌人。盾牌仍会挡住正面弹。'},
+        reflect:{name:'反击增幅',description:'永久：冲刺反弹的伤害 +1，最高 4 点。'},
+        blast:{name:'爆破扩容',description:'永久：手雷伤害 +2、范围 +24，并清除爆炸范围内敌弹。'},
+        heal:{name:'紧急医疗',description:'立即补满体力；适合已经受伤的防线。'},
+        ammo:{name:'弹药补给',description:'补充 3 枚手雷（最多 7 枚），获得 20 秒散弹。'},
+        boost:{name:'火力储备',description:'获得 20 秒强化连射与 20 秒散弹。'}
+      };
+      const MODULES=['rapid','dash','armor','pierce','reflect','blast'];
       const STORAGE_KEY='pixel-raid.progress.v1';
       const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches??false;
       const held=new Set(),padHeld=new Set(),touch=new Map();
@@ -224,6 +257,10 @@
       let frameLast=0,lag=0,bombPadLast=false,jumpPadLast=false,dashPadLast=false,pausePadLast=false,padBlocked=true;
       let mode='campaign',difficulty='standard',upgrades={rapid:0,dash:0,armor:0},selectedUpgrade=null;
       let titleView='campaign',challengeId=null,challengeTime=0,challengeReflections=0,bossWins=0;
+      let survivalWave=0,survivalCleared=0,survivalTime=0,spawnTime=0,supplyOffers=[],selectedSupply=null;
+      const survival=()=>mode==='survival';
+      const activeEnemies=()=>enemies.filter(e=>!e.dead).length;
+      const dashDelay=()=>Math.max(1.2,2.4-upgrades.dash*.6);
       const currentChallenge=()=>mode==='challenge'?CHALLENGES[challengeId]:null;
       const gauntlet=()=>mode==='challenge'&&challengeId==='bosses';
       const formatTime=seconds=>seconds.toFixed(1)+' 秒';
@@ -248,6 +285,7 @@
         if(raw?.version!==1)raw=null;
         const record={version:1,unlocked:Math.max(1,bounded(raw?.unlocked,3)),
           selectedDifficulty:raw?.selectedDifficulty==='relaxed'?'relaxed':'standard',
+          survival:{wave:bounded(raw?.survival?.wave,9999),best:bounded(raw?.survival?.best,9999999)},
           campaign:{standard:cleanRecord(raw?.campaign?.standard),relaxed:cleanRecord(raw?.campaign?.relaxed)},
           practice:{standard:cleanRecord(raw?.practice?.standard),relaxed:cleanRecord(raw?.practice?.relaxed)},
           challenges:Object.fromEntries(Object.keys(CHALLENGES).map(key=>[key,cleanChallenge(raw?.challenges?.[key])]))};
@@ -263,7 +301,7 @@
       const pressed=name=>held.has(name)||padHeld.has(name)||touches(name);
       const isGap=x=>stage.gaps.some(pair=>x>pair[0]&&x<pair[1]);
       const hit=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
-      const maxHealth=()=>5+(difficulty==='relaxed'?1:0)+upgrades.armor;
+      const maxHealth=()=>5+(survival()||difficulty==='relaxed'?1:0)+upgrades.armor;
       const starCount=mask=>[1,2,4].filter(bit=>mask&bit).length;
       const starText=mask=>'★'.repeat(starCount(mask))+'☆'.repeat(3-starCount(mask));
       const collected=()=>intel.filter(i=>i.done).length;
@@ -302,6 +340,7 @@
         updateSaveStatus();
       }
       function refreshRecords(){
+        $('survival-record').textContent='最高守住 '+progress.survival.wave+' 波 · 最高 '+progress.survival.best+' 分';
         for(let i=0;i<STAGES.length;i++){
           const unlocked=i<progress.unlocked;
           $('stage-'+(i+1)).disabled=!unlocked;
@@ -316,18 +355,20 @@
         }
       }
       function renderTitleView(){
-        const titleOpen=phase==='title',challenges=titleView==='challenges';
+        const titleOpen=phase==='title',challenges=titleView==='challenges',defense=titleView==='survival';
         $('mode-options').hidden=!titleOpen;
-        $('difficulty-options').hidden=!titleOpen||challenges;$('stage-menu').hidden=!titleOpen||challenges;
+        $('difficulty-options').hidden=!titleOpen||challenges||defense;$('stage-menu').hidden=!titleOpen||challenges||defense;
+        $('survival-menu').hidden=!titleOpen||!defense;
         $('challenge-menu').hidden=!titleOpen||!challenges;action.hidden=titleOpen&&challenges;
-        for(const name of ['campaign','challenges'])$('mode-'+name).setAttribute('aria-pressed',String(titleView===name));
+        for(const name of ['campaign','challenges','survival'])$('mode-'+name).setAttribute('aria-pressed',String(titleView===name));
         if(titleOpen){
-          kicker.textContent=challenges?'OPERATIONS / 01—03':'EXPEDITION / 01—03';
-          message.textContent=challenges?'挑一项短程任务：竞速、反击或首领连战。固定规则、独立纪录，随时重试。':'潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化；冲刺反弹敌弹，绕后击破盾卫，连击争取高分。';
+          kicker.textContent=defense?'SURVIVAL / BUILD YOUR RUN':challenges?'OPERATIONS / 01—03':'EXPEDITION / 01—03';
+          action.textContent=defense?'开始防线生存':'开始三章远征';
+          message.textContent=defense?'把每一波胜利变成下一波的战术。穿透扫射、冲刺反击、爆破清弹，选择自己的生存方式。':challenges?'挑一项短程任务：竞速、反击或首领连战。固定规则、独立纪录，随时重试。':'潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化；冲刺反弹敌弹，绕后击破盾卫，连击争取高分。';
         }
       }
       function selectTitleView(view){
-        if(phase!=='title'||!['campaign','challenges'].includes(view))return;
+        if(phase!=='title'||!['campaign','challenges','survival'].includes(view))return;
         titleView=view;renderTitleView();
       }
       function showMenu(head,sub,label,tag){
@@ -335,39 +376,49 @@
         kicker.textContent=tag==='title'?'EXPEDITION / 01—03':tag==='pause'?'PAUSED':tag==='stageClear'?'TACTICAL UPGRADE':tag==='victory'?'ALL CLEAR':tag==='confirmRestart'?'CONFIRM':tag==='practiceClear'?'PRACTICE COMPLETE':tag==='challengeClear'?'OPERATION COMPLETE':tag==='bossBreak'?'NEXT TARGET':'TRY AGAIN';
         renderTitleView();
         $('upgrade-options').hidden=tag!=='stageClear';
-        $('result-details').hidden=!['stageClear','victory','practiceClear','challengeClear','challengeFailed','bossBreak'].includes(tag);
-        $('menu-home').hidden=!['pause','stageClear','victory','gameOver','practiceClear','challengeClear','challengeFailed','bossBreak'].includes(tag);
+        $('survival-options').hidden=tag!=='waveClear';
+        $('result-details').hidden=!['stageClear','victory','practiceClear','challengeClear','challengeFailed','bossBreak','waveClear','survivalOver'].includes(tag);
+        $('menu-home').hidden=!['pause','stageClear','victory','gameOver','practiceClear','challengeClear','challengeFailed','bossBreak','waveClear','survivalOver'].includes(tag);
         $('cancel-restart').hidden=tag!=='confirmRestart';
         if(tag==='stageClear')action.disabled=!selectedUpgrade;
+        if(tag==='waveClear'){action.disabled=selectedSupply===null;kicker.textContent='FIELD SUPPLY / '+survivalCleared;}
+        if(tag==='survivalOver')kicker.textContent='SURVIVAL / RUN COMPLETE';
         overlay.hidden=false;overlay.scrollTop=0;$('game-frame').classList.add('menu-open');
         $('pause').textContent=tag==='pause'?'继续 P':'暂停 P';
         refreshRecords();announce(head+'。'+sub);
         // Keep keyboard focus in the menu, while leaving Space/Enter native to buttons.
-        (tag==='stageClear'?$('upgrade-rapid'):tag==='confirmRestart'?$('cancel-restart'):tag==='title'&&titleView==='challenges'?$('challenge-sprint'):action).focus?.({preventScroll:true});
+        (tag==='waveClear'?$('supply-0'):tag==='stageClear'?$('upgrade-rapid'):tag==='confirmRestart'?$('cancel-restart'):tag==='title'&&titleView==='challenges'?$('challenge-sprint'):action).focus?.({preventScroll:true});
       }
       function hideMenu(){
         overlay.hidden=true;$('game-frame').classList.remove('menu-open');
         $('pause').textContent='暂停 P';document.activeElement?.blur?.();
       }
       function saveBest(){
+        if(survival()){best=progress.survival.best;return;}
         if(mode==='challenge'){best=progress.challenges[challengeId].best;return;}
         const record=progress[mode][difficulty];
         if(points>record.best){record.best=bounded(points,9999999);saveProgress();}
         best=record.best;
       }
       function hud(){
-        $('level').textContent=(gauntlet()?'首领 ':'')+(stageIndex+1)+' / '+STAGES.length+' · '+stage.name;
+        $('level').textContent=survival()?'第 '+survivalWave+' 波 · '+stage.name:(gauntlet()?'首领 ':'')+(stageIndex+1)+' / '+STAGES.length+' · '+stage.name;
         $('lives').textContent=String(player?.lives??3);
         const hp=player?.hp??maxHealth();
         $('hp').textContent=('♥ '.repeat(hp)+'♡ '.repeat(maxHealth()-hp)).trim();
         $('ammo').textContent=String(player?.grenades??3);
         $('weapon').textContent=player?.weaponTime>0?'散弹 '+Math.ceil(player.weaponTime)+'s':(player?.boost>0?'步枪 · 连射':'步枪');
         $('score').textContent=String(points).padStart(5,'0');$('best').textContent=String(best).padStart(5,'0');
-        $('intel').textContent=gauntlet()?'—':collected()+' / 3';
+        $('intel').textContent=gauntlet()||survival()?'—':collected()+' / 3';
         $('dash-status').textContent=player?.dashCooldown>0?player.dashCooldown.toFixed(1)+'s':'就绪';
         $('combo-status').textContent=combo.count?combo.count+' 连 · ×'+comboMultiplier()+' · '+combo.timer.toFixed(1)+'s':'待命';
-        $('run-label').textContent=(difficulty==='relaxed'?'轻松':'标准')+' · '+(mode==='challenge'?'挑战':mode==='practice'?'练习':'远征');
-        const mission=currentChallenge();$('mission-hud').hidden=!mission;
+        $('run-label').textContent=(difficulty==='relaxed'?'轻松':'标准')+' · '+(survival()?'防线':mode==='challenge'?'挑战':mode==='practice'?'练习':'远征');
+        const mission=currentChallenge();$('mission-hud').hidden=!mission&&!survival();
+        if(survival()){
+          $('mission-name').textContent='防线生存 · 第 '+survivalWave+' 波';
+          $('mission-objective').textContent='已守住 '+survivalCleared+' 波 · '+(spawnTime>0?'增援 '+spawnTime.toFixed(1)+' 秒后抵达':'剩余 '+activeEnemies()+' 名敌人');
+          $('mission-time').textContent='用时 '+formatTime(survivalTime);
+          $('mission-hud').setAttribute('data-urgent',String(player.hp<=2));
+        }
         if(mission){
           $('mission-name').textContent=mission.name;
           $('mission-objective').textContent=gauntlet()?'已击败 '+bossWins+' / 3 · '+(bossWins===3?'任务完成':boss.dead?'等待整备':stage.bossName):
@@ -385,10 +436,7 @@
         player={x:64,y:G-44,w:27,h:44,vx:0,vy:0,face:1,hp:clamp(carry?.hp??maxHealth(),1,maxHealth()),
           lives:carry?.lives??(difficulty==='relaxed'?4:3),grenades:carry?.grenades??3,ground:true,inv:1.2,shoot:0,boost:0,
           weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashDir:1,coyote:.1,jumpBuffer:0,crouch:false};
-        enemies=stage.enemies.map(([x,type])=>({x,y:type==='drone'?260:G-(type==='turret'?34:36),
-          w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='shield'?5:type==='turret'?4:type==='drone'?2:3,
-          maxHp:type==='shield'?5:type==='turret'?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false,
-          face:-1,windup:0,burst:0,burstTimer:0,aimX:0,aimY:0,flash:0,blockFlash:0}));
+        enemies=stage.enemies.map(([x,type])=>makeEnemy(x,type));
         pickups=stage.pickups.map(([x,kind])=>({x,y:kind==='spread'?G-45:G-93,kind,done:false,age:0}));
         intel=stage.intel.map(([x,y])=>({x,y,done:false}));
         const bossHp=Math.ceil([24,34,44][stageIndex]*(gauntlet()?2.75:1));
@@ -398,6 +446,86 @@
         combo={count:0,timer:0,best:0};combatText='';combatTime=0;reflections=0;
         bullets=[];bombs=[];sparks=[];cam=0;clock=0;shake=0;stageDeaths=0;stageStars=0;selectedUpgrade=null;
         clearInput();lag=0;hud();
+      }
+      function makeEnemy(x,type){return {x,y:type==='drone'?260:G-(type==='turret'?34:36),
+          w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='shield'?5:type==='turret'?4:type==='drone'?2:3,
+          maxHp:type==='shield'?5:type==='turret'?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false,
+          face:-1,windup:0,burst:0,burstTimer:0,aimX:0,aimY:0,flash:0,blockFlash:0};}
+      function beginSurvival(){
+        mode='survival';titleView='survival';difficulty='standard';challengeId=null;
+        challengeTime=0;challengeReflections=0;bossWins=0;points=0;shotsFired=0;runStars=[];
+        upgrades=Object.fromEntries(MODULES.map(key=>[key,0]));
+        survivalWave=0;survivalCleared=0;survivalTime=0;supplyOffers=[];selectedSupply=null;
+        best=progress.survival.best;resetStage(0,{hp:6,lives:1,grenades:3});startWave();
+      }
+      function startWave(){
+        survivalWave++;stageIndex=Math.floor((survivalWave-1)/3)%3;
+        stage={...STAGES[stageIndex],name:['边境防线','要塞防线','赤焰防线'][stageIndex],width:W,
+          gaps:[],checkpoints:[],platforms:[[210,325,155],[405,285,150],[640,325,155]],intel:[],enemies:[],pickups:[]};
+        boss.dead=true;boss.hp=0;boss.windup=0;boss.beamTime=0;
+        player.x=W/2-player.w/2;player.h=44;player.y=G-44;player.vx=0;player.vy=0;player.ground=true;
+        player.crouch=false;player.inv=1.2;player.shoot=0;player.dashTime=0;player.dashCooldown=0;player.jumpBuffer=0;player.coyote=.11;
+        const slots=[140,790,260,670,370,550,90,840],count=Math.min(8,3+Math.floor(survivalWave/2));
+        const types=survivalWave===1?['walker']:survivalWave===2?['walker','drone']:['walker','turret','shield','drone'];
+        enemies=slots.slice(0,count).map((x,i)=>{
+          const type=types[(i+survivalWave-1)%types.length],e=makeEnemy(x,type);
+          // Air units stay over the middle ledges; all ground units have room to flank.
+          if(type==='drone'){e.x=e.home=300+(i%3)*160;e.y=240;}
+          e.hp+=Math.min(6,Math.floor((survivalWave-1)/4));e.maxHp=e.hp;
+          e.face=x<player.x?1:-1;e.shot=.5+i*.22;return e;
+        });
+        pickups=[{x:480,y:260,kind:'spread',done:false,age:0},
+          {x:survivalWave%2?65:895,y:G-25,kind:'heal',done:false,age:0}];
+        bullets=[];bombs=[];sparks=[];intel=[];spawnTime=2.2;cam=0;shake=0;
+        combo={count:0,timer:0,best:0};combatText='';combatTime=0;selectedSupply=null;
+        clearInput();lag=0;phase='playing';hideMenu();frameLast=performance.now();hud();
+        announce('第 '+survivalWave+' 波，'+count+' 名敌人。增援 2.2 秒后抵达，留意两侧。');
+      }
+      function supplyLabel(key){return SUPPLIES[key].name+(MODULES.includes(key)?' · '+((upgrades[key]||0)+1)+' 级':'');}
+      function showWaveMenu(){
+        showMenu('第 '+survivalCleared+' 波 · 守住了','已恢复 1 点体力和 1 枚手雷。整备不计时，选择一项补给后继续。',selectedSupply===null?'先选择防线补给':'携带'+SUPPLIES[selectedSupply].name+'，继续','waveClear');
+      }
+      function finishWave(){
+        if(!survival()||phase!=='playing'||spawnTime>0||activeEnemies()>0)return;
+        survivalCleared=survivalWave;points+=200+Math.min(1000,survivalWave*50);
+        progress.survival.wave=Math.max(progress.survival.wave,bounded(survivalCleared,9999));
+        progress.survival.best=Math.max(progress.survival.best,bounded(points,9999999));
+        best=progress.survival.best;saveProgress();
+        player.hp=Math.min(maxHealth(),player.hp+1);player.grenades=Math.min(7,player.grenades+1);
+        bullets=[];bombs=[];spawnTime=0;
+        // A no-replacement draw keeps each offer distinct. Recovery remains a choice
+        // after all permanent modules reach their cap, so late waves never softlock.
+        const pool=MODULES.filter(key=>upgrades[key]<2);
+        supplyOffers=[];
+        while(pool.length&&supplyOffers.length<2)supplyOffers.push(pool.splice(Math.floor(rng(0,pool.length)),1)[0]);
+        for(const key of ['heal','ammo','boost'])if(supplyOffers.length<3)supplyOffers.push(key);
+        selectedSupply=null;
+        for(let i=0;i<3;i++){
+          const key=supplyOffers[i];$('supply-name-'+i).textContent=supplyLabel(key);
+          $('supply-description-'+i).textContent=SUPPLIES[key].description;$('supply-'+i).setAttribute('aria-pressed','false');
+        }
+        $('result-details').textContent='已守住 '+survivalCleared+' 波 · 清场得分 '+points+'\n体力 '+player.hp+' / '+maxHealth()+' · 手雷 '+player.grenades+' · 用时 '+formatTime(survivalTime);
+        hud();showWaveMenu();
+      }
+      function chooseSupply(index){
+        if(phase!=='waveClear'||!survival()||!Number.isInteger(index)||index<0||index>=supplyOffers.length)return;
+        selectedSupply=supplyOffers[index];
+        for(let i=0;i<3;i++)$('supply-'+i).setAttribute('aria-pressed',String(i===index));
+        action.disabled=false;action.textContent='携带'+SUPPLIES[selectedSupply].name+'，继续';announce('已选择'+supplyLabel(selectedSupply)+'。');
+      }
+      function nextWave(){
+        if(phase!=='waveClear'||!survival()||selectedSupply===null||!supplyOffers.includes(selectedSupply))return;
+        const key=selectedSupply;
+        if(MODULES.includes(key))upgrades[key]=Math.min(2,upgrades[key]+1);
+        if(key==='armor'||key==='heal')player.hp=maxHealth();
+        if(key==='ammo'){player.grenades=Math.min(7,player.grenades+3);player.weaponTime=20;}
+        if(key==='boost'){player.boost=20;player.weaponTime=20;}
+        startWave();
+      }
+      function finishSurvival(){
+        if(!survival()||phase!=='playing')return;
+        $('result-details').textContent='本次守住 '+survivalCleared+' 波 · 倒在第 '+survivalWave+' 波\n最高守住 '+progress.survival.wave+' 波 · 最高清场分 '+progress.survival.best+'\n用时 '+formatTime(survivalTime)+' · 本波未计入纪录';
+        hud();showMenu('防线行动结束','已守住的波数与清场得分已保留。换一套构筑，再突破自己的纪录。','再次守住防线','survivalOver');
       }
       function beginRun(index,kind){
         clearInput();mode=kind;challengeId=null;challengeTime=0;challengeReflections=0;bossWins=0;points=0;shotsFired=0;runStars=[];upgrades={rapid:0,dash:0,armor:0};
@@ -414,7 +542,8 @@
         announce(CHALLENGES[key].name+'开始。'+CHALLENGES[key].goal+'。固定标准难度。');
       }
       function retryRun(){
-        if(mode==='challenge')beginChallenge(challengeId);
+        if(survival())beginSurvival();
+        else if(mode==='challenge')beginChallenge(challengeId);
         else if(mode==='practice')beginRun(stageIndex,'practice');else startNew();
       }
       function finishChallenge(success,reason){
@@ -458,7 +587,7 @@
         resetStage(stageIndex+1,carry);phase='playing';hideMenu();frameLast=performance.now();announce('进入'+stage.name+'。');
       }
       function finishStage(){
-        if(phase!=='playing')return;
+        if(phase!=='playing'||survival())return;
         if(mode==='challenge'){
           if(gauntlet()){
             bossWins++;
@@ -495,19 +624,20 @@
       }
       function resume(){clearInput();phase='playing';hideMenu();frameLast=performance.now();lag=0;announce('继续游戏。');}
       function togglePause(){
-        if(phase==='playing')showMenu('任务暂停',currentChallenge()?currentChallenge().goal+'。挑战计时已暂停，体力与弹药保留。':'体力、弹药和强化已保留。冲刺触碰敌弹可反弹；盾卫可用手雷或绕后击破。','继续行动','pause');
+        if(phase==='playing')showMenu('任务暂停',survival()?'防线计时已暂停，波次、补给与强化已保留。':currentChallenge()?currentChallenge().goal+'。挑战计时已暂停，体力与弹药保留。':'体力、弹药和强化已保留。冲刺触碰敌弹可反弹；盾卫可用手雷或绕后击破。','继续行动','pause');
         else if(phase==='pause')resume();
         else if(phase==='confirmRestart')cancelConfirm();
       }
       function requestConfirm(kind){
-        if(phase==='title'){if(kind==='restart'&&titleView==='campaign')startNew();return;}
+        if(phase==='title'){if(kind==='restart'){if(titleView==='campaign')startNew();else if(titleView==='survival')beginSurvival();}return;}
         if(phase==='confirmRestart')return;
-        if(['victory','gameOver','practiceClear','challengeClear','challengeFailed'].includes(phase)){kind==='home'?openTitle():retryRun();return;}
+        if(['victory','gameOver','practiceClear','challengeClear','challengeFailed','survivalOver'].includes(phase)){kind==='home'?openTitle():retryRun();return;}
         returnPhase=phase;confirmAction=kind;
-        showMenu(kind==='home'?'返回指挥部？':'重新开始？','本次未完成的行程、弹药与强化将重置，已保存的星章和解锁关卡不会丢失。',kind==='home'?'确认返回':'确认重新开始','confirmRestart');
+        showMenu(kind==='home'?'返回指挥部？':'重新开始？',survival()?'本局波次、补给与模组将重置；已守住的波数与清场纪录保留，当前未清场波次不计入纪录。':'本次未完成的行程、弹药与强化将重置，已保存的星章和解锁关卡不会丢失。',kind==='home'?'确认返回':'确认重新开始','confirmRestart');
       }
       function cancelConfirm(){
         if(returnPhase==='playing'){resume();return;}
+        if(returnPhase==='waveClear'){showWaveMenu();return;}
         if(returnPhase==='bossBreak'){showBossBreak();return;}
         if(returnPhase==='stageClear'){
           showMenu(stage.name+' · 完成','选择一项强化后继续远征。',selectedUpgrade?'携带'+UPGRADES[selectedUpgrade]+'，继续':'先选择战术强化','stageClear');return;
@@ -537,6 +667,7 @@
         if(player.hp===0){
           player.lives--;stageDeaths++;
           if(player.lives<=0){
+            if(survival()){finishSurvival();return;}
             if(mode==='challenge'){finishChallenge(false,'生命耗尽。重试会从本项挑战起点开始，已完成的挑战纪录不会丢失。');return;}
             saveBest();hud();showMenu('行动失败','本次得分 '+points+'。试试冲刺穿过弹幕，或回指挥部切换轻松模式。','再试一次','gameOver');
             return;
@@ -549,12 +680,12 @@
       }
       function dash(){
         if(player.dashCooldown>0||phase!=='playing')return;
-        player.dashTime=.18;player.dashDir=player.face;player.dashCooldown=2.4-upgrades.dash*.6;
+        player.dashTime=.18;player.dashDir=player.face;player.dashCooldown=dashDelay();
         spark(player.x+player.w/2,player.y+player.h/2,'#9ecaff',10);beep(520,.08,'triangle');hud();
       }
       function projectile(x,y,vx,vy,owner,damage=1){
         if(owner==='e'&&difficulty==='relaxed'){vx*=.78;vy*=.78;}
-        bullets.push({x,y,vx,vy,owner,damage,sourceX:x,sourceY:y,reflected:false,life:owner==='p'?1.7:3.7,r:owner==='p'?5:6});
+        bullets.push({x,y,vx,vy,owner,damage,pierce:owner==='p'?(upgrades.pierce||0):0,hitEnemies:[],sourceX:x,sourceY:y,reflected:false,life:owner==='p'?1.7:3.7,r:owner==='p'?5:6});
       }
       function fire(){
         if(player.shoot>0)return;
@@ -581,10 +712,12 @@
       function boom(x,y){
         spark(x,y,'#ffd781',34);spark(x,y,'#ff746b',14);
         shake=9;beep(120,.3,'sawtooth');
-        for(const e of enemies){
-          if(e.dead)continue;
-          if(Math.hypot(x-(e.x+e.w/2),y-(e.y+e.h/2))<112) damageEnemy(e,6);
+        const level=upgrades.blast||0,radius=112+24*level;
+        if(!survival()||spawnTime===0)for(const e of enemies){
+          if(e.dead||e.arrival>0)continue;
+          if(Math.hypot(x-(e.x+e.w/2),y-(e.y+e.h/2))<radius)damageEnemy(e,6+2*level);
         }
+        if(level)bullets=bullets.filter(b=>b.owner==='p'||Math.hypot(x-b.x,y-b.y)>=radius);
         if(!boss.dead&&Math.hypot(x-(boss.x+50),y-(boss.y+52))<135)damageBoss(7);
       }
       function damageEnemy(e,d){
@@ -603,20 +736,20 @@
       function hitEnemy(e,b){
         if(e.type==='shield'&&!b.reflected&&b.vx*e.face<0){
           e.blockFlash=.18;spark(b.x,b.y,'#91dbff',4);
-          combatNotice('盾牌格挡 · 绕后 / 手雷 / 反弹弹');return;
+          combatNotice('盾牌格挡 · 绕后 / 手雷 / 反弹弹');return false;
         }
-        damageEnemy(e,b.damage);
+        damageEnemy(e,b.damage);return true;
       }
       function reflectBullet(b){
         const dx=b.sourceX-b.x,dy=b.sourceY-b.y,len=Math.hypot(dx,dy);
         b.vx=len>1?dx/len*650:player.face*650;b.vy=len>1?dy/len*650:0;
-        b.owner='p';b.reflected=true;b.damage=2;b.life=1.7;reflections++;if(mode==='challenge')challengeReflections++;
-        spark(b.x,b.y,'#9eeaff',8);beep(820,.05,'triangle');combatNotice(mode==='challenge'&&challengeId==='counter'?'反弹 '+challengeReflections+' / 5'+(challengeReflections>=5?' · 可击败首领并撤离':' · 继续积累'):'冲刺反弹 · 双倍伤害 / 穿透盾牌');
+        b.owner='p';b.reflected=true;b.damage=2+(upgrades.reflect||0);b.life=1.7;reflections++;if(mode==='challenge')challengeReflections++;
+        spark(b.x,b.y,'#9eeaff',8);beep(820,.05,'triangle');combatNotice(mode==='challenge'&&challengeId==='counter'?'反弹 '+challengeReflections+' / 5'+(challengeReflections>=5?' · 可击败首领并撤离':' · 继续积累'):'冲刺反弹 · '+b.damage+' 点伤害 / 穿透盾牌');
       }
       function updateTurret(e,dt){
         // A fixed aim line gives the player time to choose crouch, jump or reflection.
         const viewLeft=clamp(player.x-290,0,stage.width-W);
-        if(Math.abs(e.x-player.x)>=570||e.x+e.w<viewLeft){e.windup=0;e.burst=0;e.shot=Math.max(.45,e.shot);return;}
+        if(!survival()&&(Math.abs(e.x-player.x)>=570||e.x+e.w<viewLeft)){e.windup=0;e.burst=0;e.shot=Math.max(.45,e.shot);return;}
         if(e.windup>0){
           e.windup=Math.max(0,e.windup-dt);
           if(e.windup===0){e.burst=3;e.burstTimer=0;}
@@ -629,7 +762,7 @@
           if(e.burstTimer<=0){
             const x=e.x+e.w/2,y=e.y+e.h/2,dx=e.aimX-x,dy=e.aimY-y,len=Math.hypot(dx,dy)||1;
             projectile(x,y,dx/len*315,dy/len*315,'e');
-            e.burst--;e.burstTimer=.14;e.shot=2.1;
+            e.burst--;e.burstTimer=.14;e.shot=2.1/(survival()?1+Math.min(12,survivalWave-1)*.05:1);
           }
         }
       }
@@ -640,6 +773,15 @@
       function update(dt){
         if(phase!=='playing')return;
         clock+=dt;
+        if(survival()){
+          survivalTime+=dt;
+          const spawning=spawnTime>0;spawnTime=Math.max(0,spawnTime-dt);
+          if(spawning&&spawnTime===0)for(const e of enemies){
+            if(!e.dead&&hit({x:player.x-45,y:player.y-20,w:player.w+90,h:player.h+40},e)){
+              e.x=e.home=player.x<W/2?820:100;e.arrival=.6;e.shot=Math.max(1,e.shot);
+            }
+          }
+        }
         if(mode==='challenge'){
           challengeTime+=dt;
           if(currentChallenge().limit&&challengeTime+1e-7>=currentChallenge().limit){
@@ -694,16 +836,27 @@
             player.checkpoint=checkpoint;spark(checkpoint,G-40,'#9ee9c6',18);announce('检查点已激活，失去生命后从这里继续。');
           }
         }
-        if(boss.dead&&player.x>stage.width-115){finishStage();return;}
+        if(!survival()&&boss.dead&&player.x>stage.width-115){finishStage();return;}
         // Moving threats remain near their patrol spawn; air units follow gentle sine paths.
         for(const e of enemies){
-          if(e.dead)continue;
+          if(e.dead||(survival()&&spawnTime>0))continue;
+          if(e.arrival>0){e.arrival=Math.max(0,e.arrival-dt);continue;}
           e.age+=dt;e.shot-=dt;e.flash=Math.max(0,e.flash-dt);e.blockFlash=Math.max(0,e.blockFlash-dt);
-          if(e.type==='walker'||e.type==='shield')e.x=e.home+Math.sin(e.age*1.15)*36;
+          if(e.type==='walker'||e.type==='shield'){
+            if(survival()){
+              const direction=Math.sign(player.x+player.w/2-e.x-e.w/2);
+              e.x=clamp(e.x+direction*(38+Math.min(15,survivalWave-1)*2)*dt,60,W-e.w-60);
+              // A committed turn delay gives a genuine rifle flank window.
+              if(e.type==='shield'&&direction&&direction!==e.face){
+                e.turnTime=(e.turnTime??.6)-dt;
+                if(e.turnTime<=0){e.face=direction;e.turnTime=.6;}
+              }else{e.face=direction||e.face;e.turnTime=.6;}
+            }else e.x=e.home+Math.sin(e.age*1.15)*36;
+          }
           if(e.type==='drone'){e.x=e.home+Math.sin(e.age*1.4)*53;e.y=240+Math.sin(e.age*2.1)*26;}
           if(e.type==='turret')updateTurret(e,dt);
-          else if(Math.abs(e.x-player.x)<570&&e.shot<=0){
-            aimAtPlayer(e,235);e.shot=rng(2.3,3.5);
+          else if((survival()||Math.abs(e.x-player.x)<570)&&e.shot<=0){
+            aimAtPlayer(e,235);e.shot=rng(2.3,3.5)/(survival()?1+Math.min(12,survivalWave-1)*.05:1);
           }
           if(hit(player,e))hurt(1);
           if(phase!=='playing')return;
@@ -754,7 +907,12 @@
           if(b.life<=0||b.y<20||b.y>H+30||b.x<cam-130||b.x>cam+W+130){bullets.splice(i,1);continue;}
           if(b.owner==='p'){
             let struck=false;
-            for(const e of enemies){if(!e.dead&&circRect(b.x,b.y,b.r,e)){hitEnemy(e,b);struck=true;break;}}
+            if(!survival()||spawnTime===0)for(const e of enemies){
+              if(e.dead||e.arrival>0||b.hitEnemies?.includes(e)||!circRect(b.x,b.y,b.r,e))continue;
+              const damaged=hitEnemy(e,b);
+              if(!damaged||!(b.pierce>0)){struck=true;break;}
+              b.pierce--;b.hitEnemies.push(e);
+            }
             if(!struck&&!boss.dead&&circRect(b.x,b.y,b.r,boss)){damageBoss(b.damage);struck=true;}
             if(struck)bullets.splice(i,1);
           }else if(circRect(b.x,b.y,b.r,player)){
@@ -792,6 +950,7 @@
           const s=sparks[i];s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=680*dt;s.life-=dt;
           if(s.life<=0)sparks.splice(i,1);
         }
+        if(survival()&&spawnTime===0&&activeEnemies()===0){finishWave();return;}
         player.dashTime=Math.max(0,player.dashTime-dt);
         shake=Math.max(0,shake-28*dt);
         cam=clamp(player.x-290,0,stage.width-W);
@@ -854,6 +1013,9 @@
           c.font='bold 11px system-ui';c.fillStyle=active?'#c2ffe1':'#c3d4e7';
           c.fillText(active?'已激活':'检查点',checkpoint-12,G-76);
         }
+        if(survival()){
+          rect(42,G-92,5,92,'#80d6e6');rect(W-47,G-92,5,92,'#80d6e6');return;
+        }
         if(gauntlet()){
           rect(boss.x-14,G-150,4,150,'#80d6e6');
           c.font='bold 11px system-ui';c.fillStyle='#bcecff';c.fillText('竞技场边界',boss.x-100,G-158);return;
@@ -909,7 +1071,7 @@
           const x=e.face===-1?e.x-6:e.x+e.w-2;
           rect(x,e.y+4,8,31,e.blockFlash>0?'#efffff':'#87d4ec');
           rect(x+2,e.y+8,4,22,'#294e76');
-          c.font='bold 11px system-ui';c.fillStyle='#b5efff';c.fillText('盾',e.x+8,e.y-17);
+          c.font='bold 11px system-ui';c.fillStyle='#b5efff';c.fillText(survival()&&e.turnTime<.6?'转向…':'盾',e.x+8,e.y-17);
         }
         if(e.type==='turret'&&(e.windup>0||e.burst>0)){
           c.setLineDash([8,7]);line(e.x+e.w/2,e.y+e.h/2,e.aimX,e.aimY,'#ffd584',2);c.setLineDash([]);
@@ -964,7 +1126,17 @@
           terrain();
           for(const p of pickups)drawPickup(p);
           for(const item of intel)drawIntel(item);
-          for(const e of enemies)drawEnemy(e);
+          if(survival()&&spawnTime>0)c.globalAlpha=.4;
+          for(const e of enemies){
+            c.save();if(e.arrival>0)c.globalAlpha=.4;drawEnemy(e);
+            if(e.arrival>0){c.font='bold 12px system-ui';c.fillStyle='#ffe4a0';c.fillText('增援',e.x,e.y-28);}
+            c.restore();
+          }
+          c.globalAlpha=1;
+          if(survival()&&spawnTime>0){
+            rect(305,65,350,37,'#172c43');c.font='bold 17px system-ui';c.fillStyle='#ffe4a0';
+            c.fillText('增援抵达 '+spawnTime.toFixed(1)+'s · 留意两侧',326,90);
+          }
           if(!boss.dead&&boss.attackType==='beam'&&(boss.windup>0||boss.beamTime>0)){
             const firing=boss.beamTime>0;
             if(firing){rect(boss.x-760,boss.beamY-6,780,12,'#ff7d79');rect(boss.x-760,boss.beamY-2,780,4,'#fff2bf');}
@@ -990,15 +1162,15 @@
               c.fillText(boss.beamY>G-20?'低位激光蓄力 · 跳跃 / 冲刺':'高位激光蓄力 · 下蹲 / 冲刺',cam+W/2-150,85);
             }
           }
-          if(boss.dead&&!gauntlet()){c.font='bold 15px system-ui';c.fillStyle='#d7f5c4';c.fillText('EXIT →',stage.width-218,G-181);}
+          if(boss.dead&&!gauntlet()&&!survival()){c.font='bold 15px system-ui';c.fillStyle='#d7f5c4';c.fillText('EXIT →',stage.width-218,G-181);}
         }
         c.restore();
         if(stage&&phase==='playing'){
           rect(0,H-5,W,5,'#21374a');
-          rect(0,H-5,W*clamp(player.x/(stage.width-110),0,1),5,'#f3be6b');
+          rect(0,H-5,W*(survival()?1-activeEnemies()/Math.min(8,3+Math.floor(survivalWave/2)):clamp(player.x/(stage.width-110),0,1)),5,'#f3be6b');
           c.font='bold 14px system-ui';c.fillStyle='#e4effa';
-          c.fillText(gauntlet()?'首领连战 '+(stageIndex+1)+'/3':(boss.dead?'前往出口 →':'目标：击败'+stage.bossName)+'  /  情报 '+collected()+'/3',18,28);
-          const loadout=Object.keys(UPGRADES).filter(key=>upgrades[key]>0).map(key=>UPGRADES[key]+' ×'+upgrades[key]).join('  ·  ');
+          c.fillText(survival()?'第 '+survivalWave+' 波 / 剩余 '+activeEnemies()+' 名敌人':gauntlet()?'首领连战 '+(stageIndex+1)+'/3':(boss.dead?'前往出口 →':'目标：击败'+stage.bossName)+'  /  情报 '+collected()+'/3',18,28);
+          const loadout=(survival()?MODULES:Object.keys(UPGRADES)).filter(key=>upgrades[key]>0).map(key=>(SUPPLIES[key]?.name||UPGRADES[key])+' ×'+upgrades[key]).join('  ·  ');
           if(loadout){c.font='12px system-ui';c.fillStyle='#ffe0a5';c.fillText(loadout,18,H-20);}
           if(combatTime>0){
             // Keep combat feedback below the boss beam warning at y=63..97.
@@ -1007,7 +1179,7 @@
           if(combo.count>0){
             rect(18,147,150,4,'#29425a');rect(18,147,150*combo.timer/5,4,'#ffe093');
           }
-          if(player.dashCooldown>0){rect(18,40,90,5,'#29425a');rect(18,40,90*(1-player.dashCooldown/(2.4-upgrades.dash*.6)),5,'#a8d9ff');}
+          if(player.dashCooldown>0){rect(18,40,90,5,'#29425a');rect(18,40,90*(1-player.dashCooldown/dashDelay()),5,'#a8d9ff');}
 
         }
       }
@@ -1058,11 +1230,13 @@
       });
       function activate(){
         if(action.disabled||action.hidden)return;
-        if(phase==='title'||phase==='victory')startNew();
-        else if(['gameOver','practiceClear','challengeClear','challengeFailed'].includes(phase))retryRun();
+        if(phase==='title'&&titleView==='survival')beginSurvival();
+        else if(phase==='title'||phase==='victory')startNew();
+        else if(['gameOver','practiceClear','challengeClear','challengeFailed','survivalOver'].includes(phase))retryRun();
         else if(phase==='pause')resume();
         else if(phase==='stageClear')nextStage();
         else if(phase==='bossBreak')nextBoss();
+        else if(phase==='waveClear')nextWave();
         else if(phase==='confirmRestart')confirmAction==='home'?openTitle():retryRun();
       }
       action.addEventListener('click',activate);
@@ -1070,7 +1244,8 @@
       $('restart').addEventListener('click',()=>requestConfirm('restart'));
       $('menu-home').addEventListener('click',()=>requestConfirm('home'));
       $('cancel-restart').addEventListener('click',cancelConfirm);
-      for(const view of ['campaign','challenges'])$('mode-'+view).addEventListener('click',()=>selectTitleView(view));
+      for(const view of ['campaign','challenges','survival'])$('mode-'+view).addEventListener('click',()=>selectTitleView(view));
+      for(let i=0;i<3;i++)$('supply-'+i).addEventListener('click',()=>chooseSupply(i));
       for(const key of Object.keys(CHALLENGES))$('challenge-'+key).addEventListener('click',()=>{if(phase==='title')beginChallenge(key);});
       for(const key of Object.keys(UPGRADES))$('upgrade-'+key).addEventListener('click',()=>chooseUpgrade(key));
       for(let i=0;i<STAGES.length;i++)$('stage-'+(i+1)).addEventListener('click',()=>startPractice(i));
@@ -1100,7 +1275,7 @@
         const neutral=!left&&!right&&!down&&!jump&&!bomb&&!fire&&!burst&&!pause;
         if(padBlocked){if(neutral)padBlocked=false;return;}
         if(pause&&!pausePadLast){
-          if(phase==='title'&&titleView==='campaign')startNew();else if(phase!=='title')togglePause();
+          if(phase==='title'&&titleView==='campaign')startNew();else if(phase==='title'&&titleView==='survival')beginSurvival();else if(phase!=='title')togglePause();
           pausePadLast=pause;return;
         }
         pausePadLast=pause;
@@ -1138,6 +1313,8 @@
         bossAttackType:boss?.attackType??'volley',bossBeamTime:boss?.beamTime??0,bossBeamY:boss?.beamY??0,
         turretCharge:Math.max(0,...enemies.map(e=>e.dead?0:e.windup)),shieldCount:enemies.filter(e=>!e.dead&&e.type==='shield').length,
         combo:combo.count,comboTime:combo.timer,comboBest:combo.best,combatText:combatTime>0?combatText:'',reflections,
+        survivalWave,survivalCleared,survivalTime,spawnTime,supplyOffers:[...supplyOffers],selectedSupply,
+        enemies:enemies.filter(e=>!e.dead).map(e=>({x:e.x,y:e.y,w:e.w,h:e.h,hp:e.hp,type:e.type,face:e.face,arrival:e.arrival||0})),
         clock,runStars:[...runStars],progress:JSON.parse(JSON.stringify(progress))
       })});
       refreshRecords();
