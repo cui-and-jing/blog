@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
+import { survivalTactics } from './lib/raid-survival-tactics.mjs';
 
 const source = fs.readFileSync(new URL('../public/games/pixelraid.html', import.meta.url), 'utf8');
 const inline = source.match(/<script>\s*([\s\S]*?)<\/script>/i)?.[1];
@@ -19,10 +20,10 @@ assert(!source.includes('__raidQA'), 'Mutable test hooks must never be published
 const injected = inline.replace(entry, 'window.__raidQA = code => eval(code);' + entry);
 const STORE = 'pixel-raid.progress.v1';
 
-function createGame({ storage = {}, blocked = false, reducedMotion = false } = {}) {
+function createGame({ storage = {}, blocked = false, reducedMotion = false, randomSeed = 16437 } = {}) {
   const nodes = new Map(), events = new Map(), documentEvents = new Map();
   const values = new Map(Object.entries(storage));
-  let queued = null, now = 0, seed = 16437, gamepads = [];
+  let queued = null, now = 0, seed = randomSeed, gamepads = [];
   const clone = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
   const attrsFrom = (text) => Object.fromEntries([...text.matchAll(/([\w-]+)(?:="([^"]*)")?/g)]
     .map((match) => [match[1], match[2] ?? '']));
@@ -1659,50 +1660,70 @@ test('survival long runs keep enemy and offer arrays bounded and introduce every
   eq(g.state().progress.survival.wave, 60); eq(g.state().survivalWave, 61);
 });
 
-test('genuine keyboard tactics clear survival waves one through four including the first boss at a human input cadence', () => {
-  const g = defense(), cadence = 12, tap = key => { g.key(key); g.key(key, false); };
-  const encountered = new Set(); let facing = 1, frame = 0, decisions = 0;
-  // Only detached observations, normal key events and menu clicks. No HP,
-  // enemy, position, damage, cooldown, projectile or RNG mutation is allowed.
-  for (let wave = 1; wave <= 4; wave++) {
-    eq(g.state().survivalWave, wave); g.key('j');
-    let duration = 0;
-    while (g.state().phase === 'playing' && duration < 6000) {
-      if (frame % cadence === 0) {
-        decisions++;
-        const s = g.state(); s.enemies.forEach(enemy => encountered.add(enemy.type));
-        const target = s.bossWave ? {x:s.bossX,w:105,type:'boss'} : s.enemies.sort((a, b) => Math.abs(a.x - s.x) - Math.abs(b.x - s.x))[0];
-        if (target) {
-          const direction = target.x + target.w / 2 > s.x + 13 ? 1 : -1;
-          const distance = Math.abs(target.x - s.x), airborne = target.type === 'drone';
-          const threatened = s.hostiles.some(b => Math.abs(b.x - s.x - 13) < 100 &&
-            b.y > s.y - 15 && b.y < s.y + s.playerHeight + 15);
-          if (threatened && s.dashCooldown === 0) tap('l');
-          const move = distance > (airborne ? 170 : 210) || direction !== facing;
-          g.key('a', move && direction < 0); g.key('d', move && direction > 0);
-          if (move) facing = direction;
-          if (airborne && s.ground) { g.key('w', false); g.key('w'); }
-          else if (!airborne) g.key('w', false);
-          if (target.type === 'shield' && distance > 150 && distance < 300 && s.grenades > 0 && frame % 60 === 0) tap('k');
-          if (target.type === 'shield' && distance < 110 && s.ground) { g.key('w', false); g.key('w'); }
+test('survival input controller escapes overlapping ground threats without oscillating or editing snapshots', () => {
+  const decide = survivalTactics();
+  const state = { x: 400, y: 381, playerHeight: 44, enemies: [
+    { x: 390, y: 389, w: 30, h: 36, type: 'walker' },
+    { x: 400, y: 240, w: 38, h: 26, type: 'drone' },
+  ], hostiles: [], bossWave: false, dashTime: 0, dashCooldown: 0,
+  spawnTime: 0, survivalTime: 3, grenades: 3 };
+  const before = JSON.stringify(state), first = decide(state);
+  eq(first.move, 'd'); eq(first.jump, false); eq(first.dash, true); eq(first.grenade, false);
+  eq(JSON.stringify(state), before);
+  // Keep the escape direction even if the nearest center crosses sides.
+  state.enemies[0].x = 420;
+  eq(decide(state).move, 'd');
+  state.enemies[0].x = 190; state.enemies.pop();
+  const safe = decide(state);
+  eq(safe.move, 'a'); eq(safe.grenade, true);
+  eq(decide(state).move, ''); eq(decide(state).grenade, false);
+  // Near the edge, escape across the threat instead of running into the wall.
+  const edge = survivalTactics();
+  eq(edge({ ...state, x: 20, enemies: [{ ...state.enemies[0], x: 35 }] }).move, 'd');
+});
+
+test('shared keyboard tactics clear four waves across varied timing and random fixtures without state edits', () => {
+  for (const randomSeed of [1, 42, 16437, 71901]) {
+    for (const cadence of [5, 12]) {
+      const g = defense({ randomSeed }), tap = key => { g.key(key); g.key(key, false); };
+      const encountered = new Set(); let frame = 0, decisions = 0, reflected = 0;
+      // Seed only the VM fixture before initialization. Thereafter this is the
+      // same read-only controller used by Chromium: real keys and menu clicks.
+      for (let wave = 1; wave <= 4; wave++) {
+        const decide = survivalTactics();
+        eq(g.state().survivalWave, wave); g.key('j');
+        let duration = 0;
+        while (g.state().phase === 'playing' && duration < 3600) {
+          if (frame % cadence === 0) {
+            decisions++;
+            const s = g.state(); s.enemies.forEach(enemy => encountered.add(enemy.type));
+            const input = decide(s);
+            g.key('a', input.move === 'a'); g.key('d', input.move === 'd');
+            if (input.jump && s.ground) { g.key('w', false); g.key('w'); }
+            else if (!input.jump) g.key('w', false);
+            if (input.dash) tap('l');
+            if (input.grenade) tap('k');
+          }
+          tick(g); duration++; frame++;
+        }
+        for (const key of ['a', 'd', 'w', 'j']) g.key(key, false);
+        const s = g.state();
+        eq(s.phase, 'waveClear', `Seed ${randomSeed}, cadence ${cadence}, wave ${wave}: ` + JSON.stringify(s));
+        eq(s.survivalCleared, wave); eq(s.lives, 1); assert(s.hp > 0); eq(s.stageDeaths, 0); reflected += s.reflections;
+        assert(duration > 132 && duration < 3600, 'Opening waves must resolve in under one active minute');
+        if (wave < 4) {
+          let choice = s.supplyOffers.indexOf('armor');
+          if (choice < 0) choice = s.hp < 4 ? s.supplyOffers.indexOf('heal') : 0;
+          g.click('supply-' + Math.max(0, choice)); g.click('start');
         }
       }
-      tick(g); duration++; frame++;
-    }
-    for (const key of ['a', 'd', 'w', 'j']) g.key(key, false);
-    const s = g.state(); eq(s.phase, 'waveClear', 'Wave ' + wave + ': ' + JSON.stringify(s));
-    eq(s.survivalCleared, wave); eq(s.lives, 1); assert(s.hp > 0); eq(s.stageDeaths, 0);
-    assert(duration > 132 && duration < 3600, 'Opening waves must resolve in under one active minute');
-    if (wave < 4) {
-      let choice = s.supplyOffers.indexOf('armor');
-      if (choice < 0) choice = s.hp < 4 ? s.supplyOffers.indexOf('heal') : 0;
-      g.click('supply-' + Math.max(0, choice)); g.click('start');
+      eq([...encountered].sort(), ['drone', 'shield', 'turret', 'walker']);
+      assert(reflected > 0 && decisions > 20); eq(g.state().progress.survival.wave, 4);
+      eq(g.state().progress.survival.best, g.state().score);
     }
   }
-  eq([...encountered].sort(), ['drone', 'shield', 'turret', 'walker']);
-  assert(g.state().reflections > 0 && decisions > 20); eq(g.state().progress.survival.wave, 4);
-  eq(g.state().progress.survival.best, g.state().score);
 });
+
 
 function defenseBoss(wave = 3, options) {
   const g = defense(options);

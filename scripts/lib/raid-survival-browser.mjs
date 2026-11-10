@@ -1,5 +1,6 @@
 /** Published Survival mode: ordinary DOM controls and genuine keyboard input only. */
 import path from 'node:path';
+import { survivalTactics } from './raid-survival-tactics.mjs';
 
 export async function checkRaidSurvival(page, problems) {
   const read = () => page.evaluate(() => ({ ...window.__raidState }));
@@ -9,17 +10,17 @@ export async function checkRaidSurvival(page, problems) {
   };
   const phase = name => page.waitForFunction(value => window.__raidState?.phase === value, { timeout: 4000 }, name);
   const shot = name => page.screenshot({ path: path.join(process.cwd(), '.shots', 'pixelraid-survival-' + name + '.png'), fullPage: true });
-  let facing = 1;
 
   // Drive the same controls a player uses. Snapshots only choose the next input;
   // never replace enemies, move the player, change HP, seed RNG or skip a wave.
   const fight = async (wave, { bossScreenshot = false } = {}) => {
     const deadline = Date.now() + 45000;
-    let moving = '', jumping = false, captured = false, retreating = false;
+    const decide = survivalTactics();
+    let moving = '', jumping = false, captured = false;
     const move = async direction => {
       if (moving === direction) return;
       if (moving) await page.keyboard.up(moving);
-      if (direction) { await page.keyboard.down(direction); facing = direction === 'd' ? 1 : -1; }
+      if (direction) await page.keyboard.down(direction);
       moving = direction;
     };
     await page.keyboard.down('j');
@@ -27,29 +28,16 @@ export async function checkRaidSurvival(page, problems) {
       while (Date.now() < deadline) {
         const state = await read();
         if (state.phase !== 'playing' || state.survivalWave !== wave) break;
-        const target = state.bossWave ? { x: state.bossX, w: 105, type: 'boss' } :
-          [...state.enemies].sort((a, b) => Math.abs(a.x - state.x) - Math.abs(b.x - state.x))[0];
-        if (!target) { await move(''); await wait(80); continue; }
-        const direction = target.x + target.w / 2 > state.x + 13 ? 1 : -1;
-        const airborne = target.type === 'drone', distance = Math.abs(target.x - state.x);
-        if (state.bossWave) {
-          // Stay well inside the x=749 boss boundary. A reflection dash may
-          // carry us right, so retreat before facing right and firing again.
-          if (state.x > 570) retreating = true;
-          if (state.x <= 500) retreating = false;
-          await move(retreating ? 'a' : state.x < 500 || facing < 0 ? 'd' : '');
-        } else {
-          await move(distance > (airborne ? 170 : 210) || facing !== direction ? direction > 0 ? 'd' : 'a' : '');
-        }
-        if (airborne && state.ground) {
+        const input = decide(state);
+        await move(input.move);
+        if (input.jump && state.ground) {
           if (jumping) await page.keyboard.up('w');
           await page.keyboard.down('w'); jumping = true;
-        } else if (!airborne && jumping) {
+        } else if (!input.jump && jumping) {
           await page.keyboard.up('w'); jumping = false;
         }
-        const nearby = state.hostiles.some(bullet => Math.abs(bullet.x - state.x - 13) < 100 &&
-          bullet.y > state.y - 15 && bullet.y < state.y + state.playerHeight + 15);
-        if (nearby && state.dashCooldown === 0) await page.keyboard.press('l');
+        if (input.dash) await page.keyboard.press('l');
+        if (input.grenade) await page.keyboard.press('k');
         if (bossScreenshot && !captured && state.spawnTime === 0 && state.bossHp > 0 && state.bossHp < state.bossMaxHp) {
           await shot('boss-combat'); captured = true;
         }
