@@ -23,13 +23,26 @@
     .hud b{color:#ffe08d}
     .frame{position:relative;display:grid;place-items:center;flex:1;min-height:220px;width:100%;max-width:1200px;margin:0 auto;overflow:hidden;border:2px solid #56738b;background:#070e19;border-radius:10px;box-shadow:0 18px 45px #0006}
     canvas{display:block;width:100%;height:100%;max-height:calc(100dvh - 185px);object-fit:contain;aspect-ratio:16/9;image-rendering:pixelated}
-    .overlay{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:15px;padding:25px;text-align:center;background:linear-gradient(140deg,#0a1728ed,#1d3458ee);z-index:2}
+    .overlay{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding:26px;text-align:center;background:linear-gradient(140deg,#0a1728f5,#1d3458f5);z-index:2;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
+    .menu-content{width:min(100%,800px);margin:auto;display:grid;justify-items:center;gap:15px}
+    .frame.menu-open{min-height:570px}
     [hidden]{display:none!important}
     .overlay .eyebrow{margin:0;color:#ffde81;font:700 12px/1.3 ui-monospace,monospace;letter-spacing:.2em}
-    .overlay h1{margin:0;font-size:clamp(26px,5vw,58px);line-height:1.1;color:#f6f5ec;text-shadow:3px 4px 0 #405b7b}
-    .overlay p{margin:0;max-width:560px;font-size:clamp(12px,1.6vw,16px);line-height:1.85;color:#d9e7f6}
-    .overlay button{border:2px solid #fff2b7;border-radius:9px;padding:11px 34px;color:#19263a;background:#ffce65;font-weight:800;font-size:16px;box-shadow:0 6px 0 #93662c;min-height:46px}
-    .overlay button:hover{background:#ffe097}
+    .overlay h1{margin:0;font-size:clamp(28px,5vw,50px);line-height:1.1;color:#f6f5ec;text-shadow:3px 4px 0 #405b7b}
+    .overlay p{margin:0;max-width:660px;font-size:14px;line-height:1.7;color:#d9e7f6}
+    .overlay button{border:2px solid #fff2b7;border-radius:9px;padding:10px 24px;color:#19263a;background:#ffce65;font-weight:800;font-size:15px;min-height:46px}
+    .overlay button:hover:not(:disabled){background:#ffe097}
+    .overlay button:disabled{cursor:not-allowed;opacity:.55}
+    .overlay .secondary,.overlay .choice{border:1px solid #718cac;background:#1d3550;color:#eaf3ff;box-shadow:none;font-size:13px}
+    .overlay .secondary:hover:not(:disabled),.overlay .choice:hover:not(:disabled){background:#2e506d}
+    .overlay [aria-pressed="true"]{border-color:#ffda80;box-shadow:inset 0 0 0 1px #ffda80;background:#3d4a51}
+    .option-row{display:flex;justify-content:center;flex-wrap:wrap;gap:10px}
+    .choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;width:100%}
+    .overlay .choice{display:grid;align-content:center;gap:6px;padding:12px 10px;width:100%;text-align:left}
+    .choice strong{color:#ffe4a0;font-size:14px}.choice span{font-size:11px;font-weight:500;line-height:1.6}
+    .menu-section{display:grid;gap:10px;width:100%}.overlay .small{font-size:11px;color:#b8cbdf;line-height:1.65}
+    .overlay .section-label{font-size:12px;color:#b8cbdf}.overlay .result-details{color:#ffe093;font-size:15px;white-space:pre-line}
+    #save-status{font-weight:400;color:#b8cbdf}.controls button[data-action="dash"]{background:#674d8b;border-color:#b89ed9}
     .legend{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;color:#b9cce1;font-size:12px;line-height:1.6;max-width:1100px;margin:0 auto}
     kbd{display:inline-block;border:1px solid #61758e;border-bottom-width:2px;padding:0 5px;background:#213750;border-radius:4px;color:#fff7da}
     .controls{display:none;justify-content:space-between;align-items:center;gap:12px;max-width:1200px;width:100%;margin:0 auto;touch-action:none;user-select:none}
@@ -52,19 +65,21 @@
       .hud{font-size:10px;gap:4px}
       .hud span{padding:5px 7px}
       .top-actions button{padding:6px 9px}
-      .controls button{min-width:43px;min-height:49px;font-size:12px}
+      .controls button{min-width:44px;min-height:49px;font-size:12px;padding:6px}
       .controls .cluster{gap:5px}
-      .overlay{gap:9px;padding:12px}
+      .overlay{padding:17px 12px}.menu-content{gap:13px}.frame.menu-open{min-height:570px}.choice-grid{gap:6px}.overlay .choice{padding:10px 7px}.choice strong{font-size:11px}.choice span{font-size:10px}
       .overlay h1{font-size:25px}
-      .overlay p{font-size:11px;line-height:1.5}
+      .overlay p{font-size:12px;line-height:1.6}.overlay .small{font-size:11px}
       .overlay button{font-size:13px;padding:7px 18px;min-height:41px}
     }
+    @media(max-width:360px){.controls{gap:6px}.controls .cluster{gap:4px}.controls button{min-width:42px}}
+    @media(max-width:340px){.controls{flex-wrap:wrap}.controls .cluster{flex:1;justify-content:space-around}}
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
   </style>
 </head>
 <body>
   <header class="top">
-    <div class="brand"><strong>PIXEL RAID / 像素突围</strong><span>原创横版动作 · 两关挑战</span></div>
+    <div class="brand"><strong>PIXEL RAID / 像素突围</strong><span>原创横版动作 · 三章远征</span></div>
     <div class="top-actions">
       <button id="pause" type="button">暂停 P</button>
       <button id="sound" type="button" aria-pressed="false">音效 关</button>
@@ -72,22 +87,57 @@
     </div>
   </header>
   <section class="hud" aria-label="游戏状态">
-    <span>关卡 <b id="level">1 / 2</b></span>
+    <span>关卡 <b id="level">1 / 3</b></span>
     <span>生命 <b id="lives">3</b></span>
     <span>体力 <b id="hp">♥ ♥ ♥ ♥ ♥</b></span>
     <span>手雷 <b id="ammo">3</b></span>
     <span>武器 <b id="weapon">步枪</b></span>
     <span>得分 <b id="score">00000</b></span>
     <span>最高 <b id="best">00000</b></span>
+    <span>情报 <b id="intel">0 / 3</b></span>
+    <span>冲刺 <b id="dash-status">就绪</b></span>
+    <span id="run-label">标准 · 远征</span>
+    <span id="save-status" role="status">记录保存在本机</span>
   </section>
-  <main class="frame">
+  <main class="frame menu-open" id="game-frame">
     <canvas id="field" width="960" height="540" role="img" aria-label="像素突围游戏画面：横向移动、跳跃、射击，消灭基地首领后抵达终点"></canvas>
     <div class="overlay" id="overlay" role="group" aria-labelledby="overlay-title">
-      <p class="eyebrow" id="overlay-kicker">ORIGINAL RUN &amp; GUN</p>
-      <h1 id="overlay-title">像素突围</h1>
-      <p id="overlay-text">穿过边境和机械要塞，利用跳跃与连续射击突围。拾取蓝色武器箱解锁限时散弹，Boss 红光蓄力时注意闪避。</p>
-      <button id="start" type="button">开始行动</button>
-      <p id="overlay-help">电脑：A/D 或方向键移动，W / ↑ / 空格跳跃，J 射击，K 手雷，S 下蹲，P 暂停。手机：使用下方触屏按键。</p>
+      <div class="menu-content">
+        <p class="eyebrow" id="overlay-kicker">EXPEDITION / 01—03</p>
+        <h1 id="overlay-title">像素突围</h1>
+        <p id="overlay-text">潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化，打造自己的突围路线。</p>
+        <div id="difficulty-options" class="menu-section" role="group" aria-label="远征难度">
+          <div class="option-row">
+            <button id="difficulty-standard" type="button" class="secondary" aria-pressed="true">标准 · 原味挑战</button>
+            <button id="difficulty-relaxed" type="button" class="secondary" aria-pressed="false">轻松 · 额外体力与生命</button>
+          </div>
+          <p class="small">轻松模式：敌方弹速更慢，受伤保护更长。两种难度分别记录成绩。</p>
+        </div>
+        <p id="result-details" class="result-details" hidden></p>
+        <div id="upgrade-options" class="menu-section" role="group" aria-label="选择下一关战术强化" hidden>
+          <p>选择一项强化，持续到本次远征结束，可叠加两次。</p>
+          <div class="choice-grid">
+            <button id="upgrade-rapid" type="button" class="choice" aria-pressed="false"><strong>疾速弹匣</strong><span>射击间隔缩短 20%</span></button>
+            <button id="upgrade-dash" type="button" class="choice" aria-pressed="false"><strong>闪步模组</strong><span>冲刺冷却缩短 0.6 秒</span></button>
+            <button id="upgrade-armor" type="button" class="choice" aria-pressed="false"><strong>战地装甲</strong><span>体力上限 +1，补满体力</span></button>
+          </div>
+        </div>
+        <div class="option-row primary-actions">
+          <button id="start" type="button">开始三章远征</button>
+          <button id="cancel-restart" type="button" class="secondary" hidden>取消，保留进度</button>
+          <button id="menu-home" type="button" class="secondary" hidden>返回指挥部</button>
+        </div>
+        <section id="stage-menu" class="menu-section" aria-label="选关练习">
+          <p class="section-label">选关练习 · 通关前一章解锁 · 独立记录</p>
+          <div class="choice-grid">
+            <button id="stage-1" type="button" class="choice"><strong>01 · 暮色边境</strong><span id="record-1">远征 ☆☆☆ · 练习 ☆☆☆</span></button>
+            <button id="stage-2" type="button" class="choice" disabled><strong>02 · 机械要塞</strong><span id="record-2">通关暮色边境后解锁</span></button>
+            <button id="stage-3" type="button" class="choice" disabled><strong>03 · 赤焰反应堆</strong><span id="record-3">通关机械要塞后解锁</span></button>
+          </div>
+          <p class="small">每章三星：完成任务 / 收集 3 份情报 / 不损失生命。受伤不影响生命之星。</p>
+        </section>
+        <p id="overlay-help" class="small">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · Shift / L 冲刺 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Start 暂停。手机使用下方按键。</p>
+      </div>
     </div>
   </main>
   <section class="controls" aria-label="触屏操作">
@@ -97,6 +147,7 @@
       <button type="button" data-action="down" aria-label="下蹲">↓</button>
     </div>
     <div class="cluster">
+      <button type="button" data-action="dash" aria-label="向面朝方向冲刺">冲</button>
       <button type="button" data-action="grenade" aria-label="投掷手雷">雷</button>
       <button type="button" data-action="jump" aria-label="跳跃">跳</button>
       <button type="button" data-action="fire" aria-label="连续射击">射</button>
@@ -105,7 +156,7 @@
   <footer class="legend">
     <span><kbd>A</kbd><kbd>D</kbd> 移动</span><span><kbd>W</kbd><kbd>空格</kbd> 跳跃</span>
     <span><kbd>J</kbd> 连射</span><span><kbd>K</kbd> 手雷</span><span><kbd>S</kbd> 下蹲</span>
-    <span><kbd>P</kbd> 暂停</span><span>横屏游玩体验更好 · 无外部资源</span>
+    <span><kbd>Shift</kbd><kbd>L</kbd> 冲刺</span><span><kbd>P</kbd> 暂停</span><span>横屏游玩体验更好 · 无外部资源</span>
   </footer>
   <p class="sr" id="announcer" aria-live="polite" aria-atomic="true"></p>
   <script>
@@ -116,30 +167,68 @@
       const canvas=$('field'),c=canvas.getContext('2d',{alpha:false});
       const overlay=$('overlay'),title=$('overlay-title'),kicker=$('overlay-kicker'),message=$('overlay-text'),action=$('start');
       const STAGES=[
-        {name:'暮色边境',width:3420,sky:'#243b61',far:'#425e82',near:'#2e435a',floor:'#486a61',light:'#f3b875',
-          gaps:[[840,940],[1700,1820],[2520,2640]],
+        {name:'暮色边境',bossName:'边境守卫',width:3420,sky:'#243b61',far:'#425e82',near:'#2e435a',floor:'#486a61',light:'#f3b875',
+          gaps:[[840,940],[1700,1820],[2520,2640]],checkpoints:[1100,2170],
           platforms:[[480,325,180],[890,318,170],[1320,333,180],[1760,316,175],[2270,340,180],[2570,318,170],[3000,332,150]],
+          intel:[[550,300],[1410,308],[2640,293]],
           enemies:[[380,'walker'],[670,'drone'],[1120,'turret'],[1470,'walker'],[2060,'drone'],[2350,'turret'],[2830,'walker']],
           pickups:[[260,'spread'],[590,'heal'],[1490,'grenade'],[2240,'boost'],[2790,'heal']]},
-        {name:'机械要塞',width:3840,sky:'#1e263f',far:'#38435e',near:'#283242',floor:'#565c70',light:'#a1e4ed',
-          gaps:[[740,855],[1550,1680],[2460,2590],[3160,3270]],
+        {name:'机械要塞',bossName:'要塞重装机',width:3840,sky:'#1e263f',far:'#38435e',near:'#283242',floor:'#565c70',light:'#a1e4ed',
+          gaps:[[740,855],[1550,1680],[2460,2590],[3160,3270]],checkpoints:[1170,2380],
           platforms:[[350,328,180],[810,320,180],[1280,338,165],[1600,306,180],[2100,330,195],[2550,317,190],[3185,314,175]],
+          intel:[[430,303],[1680,281],[2635,292]],
           enemies:[[330,'turret'],[580,'walker'],[1050,'drone'],[1390,'turret'],[1860,'walker'],[2220,'drone'],[2750,'turret'],[3060,'walker']],
-          pickups:[[245,'spread'],[490,'grenade'],[1370,'heal'],[2260,'boost'],[3030,'heal']]}
+          pickups:[[245,'spread'],[490,'grenade'],[1370,'heal'],[2260,'boost'],[3030,'heal']]},
+        {name:'赤焰反应堆',bossName:'赤焰核心',width:3960,sky:'#33263c',far:'#613d54',near:'#392d41',floor:'#655369',light:'#ff9a72',
+          gaps:[[690,795],[1510,1635],[2370,2490],[2940,3060]],checkpoints:[1120,2530],
+          platforms:[[390,329,175],[750,312,175],[1280,334,170],[1580,300,180],[2040,326,185],[2430,314,190],[2995,320,180],[3350,330,160]],
+          intel:[[470,304],[1660,275],[3080,295]],
+          enemies:[[330,'walker'],[590,'drone'],[1010,'turret'],[1400,'walker'],[1870,'drone'],[2240,'turret'],[2680,'walker'],[2890,'drone'],[3250,'turret']],
+          pickups:[[245,'spread'],[900,'grenade'],[1340,'heal'],[2160,'boost'],[2800,'heal'],[3310,'grenade']]}
       ];
+      const UPGRADES={rapid:'疾速弹匣',dash:'闪步模组',armor:'战地装甲'};
+      const STORAGE_KEY='pixel-raid.progress.v1';
+      const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches??false;
       const held=new Set(),padHeld=new Set(),touch=new Map();
-      let phase='title',stageIndex=0,stage=null,player=null,enemies=[],bullets=[],bombs=[],pickups=[],sparks=[],boss=null,cam=0;
-      let points=0,best=0,shotsFired=0,jumpQueued=false,grenadeQueued=false,clock=0,shake=0,soundOn=false,audio=null;
-      let frameLast=0,lag=0,gunPadLast=false,bombPadLast=false,jumpPadLast=false;
-      try{best=Number(localStorage.getItem('pixel-raid.best'))||0;}catch{}
-      $('best').textContent=String(best).padStart(5,'0');
-
+      let phase='title',stageIndex=0,stage=null,player=null,enemies=[],bullets=[],bombs=[],pickups=[],intel=[],sparks=[],boss=null,cam=0;
+      let points=0,best=0,shotsFired=0,jumpQueued=false,grenadeQueued=false,dashQueued=false,clock=0,shake=0,soundOn=false,audio=null;
+      let frameLast=0,lag=0,bombPadLast=false,jumpPadLast=false,dashPadLast=false,pausePadLast=false,padBlocked=true;
+      let mode='campaign',difficulty='standard',upgrades={rapid:0,dash:0,armor:0},selectedUpgrade=null;
+      let stageDeaths=0,stageStars=0,runStars=[],storageAvailable=true,returnPhase='playing',confirmAction='restart';
+      const bounded=(v,max)=>typeof v==='number'&&Number.isFinite(v)?Math.max(0,Math.min(max,Math.floor(v))):0;
+      const cleanRecord=value=>({best:bounded(value?.best,9999999),stars:[0,1,2].map(i=>{
+        const n=bounded(value?.stars?.[i],7);return n&1?n:0;
+      })});
+      function loadProgress(){
+        let raw=null,legacy=0;
+        try{
+          const saved=localStorage.getItem(STORAGE_KEY);
+          // A corrupt or oversized save cannot break startup or grow the record shape.
+          if(saved&&saved.length<12000){try{raw=JSON.parse(saved);}catch{}}
+          const old=Number(localStorage.getItem('pixel-raid.best'));
+          legacy=Number.isFinite(old)?bounded(old,9999999):0;
+        }catch{storageAvailable=false;}
+        if(raw?.version!==1)raw=null;
+        const record={version:1,unlocked:Math.max(1,bounded(raw?.unlocked,3)),
+          selectedDifficulty:raw?.selectedDifficulty==='relaxed'?'relaxed':'standard',
+          campaign:{standard:cleanRecord(raw?.campaign?.standard),relaxed:cleanRecord(raw?.campaign?.relaxed)},
+          practice:{standard:cleanRecord(raw?.practice?.standard),relaxed:cleanRecord(raw?.practice?.relaxed)}};
+        if(!raw)record.campaign.standard.best=legacy;
+        return record;
+      }
+      const progress=loadProgress();
+      difficulty=progress.selectedDifficulty;
+      best=progress.campaign[difficulty].best;
       const rng=(min,max)=>min+Math.random()*(max-min);
       const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-      const touches=(name)=>[...touch.values()].includes(name);
-      const pressed=(name)=>held.has(name)||padHeld.has(name)||touches(name);
+      const touches=name=>[...touch.values()].includes(name);
+      const pressed=name=>held.has(name)||padHeld.has(name)||touches(name);
       const isGap=x=>stage.gaps.some(pair=>x>pair[0]&&x<pair[1]);
       const hit=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+      const maxHealth=()=>5+(difficulty==='relaxed'?1:0)+upgrades.armor;
+      const starCount=mask=>[1,2,4].filter(bit=>mask&bit).length;
+      const starText=mask=>'★'.repeat(starCount(mask))+'☆'.repeat(3-starCount(mask));
+      const collected=()=>intel.filter(i=>i.done).length;
       const circRect=(x,y,r,rect)=>{
         const dx=x-clamp(x,rect.x,rect.x+rect.w),dy=y-clamp(y,rect.y,rect.y+rect.h);
         return dx*dx+dy*dy<r*r;
@@ -158,84 +247,186 @@
         }catch{}
       }
       function announce(text){$('announcer').textContent=text;}
-      function showMenu(head,sub,label,tag){
-        phase=tag;title.textContent=head;message.textContent=sub;action.textContent=label;
-        kicker.textContent=tag==='title'?'ORIGINAL RUN & GUN':tag==='pause'?'PAUSED':tag==='stageClear'?'MISSION COMPLETE':tag==='victory'?'ALL CLEAR':'TRY AGAIN';
-        overlay.hidden=false;$('pause').textContent=tag==='pause'?'继续 P':'暂停 P';
-        announce(head+'。'+sub);
+      function clearInput(){
+        held.clear();padHeld.clear();touch.clear();jumpQueued=false;grenadeQueued=false;dashQueued=false;
+        if(player)player.jumpBuffer=0;
+        bombPadLast=false;jumpPadLast=false;dashPadLast=false;pausePadLast=false;padBlocked=true;
+        document.querySelectorAll('[data-action]').forEach(btn=>btn.classList.remove('active'));
       }
-      function hideMenu(){overlay.hidden=true;document.activeElement?.blur?.();}
-      function saveBest(){
-        if(points>best){
-          best=points;
-          try{localStorage.setItem('pixel-raid.best',String(best));}catch{}
+      function updateSaveStatus(){
+        const text=storageAvailable?'记录保存在本机':'未能保存 · 仅本次有效';
+        if($('save-status').textContent!==text)$('save-status').textContent=text;
+      }
+      function saveProgress(){
+        try{localStorage.setItem(STORAGE_KEY,JSON.stringify(progress));storageAvailable=true;}
+        catch{storageAvailable=false;}
+        updateSaveStatus();
+      }
+      function refreshRecords(){
+        for(let i=0;i<STAGES.length;i++){
+          const unlocked=i<progress.unlocked;
+          $('stage-'+(i+1)).disabled=!unlocked;
+          $('record-'+(i+1)).textContent=unlocked?
+            '远征 '+starText(progress.campaign[difficulty].stars[i])+' · 练习 '+starText(progress.practice[difficulty].stars[i]):
+            '通关'+STAGES[i-1].name+'后解锁';
         }
+        for(const value of ['standard','relaxed'])$('difficulty-'+value).setAttribute('aria-pressed',String(value===difficulty));
+      }
+      function showMenu(head,sub,label,tag){
+        clearInput();lag=0;phase=tag;title.textContent=head;message.textContent=sub;action.textContent=label;action.disabled=false;
+        kicker.textContent=tag==='title'?'EXPEDITION / 01—03':tag==='pause'?'PAUSED':tag==='stageClear'?'TACTICAL UPGRADE':tag==='victory'?'ALL CLEAR':tag==='confirmRestart'?'CONFIRM':tag==='practiceClear'?'PRACTICE COMPLETE':'TRY AGAIN';
+        $('difficulty-options').hidden=tag!=='title';$('stage-menu').hidden=tag!=='title';
+        $('upgrade-options').hidden=tag!=='stageClear';
+        $('result-details').hidden=!['stageClear','victory','practiceClear'].includes(tag);
+        $('menu-home').hidden=!['pause','stageClear','victory','gameOver','practiceClear'].includes(tag);
+        $('cancel-restart').hidden=tag!=='confirmRestart';
+        if(tag==='stageClear')action.disabled=!selectedUpgrade;
+        overlay.hidden=false;$('game-frame').classList.add('menu-open');
+        $('pause').textContent=tag==='pause'?'继续 P':'暂停 P';
+        refreshRecords();announce(head+'。'+sub);
+        // Keep keyboard focus in the menu, while leaving Space/Enter native to buttons.
+        (tag==='stageClear'?$('upgrade-rapid'):tag==='confirmRestart'?$('cancel-restart'):action).focus?.({preventScroll:true});
+      }
+      function hideMenu(){
+        overlay.hidden=true;$('game-frame').classList.remove('menu-open');
+        $('pause').textContent='暂停 P';document.activeElement?.blur?.();
+      }
+      function saveBest(){
+        const record=progress[mode][difficulty];
+        if(points>record.best){record.best=bounded(points,9999999);saveProgress();}
+        best=record.best;
       }
       function hud(){
-        $('level').textContent=(stageIndex+1)+' / '+STAGES.length;
+        $('level').textContent=(stageIndex+1)+' / '+STAGES.length+' · '+stage.name;
         $('lives').textContent=String(player?.lives??3);
-        $('hp').textContent=player?('♥ '.repeat(player.hp)+'♡ '.repeat(5-player.hp)).trim():'♥ ♥ ♥ ♥ ♥';
+        const hp=player?.hp??maxHealth();
+        $('hp').textContent=('♥ '.repeat(hp)+'♡ '.repeat(maxHealth()-hp)).trim();
         $('ammo').textContent=String(player?.grenades??3);
         $('weapon').textContent=player?.weaponTime>0?'散弹 '+Math.ceil(player.weaponTime)+'s':(player?.boost>0?'步枪 · 连射':'步枪');
-        $('score').textContent=String(points).padStart(5,'0');
-        $('best').textContent=String(best).padStart(5,'0');
+        $('score').textContent=String(points).padStart(5,'0');$('best').textContent=String(best).padStart(5,'0');
+        $('intel').textContent=collected()+' / 3';
+        $('dash-status').textContent=player?.dashCooldown>0?player.dashCooldown.toFixed(1)+'s':'就绪';
+        $('run-label').textContent=(difficulty==='relaxed'?'轻松':'标准')+' · '+(mode==='practice'?'练习':'远征');
+        updateSaveStatus();
       }
       function resetStage(index,carry){
         stageIndex=index;stage=STAGES[index];
-        player={x:64,y:G-44,w:27,h:44,vx:0,vy:0,face:1,hp:carry?.hp??5,
-          lives:carry?.lives??3,grenades:carry?.grenades??3,ground:true,inv:1.2,shoot:0,boost:0,
-          weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64};
+        player={x:64,y:G-44,w:27,h:44,vx:0,vy:0,face:1,hp:clamp(carry?.hp??maxHealth(),1,maxHealth()),
+          lives:carry?.lives??(difficulty==='relaxed'?4:3),grenades:carry?.grenades??3,ground:true,inv:1.2,shoot:0,boost:0,
+          weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashDir:1,coyote:.1,jumpBuffer:0,crouch:false};
         enemies=stage.enemies.map(([x,type])=>({x,y:type==='drone'?260:G-(type==='turret'?34:36),
           w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='turret'?4:type==='drone'?2:3,
           maxHp:type==='turret'?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false}));
         pickups=stage.pickups.map(([x,kind])=>({x,y:kind==='spread'?G-45:G-93,kind,done:false,age:0}));
-        boss={x:stage.width-345,y:G-104,w:105,h:104,hp:stageIndex===0?24:34,maxHp:stageIndex===0?24:34,
-          shot:1.3,phase:0,windup:0,attacks:0,lastVolley:0,warned:false,dead:false};
-        bullets=[];bombs=[];sparks=[];cam=0;clock=0;shake=0;jumpQueued=false;grenadeQueued=false;hud();
+        intel=stage.intel.map(([x,y])=>({x,y,done:false}));
+        const bossHp=[24,34,44][stageIndex];
+        boss={x:stage.width-345,y:G-104,w:105,h:104,hp:bossHp,maxHp:bossHp,
+          shot:1.3,phase:0,windup:0,chargeDuration:.72,attacks:0,lastVolley:0,warned:false,dead:false,
+          attackType:'volley',beamTime:0,beamY:G-22};
+        bullets=[];bombs=[];sparks=[];cam=0;clock=0;shake=0;stageDeaths=0;stageStars=0;selectedUpgrade=null;
+        clearInput();lag=0;hud();
       }
-      function startNew(){
-        held.clear();padHeld.clear();touch.clear();points=0;shotsFired=0;
-        resetStage(0,null);phase='playing';hideMenu();announce('行动开始，第一关。');
+      function beginRun(index,kind){
+        clearInput();mode=kind;points=0;shotsFired=0;runStars=[];upgrades={rapid:0,dash:0,armor:0};
+        best=progress[mode][difficulty].best;resetStage(index,null);phase='playing';hideMenu();frameLast=performance.now();
+        announce((kind==='practice'?'单章练习':'三章远征')+'开始，'+stage.name+'。');
+      }
+      function startNew(){beginRun(0,'campaign');}
+      function startPractice(index){if(phase==='title'&&index>=0&&index<progress.unlocked)beginRun(index,'practice');}
+      function chooseUpgrade(key){
+        if(phase!=='stageClear'||!Object.hasOwn(UPGRADES,key))return;
+        selectedUpgrade=key;
+        for(const name of Object.keys(UPGRADES))$('upgrade-'+name).setAttribute('aria-pressed',String(name===key));
+        action.disabled=false;action.textContent='携带'+UPGRADES[key]+'，继续';
+        announce('已选择'+UPGRADES[key]+'。按继续进入下一章。');
       }
       function nextStage(){
-        const carry={hp:Math.min(5,player.hp+2),lives:player.lives,grenades:Math.max(2,player.grenades),
-          weaponTime:player.weaponTime};
-        resetStage(stageIndex+1,carry);phase='playing';hideMenu();announce('进入第二关。');
+        if(!selectedUpgrade||phase!=='stageClear')return;
+        upgrades[selectedUpgrade]=Math.min(2,upgrades[selectedUpgrade]+1);
+        const carry={hp:selectedUpgrade==='armor'?maxHealth():Math.min(maxHealth(),player.hp+2),lives:player.lives,
+          grenades:Math.max(2,player.grenades),weaponTime:player.weaponTime};
+        resetStage(stageIndex+1,carry);phase='playing';hideMenu();frameLast=performance.now();announce('进入'+stage.name+'。');
       }
-      function resume(){phase='playing';hideMenu();frameLast=performance.now();announce('继续游戏。');}
+      function finishStage(){
+        if(phase!=='playing')return;
+        stageStars=1|(collected()===3?2:0)|(stageDeaths===0?4:0);runStars[stageIndex]=stageStars;
+        const record=progress[mode][difficulty];
+        if(starCount(stageStars)>starCount(record.stars[stageIndex]))record.stars[stageIndex]=stageStars;
+        if(mode==='campaign')progress.unlocked=Math.max(progress.unlocked,Math.min(3,stageIndex+2));
+        addPoints(300+collected()*100+(stageDeaths===0?250:0));
+        if(mode==='campaign'&&stageIndex===2)addPoints(player.lives*500);
+        saveBest();saveProgress();hud();
+        const goals='★ 完成任务   '+(collected()===3?'★':'☆')+' 情报 '+collected()+'/3   '+(stageDeaths===0?'★':'☆')+' 不失去生命';
+        $('result-details').textContent=goals+'\n本章 '+starText(stageStars)+' · 本次得分 '+points;
+        if(mode==='practice')showMenu('练习完成','练习成绩单独保存。可以再次挑战三星，或返回指挥部。','再次练习','practiceClear');
+        else if(stageIndex<2){
+          selectedUpgrade=null;for(const key of Object.keys(UPGRADES))$('upgrade-'+key).setAttribute('aria-pressed','false');
+          showMenu(stage.name+' · 完成','检查点已突破。选择一项战术强化；进入下一章时恢复 2 点体力，并补足至少 2 枚手雷。','先选择战术强化','stageClear');
+        }else{
+          const total=runStars.reduce((sum,mask)=>sum+starCount(mask),0);
+          $('result-details').textContent+='\n远征星章 '+total+' / 9';
+          showMenu('三章突围成功','赤焰核心已关闭。试试不同强化组合，寻找遗漏的情报，挑战九星远征。','再次远征','victory');
+        }
+      }
+      function openTitle(){
+        clearInput();mode='campaign';best=progress.campaign[difficulty].best;
+        upgrades={rapid:0,dash:0,armor:0};points=0;shotsFired=0;runStars=[];resetStage(0,null);
+        showMenu('像素突围','潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化，打造自己的突围路线。','开始三章远征','title');hud();
+      }
+      function resume(){clearInput();phase='playing';hideMenu();frameLast=performance.now();lag=0;announce('继续游戏。');}
       function togglePause(){
-        if(phase==='playing')showMenu('任务暂停','调整好操作后继续向前。','继续行动','pause');
+        if(phase==='playing')showMenu('任务暂停','体力、弹药和强化已保留。冲刺可以穿过弹幕；高台上藏着情报。','继续行动','pause');
         else if(phase==='pause')resume();
+        else if(phase==='confirmRestart')cancelConfirm();
+      }
+      function requestConfirm(kind){
+        if(phase==='title'){if(kind==='restart')startNew();return;}
+        if(phase==='confirmRestart')return;
+        if(['victory','gameOver','practiceClear'].includes(phase)){kind==='home'?openTitle():(mode==='practice'?beginRun(stageIndex,'practice'):startNew());return;}
+        returnPhase=phase;confirmAction=kind;
+        showMenu(kind==='home'?'返回指挥部？':'重新开始？','本次未完成的行程、弹药与强化将重置，已保存的星章和解锁关卡不会丢失。',kind==='home'?'确认返回':'确认重新开始','confirmRestart');
+      }
+      function cancelConfirm(){
+        if(returnPhase==='playing'){resume();return;}
+        if(returnPhase==='stageClear'){
+          showMenu(stage.name+' · 完成','选择一项强化后继续远征。',selectedUpgrade?'携带'+UPGRADES[selectedUpgrade]+'，继续':'先选择战术强化','stageClear');return;
+        }
+        showMenu('任务暂停','本次行程已保留。','继续行动','pause');
       }
       function spark(x,y,color,count=8){
         for(let i=0;i<count;i++)sparks.push({x,y,vx:rng(-190,190),vy:rng(-250,50),life:rng(.24,.65),color,r:rng(2,5)});
       }
       function addPoints(n){points+=n;saveBest();hud();}
       function hurt(damage=1){
-        if(phase!=='playing'||player.inv>0)return;
-        player.hp=Math.max(0,player.hp-damage);player.inv=1.45;shake=8;beep(170,.2,'sawtooth');
+        if(phase!=='playing'||player.inv>0||player.dashTime>0)return;
+        player.hp=Math.max(0,player.hp-damage);player.inv=difficulty==='relaxed'?1.9:1.45;shake=8;beep(170,.2,'sawtooth');
         spark(player.x+12,player.y+20,'#f6a174',13);
         if(player.hp===0){
-          player.lives--;
+          player.lives--;stageDeaths++;
           if(player.lives<=0){
-            saveBest();hud();showMenu('行动失败','本次得分 '+points+'。下次试试利用平台和手雷。','再试一次','gameOver');
+            saveBest();hud();showMenu('行动失败','本次得分 '+points+'。试试冲刺穿过弹幕，或回指挥部切换轻松模式。','再试一次','gameOver');
             return;
           }
-          player.hp=5;player.x=player.checkpoint;player.y=G-44;player.vy=0;player.ground=true;player.inv=2.2;
+          player.hp=maxHealth();player.x=player.checkpoint;player.h=44;player.y=G-player.h;player.vx=0;player.vy=0;player.ground=true;player.inv=2.2;player.dashTime=0;player.jumpBuffer=0;
           bullets=bullets.filter(b=>b.owner==='p');
           announce('失去一条生命，从检查点继续。');
         }
         hud();
       }
+      function dash(){
+        if(player.dashCooldown>0||phase!=='playing')return;
+        player.dashTime=.18;player.dashDir=player.face;player.dashCooldown=2.4-upgrades.dash*.6;
+        spark(player.x+player.w/2,player.y+player.h/2,'#9ecaff',10);beep(520,.08,'triangle');hud();
+      }
       function projectile(x,y,vx,vy,owner,damage=1){
+        if(owner==='e'&&difficulty==='relaxed'){vx*=.78;vy*=.78;}
         bullets.push({x,y,vx,vy,owner,damage,life:owner==='p'?1.7:3.7,r:owner==='p'?5:6});
       }
       function fire(){
         if(player.shoot>0)return;
         const scatter=player.weaponTime>0;
-        player.shoot=scatter?(player.boost>0?.19:.33):(player.boost>0?.075:.15);
-        const crouch=pressed('down')&&player.ground;
-        const y=player.y+(crouch?34:20);
+        player.shoot=(scatter?(player.boost>0?.19:.33):(player.boost>0?.075:.15))*Math.pow(.8,upgrades.rapid);
+        const y=player.y+(player.crouch?14:20);
         const up=pressed('jump')&&!player.ground;
         const vx=player.face*(up?480:650),vy=up?-340:0;
         const spread=scatter?[-1,0,1]:[0];
@@ -270,7 +461,7 @@
         if(boss.dead)return;
         boss.hp=Math.max(0,boss.hp-d);spark(boss.x+rng(10,90),boss.y+rng(10,85),'#f9cb65',5);
         if(boss.hp===0){
-          boss.dead=true;addPoints(1300);spark(boss.x+50,boss.y+45,'#ffc65c',60);
+          boss.dead=true;boss.beamTime=0;boss.windup=0;addPoints(1300);spark(boss.x+50,boss.y+45,'#ffc65c',60);
           announce('首领已击败，向右前往终点。');beep(620,.35,'triangle');
         }
       }
@@ -283,17 +474,29 @@
         clock+=dt;
         const left=pressed('left'),right=pressed('right'),down=pressed('down');
         const axis=(right?1:0)-(left?1:0);
-        player.vx=axis*(down&&player.ground?110:255);
-        if(axis)player.face=axis;
-        if(jumpQueued){jumpQueued=false;if(player.ground){player.vy=-525;player.ground=false;beep(370,.06);}}
-        if(grenadeQueued){grenadeQueued=false;throwBomb();}
-        if(pressed('fire'))fire();
+        // The crouched body is the actual collision box, not only a visual pose.
+        const crouch=down&&player.ground;
+        const height=crouch?28:44;
+        if(player.h!==height){player.y+=player.h-height;player.h=height;}
+        player.crouch=crouch;
+        player.coyote=player.ground?.11:Math.max(0,player.coyote-dt);
+        player.jumpBuffer=Math.max(0,player.jumpBuffer-dt);
+        if(jumpQueued){jumpQueued=false;player.jumpBuffer=.13;}
+        if(player.jumpBuffer>0&&player.coyote>0){
+          player.vy=-525;player.ground=false;player.coyote=0;player.jumpBuffer=0;beep(370,.06);
+        }
+        if(axis&&player.dashTime<=0)player.face=axis;
+        player.dashCooldown=Math.max(0,player.dashCooldown-dt);
+        if(dashQueued){dashQueued=false;dash();}
+        player.vx=player.dashTime>0?player.dashDir*650:axis*(crouch?110:255);
         player.shoot=Math.max(0,player.shoot-dt);
         player.inv=Math.max(0,player.inv-dt);player.boost=Math.max(0,player.boost-dt);
         player.weaponTime=Math.max(0,player.weaponTime-dt);
+        if(grenadeQueued){grenadeQueued=false;throwBomb();}
+        if(pressed('fire'))fire();
         player.x=clamp(player.x+player.vx*dt,8,stage.width-player.w-6);
         const oldBottom=player.y+player.h;
-        player.vy=clamp(player.vy+GRAV*dt,-800,MAX_FALL);
+        if(player.dashTime>0){player.vy=0;}else player.vy=clamp(player.vy+GRAV*dt,-800,MAX_FALL);
         player.y+=player.vy*dt;player.ground=false;
         const cx=player.x+player.w/2;
         if(player.vy>=0){
@@ -305,16 +508,16 @@
           if(landing!==Infinity){player.y=landing-player.h;player.vy=0;player.ground=true;}
         }
         if(player.y>H+70){
-          player.inv=0;hurt(2);
-          if(phase==='playing'){player.x=player.checkpoint;player.y=G-44;player.vy=0;player.ground=true;}
+          player.inv=0;player.dashTime=0;hurt(2);
+          if(phase!=='playing')return;
+          player.x=player.checkpoint;player.y=G-player.h;player.vy=0;player.vx=0;player.ground=true;player.coyote=.11;
         }
-        if(player.x>1230&&player.checkpoint<1100){player.checkpoint=1100;announce('检查点已保存。');}
-        if(player.x>2350&&player.checkpoint<2200){player.checkpoint=2170;announce('检查点已保存。');}
-        if(boss.dead&&player.x>stage.width-115){
-          if(stageIndex===0)showMenu('第一关完成','边境已突破。下一关进入机械要塞。','进入下一关','stageClear');
-          else{addPoints(player.lives*500);saveBest();showMenu('全线突围成功','两关全部完成！得分 '+points+'，最高 '+best+'。','重新行动','victory');}
-          return;
+        for(const checkpoint of stage.checkpoints){
+          if(player.x>=checkpoint&&player.checkpoint<checkpoint){
+            player.checkpoint=checkpoint;spark(checkpoint,G-40,'#9ee9c6',18);announce('检查点已激活，失去生命后从这里继续。');
+          }
         }
+        if(boss.dead&&player.x>stage.width-115){finishStage();return;}
         // Moving threats remain near their patrol spawn; air units follow gentle sine paths.
         for(const e of enemies){
           if(e.dead)continue;
@@ -325,36 +528,49 @@
             aimAtPlayer(e,e.type==='turret'?315:235);e.shot=e.type==='turret'?2.1:rng(2.3,3.5);
           }
           if(hit(player,e))hurt(1);
+          if(phase!=='playing')return;
         }
         boss.phase+=dt;
+        if(boss.beamTime>0){
+          boss.beamTime=Math.max(0,boss.beamTime-dt);
+          if(!boss.dead&&hit(player,{x:boss.x-760,y:boss.beamY-5,w:760,h:10}))hurt(1);
+          if(phase!=='playing')return;
+        }
         if(!boss.dead&&Math.abs(boss.x-player.x)<780){
           if(boss.windup>0){
             boss.windup=Math.max(0,boss.windup-dt);
             if(boss.windup===0){
               const enraged=boss.hp<=boss.maxHp*.5;
-              const extra=stageIndex===1?(enraged?2:1):(enraged?1:0);
-              aimAtPlayer({x:boss.x+18,y:boss.y+48,w:60,h:30},260+stageIndex*40);
-              for(let i=1;i<=extra;i++){
-                projectile(boss.x+20,boss.y+55,-260-i*35,-i*92,'e');
-                projectile(boss.x+20,boss.y+55,-260-i*35,i*92,'e');
+              if(stageIndex===2&&boss.attackType==='beam'){
+                boss.beamTime=.16;boss.lastVolley=0;beep(150,.16,'sawtooth');
+              }else{
+                const extra=stageIndex>0?(enraged?2:1):(enraged?1:0);
+                aimAtPlayer({x:boss.x+18,y:boss.y+48,w:60,h:30},260+stageIndex*35);
+                for(let i=1;i<=extra;i++){
+                  projectile(boss.x+20,boss.y+55,-260-i*35,-i*92,'e');
+                  projectile(boss.x+20,boss.y+55,-260-i*35,i*92,'e');
+                }
+                boss.lastVolley=1+extra*2;beep(200,.045);
               }
-              boss.lastVolley=1+extra*2;boss.attacks++;
-              boss.shot=(enraged?1.35:1.8)-(stageIndex*.12);
-              beep(200,.045);
+              boss.attacks++;boss.shot=(enraged?1.35:1.8)-(stageIndex*.1);
             }
-          }else{
+          }else if(boss.beamTime<=0){
             boss.shot-=dt;
             if(boss.shot<=0){
-              boss.windup=.72;
-              if(!boss.warned){boss.warned=true;announce('首领开始蓄力，注意闪避红光。');}
+              boss.attackType=stageIndex===2&&boss.attacks%2===0?'beam':'volley';
+              boss.chargeDuration=boss.attackType==='beam'?1.05:.72;boss.windup=boss.chargeDuration;
+              if(boss.attackType==='beam'){
+                boss.beamY=Math.floor(boss.attacks/2)%2===0?G-12:G-36;
+                announce(boss.beamY>G-20?'低位激光蓄力：跳跃或冲刺躲避。':'高位激光蓄力：下蹲或冲刺躲避。');
+              }else if(!boss.warned){boss.warned=true;announce('首领开始蓄力，注意闪避红光。');}
             }
           }
         }else{
-          boss.windup=0;
+          boss.windup=0;boss.beamTime=0;
           boss.shot=Math.max(.35,boss.shot-dt);
         }
         if(!boss.dead&&hit(player,boss))hurt(1);
-
+        if(phase!=='playing')return;
         for(let i=bullets.length-1;i>=0;i--){
           const b=bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
           if(b.life<=0||b.y<20||b.y>H+30||b.x<cam-130||b.x>cam+W+130){bullets.splice(i,1);continue;}
@@ -364,7 +580,10 @@
             if(!struck&&!boss.dead&&circRect(b.x,b.y,b.r,boss)){damageBoss(b.damage);struck=true;}
             if(struck)bullets.splice(i,1);
           }else if(circRect(b.x,b.y,b.r,player)){
-            hurt(1);bullets.splice(i,1);
+            // Damage may replace the projectile list on respawn; consume this shot first.
+            bullets.splice(i,1);hurt(1);
+            if(phase!=='playing')return;
+            if(i>=bullets.length)i=bullets.length;
           }
         }
         for(let i=bombs.length-1;i>=0;i--){
@@ -375,7 +594,7 @@
         for(const p of pickups){
           if(p.done)continue;p.age+=dt;
           if(circRect(p.x,p.y,16,player)){
-            p.done=true;if(p.kind==='heal')player.hp=Math.min(5,player.hp+2);
+            p.done=true;if(p.kind==='heal')player.hp=Math.min(maxHealth(),player.hp+2);
             if(p.kind==='grenade')player.grenades=Math.min(7,player.grenades+2);
             if(p.kind==='boost')player.boost=12;
             if(p.kind==='spread')player.weaponTime=12;
@@ -384,13 +603,20 @@
               p.kind==='spread'?'获得散弹武器，持续十二秒。':'强化连射。');
           }
         }
+        for(const item of intel){
+          if(!item.done&&circRect(item.x,item.y,18,player)){
+            item.done=true;addPoints(150);spark(item.x,item.y,'#97f0ec',16);beep(970,.12,'triangle');
+            announce('获得情报，已收集 '+collected()+' / 3。');
+          }
+        }
         for(let i=sparks.length-1;i>=0;i--){
           const s=sparks[i];s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=680*dt;s.life-=dt;
           if(s.life<=0)sparks.splice(i,1);
         }
+        player.dashTime=Math.max(0,player.dashTime-dt);
         shake=Math.max(0,shake-28*dt);
         cam=clamp(player.x-290,0,stage.width-W);
-        if((Math.floor(clock*8)%8)===0)hud();
+        if(Math.floor(clock*10)!==Math.floor((clock-dt)*10))hud();
       }
 
       function rect(x,y,w,h,fill){c.fillStyle=fill;c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
@@ -442,28 +668,43 @@
           if(isGap(x))continue;
           rect(x,G-28,12,28,'#273c44');rect(x-7,G-33,26,7,'#b8c4a9');
         }
+        for(const checkpoint of stage.checkpoints){
+          const active=player.checkpoint>=checkpoint;
+          rect(checkpoint,G-63,5,63,active?'#9fe5be':'#8797a9');
+          rect(checkpoint+5,G-61,27,19,active?'#7bd8b1':'#3a526d');
+          c.font='bold 11px system-ui';c.fillStyle=active?'#c2ffe1':'#c3d4e7';
+          c.fillText(active?'已激活':'检查点',checkpoint-12,G-76);
+        }
         rect(stage.width-125,G-110,14,110,boss.dead?'#97d6a0':'#b47863');
         rect(stage.width-162,G-118,51,12,boss.dead?'#97d6a0':'#b47863');
         if(boss.dead){rect(stage.width-154,G-156,32,32,'#9de5a7');}
       }
       function drawSoldier(){
         if(player.inv>0&&Math.floor(clock*13)%2===0)return;
+        if(player.dashTime>0){
+          for(let i=1;i<=3;i++){c.globalAlpha=.3/i;rect(player.x-player.dashDir*i*17,player.y+4,player.w,player.h-4,'#8dd9ff');}
+          c.globalAlpha=1;
+        }
         c.save();c.translate(player.x+player.w/2,player.y);c.scale(player.face,1);
-        const crouch=pressed('down')&&player.ground;
-        const run=Math.sin(clock*18)*5*(Math.abs(player.vx)>5?1:0);
-        rect(-10,crouch?21:4,20,14,'#efc5a7');
-        rect(-12,crouch?16:0,24,9,'#e5b85e');
-        rect(-15,crouch?26:20,30,20,'#5bb4a5');
-        rect(-8,crouch?41:41,7,5,'#d3e9d6');
-        if(!crouch){
-          rect(-12,44,9,13+run,'#243c52');rect(4,44,9,13-run,'#243c52');
-          rect(-15,54+run,14,5,'#2b2c42');rect(2,54-run,14,5,'#2b2c42');
-        }else{rect(-15,44,29,10,'#28465a');}
-        rect(8,crouch?28:26,21,6,'#25394e');
-        rect(25,crouch?27:25,15,4,'#bfcbd0');
-        rect(11,crouch?28:24,9,7,'#f2c09e');
-        rect(3,crouch?23:12,7,5,'#2a3c4b');
+        const crouch=player.crouch,run=Math.sin(clock*18)*3*(Math.abs(player.vx)>5?1:0);
+        if(crouch){
+          rect(-11,0,23,7,'#e5b85e');rect(-9,5,19,10,'#efc5a7');rect(-13,14,27,10,'#5bb4a5');
+          rect(-13,24,27,4,'#243c52');rect(5,8,6,4,'#2a3c4b');
+          rect(8,14,23,6,'#25394e');rect(26,14,11,3,'#bfcbd0');rect(8,16,8,5,'#f2c09e');
+        }else{
+          rect(-11,0,23,7,'#e5b85e');rect(-9,6,19,11,'#efc5a7');rect(-13,18,27,15,'#5bb4a5');
+          rect(-11,33,8,8+run,'#243c52');rect(4,33,8,8-run,'#243c52');
+          rect(-13,40+run,11,3,'#d3e9d6');rect(3,40-run,11,3,'#d3e9d6');
+          rect(5,10,6,4,'#2a3c4b');rect(8,20,23,6,'#25394e');rect(26,20,11,3,'#bfcbd0');rect(8,23,8,5,'#f2c09e');
+        }
         c.restore();
+      }
+      function drawIntel(item){
+        if(item.done)return;
+        const y=item.y+Math.sin(clock*3+item.x)*3;
+        rect(item.x-13,y-13,26,26,'#80e5e1');rect(item.x-10,y-10,20,20,'#143743');
+        rect(item.x-5,y-7,10,14,'#b8f6e6');rect(item.x-2,y-4,7,2,'#27878d');rect(item.x-2,y,7,2,'#27878d');
+        c.font='bold 11px system-ui';c.fillStyle='#d8fff0';c.fillText('情报',item.x-12,y-21);
       }
       function drawEnemy(e){
         if(e.dead)return;
@@ -487,7 +728,11 @@
         if(boss.dead)return;
         const x=boss.x,y=boss.y;
         rect(x+10,y+15,83,90,'#313a57');rect(x+18,y,68,27,'#6d7890');
-        rect(x+24,y+30,55,45,'#985969');rect(x+36,y+40,31,26,'#edb376');
+        rect(x+24,y+30,55,45,stageIndex===2?'#b54d51':'#985969');rect(x+36,y+40,31,26,stageIndex===2?'#ffce82':'#edb376');
+        if(stageIndex===2){
+          rect(x+41,y+44,21,18,'#fff0ad');rect(x+45,y-9,13,13,'#ff976b');
+          rect(x-4,y+34,9,48,'#d9656a');rect(x+99,y+34,9,48,'#d9656a');
+        }
         rect(x+2,y+45,22,40,'#66758d');rect(x+81,y+45,22,40,'#66758d');
         rect(x+6,y+3,17,13,'#a9c6c8');rect(x+80,y+3,17,13,'#a9c6c8');
         rect(x+18,y+83,24,22,'#1d2840');rect(x+62,y+83,24,22,'#1d2840');
@@ -495,7 +740,7 @@
         rect(x+14,y-20,75,7,'#182738');
         rect(x+14,y-20,75*boss.hp/boss.maxHp,7,enraged?'#ff7068':'#f1ad65');
         if(boss.windup>0){
-          const charging=1-boss.windup/.72;
+          const charging=1-boss.windup/boss.chargeDuration;
           rect(x-27,y+47,29,15,'#e36c59');
           rect(x-21,y+51,19,7,'#fff0ba');
           rect(x+13,y-32,77,6,'#1e2c42');
@@ -518,11 +763,21 @@
         c.save();
         background();
         if(stage){
-          const dx=shake>0?rng(-shake,shake):0;
+          const dx=shake>0&&!reducedMotion?rng(-shake,shake):0;
           c.translate(Math.round(-cam+dx),0);
           terrain();
           for(const p of pickups)drawPickup(p);
+          for(const item of intel)drawIntel(item);
           for(const e of enemies)drawEnemy(e);
+          if(!boss.dead&&boss.attackType==='beam'&&(boss.windup>0||boss.beamTime>0)){
+            const firing=boss.beamTime>0;
+            if(firing){rect(boss.x-760,boss.beamY-6,780,12,'#ff7d79');rect(boss.x-760,boss.beamY-2,780,4,'#fff2bf');}
+            else{
+              c.globalAlpha=.5+Math.sin(clock*15)*.2;
+              for(let x=boss.x-760;x<boss.x;x+=24)rect(x,boss.beamY-2,14,4,'#ffc46a');
+              c.globalAlpha=1;
+            }
+          }
           drawBoss();drawSoldier();
           for(const b of bullets){
             rect(b.x-5,b.y-2,10,4,b.owner==='p'?'#ffe6a4':'#ff8972');
@@ -533,6 +788,11 @@
           if(!boss.dead&&Math.abs(boss.x-player.x)<750){
             rect(cam+W/2-150,15,300,10,'#172338');
             rect(cam+W/2-147,18,294*boss.hp/boss.maxHp,4,'#f0ac73');
+            c.font='bold 14px system-ui';c.fillStyle='#fff0d6';c.fillText(stage.bossName,cam+W/2-150,47);
+            if(boss.windup>0&&boss.attackType==='beam'){
+              rect(cam+W/2-175,63,350,34,'#241d31');c.fillStyle='#ffe7a1';
+              c.fillText(boss.beamY>G-20?'低位激光蓄力 · 跳跃 / 冲刺':'高位激光蓄力 · 下蹲 / 冲刺',cam+W/2-150,85);
+            }
           }
           if(boss.dead){c.font='bold 15px system-ui';c.fillStyle='#d7f5c4';c.fillText('EXIT →',stage.width-218,G-181);}
         }
@@ -540,6 +800,12 @@
         if(stage&&phase==='playing'){
           rect(0,H-5,W,5,'#21374a');
           rect(0,H-5,W*clamp(player.x/(stage.width-110),0,1),5,'#f3be6b');
+          c.font='bold 14px system-ui';c.fillStyle='#e4effa';
+          c.fillText((boss.dead?'前往出口 →':'目标：击败'+stage.bossName)+'  /  情报 '+collected()+'/3',18,28);
+          const loadout=Object.keys(UPGRADES).filter(key=>upgrades[key]>0).map(key=>UPGRADES[key]+' ×'+upgrades[key]).join('  ·  ');
+          if(loadout){c.font='12px system-ui';c.fillStyle='#ffe0a5';c.fillText(loadout,18,H-20);}
+          if(player.dashCooldown>0){rect(18,40,90,5,'#29425a');rect(18,40,90*(1-player.dashCooldown/(2.4-upgrades.dash*.6)),5,'#a8d9ff');}
+
         }
       }
       function inputName(key){
@@ -550,85 +816,122 @@
         if(['arrowdown','s'].includes(k))return 'down';
         if(['j','z'].includes(k))return 'fire';
         if(['k','x'].includes(k))return 'grenade';
+        if(['shift','l'].includes(k))return 'dash';
         return '';
       }
+      function queueAction(name){
+        if(name==='jump')jumpQueued=true;
+        if(name==='grenade')grenadeQueued=true;
+        if(name==='dash')dashQueued=true;
+      }
       window.addEventListener('keydown',e=>{
+        if(e.ctrlKey||e.metaKey||e.altKey)return;
         const key=e.key.toLowerCase(),name=inputName(e.key);
-        if(name){e.preventDefault();if(!held.has(name)){
-          if(name==='jump')jumpQueued=true;
-          if(name==='grenade')grenadeQueued=true;
-        }held.add(name);}
+        const buttonFocused=e.target?.tagName==='BUTTON';
+        // Never steal Space/Enter or movement keys from focused menu controls.
+        if(phase!=='playing'){
+          if(e.repeat)return;
+          if(key==='p'||key==='escape'){e.preventDefault();togglePause();}
+          else if(key==='r'){e.preventDefault();requestConfirm('restart');}
+          else if(key==='enter'&&!buttonFocused){e.preventDefault();activate();}
+          return;
+        }
+        if(buttonFocused&&(key==='enter'||key===' '))return;
+        if(name){e.preventDefault();if(!held.has(name))queueAction(name);held.add(name);}
         if(e.repeat)return;
         if(key==='p'||key==='escape'){e.preventDefault();togglePause();}
-        if(key==='r'){e.preventDefault();startNew();}
-        if(key==='enter'&&phase!=='playing'){e.preventDefault();activate();}
+        if(key==='r'){e.preventDefault();requestConfirm('restart');}
       });
-      window.addEventListener('keyup',e=>{const name=inputName(e.key);if(name){e.preventDefault();held.delete(name);}});
-      window.addEventListener('blur',()=>{held.clear();padHeld.clear();touch.clear();if(phase==='playing')togglePause();});
+      window.addEventListener('keyup',e=>{const name=inputName(e.key);if(name){held.delete(name);if(phase==='playing')e.preventDefault();}});
+      window.addEventListener('blur',()=>{clearInput();if(phase==='playing')togglePause();});
       document.querySelectorAll('[data-action]').forEach(btn=>{
         btn.addEventListener('pointerdown',e=>{
-          e.preventDefault();
-          try{btn.setPointerCapture(e.pointerId);}catch{/* 不支持捕获时仍允许触屏按下 */}
-          const name=btn.dataset.action;
-          if(name==='jump')jumpQueued=true;
-          if(name==='grenade')grenadeQueued=true;
-          touch.set(e.pointerId,name);btn.classList.add('active');
+          e.preventDefault();if(phase!=='playing')return;
+          try{btn.setPointerCapture(e.pointerId);}catch{/* Capture is optional on older touch browsers. */}
+          const name=btn.dataset.action;queueAction(name);touch.set(e.pointerId,name);btn.classList.add('active');
         });
-        const release=e=>{touch.delete(e.pointerId);btn.classList.remove('active');};
-        btn.addEventListener('pointerup',release);btn.addEventListener('pointercancel',release);
-        btn.addEventListener('lostpointercapture',release);
+        const release=e=>{touch.delete(e.pointerId);if(!touches(btn.dataset.action))btn.classList.remove('active');};
+        btn.addEventListener('pointerup',release);btn.addEventListener('pointercancel',release);btn.addEventListener('lostpointercapture',release);
       });
       function activate(){
-        if(phase==='title'||phase==='gameOver'||phase==='victory')startNew();
+        if(action.disabled)return;
+        if(phase==='title'||phase==='victory')startNew();
+        else if(phase==='gameOver'||phase==='practiceClear')mode==='practice'?beginRun(stageIndex,'practice'):startNew();
         else if(phase==='pause')resume();
         else if(phase==='stageClear')nextStage();
+        else if(phase==='confirmRestart')confirmAction==='home'?openTitle():(mode==='practice'?beginRun(stageIndex,'practice'):startNew());
       }
       action.addEventListener('click',activate);
       $('pause').addEventListener('click',togglePause);
-      $('restart').addEventListener('click',startNew);
+      $('restart').addEventListener('click',()=>requestConfirm('restart'));
+      $('menu-home').addEventListener('click',()=>requestConfirm('home'));
+      $('cancel-restart').addEventListener('click',cancelConfirm);
+      for(const key of Object.keys(UPGRADES))$('upgrade-'+key).addEventListener('click',()=>chooseUpgrade(key));
+      for(let i=0;i<STAGES.length;i++)$('stage-'+(i+1)).addEventListener('click',()=>startPractice(i));
+      for(const value of ['standard','relaxed'])$('difficulty-'+value).addEventListener('click',()=>{
+        if(phase!=='title')return;
+        difficulty=value;progress.selectedDifficulty=value;best=progress.campaign[difficulty].best;
+        // The title preview has no active run; reflect difficulty without altering saved records.
+        upgrades={rapid:0,dash:0,armor:0};resetStage(0,null);saveProgress();refreshRecords();hud();
+      });
       $('sound').addEventListener('click',()=>{
         soundOn=!soundOn;$('sound').textContent='音效 '+(soundOn?'开':'关');
         $('sound').setAttribute('aria-pressed',String(soundOn));beep(600,.08);
       });
       document.addEventListener('visibilitychange',()=>{
-        if(document.hidden&&phase==='playing')togglePause();
+        if(document.hidden){clearInput();if(phase==='playing')togglePause();}
       });
-
       function pollGamepad(){
-        const pad=navigator.getGamepads?.()[0];
+        const pads=navigator.getGamepads?.()||[];
+        const pad=Array.from(pads).find(item=>item?.connected);
         padHeld.clear();
-        if(!pad||!pad.connected){gunPadLast=false;bombPadLast=false;jumpPadLast=false;return;}
-        const buttons=pad.buttons;const left=pad.axes[0]<-.35||buttons[14]?.pressed;
-        const right=pad.axes[0]>.35||buttons[15]?.pressed;
+        if(!pad||document.hidden){bombPadLast=false;jumpPadLast=false;dashPadLast=false;pausePadLast=false;padBlocked=true;return;}
+        const buttons=pad.buttons;
+        const left=pad.axes[0]<-.35||buttons[14]?.pressed,right=pad.axes[0]>.35||buttons[15]?.pressed;
         const down=pad.axes[1]>.45||buttons[13]?.pressed;
-        if(left)padHeld.add('left');if(right)padHeld.add('right');if(down)padHeld.add('down');
         const jump=Boolean(buttons[0]?.pressed),bomb=Boolean(buttons[1]?.pressed),fire=Boolean(buttons[2]?.pressed||buttons[5]?.pressed);
+        const burst=Boolean(buttons[4]?.pressed),pause=Boolean(buttons[9]?.pressed);
+        const neutral=!left&&!right&&!down&&!jump&&!bomb&&!fire&&!burst&&!pause;
+        if(padBlocked){if(neutral)padBlocked=false;return;}
+        if(pause&&!pausePadLast){
+          if(phase==='title')startNew();else togglePause();
+          pausePadLast=pause;return;
+        }
+        pausePadLast=pause;
+        if(phase!=='playing'){bombPadLast=bomb;jumpPadLast=jump;dashPadLast=burst;return;}
+        if(left)padHeld.add('left');if(right)padHeld.add('right');if(down)padHeld.add('down');
+        if(jump)padHeld.add('jump');if(fire)padHeld.add('fire');
         if(jump&&!jumpPadLast)jumpQueued=true;
         if(bomb&&!bombPadLast)grenadeQueued=true;
-        if(fire)padHeld.add('fire');
-        jumpPadLast=jump;bombPadLast=bomb;gunPadLast=fire;
-        if(buttons[9]?.pressed&&phase==='title')startNew();
+        if(burst&&!dashPadLast)dashQueued=true;
+        jumpPadLast=jump;bombPadLast=bomb;dashPadLast=burst;
       }
       function loop(t){
-        let delta=Math.min((t-frameLast)/1000||0,.06);frameLast=t;
+        const delta=Math.min((t-frameLast)/1000||0,.06);frameLast=t;
+        pollGamepad();
         if(phase==='playing'){
-          pollGamepad();lag=Math.min(lag+delta,.16);
-          while(lag>=DT){update(DT);lag-=DT;}
+          lag=Math.min(lag+delta,.16);
+          while(lag>=DT&&phase==='playing'){lag-=DT;update(DT);}
         }else lag=0;
-        draw();
-        requestAnimationFrame(loop);
+        draw();requestAnimationFrame(loop);
       }
-      // This is a read-only state interface used by the repository's headless gameplay checks.
+      // Detached snapshots only. The shipped game has no mutable test hooks.
       Object.defineProperty(window,'__raidState',{get:()=>({
-        ready:true,phase,stage:stageIndex+1,x:player?.x??0,y:player?.y??0,hp:player?.hp??0,
+        ready:true,phase,stage:stageIndex+1,stageName:stage?.name??'',x:player?.x??0,y:player?.y??0,hp:player?.hp??0,
         lives:player?.lives??0,score:points,shots:shotsFired,bullets:bullets.length,
         grenades:player?.grenades??0,bossHp:boss?.hp??0,ground:player?.ground??false,
         cam,worldWidth:stage?.width??0,touchCount:touch.size,
         weapon:player?.weaponTime>0?'spread':'rifle',weaponTime:player?.weaponTime??0,
         lastVolley:player?.lastVolley??0,bossCharge:boss?.windup??0,
-        bossAttacks:boss?.attacks??0,bossLastVolley:boss?.lastVolley??0,
-        bossRage:!!boss&&boss.hp<=boss.maxHp*.5
+        bossAttacks:boss?.attacks??0,bossLastVolley:boss?.lastVolley??0,bossRage:!!boss&&boss.hp<=boss.maxHp*.5,
+        mode,difficulty,intel:collected(),intelTotal:3,stageDeaths,stageStars,unlocked:progress.unlocked,
+        upgrades:{...upgrades},dashCooldown:player?.dashCooldown??0,dashTime:player?.dashTime??0,
+        checkpoint:player?.checkpoint??64,maxHp:maxHealth(),selectedUpgrade,storageAvailable,
+        crouch:player?.crouch??false,playerHeight:player?.h??44,coyote:player?.coyote??0,jumpBuffer:player?.jumpBuffer??0,
+        bossAttackType:boss?.attackType??'volley',bossBeamTime:boss?.beamTime??0,bossBeamY:boss?.beamY??0,
+        clock,runStars:[...runStars],progress:JSON.parse(JSON.stringify(progress))
       })});
+      refreshRecords();
       resetStage(0,null);phase='title';hud();draw();window.__raidReady=true;requestAnimationFrame(loop);
     })();
   </script>

@@ -58,18 +58,18 @@ export const GAMES: Game[] = [
     title: 'PIXEL RAID',
     subtitle: '像素突围',
     description:
-      '两关像素场景，移动、跳跃、连续出击和手雷。打败最后的 Boss，向右突围。支持键盘和触屏，最高分存在本机。',
+      '三关像素战役，跳跃、冲刺与连续出击。收集情报，选择战术升级，挑战每关三星；支持关卡训练、键盘与触屏，本机保存进度。',
     tags: ['横版动作', '像素', '离线单机'],
     facts: [
-      { value: '2', label: '关卡' },
-      { value: '3', label: '条命' },
+      { value: '3', label: '关卡' },
+      { value: '9', label: '颗星' },
       { value: 'Boss', label: '战' },
       { value: '键盘', label: '触屏' },
     ],
     file: '/games/pixelraid.html',
     accent: ['#2a586b', '#a45a50'],
     badge: '离线单机',
-    weight: '单文件离线运行，首次打开约 15KB',
+    weight: '单文件离线运行，无外部资源',
   },
 ];
 
