@@ -60,7 +60,7 @@ function createGame({ storage = {}, blocked = false, reducedMotion = false, rand
           const event = { target: this, currentTarget: this, preventDefault() {}, stopPropagation() {}, ...options };
           for (const callback of listeners.get(name) ?? []) callback(event);
         },
-        click() { this.dispatch('click'); },
+        click() { this.dispatch('click',{detail:0}); },
         blur() { if (document.activeElement === this) document.activeElement = null; },
         focus() { document.activeElement = this; },
         setPointerCapture() {}, releasePointerCapture() {},
@@ -2634,6 +2634,193 @@ test('all elevated arena weapons are reachable and descendable with unassisted m
     g.key('s'); g.key('w'); tick(g); g.key('s', false); g.key('w', false); tick(g, 60);
     eq(g.state().y + g.state().playerHeight, 425); eq(g.state().ground, true); eq(g.state().dropTime, 0);
     eq(g.state().hp, 6); eq(g.state().lives, 1); eq(g.state().score, 75);
+  }
+});
+
+// Loadout actives use only survival resources. Boundary fixtures below isolate
+// damage; browser checks additionally activate every kit with real controls.
+function tacticalGame(loadout='assault') {
+  const g=defense({loadout});
+  g.run("spawnTime=0;pickups=[];enemies.forEach(e=>e.shot=100);player.inv=100;");
+  return g;
+}
+function useSkill(g) { g.key('e'); tick(g); g.key('e',false); }
+
+test('active skills start full only in survival, reject spawn and menus, and consume exactly once',()=>{
+  for(const loadout of ['assault','counter','demolition']) {
+    const g=defense({loadout}); eq(g.state().tacticalCharge,100); eq(g.state().tacticalUses,0);
+    g.key('e');tick(g);g.click('tactical-use');tick(g);eq(g.state().tacticalUses,0);
+    g.run('spawnTime=0;');g.key('e',true,true);tick(g);eq(g.state().tacticalUses,0,'Held spawn input must not release later');
+    g.key('e',false);g.key('p');const paused=g.state();g.click('tactical-use');g.key('e');g.frames(5);eq(g.state(),paused);
+    g.key('p',false);g.key('p');g.key('p',false);
+    g.click('tactical-use');g.click('tactical-use');tick(g);eq(g.state().tacticalUses,1);eq(g.state().tacticalCharge,0);
+    g.click('tactical-use');useSkill(g);eq(g.state().tacticalUses,1);
+  }
+  const g=createGame();g.start();const before=g.state();useSkill(g);eq(g.state().tacticalCharge,0);eq(g.state().tacticalUses,0);eq(g.state().shots,before.shots);
+  eq(g.nodes.get('tactical-hud').hidden,true);
+});
+
+test('charge rewards real damage and kills once, caps overkill, and ignores shields, arrival and idle time',()=>{
+  const g=tacticalGame();g.run('tacticalCharge=0;');
+  g.run('damageEnemy(enemies[0],1);');eq(g.state().tacticalCharge,3);
+  g.run('damageEnemy(enemies[0],99);');eq(g.state().tacticalCharge,21);
+  g.run('damageEnemy(enemies[0],99);');eq(g.state().tacticalCharge,21);
+  g.run("const shield=makeEnemy(600,'shield');shield.face=-1;hitEnemy(shield,{damage:20,vx:650,x:590,y:400,reflected:false});");eq(g.state().tacticalCharge,21);
+  g.run("projectile(10,10,0,0,'e');reflectBullet(bullets[0]);reflectBullet(bullets[0]);");eq(g.state().tacticalCharge,29);
+  g.run('enemies.forEach(e=>e.shot=100);');tick(g,120);eq(g.state().tacticalCharge,29);
+  g.run('tacticalCharge=95;damageEnemy(enemies[1],99);');eq(g.state().tacticalCharge,100);
+  g.run('tacticalCharge=0;spawnTime=2;damageEnemy(enemies[2],1);');eq(g.state().tacticalCharge,0);
+});
+
+test('overclock changes real rifle and scatter cadences without mutating upgrades or weapon timers',()=>{
+  for(const scatter of [false,true])for(const rapid of [0,2]) {
+    const normal=tacticalGame(),active=tacticalGame();
+    for(const g of [normal,active])g.run(`upgrades.rapid=${rapid};player.weaponTime=${scatter?12:0};player.boost=10;fire();player.shoot=0;`);
+    useSkill(active);normal.run('fire();');active.run('fire();');
+    near(active.read('player.shoot'),normal.read('player.shoot')*.55);eq(active.state().lastVolley,scatter?3:1);
+    eq(active.state().upgrades,normal.state().upgrades);assert(active.state().weaponTime<=normal.state().weaponTime);
+    eq(active.read('bullets.at(-1).tactical'),true);
+    active.run('damageEnemy(enemies[0],1);');eq(active.state().tacticalCharge,0);
+    active.run("tacticalTime=0;enemies[0].hp=10;hitEnemy(enemies[0],bullets.at(-1));");eq(active.state().tacticalCharge,0,'Late empowered shot recharged itself');
+    active.run('damageEnemy(enemies[0],1);');eq(active.state().tacticalCharge,3);
+  }
+});
+
+test('phase shield reflects swept collisions, prevents contact and beam damage, and expires without extra invulnerability',()=>{
+  const g=tacticalGame('counter');g.run('player.inv=0;');useSkill(g);
+  g.run("projectile(player.x-20,player.y+20,3000,0,'e');");tick(g);
+  eq(g.state().hp,5);eq(g.state().reflections,1);eq(g.read('bullets[0].tactical'),true);eq(g.read('bullets[0].damage'),3);eq(g.state().tacticalCharge,0);
+  g.run('hurt(99);');eq(g.state().hp,5);eq(g.state().lives,1);
+  g.run('bullets=[];enemies.forEach(e=>e.shot=100);');tick(g,185);eq(g.state().tacticalTime,0);
+  g.run('hurt(1);');eq(g.state().hp,4);eq(g.state().tacticalCharge,0);
+  const boss=defenseBoss(9,{loadout:'counter'});
+  boss.run("loadout='counter';tacticalCharge=100;spawnTime=0;player.inv=0;boss.attackType='beam';boss.beamTime=.4;boss.beamY=player.y+20;");const hp=boss.state().hp;useSkill(boss);eq(boss.state().tacticalUses,1);tick(boss,5);eq(boss.state().hp,hp);eq(boss.state().reflections,0);eq(boss.state().stageDeaths,0);
+});
+
+test('phase reflected shots remain ineligible for charge after expiry and reflux still has one cooldown',()=>{
+  const g=tacticalGame('counter');g.run('upgrades.dash=1;upgrades.reflect=1;player.hp=3;');useSkill(g);
+  g.run("projectile(10,10,0,0,'e');projectile(20,10,0,0,'e');reflectBullet(bullets[0]);reflectBullet(bullets[1]);");
+  eq(g.state().hp,4);eq(g.state().refluxCooldown,8);eq(g.state().tacticalCharge,0);
+  g.run('tacticalTime=0;hitEnemy(enemies[0],bullets[0]);');eq(g.state().tacticalCharge,0);
+});
+
+test('shock pulse has fixed reach and damage, spares arriving targets, clears only nearby hostiles and never refunds grenades',()=>{
+  const g=tacticalGame('demolition');
+  g.run("upgrades.armor=2;upgrades.blast=2;const cx=player.x+player.w/2;enemies=[makeEnemy(cx+100,'shield'),makeEnemy(cx+221,'walker'),makeEnemy(cx-40,'walker'),makeEnemy(cx+50,'walker')];enemies[0].hp=20;enemies[3].arrival=.5;enemies.forEach(e=>e.shot=100);projectile(cx+30,player.y+20,0,0,'e');projectile(cx+221,player.y+20,0,0,'e');projectile(cx+20,player.y+20,0,0,'p');");
+  const before=g.state();useSkill(g);
+  eq(g.read('enemies.map(e=>e.hp)'),[12,3,-5,3]);eq(g.state().grenades,before.grenades);eq(g.state().tacticalCharge,0);
+  eq(g.read("bullets.filter(b=>b.owner==='e').length"),1);eq(g.read("bullets.filter(b=>b.owner==='p').length"),1);
+  assert(g.state().score>before.score);eq(g.state().tacticalTime,0);eq(g.state().tacticalUses,1);
+});
+
+test('shock pulse damages a nearby boss once and cannot hit through the spawn warning',()=>{
+  const g=defenseBoss(3,{loadout:'demolition'});
+  g.run("loadout='demolition';tacticalCharge=100;spawnTime=1;player.x=boss.x-100;");useSkill(g);eq(g.state().tacticalCharge,100);
+  const hp=g.state().bossHp;g.run('spawnTime=0;');useSkill(g);eq(g.state().bossHp,hp-8);eq(g.state().tacticalCharge,0);
+  tick(g,30);eq(g.state().bossHp,hp-8);eq(g.state().tacticalUses,1);
+});
+
+test('skills and energy freeze across pause, visibility and canceled restart without queued activation',()=>{
+  const g=tacticalGame();useSkill(g);tick(g,20);g.key('p');g.key('p',false);
+  const frozen=g.state();g.frames(100);eq(g.state(),frozen);
+  g.click('restart');g.click('cancel-restart');eq(g.state(),frozen);
+  g.key('e');g.click('tactical-use');g.click('start');tick(g);eq(g.state().tacticalUses,1);assert(g.state().tacticalTime<frozen.tacticalTime);
+  g.visibility(true);const hidden=g.state();g.frames(60);eq(g.state(),hidden);
+  g.visibility(false);g.click('start');tick(g);eq(g.state().tacticalUses,1);
+});
+
+test('wave transition keeps energy but not active effects; restart and home isolate all transient skill state',()=>{
+  const g=tacticalGame();useSkill(g);g.run('tacticalCharge=37;');finishDefenseWave(g);
+  eq(g.state().tacticalCharge,37);eq(g.state().tacticalTime,0);g.click('supply-0');g.click('start');eq(g.state().tacticalCharge,37);
+  g.click('restart');g.click('start');eq(g.state().tacticalCharge,100);eq(g.state().tacticalTime,0);eq(g.state().tacticalUses,0);
+  g.key('p');g.key('p',false);g.click('menu-home');g.click('start');eq(g.state().tacticalCharge,0);eq(g.nodes.get('tactical-hud').hidden,true);
+  g.click('mode-challenges');g.click('challenge-counter');useSkill(g);eq(g.state().tacticalCharge,0);eq(g.state().tacticalUses,0);
+});
+
+test('gamepad Y is neutral-armed and edge-triggered across pause and restart',()=>{
+  const g=tacticalGame();g.pad([3]);g.frames(3);eq(g.state().tacticalUses,0);
+  g.pad();g.frames(2);g.pad([3]);g.frames(2);eq(g.state().tacticalUses,1);
+  g.run('tacticalCharge=100;tacticalTime=0;');g.frames(3);eq(g.state().tacticalUses,1);
+  g.pad();g.frames(2);g.pad([3]);g.frames(2);eq(g.state().tacticalUses,2);
+  g.key('p');g.key('p',false);g.click('restart');g.click('start');g.frames(3);eq(g.state().tacticalUses,0);
+});
+
+test('keyboard, touch and gamepad all discard skill input on the final spawn-warning tick',()=>{
+  for(const input of ['key','touch','pad']) {
+    const g=tacticalGame();g.pad();g.frames(2);g.run('spawnTime=.001;');
+    if(input==='key')g.key('e');
+    if(input==='touch')g.nodes.get('tactical-use').dispatch('pointerdown',{pointerId:91});
+    if(input==='pad')g.pad([3]);
+    g.frames(2);eq(g.state().spawnTime,0);eq(g.state().tacticalUses,0);eq(g.state().tacticalCharge,100);
+  }
+});
+
+test('a skill pointer release cannot re-activate after recharge or after a rejected ingress press',()=>{
+  const g=tacticalGame('demolition'),button=g.nodes.get('tactical-use');
+  button.dispatch('pointerdown',{pointerId:1});tick(g);eq(g.state().tacticalUses,1);
+  g.run('tacticalCharge=100;');button.dispatch('pointerup',{pointerId:1});button.dispatch('click',{detail:1});tick(g);eq(g.state().tacticalUses,1);
+  g.run('spawnTime=.001;');button.dispatch('pointerdown',{pointerId:2});tick(g);
+  button.dispatch('pointerup',{pointerId:2});button.dispatch('click',{detail:1});tick(g);eq(g.state().tacticalUses,1);
+  button.click();tick(g);eq(g.state().tacticalUses,2,'Native keyboard click must remain usable');
+});
+
+test('99 charge is not ready and boss kills grant only actual damage plus one kill reward',()=>{
+  const g=tacticalGame();g.run('tacticalCharge=99;');useSkill(g);eq(g.state().tacticalUses,0);
+  g.run('chargeTactical(1);');useSkill(g);eq(g.state().tacticalUses,1);
+  const b=defenseBoss(12);b.run('spawnTime=0;tacticalCharge=0;boss.hp=2;damageBoss(999);');eq(b.state().tacticalCharge,18);
+  b.run('damageBoss(999);');eq(b.state().tacticalCharge,18);
+});
+
+test('skill meter and charge snapshots are detached and never alter the saved record schema',()=>{
+  for(const blocked of [false,true]) {
+    const g=defense({blocked,loadout:'demolition'});g.run('spawnTime=0;');const before=g.state().progress;useSkill(g);
+    const state=g.win.__raidState;state.tacticalCharge=100;state.tacticalTime=100;eq(g.state().tacticalCharge,0);eq(g.state().tacticalTime,0);
+    g.run('hud();');eq(g.nodes.get('tactical-meter').getAttribute('aria-valuenow'),'0');eq(g.nodes.get('tactical-use').getAttribute('aria-disabled'),'true');
+    eq(g.state().progress,before);eq(Object.hasOwn(g.state().progress.survival,'tacticalCharge'),false);
+  }
+});
+
+test('active skills support all three loadouts through four real-input waves without changing baseline replays', () => {
+  for (const randomSeed of [1, 16437]) for (const loadout of ['assault', 'counter', 'demolition']) {
+    for (const cadence of [8]) {
+      const g = defense({ randomSeed, loadout }), tap = key => { g.key(key); g.key(key, false); };
+      const encountered = new Set(); let frame = 0, decisions = 0, reflected = 0;
+      // Seed only the VM fixture before initialization. Thereafter this is the
+      // same read-only controller used by Chromium: real keys and menu clicks.
+      for (let wave = 1; wave <= 4; wave++) {
+        const decide = survivalTactics();
+        eq(g.state().survivalWave, wave); g.key('j');
+        let duration = 0;
+        while (g.state().phase === 'playing' && duration < 3600) {
+          if (frame % cadence === 0) {
+            decisions++;
+            const s = g.state(); s.enemies.forEach(enemy => encountered.add(enemy.type));
+            const input = decide(s);
+            g.key('a', input.move === 'a'); g.key('d', input.move === 'd');
+            if (input.jump && s.ground) { g.key('w', false); g.key('w'); }
+            else if (!input.jump) g.key('w', false);
+            if (s.spawnTime === 0 && s.tacticalCharge === 100 && (loadout !== 'demolition' || s.bossWave || s.enemies.some(e => Math.abs(e.x - s.x) < 190))) tap('e');
+            if (input.dash) tap('l');
+            if (input.grenade) tap('k');
+          }
+          tick(g); duration++; frame++;
+        }
+        for (const key of ['a', 'd', 'w', 'j']) g.key(key, false);
+        const s = g.state();
+        eq(s.phase, 'waveClear', `Loadout ${loadout}, seed ${randomSeed}, cadence ${cadence}, wave ${wave}: ` + JSON.stringify(s));
+        eq(s.survivalCleared, wave); eq(s.lives, 1); assert(s.hp > 0); eq(s.stageDeaths, 0); reflected += s.reflections;
+        assert(duration > 132 && duration < 3600, 'Opening waves must resolve in under one active minute');
+        if (wave < 4) {
+          let choice = s.supplyOffers.indexOf('armor');
+          if (choice < 0) choice = s.hp < 4 ? s.supplyOffers.indexOf('heal') : 0;
+          g.click('supply-' + Math.max(0, choice)); g.click('start');
+        }
+      }
+      assert(g.state().tacticalUses >= 2, 'Combat did not recharge a second use');
+      eq([...encountered].sort(), ['drone', 'shield', 'turret', 'walker']);
+      assert(reflected > 0 && decisions > 20); eq(g.state().progress.survival.wave, 4);
+      eq(g.state().progress.survival.best, g.state().score);
+    }
   }
 });
 

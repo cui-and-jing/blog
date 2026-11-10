@@ -60,6 +60,12 @@
     .contract-panel .choice-grid{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:10px}
     .contract-panel .small{margin-top:9px}.contract-hud{border-color:#66baa9;background:#143a3b}
     @media(max-width:480px){.contract-panel .choice-grid{grid-template-columns:1fr}}
+    .tactical{display:flex;align-items:center;gap:12px;width:100%;max-width:1200px;margin:0 auto;padding:8px 10px;border:1px solid #687eaa;border-radius:9px;background:#202d48}
+    .tactical button{flex:none;min-height:44px;min-width:112px;padding:8px 12px;border:2px solid #f1d681;border-radius:8px;background:#f1d681;color:#17253d;font-size:13px;font-weight:800;touch-action:manipulation}
+    .tactical button[aria-disabled="true"]{background:#2f405d;color:#d1ddec;border-color:#7d93b1}
+    .tactical-info{flex:1;min-width:0;font-size:12px;line-height:1.5;color:#d6e6fb}.tactical-info p{margin:0 0 4px}
+    .tactical-meter{height:5px;background:#0c1b30;border-radius:4px;overflow:hidden}.tactical-meter i{display:block;height:100%;background:#aee9f6}
+    @media(max-width:480px){.tactical{gap:8px}.tactical button{min-width:106px;padding:7px;font-size:12px}.tactical-info{font-size:11px}}
     .legend{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;color:#b9cce1;font-size:12px;line-height:1.6;max-width:1100px;margin:0 auto}
     kbd{display:inline-block;border:1px solid #61758e;border-bottom-width:2px;padding:0 5px;background:#213750;border-radius:4px;color:#fff7da}
     .controls{display:none;justify-content:space-between;align-items:center;gap:12px;max-width:1200px;width:100%;margin:0 auto;touch-action:none;user-select:none}
@@ -169,6 +175,7 @@
             </div>
             <p id="loadout-status" class="small" role="status"></p>
           </div>
+          <p id="tactical-help" class="small">装具主动技：机动突击可超频连射 6 秒；反击先锋可开启相位护盾 3 秒，免伤并反弹接触的敌弹；爆破专家可释放半径 220 的震荡脉冲，造成 8 点伤害并清敌弹。开局充满，E / 手柄 Y / 屏幕按钮释放。普通攻击每造成 1 点伤害充能 3，击杀 +12，冲刺反弹 +8；技能生效期间及技能弹不充能。波间保留能量，效果不跨波；增援预告中不能释放。</p>
           <p id="survival-record" class="result-details">最高守住 0 波 · 最高 0 分</p>
           <p class="small">没有终点。已守住的波数与对应清场得分自动记录；未清场的当前波不计入纪录。暂停和整备不计时。刷新会结束本局，不影响远征或挑战记录。</p>
         </section>
@@ -225,6 +232,10 @@
       </div>
     </div>
   </main>
+  <section id="tactical-hud" class="tactical" aria-label="装具主动技" hidden>
+    <button id="tactical-use" data-action="tactical" type="button" aria-disabled="true" aria-describedby="tactical-status tactical-help">主动技 E</button>
+    <div class="tactical-info"><p id="tactical-status"></p><div id="tactical-meter" class="tactical-meter" role="progressbar" aria-label="主动技充能" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="tactical-fill"></i></div></div>
+  </section>
   <section class="controls" aria-label="触屏操作">
     <div class="cluster">
       <button type="button" data-action="left" aria-label="向左移动">◀</button>
@@ -309,6 +320,11 @@
         counter:{name:'反击先锋',hp:5,grenades:3,dash:.4,reflect:1,blast:0,fire:1,description:'5 体力；冲刺冷却少 0.4 秒、反弹伤害 +1。'},
         demolition:{name:'爆破专家',hp:6,grenades:5,dash:0,reflect:0,blast:1,fire:1.25,description:'5 枚起始手雷；爆炸伤害 +2、范围 +24 并清敌弹；射击间隔增加 25%。'}
       };
+      const TACTICS={
+        assault:{name:'超频连射',duration:6,description:'6 秒射击间隔减少 45%，可与模组和散弹搭配。',color:'#ffd781'},
+        counter:{name:'相位护盾',duration:3,description:'3 秒免伤并反弹接触的敌弹，包括穿过激光。',color:'#a6eaff'},
+        demolition:{name:'震荡脉冲',duration:0,description:'周围半径 220 内造成 8 点伤害并清敌弹，不消耗手雷。',color:'#ffbd94'}
+      };
       const MODULES=['rapid','dash','armor','pierce','reflect','blast'];
       const SYNERGIES={
         piercing:{name:'贯穿火力',pair:['rapid','pierce'],description:'步枪每发伤害 +1；散弹保持原伤害。'},
@@ -327,6 +343,9 @@
       let survivalWave=0,survivalCleared=0,survivalTime=0,spawnTime=0,supplyOffers=[],selectedSupply=null;
       let refluxCooldown=0,selectedLoadout='assault',loadout='assault',supplyRerolls=0;
       let selectedContract='hold',fieldContract=null;
+      let tacticalCharge=0,tacticalTime=0,tacticalQueued=false,tacticalPadLast=false,tacticalUses=0,tacticalPulse=null;
+      const tactic=()=>TACTICS[loadout];
+      const shieldActive=()=>survival()&&loadout==='counter'&&tacticalTime>0;
       const kit=()=>LOADOUTS[survival()?loadout:'assault'];
       const survival=()=>mode==='survival';
       const bossWave=()=>survival()&&survivalWave>0&&survivalWave%3===0;
@@ -422,9 +441,9 @@
       }
       function announce(text){$('announcer').textContent=text;}
       function clearInput(){
-        held.clear();padHeld.clear();touch.clear();jumpQueued=false;grenadeQueued=false;dashQueued=false;
+        held.clear();padHeld.clear();touch.clear();jumpQueued=false;grenadeQueued=false;dashQueued=false;tacticalQueued=false;
         if(player)player.jumpBuffer=0;
-        bombPadLast=false;jumpPadLast=false;dashPadLast=false;pausePadLast=false;padBlocked=true;
+        bombPadLast=false;jumpPadLast=false;dashPadLast=false;pausePadLast=false;tacticalPadLast=false;padBlocked=true;
         document.querySelectorAll('[data-action]').forEach(btn=>btn.classList.remove('active'));
       }
       function updateSaveStatus(){
@@ -473,7 +492,7 @@
         $('challenge-menu').hidden=!titleOpen||!challenges;action.hidden=titleOpen&&challenges;
         for(const name of ['campaign','challenges','survival'])$('mode-'+name).setAttribute('aria-pressed',String(titleView===name));
         for(const key of Object.keys(LOADOUTS))$('loadout-'+key).setAttribute('aria-pressed',String(selectedLoadout===key));
-        $('loadout-status').textContent='已选 '+LOADOUTS[selectedLoadout].name+'。'+LOADOUTS[selectedLoadout].description+' 点击开始生效，可在下次开局更换。';
+        $('loadout-status').textContent='已选 '+LOADOUTS[selectedLoadout].name+'。'+LOADOUTS[selectedLoadout].description+' 主动技：'+TACTICS[selectedLoadout].name+'，'+TACTICS[selectedLoadout].description+' 点击开始生效，可在下次开局更换。';
         if(titleOpen){
           kicker.textContent=defense?'SURVIVAL / BUILD YOUR RUN':challenges?'OPERATIONS / 01—03':'EXPEDITION / 01—03';
           action.textContent=defense?'开始防线生存':'开始三章远征';
@@ -513,7 +532,7 @@
       function showMenu(head,sub,label,tag){
         clearInput();lag=0;phase=tag;title.textContent=head;message.textContent=sub;action.textContent=label;action.disabled=false;
         kicker.textContent=tag==='title'?'EXPEDITION / 01—03':tag==='pause'?'PAUSED':tag==='stageClear'?'TACTICAL UPGRADE':tag==='victory'?'ALL CLEAR':tag==='confirmRestart'?'CONFIRM':tag==='practiceClear'?'PRACTICE COMPLETE':tag==='challengeClear'?'OPERATION COMPLETE':tag==='bossBreak'?'NEXT TARGET':'TRY AGAIN';
-        renderTitleView();renderBuild();renderContract();
+        renderTitleView();renderBuild();renderContract();renderTactical();
         $('upgrade-options').hidden=tag!=='stageClear';
         $('survival-options').hidden=tag!=='waveClear';
         $('supply-reroll').hidden=tag!=='waveClear';
@@ -540,7 +559,39 @@
         if(points>record.best){record.best=bounded(points,9999999);saveProgress();}
         best=record.best;
       }
+      function renderTactical(){
+        const shown=survival()&&phase!=='title';$('tactical-hud').hidden=!shown;
+        if(!shown)return;
+        const usable=phase==='playing'&&spawnTime===0&&tacticalCharge>=100&&tacticalTime===0;
+        $('tactical-use').textContent=tactic().name+' E';
+        $('tactical-use').setAttribute('aria-disabled',String(!usable));
+        $('tactical-status').textContent=tacticalTime>0?'生效中 · '+tacticalTime.toFixed(1)+' 秒':
+          phase!=='playing'?'能量保留 · '+Math.floor(tacticalCharge)+' / 100':
+          spawnTime>0?'等待增援抵达 · '+Math.floor(tacticalCharge)+' / 100':
+          usable?'已就绪 · 点击 / E / 手柄 Y':'充能 '+Math.floor(tacticalCharge)+' / 100 · 伤害、击杀、反弹可充能';
+        $('tactical-meter').setAttribute('aria-valuenow',String(Math.floor(tacticalCharge)));
+        $('tactical-fill').style.width=tacticalCharge+'%';
+      }
+      function chargeTactical(amount,fromSkill=false){
+        if(!survival()||phase!=='playing'||spawnTime>0||tacticalTime>0||fromSkill)return;
+        const before=tacticalCharge;tacticalCharge=Math.min(100,tacticalCharge+amount);
+        if(before<100&&tacticalCharge===100)announce(tactic().name+'已就绪，按 E、手柄 Y 或屏幕按钮释放。');
+      }
+      function useTactical(){
+        if(!survival()||phase!=='playing'||spawnTime>0||tacticalCharge<100||tacticalTime>0)return;
+        tacticalCharge=0;tacticalTime=tactic().duration;tacticalUses++;
+        if(loadout==='demolition'){
+          const x=player.x+player.w/2,y=player.y+player.h/2,r=220;
+          tacticalPulse={x,y,time:.45};
+          for(const e of enemies)if(!e.dead&&!(e.arrival>0)&&circRect(x,y,r,e))damageEnemy(e,8,true);
+          if(!boss.dead&&circRect(x,y,r,boss))damageBoss(8,true);
+          bullets=bullets.filter(b=>b.owner==='p'||Math.hypot(b.x-x,b.y-y)>=r);
+        }
+        spark(player.x+player.w/2,player.y+player.h/2,tactic().color,20);beep(680,.16,'triangle');
+        combatNotice(tactic().name+(tacticalTime>0?' · '+tacticalTime+' 秒':' · 震荡清弹'));hud();
+      }
       function hud(){
+        renderTactical();
         $('level').textContent=survival()?'第 '+survivalWave+' 波 · '+stage.name:(gauntlet()?'首领 ':'')+(stageIndex+1)+' / '+STAGES.length+' · '+stage.name;
         $('lives').textContent=String(player?.lives??3);
         const hp=player?.hp??maxHealth();
@@ -571,6 +622,7 @@
         updateSaveStatus();
       }
       function resetStage(index,carry){
+        tacticalTime=0;tacticalPulse=null;if(!survival()){tacticalCharge=0;tacticalUses=0;}
         fieldContract=null;selectedContract='hold';$('contract-options').open=false;
         stageIndex=index;stage=STAGES[index];
         if(gauntlet())stage={...stage,name:'首领竞技场',width:W,gaps:[],checkpoints:[],
@@ -599,10 +651,12 @@
         mode='survival';titleView='survival';difficulty='standard';challengeId=null;loadout=selectedLoadout;
         challengeTime=0;challengeReflections=0;bossWins=0;points=0;shotsFired=0;runStars=[];
         upgrades=Object.fromEntries(MODULES.map(key=>[key,0]));
+        tacticalCharge=100;tacticalTime=0;tacticalUses=0;tacticalPulse=null;
         survivalWave=0;survivalCleared=0;survivalTime=0;supplyOffers=[];selectedSupply=null;refluxCooldown=0;supplyRerolls=0;selectedContract='hold';fieldContract=null;
         best=progress.survival.best;resetStage(0,{hp:kit().hp,lives:1,grenades:kit().grenades});startWave();
       }
       function startWave(){
+        tacticalTime=0;tacticalPulse=null;
         $('supply-reroll').hidden=true;
         survivalWave++;stageIndex=Math.floor((survivalWave-1)/3)%3;
         const arena=arenaForWave(survivalWave);
@@ -652,6 +706,7 @@
           contractReward=count===3?'\n回收委托完成 · 额外 +350 分、+1 体力、+1 手雷（不超过上限）':
             '\n回收委托未完成 · '+count+' / 3 · 无额外奖励，正常清场奖励保留';
         }
+        tacticalTime=0;tacticalPulse=null;
         survivalCleared=survivalWave;points+=200+Math.min(1000,survivalWave*50)+(bossWave()?500:0);
         progress.survival.wave=Math.max(progress.survival.wave,bounded(survivalCleared,9999));
         progress.survival.best=Math.max(progress.survival.best,bounded(points,9999999));
@@ -714,6 +769,7 @@
       }
       function finishSurvival(){
         if(!survival()||phase!=='playing')return;
+        tacticalTime=0;tacticalPulse=null;
         if(fieldContract)fieldContract.status='missed';
         $('result-details').textContent='本次守住 '+survivalCleared+' 波 · 倒在第 '+survivalWave+' 波\n最高守住 '+progress.survival.wave+' 波 · 最高清场分 '+progress.survival.best+'\n用时 '+formatTime(survivalTime)+' · 本波未计入纪录'+(fieldContract?'\n回收委托未结算 · 需要活着清场，无额外奖励':'');
         hud();showMenu('防线行动结束','已守住的波数与清场得分已保留。换一套构筑，再突破自己的纪录。','再次守住防线','survivalOver');
@@ -851,7 +907,7 @@
         combatNotice(combo.count+' 连击 · +'+reward+(combo.count>=2?' · 得分 ×'+comboMultiplier():''));
       }
       function hurt(damage=1){
-        if(phase!=='playing'||player.inv>0||player.dashTime>0)return;
+        if(phase!=='playing'||player.inv>0||player.dashTime>0||shieldActive())return;
         combo.count=0;combo.timer=0;combatNotice('受到攻击 · 连击中断');
         player.hp=Math.max(0,player.hp-damage);player.inv=difficulty==='relaxed'?1.9:1.45;shake=8;beep(170,.2,'sawtooth');
         spark(player.x+12,player.y+20,'#f6a174',13);
@@ -881,7 +937,7 @@
       function fire(){
         if(player.shoot>0)return;
         const scatter=player.weaponTime>0;
-        player.shoot=(scatter?(player.boost>0?.19:.33):(player.boost>0?.075:.15))*Math.pow(.8,upgrades.rapid)*(survival()?kit().fire:1);
+        player.shoot=(scatter?(player.boost>0?.19:.33):(player.boost>0?.075:.15))*Math.pow(.8,upgrades.rapid)*(survival()?kit().fire:1)*(survival()&&loadout==='assault'&&tacticalTime>0?.55:1);
         const y=player.y+(player.crouch?14:20);
         const up=pressed('jump')&&!player.ground;
         const vx=player.face*(up?480:650),vy=up?-340:0;
@@ -890,6 +946,7 @@
           projectile(player.x+(player.face===1?player.w+4:-4),y,vx,vy+offset*(up?88:145),'p');
           // Trace the forward half of the body through the muzzle on the first
           // tick, while keeping the visible bullet at the actual muzzle.
+          bullets[bullets.length-1].tactical=survival()&&loadout==='assault'&&tacticalTime>0;
           bullets[bullets.length-1].traceX=player.x+player.w/2;bullets[bullets.length-1].traceY=y;
         }
         if(!scatter&&synergy('piercing'))bullets[bullets.length-1].damage++;
@@ -917,13 +974,15 @@
         if(!boss.dead&&Math.hypot(x-(boss.x+50),y-(boss.y+52))<135+24*level){damageBoss(7+2*level);if(boss.dead)defeated=true;}
         if(defeated&&synergy('recycle')){player.grenades=Math.min(7,player.grenades+1);combatNotice('爆破回收 · 返还 1 枚手雷');}
       }
-      function damageEnemy(e,d){
+      function damageEnemy(e,d,fromSkill=false){
         if(e.dead)return;
+        chargeTactical(Math.min(e.hp,d)*3+(d>=e.hp?12:0),fromSkill);
         e.hp-=d;e.flash=.12;spark(e.x+e.w/2,e.y+e.h/2,'#f5d48d',5);
         if(e.hp<=0&&!e.dead){e.dead=true;e.windup=0;e.burst=0;rewardKill(e.type==='shield'?200:e.type==='turret'?160:100);beep(180,.07);}
       }
-      function damageBoss(d){
+      function damageBoss(d,fromSkill=false){
         if(boss.dead||(survival()&&spawnTime>0))return;
+        chargeTactical(Math.min(boss.hp,d)*3+(d>=boss.hp?12:0),fromSkill);
         boss.hp=Math.max(0,boss.hp-d);boss.flash=.12;spark(boss.x+rng(10,90),boss.y+rng(10,85),'#f9cb65',5);
         if(boss.hp===0){
           boss.dead=true;boss.beamTime=0;boss.windup=0;addPoints(1300);spark(boss.x+50,boss.y+45,'#ffc65c',60);
@@ -935,14 +994,16 @@
           e.blockFlash=.18;spark(b.x,b.y,'#91dbff',4);
           combatNotice('盾牌格挡 · 绕后 / 手雷 / 反弹弹');return false;
         }
-        damageEnemy(e,b.damage);return true;
+        damageEnemy(e,b.damage,b.tactical);return true;
       }
       function reflectBullet(b){
+        if(b.owner!=='e')return;
+        b.tactical=shieldActive();chargeTactical(8,b.tactical);
         const dx=b.sourceX-b.x,dy=b.sourceY-b.y,len=Math.hypot(dx,dy);
         b.vx=len>1?dx/len*650:player.face*650;b.vy=len>1?dy/len*650:0;
         b.owner='p';b.reflected=true;b.damage=2+(upgrades.reflect||0)+(survival()?kit().reflect:0);b.life=1.7;reflections++;if(mode==='challenge')challengeReflections++;
         if(synergy('reflux')&&refluxCooldown===0&&player.hp<maxHealth()){player.hp++;refluxCooldown=8;}
-        spark(b.x,b.y,'#9eeaff',8);beep(820,.05,'triangle');combatNotice(mode==='challenge'&&challengeId==='counter'?'反弹 '+challengeReflections+' / 5'+(challengeReflections>=5?' · 可击败首领并撤离':' · 继续积累'):'冲刺反弹 · '+b.damage+' 点伤害 / 穿透盾牌');
+        spark(b.x,b.y,'#9eeaff',8);beep(820,.05,'triangle');combatNotice(mode==='challenge'&&challengeId==='counter'?'反弹 '+challengeReflections+' / 5'+(challengeReflections>=5?' · 可击败首领并撤离':' · 继续积累'):(b.tactical?'护盾反弹 · ':'冲刺反弹 · ')+b.damage+' 点伤害 / 穿透盾牌');
       }
       function updateTurret(e,dt){
         // A fixed aim line gives the player time to choose crouch, jump or reflection.
@@ -972,6 +1033,8 @@
         if(phase!=='playing')return;
         clock+=dt;
         if(survival()){
+          tacticalTime=Math.max(0,tacticalTime-dt);
+          if(tacticalPulse){tacticalPulse.time-=dt;if(tacticalPulse.time<=0)tacticalPulse=null;}
           survivalTime+=dt;refluxCooldown=Math.max(0,refluxCooldown-dt);
           const spawning=spawnTime>0;spawnTime=Math.max(0,spawnTime-dt);
           if(spawning&&spawnTime===0)for(const e of enemies){
@@ -1020,6 +1083,7 @@
         player.shoot=Math.max(0,player.shoot-dt);
         player.inv=Math.max(0,player.inv-dt);player.boost=Math.max(0,player.boost-dt);
         player.weaponTime=Math.max(0,player.weaponTime-dt);
+        if(tacticalQueued){tacticalQueued=false;useTactical();}
         if(grenadeQueued){grenadeQueued=false;throwBomb();}
         if(pressed('fire'))fire();
         player.x=clamp(player.x+player.vx*dt,8,gauntlet()||bossWave()?boss.x-player.w-14:stage.width-player.w-6);
@@ -1132,13 +1196,13 @@
             // or let piercing bullets damage an enemy behind a frontal shield.
             contacts.sort((a,b)=>a.at-b.at);
             for(const {target} of contacts){
-              if(target===boss){damageBoss(b.damage);struck=true;break;}
+              if(target===boss){damageBoss(b.damage,b.tactical);struck=true;break;}
               const damaged=hitEnemy(target,b);
               if(!damaged||!(b.pierce>0)){struck=true;break;}
               b.pierce--;b.hitEnemies.push(target);
             }
           }else if(shotImpact(x,y,b.x,b.y,b.r,player)!==Infinity){
-            if(player.dashTime>0){reflectBullet(b);continue;}
+            if(player.dashTime>0||shieldActive()){reflectBullet(b);continue;}
             // Damage may replace the projectile list on respawn; consume first.
             bullets.splice(i,1);hurt(1);
             if(phase!=='playing')return;
@@ -1260,6 +1324,12 @@
         if(boss.dead){rect(stage.width-154,G-156,32,32,'#9de5a7');}
       }
       function drawSoldier(){
+        if(survival()&&(tacticalTime>0||tacticalPulse)){
+          c.save();c.strokeStyle=tactic().color;c.lineWidth=3;
+          if(tacticalPulse){c.globalAlpha=tacticalPulse.time/.45;c.beginPath();c.arc(tacticalPulse.x,tacticalPulse.y,220*(1-tacticalPulse.time/.45),0,Math.PI*2);c.stroke();}
+          if(tacticalTime>0){c.strokeRect(player.x-7,player.y-6,player.w+14,player.h+12);}
+          c.restore();
+        }
         if(player.inv>0&&Math.floor(clock*13)%2===0)return;
         if(player.dashTime>0){
           for(let i=1;i<=3;i++){c.globalAlpha=.3/i;rect(player.x-player.dashDir*i*17,player.y+4,player.w,player.h-4,'#8dd9ff');}
@@ -1437,12 +1507,14 @@
         if(['j','z'].includes(k))return 'fire';
         if(['k','x'].includes(k))return 'grenade';
         if(['shift','l'].includes(k))return 'dash';
+        if(k==='e')return 'tactical';
         return '';
       }
       function queueAction(name){
         if(name==='jump')jumpQueued=true;
         if(name==='grenade')grenadeQueued=true;
         if(name==='dash')dashQueued=true;
+        if(name==='tactical'&&survival()&&phase==='playing'&&spawnTime===0&&tacticalCharge>=100&&tacticalTime===0)tacticalQueued=true;
       }
       window.addEventListener('keydown',e=>{
         if(e.ctrlKey||e.metaKey||e.altKey)return;
@@ -1485,6 +1557,9 @@
         else if(phase==='confirmRestart')confirmAction==='home'?openTitle():retryRun();
       }
       action.addEventListener('click',activate);
+      // Pointer presses use capture above; click is only keyboard/assistive input.
+      // A long press must not fire again on release after the meter recharges.
+      $('tactical-use').addEventListener('click',e=>{if(e.detail===0)queueAction('tactical');});
       $('pause').addEventListener('click',togglePause);
       $('restart').addEventListener('click',()=>requestConfirm('restart'));
       $('menu-home').addEventListener('click',()=>requestConfirm('home'));
@@ -1514,26 +1589,27 @@
         const pads=navigator.getGamepads?.()||[];
         const pad=Array.from(pads).find(item=>item?.connected);
         padHeld.clear();
-        if(!pad||document.hidden){bombPadLast=false;jumpPadLast=false;dashPadLast=false;pausePadLast=false;padBlocked=true;return;}
+        if(!pad||document.hidden){bombPadLast=false;jumpPadLast=false;dashPadLast=false;pausePadLast=false;tacticalPadLast=false;padBlocked=true;return;}
         const buttons=pad.buttons;
         const left=pad.axes[0]<-.35||buttons[14]?.pressed,right=pad.axes[0]>.35||buttons[15]?.pressed;
         const down=pad.axes[1]>.45||buttons[13]?.pressed;
         const jump=Boolean(buttons[0]?.pressed),bomb=Boolean(buttons[1]?.pressed),fire=Boolean(buttons[2]?.pressed||buttons[5]?.pressed);
-        const burst=Boolean(buttons[4]?.pressed),pause=Boolean(buttons[9]?.pressed);
-        const neutral=!left&&!right&&!down&&!jump&&!bomb&&!fire&&!burst&&!pause;
+        const tactical=Boolean(buttons[3]?.pressed),burst=Boolean(buttons[4]?.pressed),pause=Boolean(buttons[9]?.pressed);
+        const neutral=!left&&!right&&!down&&!jump&&!bomb&&!fire&&!burst&&!pause&&!tactical;
         if(padBlocked){if(neutral)padBlocked=false;return;}
         if(pause&&!pausePadLast){
           if(phase==='title'&&titleView==='campaign')startNew();else if(phase==='title'&&titleView==='survival')beginSurvival();else if(phase!=='title')togglePause();
           pausePadLast=pause;return;
         }
         pausePadLast=pause;
-        if(phase!=='playing'){bombPadLast=bomb;jumpPadLast=jump;dashPadLast=burst;return;}
+        if(phase!=='playing'){bombPadLast=bomb;jumpPadLast=jump;dashPadLast=burst;tacticalPadLast=tactical;return;}
         if(left)padHeld.add('left');if(right)padHeld.add('right');if(down)padHeld.add('down');
         if(jump)padHeld.add('jump');if(fire)padHeld.add('fire');
         if(jump&&!jumpPadLast)jumpQueued=true;
         if(bomb&&!bombPadLast)grenadeQueued=true;
         if(burst&&!dashPadLast)dashQueued=true;
-        jumpPadLast=jump;bombPadLast=bomb;dashPadLast=burst;
+        if(tactical&&!tacticalPadLast)queueAction('tactical');
+        tacticalPadLast=tactical;jumpPadLast=jump;bombPadLast=bomb;dashPadLast=burst;
       }
       function loop(t){
         const delta=Math.min((t-frameLast)/1000||0,.06);frameLast=t;
@@ -1564,6 +1640,7 @@
         turretCharge:Math.max(0,...enemies.map(e=>e.dead?0:e.windup)),shieldCount:enemies.filter(e=>!e.dead&&e.type==='shield').length,
         combo:combo.count,comboTime:combo.timer,comboBest:combo.best,combatText:combatTime>0?combatText:'',reflections,
         survivalWave,survivalCleared,survivalTime,spawnTime,bossWave:bossWave(),bossMaxHp:boss?.maxHp??0,bossX:boss?.x??0,synergies:activeSynergies(),refluxCooldown,loadout,selectedLoadout,supplyRerolls,supplyOffers:[...supplyOffers],selectedSupply,
+        tacticalCharge,tacticalTime,tacticalUses,tacticalName:survival()?tactic().name:'',
         selectedContract,fieldContract:fieldContract?{status:fieldContract.status,nodes:fieldContract.nodes.map(node=>({...node}))}:null,
         enemies:enemies.filter(e=>!e.dead).map(e=>({x:e.x,y:e.y,w:e.w,h:e.h,hp:e.hp,type:e.type,face:e.face,arrival:e.arrival||0})),
         clock,runStars:[...runStars],progress:JSON.parse(JSON.stringify(progress))

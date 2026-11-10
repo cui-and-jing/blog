@@ -1,5 +1,6 @@
 /** Published Survival mode: ordinary DOM controls and genuine keyboard/touch input only. */
 import path from 'node:path';
+import { checkRaidTactical } from './raid-tactical-browser.mjs';
 import { checkArena, checkPlatformDescent } from './raid-arena-browser.mjs';
 import { survivalTactics } from './raid-survival-tactics.mjs';
 import { recoveryTactics } from './raid-recovery-tactics.mjs';
@@ -135,6 +136,7 @@ export async function checkRaidSurvival(page, problems) {
       recipe.active === state.synergies.includes(recipe.key)), '组合配方或点亮状态与实际构筑不一致', build);
   };
 
+  await checkRaidTactical(page, problems);
   const arenaTools = { read, check, shot, phase, wait };
   await checkPlatformDescent(page, arenaTools);
 
