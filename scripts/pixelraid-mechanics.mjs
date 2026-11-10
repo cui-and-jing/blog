@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
+import { survivalTactics } from './lib/raid-survival-tactics.mjs';
 
 const source = fs.readFileSync(new URL('../public/games/pixelraid.html', import.meta.url), 'utf8');
 const inline = source.match(/<script>\s*([\s\S]*?)<\/script>/i)?.[1];
@@ -19,10 +20,10 @@ assert(!source.includes('__raidQA'), 'Mutable test hooks must never be published
 const injected = inline.replace(entry, 'window.__raidQA = code => eval(code);' + entry);
 const STORE = 'pixel-raid.progress.v1';
 
-function createGame({ storage = {}, blocked = false, reducedMotion = false } = {}) {
+function createGame({ storage = {}, blocked = false, reducedMotion = false, randomSeed = 16437 } = {}) {
   const nodes = new Map(), events = new Map(), documentEvents = new Map();
   const values = new Map(Object.entries(storage));
-  let queued = null, now = 0, seed = 16437, gamepads = [];
+  let queued = null, now = 0, seed = randomSeed, gamepads = [];
   const clone = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
   const attrsFrom = (text) => Object.fromEntries([...text.matchAll(/([\w-]+)(?:="([^"]*)")?/g)]
     .map((match) => [match[1], match[2] ?? '']));
@@ -1335,7 +1336,7 @@ function defense(options) {
   return g;
 }
 function finishDefenseWave(g) {
-  g.run('spawnTime=0; enemies.forEach(e=>e.dead=true);'); tick(g);
+  g.run('spawnTime=0; enemies.forEach(e=>e.dead=true);boss.dead=true;boss.hp=0;'); tick(g);
   eq(g.state().phase, 'waveClear');
 }
 function supplyModule(g, key) {
@@ -1642,10 +1643,12 @@ test('survival long runs keep enemy and offer arrays bounded and introduce every
   const g = defense();
   for (let wave = 1; wave <= 60; wave++) {
     eq(g.state().survivalWave, wave); const enemies = g.state().enemies;
-    eq(enemies.length, Math.min(8, 3 + Math.floor(wave / 2)));
+    eq(enemies.length, wave%3===0?0:Math.min(8, 3 + Math.floor(wave / 2)));
+    eq(g.state().bossWave,wave%3===0);
+    if(wave%3===0){assert(g.state().bossHp>=32&&g.state().bossHp<=104);eq(g.state().bossAttacks,0);eq(g.state().bossBeamTime,0);}
     if (wave === 1) assert(enemies.every(e => e.type === 'walker'));
     if (wave === 2) assert(enemies.some(e => e.type === 'drone'));
-    if (wave === 3) for (const type of ['turret', 'shield']) assert(enemies.some(e => e.type === type));
+    if (wave === 4) for (const type of ['turret', 'shield']) assert(enemies.some(e => e.type === type));
     assert(enemies.every(e => e.x >= 60 && e.x + e.w <= 900 && e.hp <= 11));
     eq(g.state().bullets, 0); eq(g.read('bombs.length'), 0);
     eq(g.read('pickups.length'), 2); eq(g.read('sparks.length'), 0);
@@ -1657,49 +1660,233 @@ test('survival long runs keep enemy and offer arrays bounded and introduce every
   eq(g.state().progress.survival.wave, 60); eq(g.state().survivalWave, 61);
 });
 
-test('genuine keyboard tactics clear survival waves one through three at a human input cadence', () => {
-  const g = defense(), cadence = 12, tap = key => { g.key(key); g.key(key, false); };
-  const encountered = new Set(); let facing = 1, frame = 0, decisions = 0;
-  // Only detached observations, normal key events and menu clicks. No HP,
-  // enemy, position, damage, cooldown, projectile or RNG mutation is allowed.
-  for (let wave = 1; wave <= 3; wave++) {
-    eq(g.state().survivalWave, wave); g.key('j');
-    let duration = 0;
-    while (g.state().phase === 'playing' && duration < 6000) {
-      if (frame % cadence === 0) {
-        decisions++;
-        const s = g.state(); s.enemies.forEach(enemy => encountered.add(enemy.type));
-        const target = s.enemies.sort((a, b) => Math.abs(a.x - s.x) - Math.abs(b.x - s.x))[0];
-        if (target) {
-          const direction = target.x + target.w / 2 > s.x + 13 ? 1 : -1;
-          const distance = Math.abs(target.x - s.x), airborne = target.type === 'drone';
-          const threatened = s.hostiles.some(b => Math.abs(b.x - s.x - 13) < 100 &&
-            b.y > s.y - 15 && b.y < s.y + s.playerHeight + 15);
-          if (threatened && s.dashCooldown === 0) tap('l');
-          const move = distance > (airborne ? 170 : 210) || direction !== facing;
-          g.key('a', move && direction < 0); g.key('d', move && direction > 0);
-          if (move) facing = direction;
-          if (airborne && s.ground) { g.key('w', false); g.key('w'); }
-          else if (!airborne) g.key('w', false);
-          if (target.type === 'shield' && distance > 150 && distance < 300 && s.grenades > 0 && frame % 60 === 0) tap('k');
-          if (target.type === 'shield' && distance < 110 && s.ground) { g.key('w', false); g.key('w'); }
+test('survival input controller escapes overlapping ground threats without oscillating or editing snapshots', () => {
+  const decide = survivalTactics();
+  const state = { x: 400, y: 381, playerHeight: 44, enemies: [
+    { x: 390, y: 389, w: 30, h: 36, type: 'walker' },
+    { x: 400, y: 240, w: 38, h: 26, type: 'drone' },
+  ], hostiles: [], bossWave: false, dashTime: 0, dashCooldown: 0,
+  spawnTime: 0, survivalTime: 3, grenades: 3 };
+  const before = JSON.stringify(state), first = decide(state);
+  eq(first.move, 'd'); eq(first.jump, false); eq(first.dash, true); eq(first.grenade, false);
+  eq(JSON.stringify(state), before);
+  // Keep the escape direction even if the nearest center crosses sides.
+  state.enemies[0].x = 420;
+  eq(decide(state).move, 'd');
+  state.enemies[0].x = 190; state.enemies[0].type = 'shield'; state.enemies.pop();
+  const safe = decide(state);
+  eq(safe.move, 'a'); eq(safe.grenade, true);
+  eq(decide(state).move, ''); eq(decide(state).grenade, false);
+  // Near the edge, escape across the threat instead of running into the wall.
+  const edge = survivalTactics();
+  eq(edge({ ...state, x: 20, enemies: [{ ...state.enemies[0], x: 35 }] }).move, 'd');
+  const orient = survivalTactics(), right = { ...state, enemies: [{ ...state.enemies[0], x: 600 }] };
+  eq(orient(right).move, 'd'); eq(orient(right).move, '');
+  const ledge = survivalTactics(), below = { ...state, x: 500, y: 241, enemies: [{ ...state.enemies[0], x: 500 }] };
+  eq(ledge(below).move, 'd');
+  eq(ledge({ ...below, x: 600 }).move, 'd');
+  eq(ledge({ ...below, x: 800, y: 381 }).move, 'a');
+});
+
+test('shared keyboard tactics clear four waves across varied timing and random fixtures without state edits', () => {
+  for (const randomSeed of [1, 42, 16437, 71901]) {
+    for (const cadence of [5, 12]) {
+      const g = defense({ randomSeed }), tap = key => { g.key(key); g.key(key, false); };
+      const encountered = new Set(); let frame = 0, decisions = 0, reflected = 0;
+      // Seed only the VM fixture before initialization. Thereafter this is the
+      // same read-only controller used by Chromium: real keys and menu clicks.
+      for (let wave = 1; wave <= 4; wave++) {
+        const decide = survivalTactics();
+        eq(g.state().survivalWave, wave); g.key('j');
+        let duration = 0;
+        while (g.state().phase === 'playing' && duration < 3600) {
+          if (frame % cadence === 0) {
+            decisions++;
+            const s = g.state(); s.enemies.forEach(enemy => encountered.add(enemy.type));
+            const input = decide(s);
+            g.key('a', input.move === 'a'); g.key('d', input.move === 'd');
+            if (input.jump && s.ground) { g.key('w', false); g.key('w'); }
+            else if (!input.jump) g.key('w', false);
+            if (input.dash) tap('l');
+            if (input.grenade) tap('k');
+          }
+          tick(g); duration++; frame++;
+        }
+        for (const key of ['a', 'd', 'w', 'j']) g.key(key, false);
+        const s = g.state();
+        eq(s.phase, 'waveClear', `Seed ${randomSeed}, cadence ${cadence}, wave ${wave}: ` + JSON.stringify(s));
+        eq(s.survivalCleared, wave); eq(s.lives, 1); assert(s.hp > 0); eq(s.stageDeaths, 0); reflected += s.reflections;
+        assert(duration > 132 && duration < 3600, 'Opening waves must resolve in under one active minute');
+        if (wave < 4) {
+          let choice = s.supplyOffers.indexOf('armor');
+          if (choice < 0) choice = s.hp < 4 ? s.supplyOffers.indexOf('heal') : 0;
+          g.click('supply-' + Math.max(0, choice)); g.click('start');
         }
       }
-      tick(g); duration++; frame++;
-    }
-    for (const key of ['a', 'd', 'w', 'j']) g.key(key, false);
-    const s = g.state(); eq(s.phase, 'waveClear', 'Wave ' + wave + ': ' + JSON.stringify(s));
-    eq(s.survivalCleared, wave); eq(s.lives, 1); assert(s.hp > 0); eq(s.stageDeaths, 0);
-    assert(duration > 132 && duration < 3600, 'Opening waves must resolve in under one active minute');
-    if (wave < 3) {
-      let choice = s.supplyOffers.indexOf('armor');
-      if (choice < 0) choice = s.hp < 4 ? s.supplyOffers.indexOf('heal') : 0;
-      g.click('supply-' + Math.max(0, choice)); g.click('start');
+      eq([...encountered].sort(), ['drone', 'shield', 'turret', 'walker']);
+      assert(reflected > 0 && decisions > 20); eq(g.state().progress.survival.wave, 4);
+      eq(g.state().progress.survival.best, g.state().score);
     }
   }
-  eq([...encountered].sort(), ['drone', 'shield', 'turret', 'walker']);
-  assert(g.state().reflections > 0 && decisions > 20); eq(g.state().progress.survival.wave, 3);
-  eq(g.state().progress.survival.best, g.state().score);
+});
+
+
+function defenseBoss(wave = 3, options) {
+  const g = defense(options);
+  g.run(`survivalWave=${wave-1};startWave();`);
+  return g;
+}
+
+test('survival boss waves rotate archetypes with bounded strength and reset all transient attacks', () => {
+  const g = defense();
+  for (const wave of [3, 6, 9, 12, 15, 18, 48, 9999]) {
+    g.run(`boss.attacks=9;boss.beamTime=1;boss.windup=1;survivalWave=${wave-1};startWave();`);
+    const s = g.state();
+    eq(s.bossWave,true); eq(s.enemies,[]); eq(s.stage,Math.floor((wave-1)/3)%3+1);
+    eq(s.bossHp,[32,44,56][s.stage-1]+Math.min(48,Math.floor((wave-1)/9)*12));
+    eq(s.bossMaxHp,s.bossHp);eq(s.bossAttacks,0);eq(s.bossBeamTime,0);eq(s.bossCharge,0);
+    eq(s.spawnTime,2.2);eq(s.worldWidth,960);eq(g.read('stage.gaps'),[]);
+    assert(g.read('pickups.every(p=>p.x<boss.x-player.w-14)'), 'No supply behind a solid boss boundary');
+    assert(g.nodes.get('mission-name').textContent.includes('首领战'));
+    g.run('draw();');
+  }
+});
+
+test('boss ingress blocks all damage and never clears merely because there are no minions', () => {
+  const g = defenseBoss();
+  g.run(`boss.shot=0;player.inv=0;player.x=boss.x;damageBoss(999);boom(boss.x+50,boss.y+52);
+    projectile(boss.x+50,boss.y+52,0,0,'p',999);finishWave();`);
+  tick(g,60);
+  eq(g.state().bossHp,32);eq(g.state().hp,6);eq(g.state().score,0);eq(g.state().hostiles,[]);
+  eq(g.state().phase,'playing');eq(g.state().survivalCleared,0);eq(g.state().x,749);
+  g.key('p');const paused=g.state();tick(g,60);eq(g.state().spawnTime,paused.spawnTime);
+  g.click('restart');g.click('cancel-restart');eq(g.state().phase,'pause');
+  g.click('start');g.run('bullets=[];');tick(g,80);
+  eq(g.state().spawnTime,0);eq(g.state().phase,'playing');eq(g.state().survivalCleared,0);
+  g.run('damageBoss(1);');eq(g.state().bossHp,31);
+});
+
+test('survival boss arena retains leftward and rightward boundaries without triggering exit', () => {
+  const g = defenseBoss();g.run('player.inv=100;');
+  g.key('d');tick(g,180);g.key('d',false);eq(g.state().x,749);eq(g.state().cam,0);
+  g.key('a');tick(g,220);g.key('a',false);eq(g.state().x,8);eq(g.state().cam,0);
+  eq(g.state().phase,'playing');eq(g.state().survivalCleared,0);
+});
+
+test('all survival boss patterns remain active across the whole arena, including low and high beams', () => {
+  for(const wave of [3,6,9]) {
+    const g=defenseBoss(wave);g.run('spawnTime=0;player.x=8;player.inv=100;boss.shot=0;');
+    tick(g);assert(g.state().bossCharge>0, 'Boss cannot sleep at the left edge');
+    if(wave<9){
+      tick(g,44);eq(g.state().bossAttacks,1);eq(g.state().bossLastVolley,wave===3?1:3);
+      g.run('boss.hp=boss.maxHp/2;boss.shot=0;');tick(g,45);
+      eq(g.state().bossLastVolley,wave===3?3:5);
+    }else{
+      eq(g.state().bossAttackType,'beam');eq(g.state().bossBeamY,413);
+      tick(g,64);assert(g.state().bossBeamTime>0);g.run('boss.beamTime=0;boss.attacks=2;boss.shot=0;');
+      tick(g);eq(g.state().bossAttackType,'beam');eq(g.state().bossBeamY,389);
+    }
+  }
+});
+
+test('boss victory gives exactly one enhanced clear reward and previews the next ordinary wave', () => {
+  const g=defenseBoss();const other=nonDefenseRecords(g);
+  g.run('spawnTime=0;player.hp=2;player.grenades=3;damageBoss(boss.hp);');tick(g);
+  eq(g.state().phase,'waveClear');eq(g.state().survivalCleared,3);eq(g.state().score,2150);
+  eq(g.state().hp,4);eq(g.state().grenades,5);eq(g.state().progress.survival,{wave:3,best:2150});
+  eq(nonDefenseRecords(g),other);assert(g.nodes.get('overlay-text').textContent.includes('第 4 波'));
+  const score=g.state().score;g.run('finishWave();damageBoss(999);');tick(g,60);eq(g.state().score,score);
+  g.click('supply-0');const selected=g.state().selectedSupply;
+  g.click('restart');g.click('cancel-restart');eq(g.state().selectedSupply,selected);eq(g.state().score,score);
+  g.click('start');eq(g.state().survivalWave,4);eq(g.state().bossWave,false);eq(g.state().bossHp,0);
+  assert(g.state().enemies.length>0);
+});
+
+test('a simultaneous lethal boss trade never saves a completed wave in either bullet order', () => {
+  for(const reverse of [false,true]) {
+    const g=defenseBoss();
+    g.run(`spawnTime=0;player.hp=1;player.inv=0;boss.hp=1;boss.shot=100;
+      projectile(player.x+12,player.y+20,0,0,'e');projectile(boss.x+50,boss.y+52,0,0,'p');
+      ${reverse?'bullets.reverse();':''}`);
+    tick(g);eq(g.state().phase,'survivalOver');eq(g.state().survivalCleared,0);
+    eq(g.state().progress.survival,{wave:0,best:0});tick(g,30);eq(g.state().phase,'survivalOver');
+  }
+});
+
+test('synergy recipes require both modules, are derived, and do not leak into other modes', () => {
+  const g=defense();eq(g.state().synergies,[]);assert(!g.nodes.get('build-panel').hidden);
+  for(const [key,pair] of Object.entries(g.read('SYNERGIES')).map(([key,v])=>[key,v.pair])) {
+    g.run(`upgrades=Object.fromEntries(MODULES.map(key=>[key,0]));upgrades.${pair[0]}=1;hud();`);
+    eq(g.state().synergies,[]);assert(g.read(`supplyDescription('${pair[1]}')`).includes('选择后点亮'));
+    g.run(`upgrades.${pair[1]}=1;hud();`);eq(g.state().synergies,[key]);
+    eq(g.nodes.get('synergy-'+key).getAttribute('data-active'),'true');
+    assert(!g.read(`supplyDescription('${pair[1]}')`).includes('选择后点亮'));
+  }
+  g.run('saveProgress();');assert(!JSON.stringify(g.state().progress).includes('synergies'));
+  g.key('p');g.click('menu-home');g.click('start');eq(g.state().synergies,[]);assert(g.nodes.get('build-panel').hidden);
+  g.click('mode-campaign');g.click('start');eq(g.state().synergies,[]);assert(g.nodes.get('build-panel').hidden);
+});
+
+test('piercing fire increases real rifle damage without buffing spread or bypassing shield rules', () => {
+  const g=defense();
+  g.run(`spawnTime=0;upgrades.rapid=1;upgrades.pierce=1;player.inv=100;player.x=100;player.face=1;
+    enemies=[{...makeEnemy(150,'walker'),shot:100,hp:10,maxHp:10}];fire();`);
+  eq(g.read('bullets[0].damage'),2);eq(g.read('bullets[0].pierce'),1);tick(g,5);
+  eq(g.read('enemies[0].hp'),8);
+  g.run("bullets=[];player.shoot=0;player.weaponTime=5;fire();");eq(g.read('bullets.map(b=>b.damage)'),[1,1,1]);
+  g.run("bullets=[];player.shoot=0;player.weaponTime=0;enemies=[{...makeEnemy(150,'shield'),shot:100}];fire();");
+  tick(g,5);eq(g.read('enemies[0].hp'),5);eq(g.state().bullets,0);
+});
+
+test('reflux heals once per cooldown, never consumes full-health recovery, and freezes in menus', () => {
+  const g=defense();
+  g.run(`upgrades.dash=1;upgrades.reflect=1;player.hp=3;
+    projectile(400,350,0,0,'e');reflectBullet(bullets[0]);`);
+  eq(g.state().hp,4);eq(g.state().refluxCooldown,8);eq(g.read('bullets[0].damage'),3);
+  g.run("projectile(410,350,0,0,'e');reflectBullet(bullets[1]);");eq(g.state().hp,4);
+  g.key('p');tick(g,180);eq(g.state().refluxCooldown,8);
+  g.nodes.get('build-summary').focus();g.key('Enter');eq(g.state().phase,'pause');
+  g.click('start');g.run('player.inv=100;spawnTime=100;bullets=[];');tick(g,481);eq(g.state().refluxCooldown,0);
+  g.run('player.hp=maxHealth();projectile(400,350,0,0,"e");reflectBullet(bullets[0]);');
+  eq(g.state().hp,6);eq(g.state().refluxCooldown,0);
+  g.run('player.hp=5;projectile(410,350,0,0,"e");reflectBullet(bullets[1]);');
+  eq(g.state().hp,6);eq(g.state().refluxCooldown,8);
+  finishDefenseWave(g);const saved=g.state().refluxCooldown;tick(g,180);eq(g.state().refluxCooldown,saved);
+  g.click('supply-0');g.click('start');eq(g.state().refluxCooldown,saved);
+  g.click('restart');g.click('start');eq(g.state().refluxCooldown,0);eq(g.state().synergies,[]);
+});
+
+test('grenade recycling refunds at most once per explosion, needs a kill, and respects ammo cap', () => {
+  for(const ranks of [[0,1],[1,0],[1,1],[2,2]]) {
+    const g=defense();
+    g.run(`spawnTime=0;upgrades.armor=${ranks[0]};upgrades.blast=${ranks[1]};player.grenades=2;
+      enemies=[makeEnemy(100,'walker'),makeEnemy(125,'turret')];boom(120,G-18);`);
+    eq(g.state().grenades,ranks.every(Boolean)?3:2);eq(g.state().enemies,[]);
+    g.run('boom(120,G-18);');eq(g.state().grenades,ranks.every(Boolean)?3:2);
+  }
+  const g=defense();
+  g.run(`spawnTime=0;upgrades.armor=1;upgrades.blast=1;player.grenades=7;
+    enemies=[makeEnemy(100,'walker')];boom(115,G-18);`);eq(g.state().grenades,7);
+  g.run(`player.grenades=0;enemies=[{...makeEnemy(100,'walker'),hp:99}];boom(115,G-18);`);eq(g.state().grenades,0);
+  g.run('spawnTime=1;enemies=[makeEnemy(100,"walker")];boom(115,G-18);');eq(g.state().grenades,0);
+});
+
+test('blast upgrades extend boss damage and range, recycling a boss kill exactly once', () => {
+  for(const rank of [0,1,2]) {
+    const g=defenseBoss();g.run(`spawnTime=0;upgrades.blast=${rank};boom(boss.x+50,boss.y+52);`);
+    eq(g.state().bossHp,32-7-2*rank);
+    g.run(`boom(boss.x+50-(135+24*${rank})-1,boss.y+52);`);eq(g.state().bossHp,32-7-2*rank);
+  }
+  const g=defenseBoss();g.run('spawnTime=0;upgrades.armor=1;upgrades.blast=1;player.grenades=0;boss.hp=9;boom(boss.x+50,boss.y+52);');
+  eq(g.state().bossHp,0);eq(g.state().grenades,1);g.run('boom(boss.x+50,boss.y+52);');eq(g.state().grenades,1);
+});
+
+test('build summary native Space and Enter never jump, resume or accept a selected supply', () => {
+  const g=defense();g.nodes.get('build-summary').focus();g.key(' ');g.key(' ',false);tick(g);
+  eq(g.state().ground,true);eq(g.state().jumpBuffer,0);eq(g.state().phase,'playing');
+  g.key('p');g.nodes.get('build-summary').focus();g.key('Enter');eq(g.state().phase,'pause');
+  g.click('start');finishDefenseWave(g);g.click('supply-0');g.nodes.get('build-summary').focus();g.key('Enter');
+  eq(g.state().phase,'waveClear');eq(g.state().survivalWave,1);
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
