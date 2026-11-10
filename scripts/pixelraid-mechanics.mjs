@@ -2178,14 +2178,14 @@ test('recovery details keyboard controls cannot start a selected wave or inject 
   g.click('start'); eq(g.state().survivalWave, 2); eq(g.state().jumpBuffer, 0); eq(g.state().ground, true);
 });
 
-test('recovery geometry has two reachable ground nodes and an alternating supported high node', () => {
+test('recovery geometry has two reachable ground nodes and a layout-supported high node', () => {
   for (const wave of [2, 4, 5, 7, 8, 11]) {
     const g = recoveryDefense({ wave }), nodes = g.state().fieldContract.nodes;
     eq(nodes.length, 3); eq(new Set(nodes.map(node => `${node.x},${node.y}`)).size, 3);
     assert(nodes.every(node => !node.done && Number.isFinite(node.x) && Number.isFinite(node.y)));
     assert(nodes[0].x >= 30 && nodes[0].x < 160 && nodes[1].x > 800 && nodes[1].x <= 930);
     eq(nodes[0].y, 401); eq(nodes[1].y, 401);
-    const top = nodes[2]; eq(top.x, wave % 2 ? 285 : 715); eq(top.y, 301);
+    const top = nodes[2]; assert(top.y >= 301 && top.y <= 311);
     const platforms = g.read('stage.platforms');
     assert(platforms.some(([x, y, w]) => top.x > x + 20 && top.x < x + w - 20 && y - top.y === 24));
     for (const node of nodes) for (const pickup of g.read('pickups')) {
@@ -2413,13 +2413,13 @@ test('blocked storage still settles recovery once in memory without changing unr
   const before = g.state(); g.run('finishWave();'); tick(g, 30); eq(g.state(), before);
 });
 
-test('all loadouts recover three real nodes and clear using only genuine inputs across seeds and cadences', () => {
+test('all loadouts recover and clear rotating arenas using only genuine inputs across seeds and cadences', () => {
   for (const randomSeed of [1, 42, 16437, 71901]) for (const loadout of ['assault', 'counter', 'demolition']) {
     for (const cadence of [5, 12]) {
       const g = defense({ randomSeed, loadout }), tap = key => { g.key(key); g.key(key, false); };
       const records = nonDefenseRecords(g);
-      for (let wave = 1; wave <= 2; wave++) {
-        const decide = wave === 2 ? recoveryTactics() : survivalTactics();
+      for (let wave = 1; wave <= 4; wave++) {
+        const recovery = [2, 4].includes(wave), decide = recovery ? recoveryTactics() : survivalTactics();
         const seenCounts = new Set(); let duration = 0, decisions = 0, sawGatheredBeforeClear = false;
         // Only the fixture seed is configured before game creation. All movement,
         // jumping, shooting, defensive dashes and menu choices are real inputs;
@@ -2429,7 +2429,7 @@ test('all loadouts recover three real nodes and clear using only genuine inputs 
             const state = g.state(), untouched = JSON.stringify(state), input = decide(state);
             eq(JSON.stringify(state), untouched, 'Read-only recovery controller mutated its snapshot');
             decisions++;
-            if (wave === 2) {
+            if (recovery) {
               const count = state.fieldContract.nodes.filter(node => node.done).length;
               seenCounts.add(count);
               if (count === 3) { sawGatheredBeforeClear = true; eq(state.fieldContract.status, 'active'); }
@@ -2447,18 +2447,172 @@ test('all loadouts recover three real nodes and clear using only genuine inputs 
         eq(state.survivalCleared, wave); eq(state.lives, 1); eq(state.stageDeaths, 0); assert(state.hp > 0);
         assert(duration > 132 && duration < 3600 && decisions > 10, 'Recovery must use real ingress and finish within one active minute');
         eq(nonDefenseRecords(g), records); eq(state.progress.survival, { wave, best: state.score });
-        if (wave === 1) {
-          eq(state.fieldContract, null);
-          let choice = state.supplyOffers.indexOf('armor');
-          if (choice < 0) choice = state.hp < 4 ? state.supplyOffers.indexOf('heal') : 0;
-          g.click('supply-' + Math.max(0, choice)); g.click('contract-recovery'); g.click('start');
-        } else {
+        if (recovery) {
           eq(state.fieldContract.status, 'success'); eq(collectedRecovery(g), 3);
           eq([...seenCounts].sort(), [0, 1, 2, 3]); assert(sawGatheredBeforeClear);
           eq(state.selectedContract, 'hold'); assert(g.nodes.get('result-details').textContent.includes('回收委托完成'));
+        } else eq(state.fieldContract, null);
+        if (wave < 4) {
+          let choice = state.supplyOffers.indexOf('armor');
+          if (choice < 0) choice = state.hp < 4 ? state.supplyOffers.indexOf('heal') : 0;
+          g.click('supply-' + Math.max(0, choice));
+          if ([2, 4].includes(wave + 1)) g.click('contract-recovery');
+          g.click('start');
         }
       }
     }
+  }
+});
+
+
+test('ordinary waves rotate three real layouts without boss rounds skipping a map', () => {
+  const g = defense(), expected = ['steps', 'flanks', null, 'bridge', 'steps', null, 'flanks', 'bridge', null];
+  const seen = new Map();
+  for (let wave = 1; wave <= 18; wave++) {
+    const s = g.state(), arena = expected[(wave - 1) % 9];
+    eq(s.survivalWave, wave); eq(s.arena?.id ?? null, arena); eq(s.worldWidth, 960); eq(s.cam, 0);
+    eq(g.read('stage.gaps'), []); eq(g.read('stage.checkpoints'), []);
+    if (arena) {
+      assert(g.nodes.get('mission-objective').textContent.includes(s.arena.name));
+      assert(g.nodes.get('announcer').textContent.includes(s.arena.name));
+      if (seen.has(arena)) eq(s.platforms, seen.get(arena)); else seen.set(arena, s.platforms);
+      assert(s.platforms.every(([x, y, w]) => x > 0 && x + w < 960 && y >= 285 && y <= 365));
+      const spread = s.pickups.find(p => p.kind === 'spread');
+      assert(s.platforms.some(([x, y, w]) => spread.x === x + w / 2 && spread.y === y - 25));
+      const drones = g.read("enemies.filter(e=>e.type==='drone').map(e=>e.home)");
+      eq(new Set(drones).size, drones.length, 'Air units must use separate patrol lanes');
+      assert(drones.every(x => x - 53 >= 60 && x + 53 + 38 <= 900));
+    } else {
+      eq(s.platforms, [[260, 320, 170], [500, 310, 150]]);
+      eq(s.pickups[0], { x: 480, y: 260, kind: 'spread', done: false });
+    }
+    finishDefenseWave(g);
+    const preview = g.nodes.get('overlay-text').textContent;
+    const next = g.read('arenaForWave(survivalWave+1)');
+    assert(preview.includes(next?.name ?? '首领战'));
+    if (next) assert(preview.includes(next.hint));
+    g.click('supply-0'); g.click('start');
+  }
+  eq(new Set([...seen.values()].map(v => JSON.stringify(v))).size, 3);
+});
+
+test('arena and reward snapshots are detached and restart restores the first route', () => {
+  const g = defense(), before = g.state(), snapshot = g.win.__raidState;
+  snapshot.arena.name = 'mutated'; snapshot.platforms[0][0] = -999;
+  snapshot.platforms.push([0, 0, 999]); snapshot.pickups[0].x = -999; snapshot.pickups[0].done = true;
+  eq(g.state(), before);
+  finishDefenseWave(g); g.click('supply-0'); g.click('start'); eq(g.state().arena.id, 'flanks');
+  g.click('restart'); g.click('start'); eq(g.state().arena.id, 'steps'); eq(g.state().platforms, before.platforms);
+  g.key('p'); g.click('menu-home'); g.click('start'); g.click('mode-campaign'); g.click('start');
+  eq(g.state().arena, null); eq(g.state().platforms, g.read('STAGES[0].platforms'));
+  eq(g.state().dropTime, 0);
+});
+
+function onLedge({ y = 325, below = false, x = 500 } = {}) {
+  const g = createGame(); g.start();
+  // Isolate collision boundaries. Only this fixture arranges positions;
+  // keyboard/pointer/gamepad input executes production physics thereafter.
+  g.run(`stage={...stage,gaps:[],platforms:[[480,${y},260]${below ? ',[480,365,260]' : ''}]};
+    enemies=[];boss.dead=true;pickups=[];intel=[];
+    player.x=${x};player.y=${y}-player.h;player.ground=true;player.vy=0;player.inv=0;`);
+  return g;
+}
+
+test('Down plus a fresh jump drops only the current ledge and lands on a lower platform', () => {
+  for (const down of ['s', 'ArrowDown']) for (const jump of ['w', 'ArrowUp', ' ']) {
+    const g = onLedge({ below: true }), before = g.state();
+    g.key(down); tick(g, 4); eq(g.state().y + g.state().playerHeight, 325);
+    eq(g.state().dropTime, 0, 'Crouching alone must not drop');
+    g.key(jump); tick(g); g.key(jump, false);
+    assert(g.state().dropTime > 0 && !g.state().ground && g.read('player.vy') > 0);
+    g.key(down, false); tick(g, 24);
+    eq(g.state().ground, true); eq(g.state().y + g.state().playerHeight, 365);
+    eq(g.state().dropTime, 0); eq(g.read('player.dropPlatform'), null);
+    eq(g.state().hp, before.hp); eq(g.state().grenades, before.grenades); eq(g.state().score, before.score);
+    eq(g.read('player.inv'), 0); eq(g.state().progress, before.progress);
+    tick(g, 30); eq(g.state().y + g.state().playerHeight, 365, 'Holding jump may not repeatedly drop through floors');
+  }
+});
+
+test('platform descent never drops through solid ground or cancels normal/coyote jumps', () => {
+  const g = onLedge(); g.run('player.x=80;player.y=G-player.h;');
+  g.key('s'); g.key('w'); tick(g); assert(g.read('player.vy') < 0); eq(g.state().dropTime, 0);
+  g.key('w', false); g.key('s', false); tick(g, 75);
+  eq(g.state().ground, true); eq(g.state().y + g.state().playerHeight, 425);
+  const normal = onLedge(); normal.key('w'); tick(normal); assert(normal.read('player.vy') < 0); eq(normal.state().dropTime, 0);
+  const edge = onLedge({ x: 735 }); edge.key('d'); tick(edge, 4); edge.key('d', false);
+  assert(!edge.state().ground); edge.key('s'); edge.key('w'); tick(edge);
+  assert(edge.read('player.vy') < -450); eq(edge.state().dropTime, 0);
+});
+
+test('simultaneous dash and descent cannot snap back to the ledge when ignore time expires', () => {
+  for (const face of [-1, 1]) {
+    const g = onLedge({ x: face === 1 ? 490 : 700 }); g.run(`player.face=${face};`);
+    g.key('s'); g.key('w'); g.key('l'); tick(g);
+    g.key('s', false); g.key('w', false); g.key('l', false);
+    assert(g.state().dashTime > 0 && g.state().dropTime > 0);
+    tick(g, 13); assert(!g.state().ground, 'Dash must not reland on the ignored support');
+    tick(g, 36); eq(g.state().ground, true); eq(g.state().y + g.state().playerHeight, 425);
+    eq(g.read('player.dropPlatform'), null);
+  }
+});
+
+test('platform descent freezes across pause and canceled confirmation without injecting a second jump', () => {
+  const g = onLedge(); g.key('s'); g.key('w'); tick(g); g.key('w', false); g.key('s', false);
+  g.key('p'); const saved = g.state(); tick(g, 90); eq(g.state(), saved);
+  g.click('restart'); tick(g, 30); g.click('cancel-restart'); eq(g.state(), saved);
+  g.click('start'); tick(g, 40); eq(g.state().y + g.state().playerHeight, 425); eq(g.state().dropTime, 0);
+  g.click('restart'); g.click('start'); eq(g.state().dropTime, 0); eq(g.read('player.dropPlatform'), null);
+});
+
+test('touch and gamepad down-jump pairs use the same platform descent physics', () => {
+  const touch = onLedge();
+  const down = [...touch.nodes.values()].find(node => node.dataset.action === 'down');
+  const jump = [...touch.nodes.values()].find(node => node.dataset.action === 'jump');
+  down.dispatch('pointerdown', { pointerId: 10 }); jump.dispatch('pointerdown', { pointerId: 11 });
+  tick(touch); assert(touch.state().dropTime > 0 && touch.read('player.vy') > 0);
+  down.dispatch('pointerup', { pointerId: 10 }); jump.dispatch('pointerup', { pointerId: 11 });
+  tick(touch, 40); eq(touch.state().y + touch.state().playerHeight, 425); eq(touch.state().touchCount, 0);
+  const pad = onLedge(); pad.pad(); pad.frames(2); pad.pad([0, 13]); pad.frames(2);
+  assert(pad.state().dropTime > 0 && pad.read('player.vy') > 0);
+  pad.pad(); pad.frames(40); eq(pad.state().y + pad.state().playerHeight, 425);
+});
+
+test('drop-through remains vulnerable to hostile fire and resets after a lost life', () => {
+  const g = onLedge(); g.key('s'); g.key('w'); tick(g); g.key('w', false); g.key('s', false);
+  g.run("projectile(player.x+10,player.y+16,0,0,'e');"); tick(g); eq(g.state().hp, 4);
+  g.run('player.inv=0;hurt(99);'); eq(g.state().lives, 2); eq(g.state().dropTime, 0);
+  eq(g.read('player.dropPlatform'), null); eq(g.state().y + g.state().playerHeight, 425);
+});
+
+
+test('all elevated arena weapons are reachable and descendable with unassisted movement inputs', () => {
+  const routes = {
+    1: [{ x: 287.5, floor: 425 }, { x: 287.5, floor: 325, jump: true }, { x: 350, floor: 325 }, { x: 480, floor: 285, jump: true }],
+    2: [{ x: 737.5, floor: 425 }, { x: 737.5, floor: 325, jump: true }],
+    4: [{ x: 217.5, floor: 425 }, { x: 217.5, floor: 335, jump: true }, { x: 280, floor: 335 }, { x: 415, floor: 295, jump: true }],
+  };
+  for (const [wave, route] of Object.entries(routes)) {
+    const g = defense();
+    // Isolate platform reachability, using production geometry and physics.
+    // No position, velocity or pickup changes after the route begins.
+    g.run(`survivalWave=${Number(wave) - 1};startWave();spawnTime=100;`);
+    for (const target of route) {
+      if (target.jump) g.key('w');
+      let reached = false;
+      for (let frame = 0; frame < 180; frame++) {
+        const state = g.state(), dx = target.x - state.x - 13.5;
+        g.key('a', dx < -3); g.key('d', dx > 3); tick(g);
+        if (Math.abs(g.state().x + 13.5 - target.x) <= 3 && g.state().ground &&
+          g.state().y + g.state().playerHeight === target.floor) { reached = true; break; }
+      }
+      for (const key of ['a', 'd', 'w']) g.key(key, false);
+      assert(reached, `Wave ${wave} waypoint ${JSON.stringify(target)} is not reachable: ${JSON.stringify(g.state())}`);
+    }
+    assert(g.state().pickups.find(p => p.kind === 'spread').done); eq(g.state().weapon, 'spread');
+    g.key('s'); g.key('w'); tick(g); g.key('s', false); g.key('w', false); tick(g, 60);
+    eq(g.state().y + g.state().playerHeight, 425); eq(g.state().ground, true); eq(g.state().dropTime, 0);
+    eq(g.state().hp, 6); eq(g.state().lives, 1); eq(g.state().score, 75);
   }
 });
 

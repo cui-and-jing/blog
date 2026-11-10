@@ -156,7 +156,7 @@
         <section id="survival-menu" class="menu-section" aria-label="防线生存规则" hidden>
           <p class="survival-summary">一条命，守住自己的纪录。双向增援与每三波首领战交替，搭配模组；还可自选战地回收，在火线中抢回数据换取额外补给。</p>
           <div class="choice-grid survival-grid">
-            <div class="choice"><strong>守住防线</strong><span>开局装具决定体力与手雷，固定标准难度。敌人出现前预警 2.2 秒；步兵追击，盾卫转向防守。</span></div>
+            <div class="choice"><strong>守住防线</strong><span>开局装具决定体力与手雷，固定标准难度。普通波轮换三套地形；平台可下蹲 + 跳跃降层。增援预警 2.2 秒。</span></div>
             <div class="choice"><strong>选择构筑</strong><span>六种永久模组，每种最多两级。两种模组各 1 级即可点亮组合：贯穿火力、反击回流、爆破回收。</span></div>
             <div class="choice"><strong>每三波迎战首领</strong><span>三位首领轮换登场，无杂兵干扰。首领清场恢复 2 体力、2 手雷，额外奖励 500 分；普通波恢复各 1。</span></div>
           </div>
@@ -221,7 +221,7 @@
           <p class="small">每章三星：完成任务 / 收集 3 份情报 / 不损失生命。受伤不影响生命之星。</p>
         </section>
         <p class="small">战术提示：炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
-        <p id="overlay-help" class="small">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · Shift / L 冲刺 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Start 暂停。手机使用下方按键。</p>
+        <p id="overlay-help" class="small">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Start 暂停。手机使用下方按键；按住 ↓ 再点跳可降层。</p>
       </div>
     </div>
   </main>
@@ -229,7 +229,7 @@
     <div class="cluster">
       <button type="button" data-action="left" aria-label="向左移动">◀</button>
       <button type="button" data-action="right" aria-label="向右移动">▶</button>
-      <button type="button" data-action="down" aria-label="下蹲">↓</button>
+      <button type="button" data-action="down" aria-label="下蹲，配合跳跃可从平台降层">↓</button>
     </div>
     <div class="cluster">
       <button type="button" data-action="dash" aria-label="向面朝方向冲刺">冲</button>
@@ -240,7 +240,7 @@
   </section>
   <footer class="legend">
     <span><kbd>A</kbd><kbd>D</kbd> 移动</span><span><kbd>W</kbd><kbd>空格</kbd> 跳跃</span>
-    <span><kbd>J</kbd> 连射</span><span><kbd>K</kbd> 手雷</span><span><kbd>S</kbd> 下蹲</span>
+    <span><kbd>J</kbd> 连射</span><span><kbd>K</kbd> 手雷</span><span><kbd>S</kbd> 下蹲 / 配合跳跃降层</span>
     <span><kbd>Shift</kbd><kbd>L</kbd> 冲刺</span><span><kbd>P</kbd> 暂停</span><span>横屏游玩体验更好 · 无外部资源</span>
   </footer>
   <p class="sr" id="announcer" aria-live="polite" aria-atomic="true"></p>
@@ -271,6 +271,22 @@
           enemies:[[330,'walker'],[590,'drone'],[1010,'turret'],[1400,'shield'],[1870,'drone'],[2240,'turret'],[2680,'shield'],[2890,'drone'],[3250,'turret']],
           pickups:[[245,'spread'],[900,'grenade'],[1340,'heal'],[2160,'boost'],[2800,'heal'],[3310,'grenade']]}
       ];
+      // Ordinary waves rotate by their own ordinal; boss waves do not skip a map.
+      // These are one-way ledges, not projectile cover. Elevated rewards are
+      // anchored to their supporting ledge instead of stale world coordinates.
+      const ARENAS=[
+        {id:'steps',name:'中央阶台',hint:'从侧翼登上中央高台；下蹲 + 跳跃可降层。',
+          platforms:[[210,325,155],[405,285,150],[640,325,155]],
+          slots:[140,790,260,670,370,550,90,840],drones:[300,460,620],spread:1,recovery:[0,2]},
+        {id:'flanks',name:'双翼高台',hint:'左右高台之间可借低台换位；散弹与数据分居两翼。',
+          platforms:[[135,325,175],[350,365,105],[510,365,105],[650,325,175]],
+          slots:[105,825,320,610,215,710,70,870],drones:[240,720],spread:3,recovery:[0,0]},
+        {id:'bridge',name:'错层栈桥',hint:'沿错层平台逐级登高；降层可快速回到地面交战。',
+          platforms:[[135,335,165],[340,295,150],[545,335,155],[745,305,145]],
+          slots:[90,835,315,675,185,560,750,60],drones:[240,600],spread:1,recovery:[0,2]}
+      ];
+      const arenaForWave=wave=>wave%3===0?null:ARENAS[(wave-1-Math.floor(wave/3))%ARENAS.length];
+      const ledgePoint=(arena,index,height)=>{const [x,y,w]=arena.platforms[index];return {x:x+w/2,y:y-height};};
       const CHALLENGES={
         sprint:{name:'闪电突袭',stage:0,limit:90,goal:'90 秒内击败首领并抵达出口',upgrades:{rapid:0,dash:1,armor:0}},
         counter:{name:'反击专线',stage:1,limit:0,goal:'反弹至少 5 枚敌弹，再击败首领并抵达出口',upgrades:{rapid:0,dash:2,armor:0}},
@@ -316,7 +332,7 @@
       const bossWave=()=>survival()&&survivalWave>0&&survivalWave%3===0;
       const synergy=key=>survival()&&SYNERGIES[key].pair.every(name=>upgrades[name]>0);
       const activeSynergies=()=>Object.keys(SYNERGIES).filter(synergy);
-      const wavePreview=wave=>wave%3===0?'首领战 · '+STAGES[Math.floor((wave-1)/3)%3].bossName:'双向增援 · 第 '+wave+' 波';
+      const wavePreview=wave=>wave%3===0?'首领战 · '+STAGES[Math.floor((wave-1)/3)%3].bossName:'双向增援 · 第 '+wave+' 波 · '+arenaForWave(wave).name;
       const activeEnemies=()=>enemies.filter(e=>!e.dead).length;
       const dashDelay=()=>Math.max(1.2,2.4-upgrades.dash*.6-(survival()?kit().dash:0));
       const currentChallenge=()=>mode==='challenge'?CHALLENGES[challengeId]:null;
@@ -540,7 +556,7 @@
         const mission=currentChallenge();$('mission-hud').hidden=!mission&&!survival();
         if(survival()){
           $('mission-name').textContent='防线生存 · 第 '+survivalWave+' 波'+(bossWave()?' · 首领战':'');
-          $('mission-objective').textContent='已守住 '+survivalCleared+' 波 · '+(spawnTime>0?(bossWave()?'首领':'增援')+' '+spawnTime.toFixed(1)+' 秒后抵达':bossWave()?(boss.dead?'首领已击败':stage.bossName+' · 体力 '+boss.hp+' / '+boss.maxHp):'剩余 '+activeEnemies()+' 名敌人');
+          $('mission-objective').textContent=(stage.arena?stage.arena.name+' · ':'')+'已守住 '+survivalCleared+' 波 · '+(spawnTime>0?(bossWave()?'首领':'增援')+' '+spawnTime.toFixed(1)+' 秒后抵达':bossWave()?(boss.dead?'首领已击败':stage.bossName+' · 体力 '+boss.hp+' / '+boss.maxHp):'剩余 '+activeEnemies()+' 名敌人');
           $('mission-time').textContent='用时 '+formatTime(survivalTime);
           $('mission-hud').setAttribute('data-urgent',String(player.hp<=2));
         }
@@ -561,7 +577,7 @@
           platforms:[[260,320,170],[500,310,150]],intel:[],enemies:[],pickups:[]};
         player={x:64,y:G-44,w:27,h:44,vx:0,vy:0,face:1,hp:clamp(carry?.hp??maxHealth(),1,maxHealth()),
           lives:carry?.lives??(difficulty==='relaxed'?4:3),grenades:carry?.grenades??3,ground:true,inv:1.2,shoot:0,boost:0,
-          weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashDir:1,coyote:.1,jumpBuffer:0,crouch:false};
+          weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashDir:1,coyote:.1,jumpBuffer:0,crouch:false,dropPlatform:null,dropTime:0};
         enemies=stage.enemies.map(([x,type])=>makeEnemy(x,type));
         pickups=stage.pickups.map(([x,kind])=>({x,y:kind==='spread'?G-45:G-93,kind,done:false,age:0}));
         intel=stage.intel.map(([x,y])=>({x,y,done:false}));
@@ -589,32 +605,34 @@
       function startWave(){
         $('supply-reroll').hidden=true;
         survivalWave++;stageIndex=Math.floor((survivalWave-1)/3)%3;
-        stage={...STAGES[stageIndex],name:['边境防线','要塞防线','赤焰防线'][stageIndex],width:W,
-          gaps:[],checkpoints:[],platforms:[[210,325,155],[405,285,150],[640,325,155]],intel:[],enemies:[],pickups:[]};
+        const arena=arenaForWave(survivalWave);
+        stage={...STAGES[stageIndex],name:['边境防线','要塞防线','赤焰防线'][stageIndex],width:W,arena,
+          gaps:[],checkpoints:[],platforms:arena?.platforms.map(ledge=>[...ledge])||[],intel:[],enemies:[],pickups:[]};
         if(bossWave())stage={...stage,platforms:[[260,320,170],[500,310,150]]};
         boss=makeBoss(bossWave()?[32,44,56][stageIndex]+Math.min(48,Math.floor((survivalWave-1)/9)*12):0,790);
         player.x=W/2-player.w/2;player.h=44;player.y=G-44;player.vx=0;player.vy=0;player.ground=true;
-        player.crouch=false;player.inv=1.2;player.shoot=0;player.dashTime=0;player.dashCooldown=0;player.jumpBuffer=0;player.coyote=.11;
-        const slots=[140,790,260,670,370,550,90,840],count=Math.min(8,3+Math.floor(survivalWave/2));
+        player.crouch=false;player.inv=1.2;player.shoot=0;player.dashTime=0;player.dashCooldown=0;player.jumpBuffer=0;player.coyote=.11;player.dropPlatform=null;player.dropTime=0;
+        const slots=arena?.slots||[],count=Math.min(8,3+Math.floor(survivalWave/2));
         const types=survivalWave===1?['walker']:survivalWave===2?['walker','drone']:['walker','turret','shield','drone'];
+        let droneIndex=0;
         enemies=slots.slice(0,bossWave()?0:count).map((x,i)=>{
           const type=types[(i+survivalWave-1)%types.length],e=makeEnemy(x,type);
-          // Air units stay over the middle ledges; all ground units have room to flank.
-          if(type==='drone'){e.x=e.home=300+(i%3)*160;e.y=240;}
+          // Air units patrol the current layout; all ground units have room to flank.
+          if(type==='drone'){e.x=e.home=arena.drones[droneIndex++%arena.drones.length];e.y=240;}
           e.hp+=Math.min(6,Math.floor((survivalWave-1)/4));e.maxHp=e.hp;
           e.face=x<player.x?1:-1;e.shot=.5+i*.22;return e;
         });
-        pickups=[{x:480,y:260,kind:'spread',done:false,age:0},
+        pickups=[{...(arena?ledgePoint(arena,arena.spread,25):{x:480,y:260}),kind:'spread',done:false,age:0},
           {x:survivalWave%2?65:bossWave()?700:895,y:G-25,kind:'heal',done:false,age:0}];
         bullets=[];bombs=[];sparks=[];intel=[];spawnTime=2.2;cam=0;shake=0;
         // A fresh, explicit choice for one ordinary wave. Never create nodes in
         // a boss arena or persist an unfinished commission across attempts.
         fieldContract=selectedContract==='recovery'&&!bossWave()?{status:'active',nodes:
-          [[120,G-24],[840,G-24],[survivalWave%2?285:715,301]].map(([x,y])=>({x,y,done:false}))}:null;
+          [{x:120,y:G-24},{x:840,y:G-24},ledgePoint(arena,arena.recovery[survivalWave%2?0:1],24)].map(point=>({...point,done:false}))}:null;
         selectedContract='hold';
         combo={count:0,timer:0,best:0};combatText='';combatTime=0;selectedSupply=null;
         clearInput();lag=0;phase='playing';hideMenu();frameLast=performance.now();hud();
-        announce('第 '+survivalWave+' 波，'+(bossWave()?stage.bossName+'。首领 2.2 秒后抵达，右侧为竞技场边界。':count+' 名敌人。增援 2.2 秒后抵达，留意两侧。'));
+        announce('第 '+survivalWave+' 波，'+(bossWave()?stage.bossName+'。首领 2.2 秒后抵达，右侧为竞技场边界。':arena.name+'，'+count+' 名敌人。增援 2.2 秒后抵达。'+arena.hint));
       }
       function supplyDescription(key){
         const awaken=Object.entries(SYNERGIES).filter(([id,value])=>!synergy(id)&&value.pair.includes(key)&&value.pair.every(name=>name===key||upgrades[name]>0)).map(([,value])=>value.name);
@@ -622,7 +640,7 @@
       }
       function supplyLabel(key){return SUPPLIES[key].name+(MODULES.includes(key)?' · '+((upgrades[key]||0)+1)+' 级':'');}
       function showWaveMenu(){
-        showMenu('第 '+survivalCleared+' 波 · 守住了','已恢复 '+(bossWave()?2:1)+' 点体力和 '+(bossWave()?2:1)+' 枚手雷。下一波：'+wavePreview(survivalWave+1)+'。整备不计时。',selectedSupply===null?'先选择防线补给':'携带'+SUPPLIES[selectedSupply].name+'，继续','waveClear');
+        showMenu('第 '+survivalCleared+' 波 · 守住了','已恢复 '+(bossWave()?2:1)+' 点体力和 '+(bossWave()?2:1)+' 枚手雷。下一波：'+wavePreview(survivalWave+1)+'。'+(arenaForWave(survivalWave+1)?.hint||'')+'整备不计时。',selectedSupply===null?'先选择防线补给':'携带'+SUPPLIES[selectedSupply].name+'，继续','waveClear');
       }
       function finishWave(){
         if(!survival()||phase!=='playing'||spawnTime>0||activeEnemies()>0||!boss.dead)return;
@@ -845,7 +863,7 @@
             saveBest();hud();showMenu('行动失败','本次得分 '+points+'。试试冲刺穿过弹幕，或回指挥部切换轻松模式。','再试一次','gameOver');
             return;
           }
-          player.hp=maxHealth();player.x=player.checkpoint;player.h=44;player.y=G-player.h;player.vx=0;player.vy=0;player.ground=true;player.inv=2.2;player.dashTime=0;player.jumpBuffer=0;
+          player.hp=maxHealth();player.x=player.checkpoint;player.h=44;player.y=G-player.h;player.vx=0;player.vy=0;player.ground=true;player.inv=2.2;player.dashTime=0;player.jumpBuffer=0;player.dropPlatform=null;player.dropTime=0;
           bullets=bullets.filter(b=>b.owner==='p');
           announce('失去一条生命，从检查点继续。');
         }
@@ -980,9 +998,20 @@
         player.crouch=crouch;
         player.coyote=player.ground?.11:Math.max(0,player.coyote-dt);
         player.jumpBuffer=Math.max(0,player.jumpBuffer-dt);
+        player.dropTime=Math.max(0,player.dropTime-dt);
+        // A simultaneous dash can hold vertical motion. Never re-enable this
+        // ledge until the feet are below its landing tolerance.
+        if(player.dropTime===0&&player.dropPlatform&&player.y+player.h>player.dropPlatform[1]+8)player.dropPlatform=null;
         if(jumpQueued){jumpQueued=false;player.jumpBuffer=.13;}
         if(player.jumpBuffer>0&&player.coyote>0){
-          player.vy=-525;player.ground=false;player.coyote=0;player.jumpBuffer=0;beep(370,.06);
+          const support=down&&player.ground?stage.platforms.find(([x,y,w])=>
+            Math.abs(player.y+player.h-y)<1&&player.x+player.w>x+3&&player.x<x+w-3):null;
+          if(support){
+            player.dropPlatform=support;player.dropTime=.2;player.vy=80;
+            // A downward step has no invulnerability, score or resource effect.
+            beep(270,.04,'triangle');
+          }else{player.vy=-525;beep(370,.06);}
+          player.ground=false;player.coyote=0;player.jumpBuffer=0;
         }
         if(axis&&player.dashTime<=0)player.face=axis;
         player.dashCooldown=Math.max(0,player.dashCooldown-dt);
@@ -1001,7 +1030,9 @@
         if(player.vy>=0){
           let landing=Infinity;
           if(!isGap(cx)&&oldBottom<=G+12&&player.y+player.h>=G)landing=G;
-          for(const [x,y,w] of stage.platforms){
+          for(const ledge of stage.platforms){
+            if(ledge===player.dropPlatform)continue;
+            const [x,y,w]=ledge;
             if(player.x+player.w>x+3&&player.x<x+w-3&&oldBottom<=y+8&&player.y+player.h>=y)landing=Math.min(landing,y);
           }
           if(landing!==Infinity){player.y=landing-player.h;player.vy=0;player.ground=true;}
@@ -1526,7 +1557,9 @@
         mode,difficulty,intel:collected(),intelTotal:intel.length,challengeId,challengeTime,challengeReflections,bossWins,titleView,stageDeaths,stageStars,unlocked:progress.unlocked,
         upgrades:{...upgrades},dashCooldown:player?.dashCooldown??0,dashTime:player?.dashTime??0,
         checkpoint:player?.checkpoint??64,maxHp:maxHealth(),selectedUpgrade,storageAvailable,
-        crouch:player?.crouch??false,playerHeight:player?.h??44,coyote:player?.coyote??0,jumpBuffer:player?.jumpBuffer??0,
+        crouch:player?.crouch??false,playerHeight:player?.h??44,coyote:player?.coyote??0,jumpBuffer:player?.jumpBuffer??0,dropTime:player?.dropTime??0,
+        platforms:stage?.platforms.map(ledge=>[...ledge])||[],arena:survival()&&stage?.arena?{id:stage.arena.id,name:stage.arena.name,hint:stage.arena.hint}:null,
+        pickups:pickups.map(p=>({x:p.x,y:p.y,kind:p.kind,done:p.done})),
         bossAttackType:boss?.attackType??'volley',bossBeamTime:boss?.beamTime??0,bossBeamY:boss?.beamY??0,
         turretCharge:Math.max(0,...enemies.map(e=>e.dead?0:e.windup)),shieldCount:enemies.filter(e=>!e.dead&&e.type==='shield').length,
         combo:combo.count,comboTime:combo.timer,comboBest:combo.best,combatText:combatTime>0?combatText:'',reflections,
