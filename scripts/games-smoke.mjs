@@ -312,6 +312,18 @@ async function checkGame(browser, file) {
           problems.push('Pixel Raid 拾取散弹后未打出三发弹道：' + JSON.stringify(scatter));
         }
       }
+      // Defeat the first patrol through real input and check live combat feedback.
+      await page.keyboard.down('j');
+      try {
+        await page.waitForFunction(() => window.__raidState?.combo > 0, { timeout: 4500 });
+      } finally { await page.keyboard.up('j'); }
+      const combo = await page.evaluate(() => ({
+        ...window.__raidState, label: document.getElementById('combo-status').textContent,
+      }));
+      if (combo.comboBest < 1 || !combo.label.includes('连') || !combo.combatText.includes('连击')) {
+        problems.push('Pixel Raid 连击状态或命中反馈错误：' + JSON.stringify(combo));
+      }
+      await page.screenshot({ path: path.join(process.cwd(), '.shots', 'pixelraid-combo.png'), fullPage: true });
 
       /* 同页切成手机视口；按住屏幕右箭头，断言实际位置改变，不止检查控件是否存在 */
       await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
@@ -409,6 +421,32 @@ async function checkGame(browser, file) {
       if (practice.stage !== 3 || practice.mode !== 'practice' || practice.maxHp !== 5 ||
           Object.values(practice.upgrades).some(Boolean)) {
         problems.push('Pixel Raid 第三章练习初始化错误：' + JSON.stringify(practice));
+      }
+      // Later-stage enemies must behave in the minified build, not just the VM harness.
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => window.__raidReady === true, { timeout: 10000 });
+      await page.click('#stage-2');
+      await page.waitForFunction(() => window.__raidState?.turretCharge > 0, { timeout: 4500 });
+      await page.screenshot({ path: path.join(process.cwd(), '.shots', 'pixelraid-turret-charge.png'), fullPage: true });
+      await page.keyboard.down('j');
+      await page.keyboard.down('d');
+      try {
+        await page.waitForFunction(() => window.__raidState?.x > 465, { timeout: 4500 });
+      } finally { await page.keyboard.up('d'); }
+      try {
+        await page.waitForFunction(() => window.__raidState?.combatText.includes('盾牌格挡'), { timeout: 4500 });
+      } finally { await page.keyboard.up('j'); }
+      const shield = await page.evaluate(() => ({ ...window.__raidState }));
+      if (shield.shieldCount !== 2 || shield.phase !== 'playing') {
+        problems.push('Pixel Raid 盾卫正面格挡或布阵错误：' + JSON.stringify(shield));
+      }
+      await page.screenshot({ path: path.join(process.cwd(), '.shots', 'pixelraid-shield.png'), fullPage: true });
+      await page.keyboard.press('p');
+      const pausedCombat = await page.evaluate(() => ({ ...window.__raidState }));
+      await new Promise(resolve => setTimeout(resolve, 180));
+      const frozenCombat = await page.evaluate(() => ({ ...window.__raidState }));
+      if (frozenCombat.comboTime !== pausedCombat.comboTime || frozenCombat.turretCharge !== pausedCombat.turretCharge) {
+        problems.push('Pixel Raid 暂停未冻结新增战斗计时');
       }
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1500));

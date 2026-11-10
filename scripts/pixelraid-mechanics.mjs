@@ -19,7 +19,7 @@ assert(!source.includes('__raidQA'), 'Mutable test hooks must never be published
 const injected = inline.replace(entry, 'window.__raidQA = code => eval(code);' + entry);
 const STORE = 'pixel-raid.progress.v1';
 
-function createGame({ storage = {}, blocked = false } = {}) {
+function createGame({ storage = {}, blocked = false, reducedMotion = false } = {}) {
   const nodes = new Map(), events = new Map(), documentEvents = new Map();
   const values = new Map(Object.entries(storage));
   let queued = null, now = 0, seed = 16437, gamepads = [];
@@ -87,7 +87,7 @@ function createGame({ storage = {}, blocked = false } = {}) {
     addEventListener(name, callback) { documentEvents.set(name, callback); },
     activeElement: null, hidden: false,
   };
-  const win = { addEventListener(name, callback) { events.set(name, callback); }, matchMedia: () => ({ matches: false }) };
+  const win = { addEventListener(name, callback) { events.set(name, callback); }, matchMedia: () => ({ matches: reducedMotion }) };
   const math = Object.create(Math);
   math.random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
   const localStorage = {
@@ -568,6 +568,249 @@ test('gamepad disconnect releases movement without freezing the keyboard', () =>
   g.pad([], [1, 0]); g.frames(8); assert(g.state().x > 80);
   g.noPad(); const x = g.state().x; g.frames(5); eq(g.state().x, x);
   g.key('a'); g.frames(5); g.key('a', false); assert(g.state().x < x);
+});
+
+// The combat iteration keeps these tests on the real update/collision path. Small
+// arenas remove unrelated patrols and pickups, never replace the gameplay code.
+function combatArena(type = null, stage = 0, difficulty = 'standard') {
+  const g = createGame();
+  g.run(`difficulty=${JSON.stringify(difficulty)}; resetStage(${stage},null); phase='playing';
+    enemies=${type ? `enemies.filter(e=>e.type===${JSON.stringify(type)}).slice(0,1)` : '[]'};
+    enemies.forEach(e=>{e.x=e.home=300;e.age=0;e.shot=100;});
+    pickups=[];intel=[];player.inv=100;boss.shot=100;`);
+  if (type) eq(g.read('enemies.length'), 1, `Missing ${type} fixture`);
+  return g;
+}
+function tick(g, count = 1) { g.run(`for(let frame=0;frame<${count};frame++)update(DT);`); }
+function tickUntil(g, code, limit = 400) {
+  for (let frame = 0; frame < limit && !g.read(code); frame++) tick(g);
+  assert(g.read(code), 'Timed out waiting for combat condition: ' + code);
+}
+
+test('shield patrols introduce fixed-facing armor only in later chapters', () => {
+  const g = createGame();
+  for (let index = 0; index < 3; index++) {
+    g.run(`resetStage(${index},null);`);
+    const shields = g.read("enemies.filter(e=>e.type==='shield')");
+    if (index === 0) eq(shields.length, 0);
+    else {
+      assert(shields.length >= 2, `Chapter ${index + 1} should teach and repeat the shield encounter`);
+      assert(shields.every(e => e.hp === 5 && e.maxHp === 5 && e.face === -1));
+    }
+  }
+  const patrol = combatArena('shield', 1);
+  patrol.run('player.x=420;'); tick(patrol, 30);
+  eq(patrol.read('enemies[0].face'), -1, 'Walking behind a shield must not silently rotate its armor');
+});
+
+test('shield collision blocks frontal fire but rear fire, reflection and grenades work', () => {
+  const g = combatArena('shield', 1);
+  const hit = (vx, reflected = false) => {
+    g.run(`projectile(enemies[0].x+15,enemies[0].y+18,${vx},0,'p',${reflected ? 2 : 1});
+      bullets[bullets.length-1].reflected=${reflected};`);
+    tick(g);
+    eq(g.read('bullets.length'), 0, 'A collision must consume exactly one player bullet');
+  };
+  hit(650); eq(g.read('enemies[0].hp'), 5); eq(g.state().score, 0); eq(g.state().combo, 0);
+  assert(g.read('enemies[0].blockFlash') > 0); assert(g.state().combatText.includes('盾牌'));
+  hit(-650); eq(g.read('enemies[0].hp'), 4); assert(g.read('enemies[0].flash') > 0);
+  hit(650, true); eq(g.read('enemies[0].hp'), 2);
+  g.run('boom(enemies[0].x+15,enemies[0].y+18)');
+  assert(g.read('enemies[0].dead')); eq(g.state().score, 200); eq(g.state().combo, 1);
+  g.run('boom(enemies[0].x+15,enemies[0].y+18); damageEnemy(enemies[0],6)');
+  eq(g.state().score, 200); eq(g.state().combo, 1, 'A dead shield must never award another kill');
+});
+
+test('turrets telegraph a locked target and fire three spaced shots before cooldown', () => {
+  for (const difficulty of ['standard', 'relaxed']) {
+    const g = combatArena('turret', 0, difficulty);
+    g.run('enemies[0].shot=0;'); tick(g);
+    near(g.read('enemies[0].windup'), difficulty === 'relaxed' ? 1.05 : .8);
+    eq(g.read('bullets.length'), 0);
+    const target = g.read('[enemies[0].aimX,enemies[0].aimY]');
+    // Change the hitbox after the aim lock; later rounds must not retarget it.
+    g.key('s'); tick(g, 10);
+    eq(g.read('[enemies[0].aimX,enemies[0].aimY]'), target);
+    eq(g.read('bullets.length'), 0);
+    tickUntil(g, 'bullets.length===1', 65);
+    const first = g.read('({clock,vx:bullets[0].vx,vy:bullets[0].vy,sourceX:bullets[0].sourceX,sourceY:bullets[0].sourceY})');
+    const chargeDuration = difficulty === 'relaxed' ? 1.05 : .8;
+    assert(first.clock - 1 / 60 >= chargeDuration - 1e-8 && first.clock - 1 / 60 <= chargeDuration + 1 / 60 + 1e-8);
+    near(first.vx * (target[1] - first.sourceY), first.vy * (target[0] - first.sourceX));
+    near(Math.hypot(first.vx, first.vy), 315 * (difficulty === 'relaxed' ? .78 : 1));
+    eq(g.read('enemies[0].burst'), 2);
+    tick(g, 8); eq(g.read('bullets.length'), 1, 'Burst spacing must not collapse into one frame');
+    tick(g); eq(g.read('bullets.length'), 2);
+    tick(g, 8); eq(g.read('bullets.length'), 2);
+    tick(g); eq(g.read('bullets.length'), 3); eq(g.read('enemies[0].burst'), 0);
+    for (const bullet of g.read('bullets')) { near(bullet.vx, first.vx); near(bullet.vy, first.vy); }
+    near(g.read('enemies[0].shot'), 2.1);
+    tick(g, 125); eq(g.read('enemies[0].windup'), 0);
+    tickUntil(g, 'enemies[0].windup>0', 3);
+    assert(g.read('enemies[0].windup') > .7, 'Next attack must start with a new warning, not an immediate bullet');
+  }
+});
+
+test('turrets cancel charging and unfinished bursts outside range or behind the camera', () => {
+  for (const pending of ['charge', 'burst']) for (const exit of ['range', 'camera']) {
+    const g = combatArena('turret');
+    g.run('enemies[0].shot=0;'); tick(g);
+    if (pending === 'burst') tickUntil(g, 'enemies[0].burst===2', 60);
+    g.run(`player.x=enemies[0].x+${exit === 'range' ? 700 : 420}; player.y=G-player.h; bullets=[];`); tick(g);
+    if (exit === 'camera') {
+      assert(g.read('Math.abs(enemies[0].x-player.x)<570 && enemies[0].x+enemies[0].w<cam'),
+        'Camera regression must leave the turret within active distance but fully offscreen');
+    }
+    eq(g.read('enemies[0].windup'), 0); eq(g.read('enemies[0].burst'), 0);
+    tick(g, 180); eq(g.read('bullets.length'), 0, 'Inactive turret must never finish an offscreen attack');
+    g.run('player.x=64; player.y=G-player.h;'); tick(g);
+    eq(g.read('bullets.length'), 0); eq(g.read('enemies[0].windup'), 0);
+    tickUntil(g, 'enemies[0].windup>0', 30);
+    eq(g.read('bullets.length'), 0, 'Returning to range must still give a complete warning');
+  }
+  const destroyed = combatArena('turret');
+  destroyed.run('enemies[0].shot=0;'); tick(destroyed);
+  tickUntil(destroyed, 'enemies[0].burst===2', 60);
+  destroyed.run('damageEnemy(enemies[0],99); bullets=[];'); tick(destroyed, 60);
+  eq(destroyed.read('bullets.length'), 0); eq(destroyed.read('enemies[0].burst'), 0);
+});
+
+test('dash reflects the same enemy projectile toward its saved source with double damage', () => {
+  const g = combatArena();
+  g.run(`player.inv=0; projectile(320,G-70,-315,0,'e');
+    window.testBullet=bullets[0]; bullets[0].x=player.x+30;bullets[0].y=player.y+20; dash();`);
+  tick(g);
+  assert(g.read('bullets.length===1 && bullets[0]===window.testBullet'), 'Reflection must convert the object, not duplicate it');
+  const bullet = g.read('bullets[0]');
+  eq(bullet.owner, 'p'); eq(bullet.reflected, true); eq(bullet.damage, 2);
+  eq(bullet.sourceX, 320); eq(bullet.sourceY, 355);
+  near(bullet.vx * (bullet.sourceY - bullet.y), bullet.vy * (bullet.sourceX - bullet.x));
+  assert(bullet.vx * (bullet.sourceX - bullet.x) + bullet.vy * (bullet.sourceY - bullet.y) > 0);
+  near(Math.hypot(bullet.vx, bullet.vy), 650);
+  eq(g.state().reflections, 1); eq(g.state().hp, 5); eq(g.state().combo, 0); eq(g.state().shots, 0);
+  assert(g.state().combatText.includes('冲刺反弹'));
+  tick(g, 4); eq(g.state().reflections, 1, 'One projectile must not reflect twice');
+});
+
+test('normal invulnerability consumes hostile fire and a dash does not reflect reactor beams', () => {
+  const invulnerable = combatArena();
+  invulnerable.run("projectile(player.x+12,player.y+20,0,0,'e')"); tick(invulnerable);
+  eq(invulnerable.state().hp, 5); eq(invulnerable.state().reflections, 0); eq(invulnerable.read('bullets.length'), 0);
+  const beam = combatArena(null, 2);
+  beam.nearBoss();
+  beam.run('player.inv=0; dash(); boss.beamTime=.12;boss.beamY=G-12;boss.shot=100;'); tick(beam);
+  eq(beam.state().hp, 5); eq(beam.state().reflections, 0); eq(beam.read('bullets.length'), 0);
+  const coincident = combatArena();
+  coincident.run("player.face=-1; projectile(player.x+12,player.y+20,0,0,'e'); reflectBullet(bullets[0]);");
+  eq(coincident.read('[bullets[0].vx,bullets[0].vy]'), [-650, 0]);
+});
+
+test('reflected projectiles damage bosses once without becoming a combo kill', () => {
+  const g = combatArena(); g.nearBoss();
+  g.run(`boss.hp=2; projectile(boss.x+20,boss.y+50,650,0,'p',2); bullets[0].reflected=true;`); tick(g);
+  eq(g.state().bossHp, 0); eq(g.state().score, 1300); eq(g.state().combo, 0);
+  eq(g.read('bullets.length'), 0); tick(g, 3); eq(g.state().score, 1300);
+});
+
+test('combo rewards follow kill thresholds, cap at triple points and award dead enemies once', () => {
+  const g = combatArena();
+  g.run("enemies=Array.from({length:12},()=>({x:300,y:389,w:30,h:36,type:'walker',hp:1,dead:false}));");
+  const totals = [100, 300, 500, 800, 1100, 1400, 1700, 2000, 2300, 2600, 2900, 3200];
+  for (let index = 0; index < totals.length; index++) {
+    g.run(`damageEnemy(enemies[${index}],1);`);
+    eq(g.state().score, totals[index]); eq(g.state().combo, index + 1); near(g.state().comboTime, 5);
+  }
+  eq(g.state().comboBest, 12); assert(g.nodes.get('combo-status').textContent.includes('×3'));
+  g.run('enemies.forEach(e=>damageEnemy(e,99));');
+  eq(g.state().score, 3200); eq(g.state().combo, 12);
+  const values = combatArena('turret');
+  values.run('damageEnemy(enemies[0],99);'); eq(values.state().score, 160);
+  values.run("damageEnemy({type:'shield',hp:1,x:300,y:389,w:30,h:36,dead:false},1)");
+  eq(values.state().score, 560, 'Shield base reward must receive the second-kill multiplier');
+});
+
+test('combo expiry and actual damage reset the streak but preserve the best chain', () => {
+  const g = combatArena();
+  g.run('rewardKill(100);'); tick(g, 240);
+  assert(g.state().comboTime > .9 && g.state().comboTime < 1.1);
+  g.run('rewardKill(100);'); eq(g.state().combo, 2); near(g.state().comboTime, 5);
+  g.run('hurt(1);'); eq(g.state().combo, 2, 'Ordinary invulnerability must preserve the streak');
+  g.run('player.inv=0;dash();hurt(1);'); eq(g.state().combo, 2, 'Dash protection must preserve the streak');
+  g.run('player.dashTime=0;hurt(1);'); eq(g.state().hp, 4); eq(g.state().combo, 0); eq(g.state().comboTime, 0);
+  eq(g.state().comboBest, 2); assert(g.state().combatText.includes('连击中断'));
+  g.run('rewardKill(100);'); eq(g.state().combo, 1); tick(g, 301);
+  eq(g.state().combo, 0); eq(g.state().comboTime, 0); eq(g.state().comboBest, 2); eq(g.state().combatText, '');
+  g.run('rewardKill(100);'); eq(g.state().combo, 1); eq(g.state().score, 500);
+});
+
+test('pickups, intel, boss and stage-clear awards are not multiplied by a kill chain', () => {
+  const g = combatArena();
+  g.run('for(let i=0;i<4;i++)rewardKill(100);'); eq(g.state().score, 800);
+  g.run(`pickups=[{x:player.x+12,y:player.y+20,kind:'grenade',done:false,age:0}];
+    intel=[{x:player.x+12,y:player.y+20,done:false}];`); tick(g);
+  eq(g.state().score, 1025); eq(g.state().combo, 4);
+  tick(g, 3); eq(g.state().score, 1025, 'Collected objects must not award points again');
+  g.run('damageBoss(boss.hp);'); eq(g.state().score, 2325); eq(g.state().combo, 4);
+  g.exit(); tick(g); eq(g.state().phase, 'stageClear'); eq(g.state().score, 2975);
+  tick(g, 120); eq(g.state().score, 2975); eq(g.state().comboBest, 4);
+});
+
+test('pause freezes combat timers and stage changes or restart clear all combat state', () => {
+  for (const reset of ['stage', 'restart']) {
+    const g = combatArena('turret');
+    g.run(`rewardKill(100);rewardKill(100);reflections=3;enemies[0].windup=.4;
+      enemies[0].burst=2;enemies[0].burstTimer=.1;enemies[0].flash=.12;`);
+    const timers = () => g.read('({combo,combatText,combatTime,reflections,windup:enemies[0].windup,burst:enemies[0].burst,burstTimer:enemies[0].burstTimer,flash:enemies[0].flash})');
+    g.key('p'); const frozen = timers(); g.frames(180); eq(timers(), frozen);
+    const snapshot = g.win.__raidState;
+    try { snapshot.combo=999; snapshot.comboTime=999; snapshot.comboBest=999; snapshot.reflections=999; snapshot.combatText='changed'; } catch {}
+    eq(g.state().combo, 2); eq(g.state().reflections, 3); eq(timers(), frozen);
+    if (reset === 'stage') g.run("resetStage(1,{hp:player.hp,lives:player.lives,grenades:player.grenades});phase='playing';");
+    else { g.key('r'); g.click('start'); }
+    eq(g.state().phase, 'playing'); eq(g.state().combo, 0); eq(g.state().comboTime, 0); eq(g.state().comboBest, 0);
+    eq(g.state().reflections, 0); eq(g.state().combatText, ''); eq(g.read('combatTime'), 0);
+    assert(g.read('enemies.every(e=>e.windup===0&&e.burst===0&&e.flash===0&&e.blockFlash===0)'));
+    eq(g.nodes.get('combo-status').textContent, '待命');
+  }
+});
+
+test('lethal hostile fire retains reflected shots without stale iteration or duplicate kill awards', () => {
+  const g = combatArena('shield', 1);
+  g.run(`enemies[0].hp=2;
+    enemies.push({...enemies[0],type:'walker',hp:1,x:450,home:450});
+    projectile(465,G-18,0,0,'p');
+    projectile(315,G-18,650,0,'p',2);bullets[1].reflected=true;
+    player.hp=1;player.inv=0;
+    for(let i=0;i<4;i++)projectile(player.x+12,player.y+20,0,0,'e');`);
+  tick(g);
+  eq(g.state().lives, 2); eq(g.state().hp, 5); eq(g.state().stageDeaths, 1);
+  assert(g.read('enemies.every(e=>e.dead)')); eq(g.read('bullets.length'), 0);
+  eq(g.state().score, 400); eq(g.state().combo, 2); eq(g.state().reflections, 0);
+  tick(g, 3); eq(g.state().score, 400); eq(g.state().combo, 2);
+});
+
+test('reduced-motion rendering suppresses enemy and boss hit flashes while keeping combat feedback', () => {
+  for (const reducedMotion of [false, true]) {
+    const g = createGame({ reducedMotion });
+    g.run(`phase='playing';enemies[0].flash=.12;boss.flash=.12;
+      combatNotice('命中');window.drawRects=[];
+      c.fillRect=(...coords)=>window.drawRects.push({coords,fill:c.fillStyle,alpha:c.globalAlpha});
+      drawEnemy(enemies[0]);drawBoss();`);
+    const overlays = g.read("window.drawRects.filter(rect=>rect.fill==='#fff3c9')");
+    eq(overlays.length, reducedMotion ? 0 : 2);
+    if (!reducedMotion) eq(overlays.map(rect => rect.alpha), [.65, .55]);
+    eq(g.state().combatText, '命中');
+  }
+});
+
+test('combat feedback never covers the reactor beam dodge warning', () => {
+  const g = createGame();
+  g.run(`resetStage(2,null);phase='playing';player.x=boss.x-300;cam=player.x-290;
+    boss.attackType='beam';boss.windup=.5;combatNotice('冲刺反弹');
+    window.drawRects=[];c.fillRect=(...coords)=>window.drawRects.push({coords,fill:c.fillStyle});draw();`);
+  const warning = g.read("window.drawRects.find(rect=>rect.fill==='#241d31').coords");
+  const feedback = g.read("window.drawRects.find(rect=>rect.fill==='#14283c').coords");
+  assert(feedback[1] >= warning[1] + warning[3], 'Hit feedback must sit below the critical dodge instruction');
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition and combat contracts passed`);

@@ -97,6 +97,7 @@
     <span>最高 <b id="best">00000</b></span>
     <span>情报 <b id="intel">0 / 3</b></span>
     <span>冲刺 <b id="dash-status">就绪</b></span>
+    <span>连击 <b id="combo-status">待命</b></span>
     <span id="run-label">标准 · 远征</span>
     <span id="save-status" role="status">记录保存在本机</span>
   </section>
@@ -106,7 +107,7 @@
       <div class="menu-content">
         <p class="eyebrow" id="overlay-kicker">EXPEDITION / 01—03</p>
         <h1 id="overlay-title">像素突围</h1>
-        <p id="overlay-text">潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化，打造自己的突围路线。</p>
+        <p id="overlay-text">潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化；冲刺反弹敌弹，绕后击破盾卫，连击争取高分。</p>
         <div id="difficulty-options" class="menu-section" role="group" aria-label="远征难度">
           <div class="option-row">
             <button id="difficulty-standard" type="button" class="secondary" aria-pressed="true">标准 · 原味挑战</button>
@@ -137,6 +138,7 @@
           </div>
           <p class="small">每章三星：完成任务 / 收集 3 份情报 / 不损失生命。受伤不影响生命之星。</p>
         </section>
+        <p class="small">战术提示：炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
         <p id="overlay-help" class="small">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · Shift / L 冲刺 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Start 暂停。手机使用下方按键。</p>
       </div>
     </div>
@@ -178,13 +180,13 @@
           gaps:[[740,855],[1550,1680],[2460,2590],[3160,3270]],checkpoints:[1170,2380],
           platforms:[[350,328,180],[810,320,180],[1280,338,165],[1600,306,180],[2100,330,195],[2550,317,190],[3185,314,175]],
           intel:[[430,303],[1680,281],[2635,292]],
-          enemies:[[330,'turret'],[580,'walker'],[1050,'drone'],[1390,'turret'],[1860,'walker'],[2220,'drone'],[2750,'turret'],[3060,'walker']],
+          enemies:[[330,'turret'],[580,'shield'],[1050,'drone'],[1390,'turret'],[1860,'shield'],[2220,'drone'],[2750,'turret'],[3060,'walker']],
           pickups:[[245,'spread'],[490,'grenade'],[1370,'heal'],[2260,'boost'],[3030,'heal']]},
         {name:'赤焰反应堆',bossName:'赤焰核心',width:3960,sky:'#33263c',far:'#613d54',near:'#392d41',floor:'#655369',light:'#ff9a72',
           gaps:[[690,795],[1510,1635],[2370,2490],[2940,3060]],checkpoints:[1120,2530],
           platforms:[[390,329,175],[750,312,175],[1280,334,170],[1580,300,180],[2040,326,185],[2430,314,190],[2995,320,180],[3350,330,160]],
           intel:[[470,304],[1660,275],[3080,295]],
-          enemies:[[330,'walker'],[590,'drone'],[1010,'turret'],[1400,'walker'],[1870,'drone'],[2240,'turret'],[2680,'walker'],[2890,'drone'],[3250,'turret']],
+          enemies:[[330,'walker'],[590,'drone'],[1010,'turret'],[1400,'shield'],[1870,'drone'],[2240,'turret'],[2680,'shield'],[2890,'drone'],[3250,'turret']],
           pickups:[[245,'spread'],[900,'grenade'],[1340,'heal'],[2160,'boost'],[2800,'heal'],[3310,'grenade']]}
       ];
       const UPGRADES={rapid:'疾速弹匣',dash:'闪步模组',armor:'战地装甲'};
@@ -192,6 +194,7 @@
       const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches??false;
       const held=new Set(),padHeld=new Set(),touch=new Map();
       let phase='title',stageIndex=0,stage=null,player=null,enemies=[],bullets=[],bombs=[],pickups=[],intel=[],sparks=[],boss=null,cam=0;
+      let combo={count:0,timer:0,best:0},combatText='',combatTime=0,reflections=0;
       let points=0,best=0,shotsFired=0,jumpQueued=false,grenadeQueued=false,dashQueued=false,clock=0,shake=0,soundOn=false,audio=null;
       let frameLast=0,lag=0,bombPadLast=false,jumpPadLast=false,dashPadLast=false,pausePadLast=false,padBlocked=true;
       let mode='campaign',difficulty='standard',upgrades={rapid:0,dash:0,armor:0},selectedUpgrade=null;
@@ -230,6 +233,7 @@
       const starCount=mask=>[1,2,4].filter(bit=>mask&bit).length;
       const starText=mask=>'★'.repeat(starCount(mask))+'☆'.repeat(3-starCount(mask));
       const collected=()=>intel.filter(i=>i.done).length;
+      const comboMultiplier=()=>combo.count>=4?3:combo.count>=2?2:1;
       const circRect=(x,y,r,rect)=>{
         const dx=x-clamp(x,rect.x,rect.x+rect.w),dy=y-clamp(y,rect.y,rect.y+rect.h);
         return dx*dx+dy*dy<r*r;
@@ -307,6 +311,7 @@
         $('score').textContent=String(points).padStart(5,'0');$('best').textContent=String(best).padStart(5,'0');
         $('intel').textContent=collected()+' / 3';
         $('dash-status').textContent=player?.dashCooldown>0?player.dashCooldown.toFixed(1)+'s':'就绪';
+        $('combo-status').textContent=combo.count?combo.count+' 连 · ×'+comboMultiplier()+' · '+combo.timer.toFixed(1)+'s':'待命';
         $('run-label').textContent=(difficulty==='relaxed'?'轻松':'标准')+' · '+(mode==='practice'?'练习':'远征');
         updateSaveStatus();
       }
@@ -316,14 +321,16 @@
           lives:carry?.lives??(difficulty==='relaxed'?4:3),grenades:carry?.grenades??3,ground:true,inv:1.2,shoot:0,boost:0,
           weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashDir:1,coyote:.1,jumpBuffer:0,crouch:false};
         enemies=stage.enemies.map(([x,type])=>({x,y:type==='drone'?260:G-(type==='turret'?34:36),
-          w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='turret'?4:type==='drone'?2:3,
-          maxHp:type==='turret'?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false}));
+          w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='shield'?5:type==='turret'?4:type==='drone'?2:3,
+          maxHp:type==='shield'?5:type==='turret'?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false,
+          face:-1,windup:0,burst:0,burstTimer:0,aimX:0,aimY:0,flash:0,blockFlash:0}));
         pickups=stage.pickups.map(([x,kind])=>({x,y:kind==='spread'?G-45:G-93,kind,done:false,age:0}));
         intel=stage.intel.map(([x,y])=>({x,y,done:false}));
         const bossHp=[24,34,44][stageIndex];
         boss={x:stage.width-345,y:G-104,w:105,h:104,hp:bossHp,maxHp:bossHp,
           shot:1.3,phase:0,windup:0,chargeDuration:.72,attacks:0,lastVolley:0,warned:false,dead:false,
-          attackType:'volley',beamTime:0,beamY:G-22};
+          attackType:'volley',beamTime:0,beamY:G-22,flash:0};
+        combo={count:0,timer:0,best:0};combatText='';combatTime=0;reflections=0;
         bullets=[];bombs=[];sparks=[];cam=0;clock=0;shake=0;stageDeaths=0;stageStars=0;selectedUpgrade=null;
         clearInput();lag=0;hud();
       }
@@ -358,7 +365,7 @@
         if(mode==='campaign'&&stageIndex===2)addPoints(player.lives*500);
         saveBest();saveProgress();hud();
         const goals='★ 完成任务   '+(collected()===3?'★':'☆')+' 情报 '+collected()+'/3   '+(stageDeaths===0?'★':'☆')+' 不失去生命';
-        $('result-details').textContent=goals+'\n本章 '+starText(stageStars)+' · 本次得分 '+points;
+        $('result-details').textContent=goals+'\n本章 '+starText(stageStars)+' · 本次得分 '+points+'\n最高连击 '+combo.best+' · 反弹敌弹 '+reflections;
         if(mode==='practice')showMenu('练习完成','练习成绩单独保存。可以再次挑战三星，或返回指挥部。','再次练习','practiceClear');
         else if(stageIndex<2){
           selectedUpgrade=null;for(const key of Object.keys(UPGRADES))$('upgrade-'+key).setAttribute('aria-pressed','false');
@@ -372,11 +379,11 @@
       function openTitle(){
         clearInput();mode='campaign';best=progress.campaign[difficulty].best;
         upgrades={rapid:0,dash:0,armor:0};points=0;shotsFired=0;runStars=[];resetStage(0,null);
-        showMenu('像素突围','潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化，打造自己的突围路线。','开始三章远征','title');hud();
+        showMenu('像素突围','潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化；冲刺反弹敌弹，绕后击破盾卫，连击争取高分。','开始三章远征','title');hud();
       }
       function resume(){clearInput();phase='playing';hideMenu();frameLast=performance.now();lag=0;announce('继续游戏。');}
       function togglePause(){
-        if(phase==='playing')showMenu('任务暂停','体力、弹药和强化已保留。冲刺可以穿过弹幕；高台上藏着情报。','继续行动','pause');
+        if(phase==='playing')showMenu('任务暂停','体力、弹药和强化已保留。冲刺触碰敌弹可反弹；盾卫可用手雷或绕后击破。','继续行动','pause');
         else if(phase==='pause')resume();
         else if(phase==='confirmRestart')cancelConfirm();
       }
@@ -398,8 +405,20 @@
         for(let i=0;i<count;i++)sparks.push({x,y,vx:rng(-190,190),vy:rng(-250,50),life:rng(.24,.65),color,r:rng(2,5)});
       }
       function addPoints(n){points+=n;saveBest();hud();}
+      function combatNotice(text){
+        // Repeated impacts keep the visual hint alive without spamming the live region.
+        if(combatText!==text||combatTime<=0)announce(text);
+        combatText=text;combatTime=1.8;
+      }
+      function rewardKill(base){
+        combo.count=combo.timer>0?combo.count+1:1;combo.timer=5;
+        combo.best=Math.max(combo.best,combo.count);
+        const reward=base*comboMultiplier();addPoints(reward);
+        combatNotice(combo.count+' 连击 · +'+reward+(combo.count>=2?' · 得分 ×'+comboMultiplier():''));
+      }
       function hurt(damage=1){
         if(phase!=='playing'||player.inv>0||player.dashTime>0)return;
+        combo.count=0;combo.timer=0;combatNotice('受到攻击 · 连击中断');
         player.hp=Math.max(0,player.hp-damage);player.inv=difficulty==='relaxed'?1.9:1.45;shake=8;beep(170,.2,'sawtooth');
         spark(player.x+12,player.y+20,'#f6a174',13);
         if(player.hp===0){
@@ -421,7 +440,7 @@
       }
       function projectile(x,y,vx,vy,owner,damage=1){
         if(owner==='e'&&difficulty==='relaxed'){vx*=.78;vy*=.78;}
-        bullets.push({x,y,vx,vy,owner,damage,life:owner==='p'?1.7:3.7,r:owner==='p'?5:6});
+        bullets.push({x,y,vx,vy,owner,damage,sourceX:x,sourceY:y,reflected:false,life:owner==='p'?1.7:3.7,r:owner==='p'?5:6});
       }
       function fire(){
         if(player.shoot>0)return;
@@ -455,15 +474,49 @@
         if(!boss.dead&&Math.hypot(x-(boss.x+50),y-(boss.y+52))<135)damageBoss(7);
       }
       function damageEnemy(e,d){
-        e.hp-=d;spark(e.x+e.w/2,e.y+e.h/2,'#f5d48d',5);
-        if(e.hp<=0&&!e.dead){e.dead=true;addPoints(e.type==='turret'?160:100);beep(180,.07);}
+        if(e.dead)return;
+        e.hp-=d;e.flash=.12;spark(e.x+e.w/2,e.y+e.h/2,'#f5d48d',5);
+        if(e.hp<=0&&!e.dead){e.dead=true;e.windup=0;e.burst=0;rewardKill(e.type==='shield'?200:e.type==='turret'?160:100);beep(180,.07);}
       }
       function damageBoss(d){
         if(boss.dead)return;
-        boss.hp=Math.max(0,boss.hp-d);spark(boss.x+rng(10,90),boss.y+rng(10,85),'#f9cb65',5);
+        boss.hp=Math.max(0,boss.hp-d);boss.flash=.12;spark(boss.x+rng(10,90),boss.y+rng(10,85),'#f9cb65',5);
         if(boss.hp===0){
           boss.dead=true;boss.beamTime=0;boss.windup=0;addPoints(1300);spark(boss.x+50,boss.y+45,'#ffc65c',60);
           announce('首领已击败，向右前往终点。');beep(620,.35,'triangle');
+        }
+      }
+      function hitEnemy(e,b){
+        if(e.type==='shield'&&!b.reflected&&b.vx*e.face<0){
+          e.blockFlash=.18;spark(b.x,b.y,'#91dbff',4);
+          combatNotice('盾牌格挡 · 绕后 / 手雷 / 反弹弹');return;
+        }
+        damageEnemy(e,b.damage);
+      }
+      function reflectBullet(b){
+        const dx=b.sourceX-b.x,dy=b.sourceY-b.y,len=Math.hypot(dx,dy);
+        b.vx=len>1?dx/len*650:player.face*650;b.vy=len>1?dy/len*650:0;
+        b.owner='p';b.reflected=true;b.damage=2;b.life=1.7;reflections++;
+        spark(b.x,b.y,'#9eeaff',8);beep(820,.05,'triangle');combatNotice('冲刺反弹 · 双倍伤害 / 穿透盾牌');
+      }
+      function updateTurret(e,dt){
+        // A fixed aim line gives the player time to choose crouch, jump or reflection.
+        const viewLeft=clamp(player.x-290,0,stage.width-W);
+        if(Math.abs(e.x-player.x)>=570||e.x+e.w<viewLeft){e.windup=0;e.burst=0;e.shot=Math.max(.45,e.shot);return;}
+        if(e.windup>0){
+          e.windup=Math.max(0,e.windup-dt);
+          if(e.windup===0){e.burst=3;e.burstTimer=0;}
+        }else if(e.burst===0&&e.shot<=0){
+          e.windup=difficulty==='relaxed'?1.05:.8;
+          e.aimX=player.x+player.w/2;e.aimY=player.y+player.h/2;
+        }
+        if(e.burst>0){
+          e.burstTimer-=dt;
+          if(e.burstTimer<=0){
+            const x=e.x+e.w/2,y=e.y+e.h/2,dx=e.aimX-x,dy=e.aimY-y,len=Math.hypot(dx,dy)||1;
+            projectile(x,y,dx/len*315,dy/len*315,'e');
+            e.burst--;e.burstTimer=.14;e.shot=2.1;
+          }
         }
       }
       function aimAtPlayer(e,speed){
@@ -473,6 +526,8 @@
       function update(dt){
         if(phase!=='playing')return;
         clock+=dt;
+        combo.timer=Math.max(0,combo.timer-dt);if(combo.timer===0)combo.count=0;
+        combatTime=Math.max(0,combatTime-dt);boss.flash=Math.max(0,boss.flash-dt);
         const left=pressed('left'),right=pressed('right'),down=pressed('down');
         const axis=(right?1:0)-(left?1:0);
         // The crouched body is the actual collision box, not only a visual pose.
@@ -522,11 +577,12 @@
         // Moving threats remain near their patrol spawn; air units follow gentle sine paths.
         for(const e of enemies){
           if(e.dead)continue;
-          e.age+=dt;e.shot-=dt;
-          if(e.type==='walker')e.x=e.home+Math.sin(e.age*1.15)*36;
+          e.age+=dt;e.shot-=dt;e.flash=Math.max(0,e.flash-dt);e.blockFlash=Math.max(0,e.blockFlash-dt);
+          if(e.type==='walker'||e.type==='shield')e.x=e.home+Math.sin(e.age*1.15)*36;
           if(e.type==='drone'){e.x=e.home+Math.sin(e.age*1.4)*53;e.y=240+Math.sin(e.age*2.1)*26;}
-          if(Math.abs(e.x-player.x)<570&&e.shot<=0){
-            aimAtPlayer(e,e.type==='turret'?315:235);e.shot=e.type==='turret'?2.1:rng(2.3,3.5);
+          if(e.type==='turret')updateTurret(e,dt);
+          else if(Math.abs(e.x-player.x)<570&&e.shot<=0){
+            aimAtPlayer(e,235);e.shot=rng(2.3,3.5);
           }
           if(hit(player,e))hurt(1);
           if(phase!=='playing')return;
@@ -577,10 +633,11 @@
           if(b.life<=0||b.y<20||b.y>H+30||b.x<cam-130||b.x>cam+W+130){bullets.splice(i,1);continue;}
           if(b.owner==='p'){
             let struck=false;
-            for(const e of enemies){if(!e.dead&&circRect(b.x,b.y,b.r,e)){damageEnemy(e,b.damage);struck=true;break;}}
+            for(const e of enemies){if(!e.dead&&circRect(b.x,b.y,b.r,e)){hitEnemy(e,b);struck=true;break;}}
             if(!struck&&!boss.dead&&circRect(b.x,b.y,b.r,boss)){damageBoss(b.damage);struck=true;}
             if(struck)bullets.splice(i,1);
           }else if(circRect(b.x,b.y,b.r,player)){
+            if(player.dashTime>0){reflectBullet(b);continue;}
             // Damage may replace the projectile list on respawn; consume this shot first.
             bullets.splice(i,1);hurt(1);
             if(phase!=='playing')return;
@@ -723,6 +780,18 @@
           rect(e.x+4,e.y+30,8,8,'#303349');rect(e.x+20,e.y+30,8,8,'#303349');
           rect(e.x-10,e.y+18,17,5,'#c7c4b0');rect(e.x+11,e.y+5,8,5,'#312e3d');
         }
+        if(e.type==='shield'){
+          const x=e.face===-1?e.x-6:e.x+e.w-2;
+          rect(x,e.y+4,8,31,e.blockFlash>0?'#efffff':'#87d4ec');
+          rect(x+2,e.y+8,4,22,'#294e76');
+          c.font='bold 11px system-ui';c.fillStyle='#b5efff';c.fillText('盾',e.x+8,e.y-17);
+        }
+        if(e.type==='turret'&&(e.windup>0||e.burst>0)){
+          c.setLineDash([8,7]);line(e.x+e.w/2,e.y+e.h/2,e.aimX,e.aimY,'#ffd584',2);c.setLineDash([]);
+          rect(e.aimX-5,e.aimY-5,10,10,'#ffe7a4');
+          c.font='bold 11px system-ui';c.fillStyle='#ffe7a4';c.fillText(e.windup>0?'锁定 · 三连射':'三连射',e.x-20,e.y-22);
+        }
+        if(e.flash>0&&!reducedMotion){c.globalAlpha=.65;rect(e.x,e.y,e.w,e.h,'#fff3c9');c.globalAlpha=1;}
         if(e.hp<e.maxHp){rect(e.x,e.y-10,e.w,4,'#263142');rect(e.x,e.y-10,e.w*e.hp/e.maxHp,4,'#efb66e');}
       }
       function drawBoss(){
@@ -737,6 +806,7 @@
         rect(x+2,y+45,22,40,'#66758d');rect(x+81,y+45,22,40,'#66758d');
         rect(x+6,y+3,17,13,'#a9c6c8');rect(x+80,y+3,17,13,'#a9c6c8');
         rect(x+18,y+83,24,22,'#1d2840');rect(x+62,y+83,24,22,'#1d2840');
+        if(boss.flash>0&&!reducedMotion){c.globalAlpha=.55;rect(x+10,y+15,83,90,'#fff3c9');c.globalAlpha=1;}
         const enraged=boss.hp<=boss.maxHp*.5;
         rect(x+14,y-20,75,7,'#182738');
         rect(x+14,y-20,75*boss.hp/boss.maxHp,7,enraged?'#ff7068':'#f1ad65');
@@ -781,7 +851,7 @@
           }
           drawBoss();drawSoldier();
           for(const b of bullets){
-            rect(b.x-5,b.y-2,10,4,b.owner==='p'?'#ffe6a4':'#ff8972');
+            rect(b.x-5,b.y-2,10,4,b.reflected?'#80e5ff':b.owner==='p'?'#ffe6a4':'#ff8972');
             rect(b.x-2,b.y-5,4,10,b.owner==='p'?'#fffbd7':'#ffbcac');
           }
           for(const b of bombs){rect(b.x-7,b.y-7,14,14,'#c3d0a4');rect(b.x-3,b.y-9,7,5,'#eabd65');}
@@ -805,6 +875,13 @@
           c.fillText((boss.dead?'前往出口 →':'目标：击败'+stage.bossName)+'  /  情报 '+collected()+'/3',18,28);
           const loadout=Object.keys(UPGRADES).filter(key=>upgrades[key]>0).map(key=>UPGRADES[key]+' ×'+upgrades[key]).join('  ·  ');
           if(loadout){c.font='12px system-ui';c.fillStyle='#ffe0a5';c.fillText(loadout,18,H-20);}
+          if(combatTime>0){
+            // Keep combat feedback below the boss beam warning at y=63..97.
+            rect(16,108,360,31,'#14283c');c.font='bold 13px system-ui';c.fillStyle='#b9efff';c.fillText(combatText,26,129);
+          }
+          if(combo.count>0){
+            rect(18,147,150,4,'#29425a');rect(18,147,150*combo.timer/5,4,'#ffe093');
+          }
           if(player.dashCooldown>0){rect(18,40,90,5,'#29425a');rect(18,40,90*(1-player.dashCooldown/(2.4-upgrades.dash*.6)),5,'#a8d9ff');}
 
         }
@@ -930,6 +1007,8 @@
         checkpoint:player?.checkpoint??64,maxHp:maxHealth(),selectedUpgrade,storageAvailable,
         crouch:player?.crouch??false,playerHeight:player?.h??44,coyote:player?.coyote??0,jumpBuffer:player?.jumpBuffer??0,
         bossAttackType:boss?.attackType??'volley',bossBeamTime:boss?.beamTime??0,bossBeamY:boss?.beamY??0,
+        turretCharge:Math.max(0,...enemies.map(e=>e.dead?0:e.windup)),shieldCount:enemies.filter(e=>!e.dead&&e.type==='shield').length,
+        combo:combo.count,comboTime:combo.timer,comboBest:combo.best,combatText:combatTime>0?combatText:'',reflections,
         clock,runStars:[...runStars],progress:JSON.parse(JSON.stringify(progress))
       })});
       refreshRecords();

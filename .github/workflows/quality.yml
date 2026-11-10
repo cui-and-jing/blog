@@ -139,6 +139,16 @@ jobs:
 
       # 四项检查拆成四个 step：合成一条时只知道「整块失败」，
       # 分开放才能从红色叉号直接看出是游戏冒烟、axe、键盘实测还是传输预算挂了
+      # Canvas games use OS fonts, so screenshots need Chinese glyphs as well.
+      # This changes the QA runner only; no font payload is added to the game.
+      - name: Install Chinese fonts for browser screenshots
+        # WenQuanYi covers the Chinese UI with a much smaller download than
+        # the full multilingual Noto CJK bundle.
+        # The hosted image already has package indexes. Refreshing every OS
+        # repository makes this small QA dependency wait on unrelated mirrors.
+        timeout-minutes: 3
+        run: sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install --no-install-recommends -y fonts-wqy-zenhei
+
       - name: Start preview server
         run: |
           npx astro preview --port 4321 > /tmp/preview.log 2>&1 &
