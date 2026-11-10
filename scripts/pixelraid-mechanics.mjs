@@ -2413,6 +2413,27 @@ test('blocked storage still settles recovery once in memory without changing unr
   const before = g.state(); g.run('finishWave();'); tick(g, 30); eq(g.state(), before);
 });
 
+test('recovery inputs descend from either ledge edge even inside the horizontal ground-node stop radius', () => {
+  for (const [index, x] of [[0, 113.75], [1, 818.5]]) {
+    const g = recoveryDefense(), decide = recoveryTactics(); isolateRecoveryCombat(g);
+    g.run(`fieldContract.nodes[2].done=true;fieldContract.nodes[${1-index}].done=true;
+      player.x=${x};player.y=325-player.h;player.ground=true;player.vy=0;`);
+    const before = g.state(), input = decide(before);
+    eq(input.move, ''); eq(input.down, true); eq(input.jump, true); eq(input.dash, false);
+    eq(input.fire, false); eq(g.state(), before, 'Route planning must remain read-only');
+    for (let frame = 0; frame < 45 && !g.state().fieldContract.nodes[index].done; frame++) {
+      const state = g.state(), next = decide(state);
+      g.key('s', next.down === true); g.key('a', next.move === 'a'); g.key('d', next.move === 'd');
+      if (next.jump && state.ground) { g.key('w', false); g.key('w'); } else if (!next.jump) g.key('w', false);
+      tick(g);
+    }
+    for (const key of ['s', 'a', 'd', 'w']) g.key(key, false);
+    eq(g.state().fieldContract.nodes[index].done, true); eq(collectedRecovery(g), 3);
+    assert(g.state().y + g.state().playerHeight > 365); eq(g.state().phase, 'playing');
+    eq(g.state().score, before.score); eq(g.state().progress, before.progress);
+  }
+});
+
 test('all loadouts recover and clear rotating arenas using only genuine inputs across seeds and cadences', () => {
   for (const randomSeed of [1, 42, 16437, 71901]) for (const loadout of ['assault', 'counter', 'demolition']) {
     for (const cadence of [5, 12]) {
@@ -2434,14 +2455,14 @@ test('all loadouts recover and clear rotating arenas using only genuine inputs a
               seenCounts.add(count);
               if (count === 3) { sawGatheredBeforeClear = true; eq(state.fieldContract.status, 'active'); }
             }
-            g.key('a', input.move === 'a'); g.key('d', input.move === 'd'); g.key('j', input.fire !== false);
+            g.key('a', input.move === 'a'); g.key('d', input.move === 'd'); g.key('j', input.fire !== false); g.key('s', input.down === true);
             if (input.jump && state.ground) { g.key('w', false); g.key('w'); }
             else if (!input.jump) g.key('w', false);
             if (input.dash) tap('l'); if (input.grenade) tap('k');
           }
           tick(g); duration++;
         }
-        for (const key of ['a', 'd', 'w', 'j']) g.key(key, false);
+        for (const key of ['a', 'd', 'w', 'j', 's']) g.key(key, false);
         const state = g.state();
         eq(state.phase, 'waveClear', `Recovery loadout ${loadout}, seed ${randomSeed}, cadence ${cadence}, wave ${wave}: ` + JSON.stringify(state));
         eq(state.survivalCleared, wave); eq(state.lives, 1); eq(state.stageDeaths, 0); assert(state.hp > 0);

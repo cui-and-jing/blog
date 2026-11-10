@@ -13,15 +13,19 @@ export function recoveryTactics() {
       .find(index => !nodes[index].done);
     const target = nodes[targetIndex], center = state.x + 13.5, dx = target.x - center;
     const high = target.y < 350;
-    const move = Math.abs(dx) > 8 ? dx > 0 ? 'd' : 'a' : '';
+    // A body can still overlap a ledge even when its centre is horizontally
+    // within the ground node's stop radius. Use the player's real descent
+    // chord rather than waiting forever above that node at the platform edge.
+    const down = !high && state.ground && state.y + state.playerHeight < target.y;
+    const move = down ? '' : Math.abs(dx) > 8 ? dx > 0 ? 'd' : 'a' : '';
     const nearby = state.hostiles.some(bullet => Math.abs(bullet.x - center) < 85 &&
       bullet.y > state.y - 12 && bullet.y < state.y + state.playerHeight + 12);
     return {
-      move,
-      jump: high && Math.abs(dx) < 155 && state.ground && state.y > target.y - 10,
+      move, down,
+      jump: down || high && Math.abs(dx) < 155 && state.ground && state.y > target.y - 10,
       // Stay on the jump arc near the ledge. On the long cross-field sprint,
       // dashing through incoming bullets is a real defensive player action.
-      dash: !high && Math.abs(dx) > 100 && state.dashCooldown === 0 && nearby,
+      dash: !down && !high && Math.abs(dx) > 100 && state.dashCooldown === 0 && nearby,
       grenade: false,
       fire: false,
     };

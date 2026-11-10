@@ -69,7 +69,7 @@ export async function checkRaidSurvival(page, problems) {
   const fight = async (wave, { bossScreenshot = false, recovery = false } = {}) => {
     const deadline = Date.now() + 45000;
     const decide = recovery ? recoveryTactics() : survivalTactics();
-    let moving = '', jumping = false, captured = false, firing = false;
+    let moving = '', jumping = false, crouching = false, captured = false, firing = false;
     const move = async direction => {
       if (moving === direction) return;
       if (moving) await page.keyboard.up(moving);
@@ -84,6 +84,10 @@ export async function checkRaidSurvival(page, problems) {
         const shoot = input.fire !== false;
         if (shoot !== firing) { await page.keyboard[shoot ? 'down' : 'up']('j'); firing = shoot; }
         await move(input.move);
+        // Apply Down before Jump so recovery can descend from a one-way ledge.
+        // This shared driver also handles the narrow-touch-viewport replay.
+        const down = input.down === true;
+        if (down !== crouching) { await page.keyboard[down ? 'down' : 'up']('s'); crouching = down; }
         if (input.jump && state.ground) {
           if (jumping) await page.keyboard.up('w');
           await page.keyboard.down('w'); jumping = true;
@@ -101,7 +105,7 @@ export async function checkRaidSurvival(page, problems) {
         await wait(80);
       }
     } finally {
-      for (const key of ['j', 'a', 'd', 'w']) await page.keyboard.up(key);
+      for (const key of ['j', 'a', 'd', 'w', 's']) await page.keyboard.up(key);
     }
     const state = await read();
     check(state.phase === 'waveClear' && state.survivalCleared === wave && state.progress.survival.wave >= wave &&
