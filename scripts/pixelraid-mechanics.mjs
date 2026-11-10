@@ -1331,7 +1331,9 @@ test('active movement, reflected fire and beam dodges win the full gauntlet at h
 const defenseModules = ['rapid', 'dash', 'armor', 'pierce', 'reflect', 'blast'];
 function defense(options) {
   const g = createGame(options);
-  g.click('mode-survival'); g.click('start');
+  g.click('mode-survival');
+  if(options?.loadout)g.click('loadout-'+options.loadout);
+  g.click('start');
   eq(g.state().mode, 'survival'); eq(g.state().phase, 'playing');
   return g;
 }
@@ -1688,10 +1690,10 @@ test('survival input controller escapes overlapping ground threats without oscil
   eq(ledge({ ...below, x: 800, y: 381 }).move, 'a');
 });
 
-test('shared keyboard tactics clear four waves across varied timing and random fixtures without state edits', () => {
-  for (const randomSeed of [1, 42, 16437, 71901]) {
+test('all three loadouts clear four waves across varied timing and seeds using only genuine inputs', () => {
+  for (const randomSeed of [1, 42, 16437, 71901]) for (const loadout of ['assault', 'counter', 'demolition']) {
     for (const cadence of [5, 12]) {
-      const g = defense({ randomSeed }), tap = key => { g.key(key); g.key(key, false); };
+      const g = defense({ randomSeed, loadout }), tap = key => { g.key(key); g.key(key, false); };
       const encountered = new Set(); let frame = 0, decisions = 0, reflected = 0;
       // Seed only the VM fixture before initialization. Thereafter this is the
       // same read-only controller used by Chromium: real keys and menu clicks.
@@ -1714,7 +1716,7 @@ test('shared keyboard tactics clear four waves across varied timing and random f
         }
         for (const key of ['a', 'd', 'w', 'j']) g.key(key, false);
         const s = g.state();
-        eq(s.phase, 'waveClear', `Seed ${randomSeed}, cadence ${cadence}, wave ${wave}: ` + JSON.stringify(s));
+        eq(s.phase, 'waveClear', `Loadout ${loadout}, seed ${randomSeed}, cadence ${cadence}, wave ${wave}: ` + JSON.stringify(s));
         eq(s.survivalCleared, wave); eq(s.lives, 1); assert(s.hp > 0); eq(s.stageDeaths, 0); reflected += s.reflections;
         assert(duration > 132 && duration < 3600, 'Opening waves must resolve in under one active minute');
         if (wave < 4) {
@@ -1887,6 +1889,194 @@ test('build summary native Space and Enter never jump, resume or accept a select
   g.key('p');g.nodes.get('build-summary').focus();g.key('Enter');eq(g.state().phase,'pause');
   g.click('start');finishDefenseWave(g);g.click('supply-0');g.nodes.get('build-summary').focus();g.key('Enter');
   eq(g.state().phase,'waveClear');eq(g.state().survivalWave,1);
+});
+
+test('point-blank rifle covers the forward body-to-muzzle interval on both facings', () => {
+  for (const face of [-1, 1]) {
+    const g = defense();
+    g.run(`spawnTime=0;player.x=400;player.face=${face};player.inv=100;
+      enemies=[{...makeEnemy(400,'turret'),w:20,shot:100,hp:20,maxHp:20}];fire();`);
+    tick(g); eq(g.read('enemies[0].hp'), 19, 'Overlapping forward target must not be skipped by muzzle offset');
+  }
+});
+
+test('point-blank standing, crouched and scatter shots hit forward targets without shooting behind', () => {
+  for (const face of [-1, 1]) for (const crouch of [false, true]) for (const scatter of [false, true]) {
+    const g = defense();
+    g.run(`spawnTime=0;player.x=400;player.face=${face};player.inv=100;player.crouch=${crouch};
+      player.h=${crouch ? 28 : 44};player.y=G-player.h;player.weaponTime=${scatter ? 20 : 0};
+      enemies=[{...makeEnemy(400,'turret'),w:20,shot:100,hp:20,maxHp:20},
+        {...makeEnemy(${face > 0 ? 370 : 437},'turret'),w:12,shot:100,hp:20,maxHp:20}];fire();`);
+    if (crouch) g.key('s');
+    tick(g); eq(g.read('enemies.map(e=>e.hp)'), [20 - (scatter ? 3 : 1), 20]);
+    eq(g.state().lastVolley, scatter ? 3 : 1);
+  }
+});
+
+test('point-blank frontal shields remain closed and a real flank still works', () => {
+  for (const face of [-1, 1]) for (const front of [false, true]) {
+    const g = defense();
+    g.run(`spawnTime=0;player.x=400;player.face=${face};player.inv=100;upgrades.pierce=2;
+      enemies=[{...makeEnemy(400,'shield'),shot:100,face:${front ? -face : face},turnTime:1}];fire();`);
+    tick(g); eq(g.read('enemies[0].hp'), front ? 5 : 4);
+    if (front) { eq(g.state().bullets, 0); assert(g.state().combatText.includes('盾牌格挡')); }
+  }
+});
+
+test('swept rounds cannot tunnel and hit nearest targets rather than spawn-array order', () => {
+  for (const face of [-1, 1]) for (const rank of [0, 1, 2]) {
+    const g = defense(), nearX = face > 0 ? 310 : 490, farX = face > 0 ? 490 : 310;
+    g.run(`spawnTime=0;player.inv=100;player.x=700;upgrades.pierce=${rank};
+      enemies=[${farX},${nearX}].map(x=>({...makeEnemy(x,'turret'),w:10,shot:100,hp:20,maxHp:20}));
+      projectile(${face > 0 ? 280 : 530},G-17,${face * 18000},0,'p');`);
+    tick(g); eq(g.read('enemies.map(e=>e.hp)'), [rank ? 19 : 20, 19]);
+  }
+});
+
+test('a swept shield stops piercing before rear targets and boss contacts obey distance order', () => {
+  const g = defense();
+  g.run(`spawnTime=0;player.inv=100;player.x=700;upgrades.pierce=2;
+    enemies=[{...makeEnemy(480,'turret'),shot:100},{...makeEnemy(320,'shield'),shot:100,face:-1}];
+    projectile(280,G-17,18000,0,'p');`);
+  tick(g); eq(g.read('enemies.map(e=>e.hp)'), [4, 5]); eq(g.state().bullets, 0);
+  for (const bossFirst of [false, true]) {
+    g.run(`enemies=[{...makeEnemy(${bossFirst ? 480 : 320},'turret'),shot:100,hp:20,maxHp:20}];
+      boss=makeBoss(20,${bossFirst ? 320 : 480});boss.shot=100;upgrades.pierce=0;
+      projectile(280,G-17,18000,0,'p');`);
+    tick(g); eq(g.read('enemies[0].hp'), bossFirst ? 20 : 19); eq(g.state().bossHp, bossFirst ? 19 : 20);
+  }
+});
+
+test('swept circle geometry preserves misses beside rounded corners and supports stationary shots', () => {
+  const g = createGame();
+  g.run('globalThis.target={x:100,y:100,w:20,h:20};');
+  eq(g.read('shotImpact(90,95.1,97,95.1,5,target)===Infinity'), true, 'Expanded-square corner is not a circular hit');
+  near(g.read('shotImpact(80,110,140,110,5,target)'), .25);
+  near(g.read('shotImpact(140,110,80,110,5,target)'), .25);
+  near(g.read('shotImpact(110,80,110,140,5,target)'), .25);
+  near(g.read('shotImpact(110,140,110,80,5,target)'), .25);
+  eq(g.read('shotImpact(110,110,110,110,5,target)'), 0);
+  eq(g.read('shotImpact(90,90,90,90,5,target)===Infinity'), true);
+  assert(g.read('shotImpact(90,90,110,110,5,target)') > 0);
+});
+
+test('fast hostile shots respect crouch, invulnerability and dash reflection across a whole tick', () => {
+  for (const state of ['standing', 'crouched', 'invulnerable', 'dashing']) {
+    const g = defense();
+    g.run(`spawnTime=0;player.x=400;player.inv=${state === 'invulnerable' ? 10 : 0};
+      player.dashTime=${state === 'dashing' ? .18 : 0};player.dashDir=1;
+      enemies=[{...makeEnemy(800,'turret'),shot:100}];projectile(350,G-35,6000,0,'e');`);
+    if (state === 'crouched') g.key('s');
+    tick(g); eq(g.state().hp, state === 'standing' ? 5 : 6);
+    eq(g.state().reflections, state === 'dashing' ? 1 : 0);
+  }
+});
+
+test('muzzle traces and fast rounds cannot damage enemies or bosses during ingress', () => {
+  const g = defense();
+  g.run(`player.x=400;enemies=[{...makeEnemy(400,'turret'),shot:100,hp:20,maxHp:20}];fire();`);
+  tick(g); eq(g.read('enemies[0].hp'), 20);
+  g.run(`spawnTime=0;enemies[0].arrival=1;player.shoot=0;fire();`);
+  tick(g); eq(g.read('enemies[0].hp'), 20);
+  g.run(`survivalWave=2;startWave();player.x=749;player.face=1;fire();projectile(600,G-20,18000,0,'p',99);`);
+  tick(g); eq(g.state().bossHp, 32); eq(g.state().phase, 'playing');
+});
+
+function kitDefense(key) {
+  const g=createGame();g.click('mode-survival');g.click('loadout-'+key);g.click('start');return g;
+}
+test('loadout choices are title-only, explicit and do not grant module ranks or write records', () => {
+  for (const [key,hp,ammo,name] of [['assault',6,3,'机动突击'],['counter',5,3,'反击先锋'],['demolition',6,5,'爆破专家']]) {
+    const g=createGame(), before=g.state().progress;
+    g.click('loadout-'+key);eq(g.state().selectedLoadout,'assault');
+    g.click('mode-survival');g.click('loadout-'+key);g.click('loadout-'+key);
+    eq(g.state().phase,'title');eq(g.state().selectedLoadout,key);eq(g.state().loadout,'assault');
+    eq(g.nodes.get('loadout-'+key).getAttribute('aria-pressed'),'true');assert(g.nodes.get('loadout-status').textContent.includes(name));
+    g.click('start');eq(g.state().loadout,key);eq(g.state().maxHp,hp);eq(g.state().hp,hp);eq(g.state().grenades,ammo);
+    eq(g.state().upgrades,Object.fromEntries(defenseModules.map(k=>[k,0])));eq(g.state().synergies,[]);
+    eq(g.state().progress,before);assert(g.nodes.get('run-label').textContent.includes(name));assert(g.nodes.get('build-summary').textContent.includes(name));
+    g.click('loadout-counter');g.click('loadout-demolition');eq(g.state().loadout,key);eq(g.state().selectedLoadout,key);
+    g.key('p');g.click('loadout-counter');eq(g.state().selectedLoadout,key);
+    g.click('restart');g.click('cancel-restart');eq(g.state().loadout,key);eq(g.state().phase,'pause');
+    g.click('restart');g.click('start');eq(g.state().loadout,key);eq(g.state().hp,hp);eq(g.state().grenades,ammo);eq(g.state().survivalWave,1);
+  }
+});
+
+test('counter loadout trades health for real dash and reflected damage without bypassing floor', () => {
+  const g=kitDefense('counter');
+  for(const rank of [0,1,2]){
+    g.run(`upgrades.dash=${rank};player.dashCooldown=0;dash();`);near(g.state().dashCooldown,Math.max(1.2,2-.6*rank));
+    g.run(`upgrades.reflect=${rank};bullets=[];projectile(100,100,0,0,'e');reflectBullet(bullets[0]);`);
+    eq(g.read('bullets[0].damage'),3+rank);
+  }
+  supplyModule(g,'armor');eq(g.state().maxHp,6);eq(g.state().hp,6);
+  eq(g.state().loadout,'counter');eq(g.state().grenades,4);
+});
+
+test('demolition loadout changes real blast radius, damage and gun interval with bounded module stacking', () => {
+  for(const rank of [0,1,2]){
+    const g=kitDefense('demolition'),radius=112+24*(rank+1);
+    g.run(`spawnTime=0;upgrades.blast=${rank};player.x=600;player.inv=100;
+      enemies=[0,${radius-1},${radius+1}].map(dx=>({...makeEnemy(100+dx-15,'turret'),y:200,hp:50,maxHp:50,shot:100}));
+      projectile(100,218,0,0,'e');boom(100,218);`);
+    eq(g.read('enemies.map(e=>e.hp)'),[42-2*rank,42-2*rank,50]);eq(g.state().hostiles,[]);
+    for(const scatter of [false,true]){
+      g.run(`player.shoot=0;player.weaponTime=${scatter?20:0};upgrades.rapid=${rank};fire();`);
+      near(g.read('player.shoot'),(scatter?.33:.15)*.8**rank*1.25);
+    }
+  }
+});
+
+test('loadouts never leak into campaign or operations and reload returns to default kit', () => {
+  for(const key of ['counter','demolition']){
+    const g=kitDefense(key);g.key('p');g.click('menu-home');g.click('start');
+    eq(g.state().selectedLoadout,key);g.click('mode-campaign');g.click('start');eq(g.state().maxHp,5);eq(g.state().grenades,3);
+    g.run('fire();dash();');near(g.read('player.shoot'),.15);near(g.state().dashCooldown,2.4);
+    g.run("projectile(100,100,0,0,'e');reflectBullet(bullets[bullets.length-1]);");eq(g.read('bullets[bullets.length-1].damage'),2);
+    g.key('p');g.click('menu-home');g.click('start');g.click('mode-challenges');g.click('challenge-counter');
+    eq(g.state().maxHp,5);near(g.read('dashDelay()'),1.2);g.run('saveProgress();');
+    assert(!JSON.stringify(g.state().progress).includes('loadout'));
+    const reloaded=createGame({storage:Object.fromEntries(g.values)});eq(reloaded.state().selectedLoadout,'assault');
+  }
+});
+
+test('supply draws always offer a missing recipe partner without duplicates or capped modules', () => {
+  for(const key of defenseModules)for(const randomSeed of [1,2,7,2026,98765]){
+    const g=defense({randomSeed});g.run(`upgrades.${key}=1;`);finishDefenseWave(g);
+    const missing=g.read(`Object.values(SYNERGIES).find(s=>s.pair.includes('${key}')).pair.find(k=>k!=='${key}')`);
+    assert(g.state().supplyOffers.includes(missing));eq(new Set(g.state().supplyOffers).size,3);
+    g.click('supply-reroll');assert(g.state().supplyOffers.includes(missing));eq(new Set(g.state().supplyOffers).size,3);
+  }
+  const g=defense();g.run('upgrades.rapid=2;upgrades.dash=1;upgrades.armor=1;');finishDefenseWave(g);
+  assert(!g.state().supplyOffers.includes('rapid'));assert(g.state().supplyOffers.some(k=>['pierce','reflect','blast'].includes(k)));
+});
+
+test('reroll is once per intermission, changes offers, clears selection and preserves resources and time', () => {
+  for(const randomSeed of [1,2,3,2026,98765]){
+    const g=defense({randomSeed});g.click('supply-reroll');eq(g.state().supplyRerolls,0);
+    finishDefenseWave(g);g.click('supply-1');const before=g.state();eq(before.supplyRerolls,1);
+    g.click('supply-reroll');const after=g.state();eq(after.supplyRerolls,0);eq(after.selectedSupply,null);
+    assert(after.supplyOffers.some(key=>!before.supplyOffers.includes(key)),'Reroll must give at least one new offer when alternatives exist');
+    for(const key of Object.keys(before))if(!['supplyOffers','selectedSupply','supplyRerolls'].includes(key))eq(after[key],before[key],key+' changed during reroll');
+    assert(g.nodes.get('start').disabled);assert(g.nodes.get('supply-reroll').disabled);eq(g.nodes.get('supply-reroll').getAttribute('aria-disabled'),'true');
+    for(let i=0;i<3;i++)eq(g.nodes.get('supply-'+i).getAttribute('aria-pressed'),'false');
+    g.run('rerollSupplies();');g.click('start');tick(g,60);eq(g.state(),after);
+    for(const action of ['restart','menu-home']){g.click(action);g.click('cancel-restart');eq(g.state(),after);}
+    g.click('supply-0');g.click('start');eq(g.state().survivalWave,2);eq(g.state().upgrades[after.supplyOffers[0]],1);
+    assert(g.nodes.get('supply-reroll').hidden);finishDefenseWave(g);eq(g.state().supplyRerolls,1);assert(!g.nodes.get('supply-reroll').hidden);
+  }
+});
+
+test('nearly capped rerolls change recovery options and fully capped builds disable empty rerolls', () => {
+  for(const remaining of [1,2]){
+    const g=defense();g.run(`for(const key of MODULES)upgrades[key]=2;upgrades.blast=1;${remaining===2?'upgrades.reflect=1;':''}`);
+    finishDefenseWave(g);const before=g.state().supplyOffers;eq(g.state().supplyRerolls,1);
+    g.click('supply-reroll');const after=g.state().supplyOffers;assert(after.includes('blast'));eq(new Set(after).size,3);
+    assert(after.some(key=>!before.includes(key)));assert(after.every(key=>!defenseModules.includes(key)||['blast','reflect'].includes(key)));
+  }
+  const g=defense();g.run('for(const key of MODULES)upgrades[key]=2;');finishDefenseWave(g);
+  eq(g.state().supplyOffers,['heal','ammo','boost']);eq(g.state().supplyRerolls,0);assert(g.nodes.get('supply-reroll').disabled);
+  eq(g.nodes.get('supply-reroll').textContent,'已展示全部补给');const before=g.state();g.run('rerollSupplies();');eq(g.state(),before);
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);

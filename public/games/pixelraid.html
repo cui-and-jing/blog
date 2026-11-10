@@ -32,6 +32,7 @@
     .overlay p{margin:0;max-width:660px;font-size:14px;line-height:1.7;color:#d9e7f6}
     .overlay button{border:2px solid #fff2b7;border-radius:9px;padding:10px 24px;color:#19263a;background:#ffce65;font-weight:800;font-size:15px;min-height:46px}
     #start{min-width:140px;max-width:100%}
+    #supply-reroll{min-height:44px}
     .overlay button:hover:not(:disabled){background:#ffe097}
     .overlay button:disabled{cursor:not-allowed;opacity:.55}
     .overlay .secondary,.overlay .choice{border:1px solid #718cac;background:#1d3550;color:#eaf3ff;box-shadow:none;font-size:13px}
@@ -115,6 +116,7 @@
   </section>
   <details class="build-panel" id="build-panel" hidden>
     <summary id="build-summary">本局构筑 · 展开查看组合配方</summary>
+    <p id="build-loadout"></p>
     <p id="build-modules"></p>
     <ul aria-label="模组组合配方">
       <li id="synergy-piercing"></li><li id="synergy-reflux"></li><li id="synergy-recycle"></li>
@@ -145,20 +147,30 @@
         <section id="survival-menu" class="menu-section" aria-label="防线生存规则" hidden>
           <p class="survival-summary">一条命，守住自己的纪录。双向增援与每三波首领战交替，清场后选择补给，配对模组点亮三种组合效果。</p>
           <div class="choice-grid survival-grid">
-            <div class="choice"><strong>守住防线</strong><span>6 体力、3 手雷，固定标准难度。敌人出现前预警 2.2 秒；步兵追击，盾卫转向防守。</span></div>
+            <div class="choice"><strong>守住防线</strong><span>开局装具决定体力与手雷，固定标准难度。敌人出现前预警 2.2 秒；步兵追击，盾卫转向防守。</span></div>
             <div class="choice"><strong>选择构筑</strong><span>六种永久模组，每种最多两级。两种模组各 1 级即可点亮组合：贯穿火力、反击回流、爆破回收。</span></div>
             <div class="choice"><strong>每三波迎战首领</strong><span>三位首领轮换登场，无杂兵干扰。首领清场恢复 2 体力、2 手雷，额外奖励 500 分；普通波恢复各 1。</span></div>
+          </div>
+          <div role="group" aria-label="选择开局装具" class="menu-section">
+            <p class="section-label">开局装具 · 三种打法，本局固定</p>
+            <div class="choice-grid survival-grid">
+              <button id="loadout-assault" type="button" class="choice" aria-pressed="true"><strong>机动突击</strong><span>6 体力 / 3 手雷。标准连射，适合走位、穿透与持续火力。</span></button>
+              <button id="loadout-counter" type="button" class="choice" aria-pressed="false"><strong>反击先锋</strong><span>5 体力 / 3 手雷。冲刺冷却少 0.4 秒，反弹伤害 +1；以更低体力换取反击能力。</span></button>
+              <button id="loadout-demolition" type="button" class="choice" aria-pressed="false"><strong>爆破专家</strong><span>6 体力 / 5 手雷。爆炸伤害 +2、范围 +24，可清敌弹；代价是射击间隔增加 25%。</span></button>
+            </div>
+            <p id="loadout-status" class="small" role="status"></p>
           </div>
           <p id="survival-record" class="result-details">最高守住 0 波 · 最高 0 分</p>
           <p class="small">没有终点。已守住的波数与对应清场得分自动记录；未清场的当前波不计入纪录。暂停和整备不计时。刷新会结束本局，不影响远征或挑战记录。</p>
         </section>
         <section id="survival-options" class="menu-section" role="group" aria-label="选择防线补给" hidden>
-          <p>选择一项，再进入下一波。永久模组仅本局有效，每种最多两级。</p>
+          <p>选择一项，再进入下一波。优先提供可点亮组合的模组；每波可免费重抽一次。永久模组仅本局有效，每种最多两级。</p>
           <div class="choice-grid survival-grid">
             <button id="supply-0" type="button" class="choice" aria-pressed="false"><strong id="supply-name-0"></strong><span id="supply-description-0"></span></button>
             <button id="supply-1" type="button" class="choice" aria-pressed="false"><strong id="supply-name-1"></strong><span id="supply-description-1"></span></button>
             <button id="supply-2" type="button" class="choice" aria-pressed="false"><strong id="supply-name-2"></strong><span id="supply-description-2"></span></button>
           </div>
+          <button id="supply-reroll" type="button" class="secondary" aria-disabled="true" disabled hidden>免费重抽 · 1 次</button>
         </section>
         <div id="difficulty-options" class="menu-section" role="group" aria-label="远征难度">
           <div class="option-row">
@@ -252,11 +264,16 @@
         dash:{name:'闪步模组',description:'永久：冲刺冷却缩短 0.6 秒，最低 1.2 秒。'},
         armor:{name:'战地装甲',description:'永久：体力上限 +1，并补满体力。'},
         pierce:{name:'穿透弹芯',description:'永久：普通子弹可多穿透 1 个敌人。盾牌仍会挡住正面弹。'},
-        reflect:{name:'反击增幅',description:'永久：冲刺反弹的伤害 +1，最高 4 点。'},
+        reflect:{name:'反击增幅',description:'永久：冲刺反弹的伤害 +1，装具加成另计。'},
         blast:{name:'爆破扩容',description:'永久：手雷伤害 +2、范围 +24，并清除爆炸范围内敌弹。'},
         heal:{name:'紧急医疗',description:'立即补满体力；适合已经受伤的防线。'},
         ammo:{name:'弹药补给',description:'补充 3 枚手雷（最多 7 枚），获得 20 秒散弹。'},
         boost:{name:'火力储备',description:'获得 20 秒强化连射与 20 秒散弹。'}
+      };
+      const LOADOUTS={
+        assault:{name:'机动突击',hp:6,grenades:3,dash:0,reflect:0,blast:0,fire:1,description:'标准连射与 6 体力，适合走位和持续火力。'},
+        counter:{name:'反击先锋',hp:5,grenades:3,dash:.4,reflect:1,blast:0,fire:1,description:'5 体力；冲刺冷却少 0.4 秒、反弹伤害 +1。'},
+        demolition:{name:'爆破专家',hp:6,grenades:5,dash:0,reflect:0,blast:1,fire:1.25,description:'5 枚起始手雷；爆炸伤害 +2、范围 +24 并清敌弹；射击间隔增加 25%。'}
       };
       const MODULES=['rapid','dash','armor','pierce','reflect','blast'];
       const SYNERGIES={
@@ -274,14 +291,15 @@
       let mode='campaign',difficulty='standard',upgrades={rapid:0,dash:0,armor:0},selectedUpgrade=null;
       let titleView='campaign',challengeId=null,challengeTime=0,challengeReflections=0,bossWins=0;
       let survivalWave=0,survivalCleared=0,survivalTime=0,spawnTime=0,supplyOffers=[],selectedSupply=null;
-      let refluxCooldown=0;
+      let refluxCooldown=0,selectedLoadout='assault',loadout='assault',supplyRerolls=0;
+      const kit=()=>LOADOUTS[survival()?loadout:'assault'];
       const survival=()=>mode==='survival';
       const bossWave=()=>survival()&&survivalWave>0&&survivalWave%3===0;
       const synergy=key=>survival()&&SYNERGIES[key].pair.every(name=>upgrades[name]>0);
       const activeSynergies=()=>Object.keys(SYNERGIES).filter(synergy);
       const wavePreview=wave=>wave%3===0?'首领战 · '+STAGES[Math.floor((wave-1)/3)%3].bossName:'双向增援 · 第 '+wave+' 波';
       const activeEnemies=()=>enemies.filter(e=>!e.dead).length;
-      const dashDelay=()=>Math.max(1.2,2.4-upgrades.dash*.6);
+      const dashDelay=()=>Math.max(1.2,2.4-upgrades.dash*.6-(survival()?kit().dash:0));
       const currentChallenge=()=>mode==='challenge'?CHALLENGES[challengeId]:null;
       const gauntlet=()=>mode==='challenge'&&challengeId==='bosses';
       const formatTime=seconds=>seconds.toFixed(1)+' 秒';
@@ -322,7 +340,7 @@
       const pressed=name=>held.has(name)||padHeld.has(name)||touches(name);
       const isGap=x=>stage.gaps.some(pair=>x>pair[0]&&x<pair[1]);
       const hit=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
-      const maxHealth=()=>5+(survival()||difficulty==='relaxed'?1:0)+upgrades.armor;
+      const maxHealth=()=>(survival()?kit().hp:5+(difficulty==='relaxed'?1:0))+upgrades.armor;
       const starCount=mask=>[1,2,4].filter(bit=>mask&bit).length;
       const starText=mask=>'★'.repeat(starCount(mask))+'☆'.repeat(3-starCount(mask));
       const collected=()=>intel.filter(i=>i.done).length;
@@ -331,6 +349,29 @@
         const dx=x-clamp(x,rect.x,rect.x+rect.w),dy=y-clamp(y,rect.y,rect.y+rect.h);
         return dx*dx+dy*dy<r*r;
       };
+
+      // Earliest contact of a moving circular shot with the real rounded rectangle.
+      // Face strips + corner circles avoid diagonal hits in the expanded AABB corners.
+      function shotImpact(x,y,nx,ny,r,target){
+        if(circRect(x,y,r,target))return 0;
+        if(Math.max(x,nx)<target.x-r||Math.min(x,nx)>target.x+target.w+r||
+          Math.max(y,ny)<target.y-r||Math.min(y,ny)>target.y+target.h+r)return Infinity;
+        const dx=nx-x,dy=ny-y,length=dx*dx+dy*dy;
+        if(!length)return Infinity;
+        let first=Infinity;
+        const take=t=>{if(t>=0&&t<=1)first=Math.min(first,t);};
+        if(dx)for(const edge of [target.x-r,target.x+target.w+r]){
+          const t=(edge-x)/dx,at=y+dy*t;if(at>=target.y&&at<=target.y+target.h)take(t);
+        }
+        if(dy)for(const edge of [target.y-r,target.y+target.h+r]){
+          const t=(edge-y)/dy,at=x+dx*t;if(at>=target.x&&at<=target.x+target.w)take(t);
+        }
+        for(const cx of [target.x,target.x+target.w])for(const cy of [target.y,target.y+target.h]){
+          const ox=x-cx,oy=y-cy,dot=ox*dx+oy*dy,disc=dot*dot-length*(ox*ox+oy*oy-r*r);
+          if(disc>=0)take((-dot-Math.sqrt(disc))/length);
+        }
+        return first;
+      }
 
       function beep(freq=380,time=.07,type='square'){
         if(!soundOn)return;
@@ -379,8 +420,9 @@
         $('build-panel').hidden=!survival()||phase==='title';
         if(!survival())return;
         const active=activeSynergies(),names=MODULES.filter(key=>upgrades[key]>0).map(key=>SUPPLIES[key].name+' '+upgrades[key]+' 级');
-        const summary='本局构筑 · '+(active.length?active.map(key=>SYNERGIES[key].name).join(' / '):'尚未点亮组合')+' · 展开配方';
+        const summary='本局构筑 · '+kit().name+' · '+(active.length?active.map(key=>SYNERGIES[key].name).join(' / '):'尚未点亮组合')+' · 展开配方';
         if($('build-summary').textContent!==summary)$('build-summary').textContent=summary;
+        $('build-loadout').textContent=kit().name+'：'+kit().description+' 装具不占模组等级。';
         $('build-modules').textContent=names.length?names.join(' · '):'暂无永久模组。每波清场后选择一项补给。';
         for(const [key,value] of Object.entries(SYNERGIES)){
           const active=synergy(key),node=$('synergy-'+key);node.setAttribute('data-active',String(active));
@@ -395,11 +437,17 @@
         $('survival-menu').hidden=!titleOpen||!defense;
         $('challenge-menu').hidden=!titleOpen||!challenges;action.hidden=titleOpen&&challenges;
         for(const name of ['campaign','challenges','survival'])$('mode-'+name).setAttribute('aria-pressed',String(titleView===name));
+        for(const key of Object.keys(LOADOUTS))$('loadout-'+key).setAttribute('aria-pressed',String(selectedLoadout===key));
+        $('loadout-status').textContent='已选 '+LOADOUTS[selectedLoadout].name+'。'+LOADOUTS[selectedLoadout].description+' 点击开始生效，可在下次开局更换。';
         if(titleOpen){
           kicker.textContent=defense?'SURVIVAL / BUILD YOUR RUN':challenges?'OPERATIONS / 01—03':'EXPEDITION / 01—03';
           action.textContent=defense?'开始防线生存':'开始三章远征';
           message.textContent=defense?'每三波迎战一位首领。搭配模组点亮贯穿火力、反击回流或爆破回收，把每次胜利变成下一波的战术。':challenges?'挑一项短程任务：竞速、反击或首领连战。固定规则、独立纪录，随时重试。':'潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化；冲刺反弹敌弹，绕后击破盾卫，连击争取高分。';
         }
+      }
+      function selectLoadout(key){
+        if(phase!=='title'||titleView!=='survival'||!Object.hasOwn(LOADOUTS,key))return;
+        selectedLoadout=key;renderTitleView();
       }
       function selectTitleView(view){
         if(phase!=='title'||!['campaign','challenges','survival'].includes(view))return;
@@ -411,6 +459,7 @@
         renderTitleView();renderBuild();
         $('upgrade-options').hidden=tag!=='stageClear';
         $('survival-options').hidden=tag!=='waveClear';
+        $('supply-reroll').hidden=tag!=='waveClear';
         $('result-details').hidden=!['stageClear','victory','practiceClear','challengeClear','challengeFailed','bossBreak','waveClear','survivalOver'].includes(tag);
         $('menu-home').hidden=!['pause','stageClear','victory','gameOver','practiceClear','challengeClear','challengeFailed','bossBreak','waveClear','survivalOver'].includes(tag);
         $('cancel-restart').hidden=tag!=='confirmRestart';
@@ -445,7 +494,7 @@
         $('intel').textContent=gauntlet()||survival()?'—':collected()+' / 3';
         $('dash-status').textContent=player?.dashCooldown>0?player.dashCooldown.toFixed(1)+'s':'就绪';
         $('combo-status').textContent=combo.count?combo.count+' 连 · ×'+comboMultiplier()+' · '+combo.timer.toFixed(1)+'s':'待命';
-        $('run-label').textContent=(difficulty==='relaxed'?'轻松':'标准')+' · '+(survival()?'防线':mode==='challenge'?'挑战':mode==='practice'?'练习':'远征');
+        $('run-label').textContent=(difficulty==='relaxed'?'轻松':'标准')+' · '+(survival()?'防线 · '+kit().name:mode==='challenge'?'挑战':mode==='practice'?'练习':'远征');
         renderBuild();
         const mission=currentChallenge();$('mission-hud').hidden=!mission&&!survival();
         if(survival()){
@@ -489,13 +538,14 @@
           maxHp:type==='shield'?5:type==='turret'?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false,
           face:-1,windup:0,burst:0,burstTimer:0,aimX:0,aimY:0,flash:0,blockFlash:0};}
       function beginSurvival(){
-        mode='survival';titleView='survival';difficulty='standard';challengeId=null;
+        mode='survival';titleView='survival';difficulty='standard';challengeId=null;loadout=selectedLoadout;
         challengeTime=0;challengeReflections=0;bossWins=0;points=0;shotsFired=0;runStars=[];
         upgrades=Object.fromEntries(MODULES.map(key=>[key,0]));
-        survivalWave=0;survivalCleared=0;survivalTime=0;supplyOffers=[];selectedSupply=null;refluxCooldown=0;
-        best=progress.survival.best;resetStage(0,{hp:6,lives:1,grenades:3});startWave();
+        survivalWave=0;survivalCleared=0;survivalTime=0;supplyOffers=[];selectedSupply=null;refluxCooldown=0;supplyRerolls=0;
+        best=progress.survival.best;resetStage(0,{hp:kit().hp,lives:1,grenades:kit().grenades});startWave();
       }
       function startWave(){
+        $('supply-reroll').hidden=true;
         survivalWave++;stageIndex=Math.floor((survivalWave-1)/3)%3;
         stage={...STAGES[stageIndex],name:['边境防线','要塞防线','赤焰防线'][stageIndex],width:W,
           gaps:[],checkpoints:[],platforms:[[210,325,155],[405,285,150],[640,325,155]],intel:[],enemies:[],pickups:[]};
@@ -535,19 +585,43 @@
         best=progress.survival.best;saveProgress();
         player.hp=Math.min(maxHealth(),player.hp+(bossWave()?2:1));player.grenades=Math.min(7,player.grenades+(bossWave()?2:1));
         bullets=[];bombs=[];spawnTime=0;
-        // A no-replacement draw keeps each offer distinct. Recovery remains a choice
-        // after all permanent modules reach their cap, so late waves never softlock.
+        supplyRerolls=MODULES.some(key=>upgrades[key]<2)?1:0;rollSupplies();
+        $('result-details').textContent='已守住 '+survivalCleared+' 波 · 清场得分 '+points+'\n体力 '+player.hp+' / '+maxHealth()+' · 手雷 '+player.grenades+' · 用时 '+formatTime(survivalTime);
+        hud();showWaveMenu();
+      }
+      function rollSupplies(){
+        // Guarantee one missing partner when a recipe can be completed, then
+        // draw without replacement. Capped builds retain three recovery choices.
         const pool=MODULES.filter(key=>upgrades[key]<2);
-        supplyOffers=[];
+        const partners=pool.filter(key=>upgrades[key]===0&&Object.values(SYNERGIES).some(value=>
+          value.pair.includes(key)&&value.pair.some(other=>other!==key&&upgrades[other]>0)));
+        const previous=[...supplyOffers];supplyOffers=[];
+        if(partners.length){
+          const key=partners[Math.floor(rng(0,partners.length))];supplyOffers.push(key);pool.splice(pool.indexOf(key),1);
+        }
         while(pool.length&&supplyOffers.length<2)supplyOffers.push(pool.splice(Math.floor(rng(0,pool.length)),1)[0]);
         for(const key of ['heal','ammo','boost'])if(supplyOffers.length<3)supplyOffers.push(key);
+        // Reroll must offer a genuinely different choice when alternatives exist;
+        // never discard the guaranteed recipe partner to do so.
+        if(supplyRerolls===0&&supplyOffers.every(key=>previous.includes(key))){
+          if(pool.length)supplyOffers[partners.length?1:0]=pool[Math.floor(rng(0,pool.length))];
+          else{
+            const recovery=['heal','ammo','boost'].filter(key=>!supplyOffers.includes(key));
+            if(recovery.length)supplyOffers[2]=recovery[Math.floor(rng(0,recovery.length))];
+          }
+        }
         selectedSupply=null;
         for(let i=0;i<3;i++){
           const key=supplyOffers[i];$('supply-name-'+i).textContent=supplyLabel(key);
           $('supply-description-'+i).textContent=supplyDescription(key);$('supply-'+i).setAttribute('aria-pressed','false');
         }
-        $('result-details').textContent='已守住 '+survivalCleared+' 波 · 清场得分 '+points+'\n体力 '+player.hp+' / '+maxHealth()+' · 手雷 '+player.grenades+' · 用时 '+formatTime(survivalTime);
-        hud();showWaveMenu();
+        $('supply-reroll').disabled=supplyRerolls===0;
+        $('supply-reroll').setAttribute('aria-disabled',String(supplyRerolls===0));
+        $('supply-reroll').textContent=supplyRerolls?'免费重抽 · 1 次':MODULES.some(key=>upgrades[key]<2)?'本波重抽已用完':'已展示全部补给';
+      }
+      function rerollSupplies(){
+        if(!survival()||phase!=='waveClear'||supplyRerolls<1)return;
+        supplyRerolls--;rollSupplies();showWaveMenu();announce('补给已重抽，请重新选择。本波重抽已用完。');
       }
       function chooseSupply(index){
         if(phase!=='waveClear'||!survival()||!Number.isInteger(index)||index<0||index>=supplyOffers.length)return;
@@ -732,13 +806,16 @@
       function fire(){
         if(player.shoot>0)return;
         const scatter=player.weaponTime>0;
-        player.shoot=(scatter?(player.boost>0?.19:.33):(player.boost>0?.075:.15))*Math.pow(.8,upgrades.rapid);
+        player.shoot=(scatter?(player.boost>0?.19:.33):(player.boost>0?.075:.15))*Math.pow(.8,upgrades.rapid)*(survival()?kit().fire:1);
         const y=player.y+(player.crouch?14:20);
         const up=pressed('jump')&&!player.ground;
         const vx=player.face*(up?480:650),vy=up?-340:0;
         const spread=scatter?[-1,0,1]:[0];
         for(const offset of spread){
           projectile(player.x+(player.face===1?player.w+4:-4),y,vx,vy+offset*(up?88:145),'p');
+          // Trace the forward half of the body through the muzzle on the first
+          // tick, while keeping the visible bullet at the actual muzzle.
+          bullets[bullets.length-1].traceX=player.x+player.w/2;bullets[bullets.length-1].traceY=y;
         }
         if(!scatter&&synergy('piercing'))bullets[bullets.length-1].damage++;
         player.lastVolley=spread.length;
@@ -755,7 +832,7 @@
       function boom(x,y){
         spark(x,y,'#ffd781',34);spark(x,y,'#ff746b',14);
         shake=9;beep(120,.3,'sawtooth');
-        const level=upgrades.blast||0,radius=112+24*level;
+        const level=(upgrades.blast||0)+(survival()?kit().blast:0),radius=112+24*level;
         let defeated=false;
         if(!survival()||spawnTime===0)for(const e of enemies){
           if(e.dead||e.arrival>0)continue;
@@ -788,7 +865,7 @@
       function reflectBullet(b){
         const dx=b.sourceX-b.x,dy=b.sourceY-b.y,len=Math.hypot(dx,dy);
         b.vx=len>1?dx/len*650:player.face*650;b.vy=len>1?dy/len*650:0;
-        b.owner='p';b.reflected=true;b.damage=2+(upgrades.reflect||0);b.life=1.7;reflections++;if(mode==='challenge')challengeReflections++;
+        b.owner='p';b.reflected=true;b.damage=2+(upgrades.reflect||0)+(survival()?kit().reflect:0);b.life=1.7;reflections++;if(mode==='challenge')challengeReflections++;
         if(synergy('reflux')&&refluxCooldown===0&&player.hp<maxHealth()){player.hp++;refluxCooldown=8;}
         spark(b.x,b.y,'#9eeaff',8);beep(820,.05,'triangle');combatNotice(mode==='challenge'&&challengeId==='counter'?'反弹 '+challengeReflections+' / 5'+(challengeReflections>=5?' · 可击败首领并撤离':' · 继续积累'):'冲刺反弹 · '+b.damage+' 点伤害 / 穿透盾牌');
       }
@@ -949,25 +1026,38 @@
         if(!boss.dead&&(!survival()||spawnTime===0)&&hit(player,boss))hurt(1);
         if(phase!=='playing')return;
         for(let i=bullets.length-1;i>=0;i--){
-          const b=bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
-          if(b.life<=0||b.y<20||b.y>H+30||b.x<cam-130||b.x>cam+W+130){bullets.splice(i,1);continue;}
+          const b=bullets[i],x=b.traceX??b.x,y=b.traceY??b.y;
+          delete b.traceX;delete b.traceY;
+          b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
+          if(b.life<=0){bullets.splice(i,1);continue;}
+          let struck=false;
           if(b.owner==='p'){
-            let struck=false;
-            if(!survival()||spawnTime===0)for(const e of enemies){
-              if(e.dead||e.arrival>0||b.hitEnemies?.includes(e)||!circRect(b.x,b.y,b.r,e))continue;
-              const damaged=hitEnemy(e,b);
-              if(!damaged||!(b.pierce>0)){struck=true;break;}
-              b.pierce--;b.hitEnemies.push(e);
+            const contacts=[];
+            if(!survival()||spawnTime===0){
+              for(const e of enemies){
+                if(e.dead||e.arrival>0||b.hitEnemies?.includes(e))continue;
+                const at=shotImpact(x,y,b.x,b.y,b.r,e);if(at!==Infinity)contacts.push({target:e,at});
+              }
+              if(!boss.dead){const at=shotImpact(x,y,b.x,b.y,b.r,boss);if(at!==Infinity)contacts.push({target:boss,at});}
             }
-            if(!struck&&!boss.dead&&(!survival()||spawnTime===0)&&circRect(b.x,b.y,b.r,boss)){damageBoss(b.damage);struck=true;}
-            if(struck)bullets.splice(i,1);
-          }else if(circRect(b.x,b.y,b.r,player)){
+            // Array order must not allow a distant target to absorb the shot,
+            // or let piercing bullets damage an enemy behind a frontal shield.
+            contacts.sort((a,b)=>a.at-b.at);
+            for(const {target} of contacts){
+              if(target===boss){damageBoss(b.damage);struck=true;break;}
+              const damaged=hitEnemy(target,b);
+              if(!damaged||!(b.pierce>0)){struck=true;break;}
+              b.pierce--;b.hitEnemies.push(target);
+            }
+          }else if(shotImpact(x,y,b.x,b.y,b.r,player)!==Infinity){
             if(player.dashTime>0){reflectBullet(b);continue;}
-            // Damage may replace the projectile list on respawn; consume this shot first.
+            // Damage may replace the projectile list on respawn; consume first.
             bullets.splice(i,1);hurt(1);
             if(phase!=='playing')return;
             if(i>=bullets.length)i=bullets.length;
+            continue;
           }
+          if(struck||b.y<20||b.y>H+30||b.x<cam-130||b.x>cam+W+130)bullets.splice(i,1);
         }
         for(let i=bombs.length-1;i>=0;i--){
           const b=bombs[i];b.vy+=GRAV*.83*dt;b.x+=b.vx*dt;b.y+=b.vy*dt;b.timer-=dt;
@@ -1293,6 +1383,8 @@
       $('menu-home').addEventListener('click',()=>requestConfirm('home'));
       $('cancel-restart').addEventListener('click',cancelConfirm);
       for(const view of ['campaign','challenges','survival'])$('mode-'+view).addEventListener('click',()=>selectTitleView(view));
+      for(const key of Object.keys(LOADOUTS))$('loadout-'+key).addEventListener('click',()=>selectLoadout(key));
+      $('supply-reroll').addEventListener('click',rerollSupplies);
       for(let i=0;i<3;i++)$('supply-'+i).addEventListener('click',()=>chooseSupply(i));
       for(const key of Object.keys(CHALLENGES))$('challenge-'+key).addEventListener('click',()=>{if(phase==='title')beginChallenge(key);});
       for(const key of Object.keys(UPGRADES))$('upgrade-'+key).addEventListener('click',()=>chooseUpgrade(key));
@@ -1361,7 +1453,7 @@
         bossAttackType:boss?.attackType??'volley',bossBeamTime:boss?.beamTime??0,bossBeamY:boss?.beamY??0,
         turretCharge:Math.max(0,...enemies.map(e=>e.dead?0:e.windup)),shieldCount:enemies.filter(e=>!e.dead&&e.type==='shield').length,
         combo:combo.count,comboTime:combo.timer,comboBest:combo.best,combatText:combatTime>0?combatText:'',reflections,
-        survivalWave,survivalCleared,survivalTime,spawnTime,bossWave:bossWave(),bossMaxHp:boss?.maxHp??0,bossX:boss?.x??0,synergies:activeSynergies(),refluxCooldown,supplyOffers:[...supplyOffers],selectedSupply,
+        survivalWave,survivalCleared,survivalTime,spawnTime,bossWave:bossWave(),bossMaxHp:boss?.maxHp??0,bossX:boss?.x??0,synergies:activeSynergies(),refluxCooldown,loadout,selectedLoadout,supplyRerolls,supplyOffers:[...supplyOffers],selectedSupply,
         enemies:enemies.filter(e=>!e.dead).map(e=>({x:e.x,y:e.y,w:e.w,h:e.h,hp:e.hp,type:e.type,face:e.face,arrival:e.arrival||0})),
         clock,runStars:[...runStars],progress:JSON.parse(JSON.stringify(progress))
       })});
