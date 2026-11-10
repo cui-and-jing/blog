@@ -1,5 +1,6 @@
-/** Published Survival mode: ordinary DOM controls and genuine keyboard input only. */
+/** Published Survival mode: ordinary DOM controls and genuine keyboard/touch input only. */
 import path from 'node:path';
+import { checkArena, checkPlatformDescent } from './raid-arena-browser.mjs';
 import { survivalTactics } from './raid-survival-tactics.mjs';
 import { recoveryTactics } from './raid-recovery-tactics.mjs';
 
@@ -130,6 +131,9 @@ export async function checkRaidSurvival(page, problems) {
       recipe.active === state.synergies.includes(recipe.key)), '组合配方或点亮状态与实际构筑不一致', build);
   };
 
+  const arenaTools = { read, check, shot, phase, wait };
+  await checkPlatformDescent(page, arenaTools);
+
   await page.setViewport({ width: 1280, height: 960, isMobile: false, hasTouch: false });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__raidReady === true);
@@ -182,13 +186,14 @@ export async function checkRaidSurvival(page, problems) {
   check((await read()).survivalTime === paused.survivalTime, '取消重开改变波次时间');
   await page.click('#start'); await phase('playing');
   await shot('spawn-warning');
+  await checkArena(page, 'steps', arenaTools);
 
   state = await fight(1);
   check(state.progress.survival.best > 250, '首波未保存清场得分', state);
   if (state.phase !== 'waveClear') return;
   check(await page.$eval('#start', element => element.disabled), '未选补给即可继续');
   check(state.supplyOffers.length === 3 && new Set(state.supplyOffers).size === 3, '补给选项重复');
-  check((await page.$eval('#overlay-text', element => element.textContent)).includes('下一波：双向增援 · 第 2 波'), '首波未预告第二波增援');
+  check((await page.$eval('#overlay-text', element => element.textContent)).includes('下一波：双向增援 · 第 2 波 · 双翼高台'), '首波未预告第二波增援');
   check(state.supplyRerolls === 1 && await visible('#supply-reroll') &&
     await page.$eval('#supply-reroll', element => element.getAttribute('aria-disabled') === 'false'), '首波没有可用的免费补给重抽', state);
   check(state.selectedContract === 'hold' && state.fieldContract === null &&
@@ -271,6 +276,7 @@ export async function checkRaidSurvival(page, problems) {
     state.fieldContract.nodes.every(node => !node.done) && state.selectedContract === 'hold' &&
     await visible('#contract-hud'), '回收委托没有在第二波独立启用或预警中提前取得节点', state);
   await shot('recovery-warning');
+  await checkArena(page, 'flanks', arenaTools);
 
   // Native details/summary keyboard operation must work without Space jumping
   // in play, or Enter accidentally resuming the game while it is paused.
@@ -328,6 +334,8 @@ export async function checkRaidSurvival(page, problems) {
     '首领没有完整的 2.2 秒抵达预警', state);
   check((await page.$eval('#mission-name', element => element.textContent)).includes('首领战') &&
     (await page.$eval('#mission-objective', element => element.textContent)).includes('首领'), '首领预警缺少可读任务提示');
+  check(state.arena === null && JSON.stringify(state.platforms) === JSON.stringify([[260,320,170],[500,310,150]]),
+    '首领波错误继承普通波轮换地形', state);
   await shot('boss-warning');
   await page.keyboard.press('p'); await phase('pause');
   const bossPaused = await read();
@@ -353,10 +361,28 @@ export async function checkRaidSurvival(page, problems) {
     state.selectedSupply === null && state.supplyOffers.length === 3 && new Set(state.supplyOffers).size === 3,
     '真实击败首领后纪录、奖励或补给错误', state);
   check((await page.$eval('#overlay-text', element => element.textContent)).includes('已恢复 2 点体力和 2 枚手雷') &&
-    (await page.$eval('#overlay-text', element => element.textContent)).includes('下一波：双向增援 · 第 4 波'),
+    (await page.$eval('#overlay-text', element => element.textContent)).includes('下一波：双向增援 · 第 4 波 · 错层栈桥'),
     '首领补给未显示强化恢复和第四波预告');
   check(await page.$eval('#start', element => element.disabled), '首领清场后未选补给即可继续');
   await shot('boss-supply');
+  // The boss must not consume an ordinary-layout turn: genuinely play the
+  // bridge wave, including its elevated recovery node, before returning home.
+  await page.click('#contract-summary');
+  await page.click('#contract-recovery');
+  let bridgeChoice = state.supplyOffers.indexOf('armor');
+  if (bridgeChoice < 0 && state.hp < 4) bridgeChoice = state.supplyOffers.indexOf('heal');
+  await page.click('#supply-' + Math.max(0, bridgeChoice));
+  await page.click('#start'); await phase('playing');
+  state = await read();
+  check(state.survivalWave === 4 && !state.bossWave && state.fieldContract?.status === 'active' &&
+    state.fieldContract.nodes.some(node => node.x === 622.5 && node.y === 311),
+    '第四波未启用栈桥或回收目标没有绑定栈桥平台', state);
+  await checkArena(page, 'bridge', arenaTools);
+  state = await fight(4, { recovery: true });
+  if (state.phase !== 'waveClear') return;
+  check((await page.$eval('#overlay-text', element => element.textContent)).includes('第 5 波 · 中央阶台'),
+    '三套普通波地形轮换后未预告回到中央阶台');
+  await shot('bridge-recovery-result');
   let record = state.progress.survival;
   await page.click('#menu-home'); await phase('confirmRestart'); await page.click('#start'); await phase('title');
   state = await read();
