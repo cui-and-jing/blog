@@ -35,7 +35,7 @@ export async function checkPlatformDescent(page, { read, check, shot, phase, wai
     await page.click('#mode-survival'); await page.click('#start'); await phase('playing');
     // Walk from the centre to the left ledge, then jump onto its real collision
     // surface. No teleport, enemy removal, seeded randomness or wave skipping.
-    let client;
+    let client, touchActive = false, failed = false;
     try {
       await page.keyboard.down('a');
       await page.waitForFunction(() => window.__raidState.x < 280, { timeout: 2500 });
@@ -57,12 +57,19 @@ export async function checkPlatformDescent(page, { read, check, shot, phase, wai
           const r = el.getBoundingClientRect(); return { id, x: r.x + r.width / 2, y: r.y + r.height / 2 };
         }));
         check(points.length === 2 && points.every(p => p.x >= 0 && p.x < 320 && p.y >= 0 && p.y < 844), '触屏降层控件不在可触区域', points);
+        // CDP receives the complete active-contact set: first Down, then add
+        // Jump while retaining Down's id. End exactly once with an empty set.
         await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [points[0]] });
+        touchActive = true;
         await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points });
       };
       const release = async () => {
-        if (touch) await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-        else { await page.keyboard.up('w'); await page.keyboard.up('s'); }
+        if (touch) {
+          if (touchActive) {
+            await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+            touchActive = false;
+          }
+        } else { await page.keyboard.up('w'); await page.keyboard.up('s'); }
       };
       await chord();
       await page.waitForFunction(() => window.__raidState.dropTime > 0, { timeout: 1200, polling: 'raf' });
@@ -98,12 +105,25 @@ export async function checkPlatformDescent(page, { read, check, shot, phase, wai
       }
       check(rose && !belowFloor && !floorDrop && (await read()).stageDeaths === 0,
         '实地的下蹲加跳跃不是正常起跳或穿透地板：' + (touch ? 'touch' : 'keyboard'));
+    } catch (error) {
+      failed = true;
+      throw error;
     } finally {
-      for (const key of ['a', 's', 'w']) await page.keyboard.up(key);
+      // Always attempt every cleanup, but preserve the original test failure.
+      // A completed release must not produce a second, invalid CDP touchEnd.
+      const errors = [];
+      const cleanup = async action => {
+        try { await action(); } catch (error) { errors.push(error); }
+      };
+      for (const key of ['a', 's', 'w']) await cleanup(() => page.keyboard.up(key));
       if (client) {
-        await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-        await client.detach();
+        if (touchActive) await cleanup(async () => {
+          await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+          touchActive = false;
+        });
+        await cleanup(() => client.detach());
       }
+      if (!failed && errors.length) throw new AggregateError(errors, 'Platform descent input cleanup failed');
     }
   }
 }
