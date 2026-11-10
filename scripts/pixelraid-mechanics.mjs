@@ -1673,13 +1673,19 @@ test('survival input controller escapes overlapping ground threats without oscil
   // Keep the escape direction even if the nearest center crosses sides.
   state.enemies[0].x = 420;
   eq(decide(state).move, 'd');
-  state.enemies[0].x = 190; state.enemies.pop();
+  state.enemies[0].x = 190; state.enemies[0].type = 'shield'; state.enemies.pop();
   const safe = decide(state);
   eq(safe.move, 'a'); eq(safe.grenade, true);
   eq(decide(state).move, ''); eq(decide(state).grenade, false);
   // Near the edge, escape across the threat instead of running into the wall.
   const edge = survivalTactics();
   eq(edge({ ...state, x: 20, enemies: [{ ...state.enemies[0], x: 35 }] }).move, 'd');
+  const orient = survivalTactics(), right = { ...state, enemies: [{ ...state.enemies[0], x: 600 }] };
+  eq(orient(right).move, 'd'); eq(orient(right).move, '');
+  const ledge = survivalTactics(), below = { ...state, x: 500, y: 241, enemies: [{ ...state.enemies[0], x: 500 }] };
+  eq(ledge(below).move, 'd');
+  eq(ledge({ ...below, x: 600 }).move, 'd');
+  eq(ledge({ ...below, x: 800, y: 381 }).move, 'a');
 });
 
 test('shared keyboard tactics clear four waves across varied timing and random fixtures without state edits', () => {
