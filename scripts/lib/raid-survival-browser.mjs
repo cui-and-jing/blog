@@ -2,6 +2,7 @@
 import path from 'node:path';
 import { checkRaidTactical } from './raid-tactical-browser.mjs';
 import { checkArena, checkPlatformDescent } from './raid-arena-browser.mjs';
+import { checkRaidCharger } from './raid-charger-browser.mjs';
 import { survivalTactics } from './raid-survival-tactics.mjs';
 import { recoveryTactics } from './raid-recovery-tactics.mjs';
 
@@ -182,7 +183,7 @@ export async function checkRaidSurvival(page, problems) {
   let state = await read();
   check(state.mode === 'survival' && state.hp === 6 && state.lives === 1 && state.grenades === 3 &&
     state.survivalWave === 1 && !state.bossWave && state.bossMaxHp === 0 && state.difficulty === 'standard' &&
-    state.worldWidth === 960, '起始资源、首波类型或竞技场错误', state);
+    state.worldWidth === 960 && !state.enemies.some(enemy => enemy.type === 'charger'), '起始资源、首波类型或竞技场错误', state);
   await page.keyboard.press('p'); await phase('pause');
   const paused = await read(); await wait(180);
   state = await read();
@@ -275,7 +276,8 @@ export async function checkRaidSurvival(page, problems) {
   await page.click('#start'); await phase('playing');
   state = await read();
   check(state.survivalWave === 2 && !state.bossWave && state.bossMaxHp === 0 &&
-    state.loadout === 'assault' && state.upgrades[selected.selectedSupply] === 1 && state.shots === intermission.shots,
+    state.loadout === 'assault' && state.upgrades[selected.selectedSupply] === 1 && state.shots === intermission.shots &&
+    !state.enemies.some(enemy => enemy.type === 'charger'),
     '第二波类型、补给效果或整备输入隔离错误', state);
   check(!await visible('#supply-reroll'), '新波战斗仍显示补给重抽');
   check(state.fieldContract?.status === 'active' && state.fieldContract.nodes.length === 3 &&
@@ -383,6 +385,7 @@ export async function checkRaidSurvival(page, problems) {
   check(state.survivalWave === 4 && !state.bossWave && state.fieldContract?.status === 'active' &&
     state.fieldContract.nodes.some(node => node.x === 622.5 && node.y === 311),
     '第四波未启用栈桥或回收目标没有绑定栈桥平台', state);
+  await checkRaidCharger(page, arenaTools);
   await checkArena(page, 'bridge', arenaTools);
   state = await fight(4, { recovery: true });
   if (state.phase !== 'waveClear') return;
