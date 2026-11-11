@@ -138,7 +138,21 @@ export async function checkRaidLobby(page, problems) {
         '取消重开后焦点或说明状态不正确');
       await page.click('#menu-home'); await phase('confirmRestart');
       await page.click('#cancel-restart'); await phase('pause');
-      await home();
+      await page.click('#menu-home'); await phase('confirmRestart');
+      await page.focus('#start');
+      if (viewport.width === 844) {
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        check(await page.evaluate(() => scrollY > 0), '横屏返回测试没有产生页面滚动');
+      }
+      // Keep focus in place: clicking/focusing again would repair scrolling before the return.
+      await page.keyboard.press('Enter'); await phase('title');
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const restored = await page.evaluate(() => ({
+        scroll: scrollY, title: document.querySelector('#overlay-title').getBoundingClientRect().top,
+        modes: document.querySelector('#mode-options').getBoundingClientRect().bottom, height: innerHeight,
+      }));
+      check(restored.scroll <= 1 && restored.title >= 0 && restored.modes <= restored.height,
+        '返回指挥部没有恢复顶部玩法入口', { viewport, restored });
       check(await detailsClosed() && !await visible('.hud') && !await visible('.controls') &&
         await page.$eval('#start', element => document.activeElement === element),
         '返回指挥部没有恢复精简界面或焦点');

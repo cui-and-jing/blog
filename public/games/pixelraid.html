@@ -641,6 +641,7 @@
         refreshRecords();announce(head+'。'+sub);
         // Keep keyboard focus in the menu, while leaving Space/Enter native to buttons.
         (tag==='waveClear'?$('supply-0'):tag==='stageClear'?$('upgrade-rapid'):tag==='confirmRestart'?$('cancel-restart'):tag==='title'&&titleView==='challenges'?$('challenge-sprint'):action).focus?.({preventScroll:true});
+        if(tag==='title')window.scrollTo(0,0);
       }
       function hideMenu(){
         closeMenuDetails();$('game-page').classList.remove('title-screen');

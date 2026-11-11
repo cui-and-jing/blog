@@ -89,7 +89,7 @@ function createGame({ storage = {}, blocked = false, reducedMotion = false, rand
     addEventListener(name, callback) { documentEvents.set(name, callback); },
     activeElement: null, hidden: false,
   };
-  const win = { addEventListener(name, callback) { events.set(name, callback); }, matchMedia: () => ({ matches: reducedMotion }) };
+  const win = { scrollY: 0, scrollTo(_x, y) { this.scrollY = y; }, addEventListener(name, callback) { events.set(name, callback); }, matchMedia: () => ({ matches: reducedMotion }) };
   const math = Object.create(Math);
   math.random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
   const localStorage = {
@@ -157,6 +157,15 @@ test('title initializes safely with no published mutable API', () => {
   const snapshot = g.win.__raidState;
   try { snapshot.hp = -999; } catch {}
   assert(g.state().hp > 0, 'Mutating a state snapshot must not affect gameplay');
+});
+test('returning to the command room restores page scroll without disturbing choices', () => {
+  const g = createGame();
+  g.win.scrollY = 120; g.click('mode-survival'); g.click('loadout-counter');
+  eq(g.win.scrollY, 120, 'Choosing a mode or loadout must not reset page scroll');
+  g.start(); g.key('p'); g.click('menu-home');
+  eq(g.state().phase, 'confirmRestart');
+  g.win.scrollY = 400; g.click('start');
+  eq(g.state().phase, 'title'); eq(g.win.scrollY, 0);
 });
 test('rifle, reachable scatter pickup and timed weapon expiry', () => {
   const g = createGame(); g.start();
