@@ -11,6 +11,7 @@ import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { survivalTactics } from './lib/raid-survival-tactics.mjs';
 import { recoveryTactics } from './lib/raid-recovery-tactics.mjs';
+import { beaconTactics } from './lib/raid-beacon-tactics.mjs';
 
 const source = fs.readFileSync(new URL('../public/games/pixelraid.html', import.meta.url), 'utf8');
 const inline = source.match(/<script>\s*([\s\S]*?)<\/script>/i)?.[1];
@@ -3282,6 +3283,244 @@ test('charger snapshots are detached and no attack state is written to saved rec
   snapshot.enemies[0].chargerEnd=9999;snapshot.enemies[0].chargerPhase='rush';snapshot.enemies.splice(0,1);
   eq(charger(g),first);g.run('saveProgress();');
   assert(!JSON.stringify(g.state().progress).includes('charger'));
+});
+
+// Beacon occupation reuses the wave contract boundary; private arrangements
+// below isolate geometry, timing and same-frame resolution, not browser input.
+function beaconDefense({ wave = 2, ...options } = {}) {
+  const g = defense(options);
+  if (wave !== 2) g.run(`survivalWave=${wave - 2};startWave();`);
+  finishDefenseWave(g); g.click('contract-beacon'); g.click('supply-0'); g.click('start');
+  eq(g.state().survivalWave, wave); assert(g.state().fieldContract.beacon);
+  return g;
+}
+function standAtBeacon(g, offset = 0) {
+  const b = g.state().fieldContract.beacon;
+  g.run(`clearInput();player.x=${b.x - 13.5 + offset};player.y=${b.y - 44};player.h=44;
+    player.vx=0;player.vy=0;player.ground=true;player.dashTime=0;player.dropPlatform=null;`);
+}
+const beaconProgress = g => g.state().fieldContract.beacon.progress;
+function captureBeacon(g) { isolateRecoveryCombat(g); standAtBeacon(g); tick(g, 300); eq(beaconProgress(g), 5); }
+
+test('beacon is an exclusive opt-in commission and never starts a wave without a supply', () => {
+  const g = createGame(); g.click('contract-beacon'); eq(g.state().selectedContract, 'hold');
+  g.click('mode-survival'); g.click('start'); eq(g.state().fieldContract, null);
+  finishDefenseWave(g); const initial = g.state();
+  for (let i = 0; i < 3; i++) g.click('contract-beacon');
+  eq(g.state().selectedContract, 'beacon'); eq(g.state().fieldContract, null); assert(g.nodes.get('start').disabled);
+  for (const key of Object.keys(initial)) if (key !== 'selectedContract') eq(g.state()[key], initial[key]);
+  g.click('start'); eq(g.state().phase, 'waveClear');
+  g.click('contract-recovery'); eq(g.state().selectedContract, 'recovery');
+  eq(g.nodes.get('contract-beacon').getAttribute('aria-pressed'), 'false');
+  g.click('contract-beacon'); eq(g.nodes.get('contract-recovery').getAttribute('aria-pressed'), 'false');
+  g.click('supply-reroll'); eq(g.state().selectedContract, 'beacon');
+  g.click('supply-0'); const ready = g.state();
+  for (const id of ['restart', 'menu-home']) { g.click(id); tick(g, 60); g.click('cancel-restart'); eq(g.state(), ready); }
+  g.click('start'); eq(g.state().selectedContract, 'hold'); eq(g.state().fieldContract.nodes, []);
+  eq(g.nodes.get('contract-name').textContent, '信标夺控');
+  assert(g.nodes.get('contract-objective').textContent.includes('尚未启用'));
+  assert(g.nodes.get('contract-reward').textContent.includes('+35'));
+  const started = g.state(); g.click('contract-hold'); g.click('contract-beacon'); eq(g.state(), started);
+});
+
+test('beacons stay on distinct supported ledges in all three layouts, away from pickups and devices', () => {
+  const seen = new Set();
+  for (const wave of [2, 4, 5, 7, 8, 10, 11, 13]) {
+    const g = beaconDefense({ wave }), state = g.state(), b = state.fieldContract.beacon;
+    seen.add(state.arena.id); eq(b.radius, 48); eq(b.progress, 0); eq(b.occupied, false);
+    assert(state.platforms.some(([x, y, w]) => y === b.y && b.x - b.radius > x + 3 && b.x + b.radius < x + w - 3));
+    assert(state.pickups.every(p => Math.hypot(p.x - b.x, p.y - (b.y - 25)) > 40));
+    assert(state.devices.every(d => d.y + d.h !== b.y || d.x + d.w < b.x - b.radius || d.x > b.x + b.radius));
+    isolateRecoveryCombat(g); g.run(`player.x=${b.x - 13.5};player.y=G-44;player.vy=0;`); tick(g, 10);
+    eq(beaconProgress(g), 0, 'Ground below the signal must never count');
+    standAtBeacon(g); tick(g); assert(beaconProgress(g) > 0);
+  }
+  eq([...seen].sort(), ['bridge', 'flanks', 'steps']);
+});
+
+test('beacon takes exactly 300 eligible ticks, caps at five seconds and pays nothing on capture', () => {
+  const g = beaconDefense(); isolateRecoveryCombat(g); standAtBeacon(g);
+  g.run('player.hp=2;player.grenades=2;tacticalCharge=17;');
+  const before = g.state(), stored = g.values.get(STORE);
+  tick(g, 299); near(beaconProgress(g), 299 / 60); eq(g.state().fieldContract.status, 'active');
+  assert(!g.nodes.get('contract-objective').textContent.includes('夺控完成'));
+  tick(g); eq(beaconProgress(g), 5); assert(g.nodes.get('contract-objective').textContent.includes('夺控完成'));
+  eq(g.state().combatText, '信标夺控完成 · 活着清场领取奖励');
+  tick(g, 480); eq(beaconProgress(g), 5); eq(g.state().phase, 'playing');
+  for (const key of ['score', 'hp', 'grenades', 'tacticalCharge', 'progress']) eq(g.state()[key], before[key]);
+  eq(g.values.get(STORE), stored);
+});
+
+test('beacon zone includes its marked center boundary but excludes outside, flight and drop-through', () => {
+  for (const sign of [-1, 1]) {
+    const g = beaconDefense(); isolateRecoveryCombat(g);
+    standAtBeacon(g, sign * 48.1); tick(g); eq(beaconProgress(g), 0);
+    standAtBeacon(g, sign * 48); tick(g); near(beaconProgress(g), 1 / 60);
+    standAtBeacon(g); g.key('w'); tick(g); g.key('w', false);
+    const before = beaconProgress(g); assert(!g.state().ground); tick(g, 15); eq(beaconProgress(g), before);
+    standAtBeacon(g); g.key('s'); tick(g, 30); eq(g.state().crouch, true); near(beaconProgress(g), before + .5);
+    g.key('w'); tick(g); g.key('w', false); g.key('s', false);
+    assert(g.state().dropTime > 0); const left = beaconProgress(g); tick(g, 25); eq(beaconProgress(g), left);
+    standAtBeacon(g); tick(g, 30); near(beaconProgress(g), left + .5);
+  }
+});
+
+test('beacon ingress, off-zone movement, damage and pauses preserve existing progress without advancing it', () => {
+  const g = beaconDefense(); isolateRecoveryCombat(g); standAtBeacon(g); g.run('spawnTime=.5;');
+  tick(g, 20); eq(beaconProgress(g), 0); g.run('spawnTime=0;'); tick(g, 90); near(beaconProgress(g), 1.5);
+  g.run('player.inv=0;hurt(1);'); near(beaconProgress(g), 1.5);
+  standAtBeacon(g, 60); tick(g, 120); near(beaconProgress(g), 1.5); eq(g.state().fieldContract.beacon.occupied, false);
+  standAtBeacon(g);
+  for (const pause of ['keyboard', 'blur', 'visibility']) {
+    if (pause === 'keyboard') g.key('p'); else if (pause === 'blur') g.event('blur'); else g.visibility(true);
+    eq(g.state().phase, 'pause'); const frozen = g.state(); tick(g, 120); g.frames(20); eq(g.state(), frozen);
+    for (const id of ['restart', 'menu-home']) { g.click(id); tick(g, 120); g.click('cancel-restart'); eq(g.state(), frozen); }
+    if (pause === 'visibility') g.visibility(false);
+    g.click('start'); near(beaconProgress(g), 1.5);
+  }
+  tick(g, 210); eq(beaconProgress(g), 5);
+});
+
+test('completed beacon settles only once with normal rewards and persists the combined clear score', () => {
+  const g = beaconDefense(); captureBeacon(g); g.run('player.hp=2;player.grenades=2;tacticalCharge=17;');
+  const before = g.state(); finishDefenseWave(g); const settled = g.state();
+  eq(settled.fieldContract.status, 'success'); eq(settled.fieldContract.beacon.occupied, false);
+  eq(settled.score, before.score + 600); eq(settled.hp, 4); eq(settled.grenades, 3); eq(settled.tacticalCharge, 52);
+  eq(settled.progress.survival, { wave: 2, best: settled.score }); eq(JSON.parse(g.values.get(STORE)).survival, settled.progress.survival);
+  assert(g.nodes.get('result-details').textContent.includes('信标夺控完成')); assert(g.nodes.get('contract-hud').hidden);
+  for (let i = 0; i < 3; i++) { g.run('finishWave();'); tick(g, 60); eq(g.state(), settled); }
+});
+
+test('beacon reward respects health and charge caps even during active timed skills', () => {
+  for (const loadout of ['assault', 'counter', 'demolition']) for (const charge of [0, 90, 100]) {
+    const g = beaconDefense({ loadout }); captureBeacon(g);
+    g.run(`upgrades.armor=2;player.hp=maxHealth()-1;player.grenades=6;tacticalCharge=${charge};tacticalTime=2;`);
+    finishDefenseWave(g); const state = g.state();
+    eq(state.hp, state.maxHp); eq(state.grenades, 7); eq(state.tacticalCharge, Math.min(100, charge + 35));
+    eq(state.tacticalTime, 0); eq(state.fieldContract.status, 'success');
+  }
+});
+
+test('clearing early never stalls or pays a beacon reward, including a last-enemy kill at 4.99 seconds', () => {
+  for (const progress of [0, 2.5, 4.99]) {
+    const g = beaconDefense(); isolateRecoveryCombat(g); standAtBeacon(g);
+    g.run(`fieldContract.beacon.progress=${progress};player.hp=2;player.grenades=2;tacticalCharge=17;`);
+    const before = g.state(); finishDefenseWave(g); const state = g.state();
+    eq(state.fieldContract.status, 'missed'); eq(beaconProgress(g), progress);
+    eq(state.score, before.score + 300); eq(state.hp, 3); eq(state.grenades, 3); eq(state.tacticalCharge, 17);
+    assert(g.nodes.get('result-details').textContent.includes('信标夺控未完成'));
+    if (progress === 4.99) assert(g.nodes.get('result-details').textContent.includes('4.9 / 5.0'));
+    assert(g.nodes.get('result-details').textContent.includes('正常清场奖励保留'));
+  }
+});
+
+test('a final live projectile kill at 4.99 seconds resolves before occupation and cannot earn the beacon bonus', () => {
+  const g = beaconDefense(); isolateRecoveryCombat(g); standAtBeacon(g);
+  g.run(`fieldContract.beacon.progress=4.99;player.hp=2;tacticalCharge=17;
+    enemies=[{...makeEnemy(150,'turret'),hp:1,shot:100}];
+    projectile(enemies[0].x+15,enemies[0].y+18,0,0,'p');`);
+  const before = g.state(); tick(g); const state = g.state();
+  eq(state.phase, 'waveClear'); eq(beaconProgress(g), 4.99); eq(state.fieldContract.status, 'missed');
+  eq(state.score, before.score + 160 + 300); eq(state.hp, 3); eq(state.tacticalCharge, 32);
+});
+
+test('death and either projectile order in lethal trades override completed beacon settlement', () => {
+  for (const complete of [false, true]) for (const killFirst of [false, true]) {
+    const g = beaconDefense(); isolateRecoveryCombat(g); standAtBeacon(g);
+    if (complete) tick(g, 300);
+    const before = g.state(), stored = g.values.get(STORE);
+    const lethal = "projectile(player.x+12,player.y+20,0,0,'e');";
+    const kill = "projectile(enemies[0].x+15,enemies[0].y+18,0,0,'p');";
+    g.run(`player.hp=1;player.inv=0;enemies=[{...makeEnemy(150,'turret'),hp:1,shot:100}];bullets=[];
+      ${killFirst ? lethal + kill : kill + lethal}`); tick(g);
+    eq(g.state().phase, 'survivalOver'); eq(g.state().fieldContract.status, 'missed');
+    eq(g.state().hp, 0); eq(g.state().score, before.score + (killFirst ? 160 : 0));
+    eq(g.state().progress, before.progress); eq(g.values.get(STORE), stored);
+    assert(g.nodes.get('result-details').textContent.includes('信标夺控未结算'));
+    const dead = g.state(); tick(g, 60); g.run('finishWave();'); eq(g.state(), dead);
+    g.click('start'); eq(g.state().survivalWave, 1); eq(g.state().fieldContract, null);
+  }
+});
+
+test('beacon choice and nested progress are detached, transient and excluded from boss waves', () => {
+  const g = beaconDefense(); isolateRecoveryCombat(g); standAtBeacon(g); tick(g, 90);
+  const before = g.state(), snapshot = g.win.__raidState;
+  snapshot.fieldContract.beacon.progress = 5; snapshot.fieldContract.beacon.x = -500; snapshot.fieldContract.status = 'success';
+  eq(g.state(), before); finishDefenseWave(g); eq(g.state().selectedContract, 'hold');
+  assert(!g.nodes.get('contract-options').open); assert(g.nodes.get('contract-beacon').disabled);
+  const clear = g.state(); g.click('contract-beacon'); g.run("chooseContract('beacon');"); eq(g.state(), clear);
+  g.click('supply-0'); g.click('start'); eq(g.state().survivalWave, 3); eq(g.state().fieldContract, null);
+  finishDefenseWave(g); g.click('contract-beacon'); g.click('supply-0'); g.click('start');
+  eq(g.state().survivalWave, 4); eq(beaconProgress(g), 0);
+  g.click('restart'); g.click('start'); eq(g.state().fieldContract, null); eq(g.state().survivalWave, 1);
+});
+
+test('beacon reset, reload and blocked storage preserve records without carrying objectives into other modes', () => {
+  for (const blocked of [false, true]) {
+    const g = beaconDefense({ blocked }), other = nonDefenseRecords(g); captureBeacon(g); finishDefenseWave(g);
+    eq(nonDefenseRecords(g), other); const records = g.state().progress;
+    if (blocked) eq(g.values.size, 0);
+    else {
+      const saved = JSON.parse(g.values.get(STORE)); assert(!/beacon|fieldContract|selectedContract/.test(JSON.stringify(saved)));
+      const reload = createGame({ storage: Object.fromEntries(g.values) }); eq(reload.state().progress, records); eq(reload.state().fieldContract, null);
+    }
+    g.click('menu-home'); g.click('start'); eq(g.state().phase, 'title'); eq(g.state().fieldContract, null);
+    g.click('mode-campaign'); g.click('start'); g.click('contract-beacon'); eq(g.state().fieldContract, null);
+    eq(g.state().progress, records); assert(g.nodes.get('contract-hud').hidden);
+  }
+});
+
+test('gamepad can select and switch beacon without leaking menu inputs or replaying a settled reward', () => {
+  const g = defense(); finishDefenseWave(g); g.pad([]); g.frames(2);
+  padChoose(g, 'contract-summary'); padChoose(g, 'contract-beacon'); eq(g.state().selectedContract, 'beacon');
+  padChoose(g, 'contract-recovery'); eq(g.state().selectedContract, 'recovery');
+  padChoose(g, 'contract-beacon'); padTap(g, 1); assert(!g.nodes.get('contract-options').open);
+  padChoose(g, 'supply-0'); padChoose(g, 'start'); g.noPad();
+  eq(g.state().survivalWave, 2); assert(g.state().fieldContract.beacon); eq(g.state().shots, 0);
+  eq(g.state().jumpBuffer, 0); captureBeacon(g); finishDefenseWave(g); const settled = g.state();
+  padTap(g, 0); eq(g.state().score, settled.score); eq(g.state().tacticalCharge, settled.tacticalCharge);
+});
+
+test('real inputs capture all three beacon layouts and clear five waves across loadouts and timing cadences', () => {
+  for (const loadout of ['assault', 'counter', 'demolition']) for (const randomSeed of [42]) for (const cadence of [5, 12]) {
+    const g = defense({ loadout, randomSeed }), records = nonDefenseRecords(g);
+    const tap = key => { g.key(key); g.key(key, false); };
+    const layouts = new Set();
+    for (let wave = 1; wave <= 5; wave++) {
+      const capture = [2, 4, 5].includes(wave), navigate = beaconTactics(), fight = survivalTactics();
+      let frames = 0, observedCapture = false, prior = 0;
+      while (g.state().phase === 'playing' && frames < 3600) {
+        if (frames % cadence === 0) {
+          const state = g.state(), untouched = JSON.stringify(state), b = state.fieldContract?.beacon;
+          const input = capture && b.progress < 5 ? navigate(state) : fight(state);
+          eq(JSON.stringify(state), untouched);
+          if (capture) {
+            assert(b.progress >= prior); prior = b.progress;
+            if (b.progress === 5) { observedCapture = true; eq(state.fieldContract.status, 'active'); }
+          }
+          g.key('a', input.move === 'a'); g.key('d', input.move === 'd'); g.key('j', input.fire !== false); g.key('s', input.down === true);
+          if (input.jump && state.ground) { g.key('w', false); g.key('w'); } else if (!input.jump) g.key('w', false);
+          if (input.dash) tap('l'); if (input.grenade) tap('k');
+        }
+        tick(g); frames++;
+      }
+      for (const key of ['a', 'd', 'w', 's', 'j']) g.key(key, false);
+      const state = g.state();
+      eq(state.phase, 'waveClear', `Beacon ${loadout}, seed ${randomSeed}, cadence ${cadence}, wave ${wave}: ` + JSON.stringify(state));
+      eq(state.survivalCleared, wave); assert(state.hp > 0); eq(state.stageDeaths, 0); eq(nonDefenseRecords(g), records);
+      eq(state.progress.survival, { wave, best: state.score });
+      if (capture) { eq(state.fieldContract.status, 'success'); eq(state.fieldContract.beacon.progress, 5); assert(observedCapture); layouts.add(state.arena.id); }
+      else eq(state.fieldContract, null);
+      if (wave < 5) {
+        let index = state.supplyOffers.indexOf('armor');
+        if (index < 0) index = state.hp < 4 ? state.supplyOffers.indexOf('heal') : 0;
+        g.click('supply-' + Math.max(0, index));
+        if ([2, 4, 5].includes(wave + 1)) g.click('contract-beacon');
+        g.click('start');
+      }
+    }
+    eq([...layouts].sort(), ['bridge', 'flanks', 'steps']);
+  }
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
