@@ -11,12 +11,14 @@ export async function checkGameHall(browser, base, check) {
       await page.setViewport({ width, height: 900, isMobile: width < 600, hasTouch: width < 600 });
       await page.goto(base + '/games/', { waitUntil: 'load' });
       await page.evaluate(() => document.fonts.ready.then(() => true));
+      await page.addStyleTag({ content: '*,*::before,*::after{transition:none!important;animation:none!important}' });
       const state = await page.evaluate(() => {
         const cards = [...document.querySelectorAll('.game-card')];
         const bounds = cards.map(card => card.getBoundingClientRect());
         const actions = [...document.querySelectorAll('.game-actions a')];
         return {
           cards: cards.length,
+          topSpacing: parseFloat(getComputedStyle(document.querySelector('.game-hall')).paddingTop),
           titles: cards.map(card => card.querySelector('h2').textContent),
           sameRow: bounds.length === 2 && Math.abs(bounds[0].top - bounds[1].top) < 1,
           sameSize: bounds.length === 2 && Math.abs(bounds[0].width - bounds[1].width) < 1 && Math.abs(bounds[0].height - bounds[1].height) < 1,
@@ -29,13 +31,17 @@ export async function checkGameHall(browser, base, check) {
       });
       check(`${width}px 大厅双入口清晰、响应式且无溢出`,
         state.cards === 2 && state.cols === (width > 600 ? 2 : 1) && state.overflow <= 0 && state.guideClosed
+          && state.topSpacing === (width <= 600 ? 30 : 48)
           && (width <= 600 || (state.sameRow && state.sameSize)), JSON.stringify(state));
       check(`${width}px 四个入口有明确名称与至少44px触控高度`,
         state.targets.length === 4 && state.targets.every(t => t.w >= 44 && t.h >= 44 && t.label)
           && state.targets.filter(t => t.target === '_blank').every(t => t.rel.includes('noopener')));
       if (width === 1280) check('桌面首屏可见两个开始入口', state.bottom.every(b => b < 900), JSON.stringify(state.bottom));
       for (const theme of ['light', 'dark']) {
-        await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);
+        await page.evaluate(async theme => {
+          document.documentElement.dataset.theme = theme;
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        }, theme);
         await page.screenshot({ path: path.join('.shots', `lobby-${width}-${theme}.png`), fullPage: true });
       }
       await page.focus('.game-guide summary');

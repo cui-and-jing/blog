@@ -1,5 +1,5 @@
 /* Games hall: equal choices first, optional detail second. No new JS required. */
-.game-hall { padding-top: 48px; }
+.shell.game-hall { padding-top: 48px; }
 .game-hall-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
 .game-hall-kicker { margin: 0 0 14px; color: var(--accent-2); font: 500 12px/1.5 var(--font-mono); letter-spacing: .1em; }
 .game-hall-head h1 { margin: 0; font-family: var(--font-serif); font-size: clamp(28px, 3.2vw, 40px); font-weight: 400; line-height: 1.35; letter-spacing: -.02em; }
@@ -54,7 +54,7 @@
   .game-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
-  .game-hall { padding-top: 30px; }
+  .shell.game-hall { padding-top: 30px; }
   .game-hall-head { align-items: flex-start; gap: 10px; margin-bottom: 24px; }
   .game-hall-count { display: none; }
   .game-hall-intro { max-width: 24em; font-size: 13px; }
