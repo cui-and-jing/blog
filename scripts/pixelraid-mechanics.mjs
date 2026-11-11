@@ -29,6 +29,7 @@ function createGame({ storage = {}, blocked = false, reducedMotion = false, rand
   const attrsFrom = (text) => Object.fromEntries([...text.matchAll(/([\w-]+)(?:="([^"]*)")?/g)]
     .map((match) => [match[1], match[2] ?? '']));
   const matches = (element, selector) => {
+    if (selector.includes(',')) return selector.split(',').some(part => matches(element, part.trim()));
     if (selector.startsWith('#')) return element.id === selector.slice(1);
     if (selector.startsWith('.')) return element.classList.contains(selector.slice(1));
     const match = selector.match(/^\[([^=\]]+)(?:="?([^"\]]+)"?)?\]$/);
@@ -39,7 +40,7 @@ function createGame({ storage = {}, blocked = false, reducedMotion = false, rand
     if (!nodes.has(id)) {
       const listeners = new Map(), classes = new Set();
       const item = {
-        id, tagName: tag.toUpperCase(), hidden: Object.hasOwn(attrs, 'hidden'),
+        id, tagName: tag.toUpperCase(), parentElement: null, children: [], open: Object.hasOwn(attrs, 'open'), hidden: Object.hasOwn(attrs, 'hidden'),
         disabled: Object.hasOwn(attrs, 'disabled'), textContent: '', innerHTML: '',
         attributes: { ...attrs }, style: {}, dataset: {},
         classList: {
@@ -50,6 +51,7 @@ function createGame({ storage = {}, blocked = false, reducedMotion = false, rand
         },
         setAttribute(name, value) { this.attributes[name] = String(value); },
         getAttribute(name) { return this.attributes[name] ?? null; },
+        hasAttribute(name) { return Object.hasOwn(this.attributes, name); },
         removeAttribute(name) { delete this.attributes[name]; },
         addEventListener(name, callback) {
           if (!listeners.has(name)) listeners.set(name, []);
@@ -60,11 +62,28 @@ function createGame({ storage = {}, blocked = false, reducedMotion = false, rand
           const event = { target: this, currentTarget: this, preventDefault() {}, stopPropagation() {}, ...options };
           for (const callback of listeners.get(name) ?? []) callback(event);
         },
-        click() { this.dispatch('click',{detail:0}); },
+        click() { this.dispatch('click',{detail:0}); if (this.tagName === 'SUMMARY') this.parentElement.open = !this.parentElement.open; },
         blur() { if (document.activeElement === this) document.activeElement = null; },
         focus() { document.activeElement = this; },
         setPointerCapture() {}, releasePointerCapture() {},
-        querySelectorAll(selector) { return [...nodes.values()].filter((candidate) => candidate !== this && matches(candidate, selector)); },
+        contains(candidate) { for (let current = candidate; current; current = current.parentElement) if (current === this) return true; return false; },
+        closest(selector) { for (let current = this; current; current = current.parentElement) if (matches(current, selector)) return current; return null; },
+        querySelectorAll(selector) { return [...nodes.values()].filter(candidate => candidate !== this && this.contains(candidate) && matches(candidate, selector)); },
+        querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; },
+        scrollIntoView() {},
+        getClientRects() {
+          for (let current = this; current; current = current.parentElement) if (current.hidden) return [];
+          return nodes.get('game-page')?.classList.contains('title-screen') && ['pause', 'restart'].includes(this.id) ? [] : [{}];
+        },
+        // Semantic visibility only. Actual CSS, clipping and scroll behavior are
+        // verified by the separate published-page controller browser contract.
+        checkVisibility() {
+          for (let current = this; current; current = current.parentElement) {
+            if (current.hidden) return false;
+            if (current.parentElement?.tagName === 'DETAILS' && !current.parentElement.open && current.tagName !== 'SUMMARY') return false;
+          }
+          return !(nodes.get('game-page')?.classList.contains('title-screen') && ['pause', 'restart'].includes(this.id));
+        },
       };
       for (const [name, value] of Object.entries(attrs)) {
         if (name.startsWith('data-')) item.dataset[name.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = value;
@@ -74,11 +93,15 @@ function createGame({ storage = {}, blocked = false, reducedMotion = false, rand
     }
     return nodes.get(id);
   }
-  for (const [_, tag, text] of source.matchAll(/<([a-z][\w-]*)\s+([^>]+)>/gi)) {
-    const attrs = attrsFrom(text);
-    if (attrs.id || attrs['data-action'] || attrs['data-upgrade'] || attrs['data-stage'] || attrs['data-difficulty']) {
-      node(attrs.id ?? `${tag}-${nodes.size}`, attrs, tag);
-    }
+  // Preserve the source hierarchy for menu candidates and native details.
+  // The real browser suite remains responsible for rendered visibility/layout.
+  const stack = [], voids = new Set(['meta', 'link', 'br', 'hr', 'img', 'input']);
+  for (const [_, closing, tag, text] of source.split('<script>')[0].matchAll(/<(\/?)([a-z][\w-]*)([^>]*)>/gi)) {
+    if (closing) { if (stack.at(-1)?.tagName === tag.toUpperCase()) stack.pop(); continue; }
+    const attrs = attrsFrom(text), item = node(attrs.id ?? `${tag}-${nodes.size}`, attrs, tag);
+    item.parentElement = stack.at(-1) ?? null;
+    item.parentElement?.children.push(item);
+    if (!voids.has(tag.toLowerCase())) stack.push(item);
   }
   const graphics = new Proxy({}, { get: (target, name) => target[name] ?? (() => {}), set: (target, name, value) => { target[name] = value; return true; } });
   node('field').getContext = () => graphics;
@@ -98,7 +121,7 @@ function createGame({ storage = {}, blocked = false, reducedMotion = false, rand
     removeItem(key) { if (blocked) throw new Error('Storage denied'); values.delete(key); },
   };
   const context = {
-    window: win, document, Math: math, localStorage,
+    window: win, document, Math: math, localStorage, getComputedStyle: element => ({ visibility: element.style.visibility ?? 'visible' }),
     performance: { now: () => now }, requestAnimationFrame: (callback) => { queued = callback; },
     navigator: { getGamepads: () => gamepads },
     setTimeout: (fn) => fn(), clearTimeout() {}, console,
@@ -123,8 +146,8 @@ function createGame({ storage = {}, blocked = false, reducedMotion = false, rand
     click(id) { assert(nodes.has(id), 'Missing DOM node #' + id); node(id).click(); },
     event(name) { events.get(name)?.(); },
     visibility(hidden) { document.hidden = hidden; documentEvents.get('visibilitychange')?.(); },
-    pad(buttons = [], axes = [0, 0]) {
-      gamepads = [{ connected: true, axes, buttons: Array.from({ length: 16 }, (_, index) => ({ pressed: buttons.includes(index) })) }];
+    pad(buttons = [], axes = [0, 0], id = 'test-controller') {
+      gamepads = [{ connected: true, index: 0, id, axes, buttons: Array.from({ length: 16 }, (_, index) => ({ pressed: buttons.includes(index) })) }];
     },
     noPad() { gamepads = []; },
     safe() { game.run('player.inv=100; enemies.forEach(e=>e.dead=true);'); },
@@ -2830,6 +2853,169 @@ test('active skills support all three loadouts through four real-input waves wit
       assert(reflected > 0 && decisions > 20); eq(g.state().progress.survival.wave, 4);
       eq(g.state().progress.survival.best, g.state().score);
     }
+  }
+});
+
+// Controller menu contracts use the source DOM hierarchy, not a fake list of
+// always-visible controls. Real focus scrolling and CSS are checked in Chromium.
+function padTap(g, button) { g.pad(); g.frames(2); g.pad([button]); g.frames(2); g.pad(); g.frames(2); }
+function padFocus(g, id) {
+  for (let i = 0; i < 45 && g.document.activeElement?.id !== id; i++) padTap(g, 13);
+  eq(g.document.activeElement?.id, id, 'Controller cannot reach ' + id);
+}
+function padChoose(g, id) { padFocus(g, id); padTap(g, 0); }
+function padWaveMenu(g) {
+  g.click('mode-survival'); g.click('start');
+  g.run('spawnTime=0; enemies.forEach(e=>e.dead=true); boss.dead=true; finishWave();');
+  eq(g.state().phase, 'waveClear');
+}
+
+test('controller menus can choose modes, difficulty, loadout and challenge without phantom combat input', () => {
+  const g = createGame();
+  assert(g.nodes.get('controller-hint').hidden);
+  g.pad(); g.frames(2); assert(!g.nodes.get('controller-hint').hidden);
+  padChoose(g, 'difficulty-relaxed'); eq(g.state().difficulty, 'relaxed'); eq(g.state().phase, 'title');
+  padChoose(g, 'mode-survival'); padChoose(g, 'loadout-demolition');
+  eq(g.state().selectedLoadout, 'demolition'); eq(g.state().phase, 'title');
+  padFocus(g, 'start'); g.pad([0]); g.frames(30);
+  eq(g.state().mode, 'survival'); eq(g.state().loadout, 'demolition');
+  eq(g.state().x, 466.5); assert(g.state().ground); eq(g.state().shots, 0); eq(g.state().grenades, 5);
+  eq(g.state().tacticalUses, 0); assert(g.nodes.get('controller-hint').hidden);
+  padTap(g, 9); eq(g.state().phase, 'pause');
+  padChoose(g, 'menu-home'); eq(g.state().phase, 'confirmRestart');
+  padChoose(g, 'start'); eq(g.state().phase, 'title');
+  padChoose(g, 'mode-challenges'); padChoose(g, 'challenge-counter');
+  eq(g.state().mode, 'challenge'); eq(g.state().challengeId, 'counter');
+});
+
+test('controller directions skip hidden modes, closed details, locked stages and disabled continue', () => {
+  const g = createGame(); g.pad(); g.frames(2);
+  const ids = () => g.read('menuControls().map(node=>node.id)');
+  assert(!ids().includes('stage-1') && !ids().includes('stage-2') && !ids().includes('pause'));
+  assert(!ids().includes('loadout-assault') && !ids().includes('challenge-sprint'));
+  const summary = g.nodes.get('stage-menu').querySelector('summary');
+  padChoose(g, summary.id); assert(g.nodes.get('stage-menu').open);
+  assert(ids().includes('stage-1') && !ids().includes('stage-2') && !ids().includes('stage-3'));
+  padFocus(g, 'stage-1'); padTap(g, 1); assert(!g.nodes.get('stage-menu').open);
+  eq(g.document.activeElement.id, summary.id); eq(g.state().phase, 'title');
+  padWaveMenu(g); assert(!ids().includes('start')); padTap(g, 9); eq(g.state().phase, 'waveClear');
+  padChoose(g, 'supply-0'); assert(ids().includes('start'));
+});
+
+test('controller menus keep working without Element.checkVisibility', () => {
+  const g = createGame();
+  for (const node of g.nodes.values()) node.checkVisibility = undefined;
+  const ids = () => g.read('menuControls().map(node=>node.id)');
+  assert(!ids().includes('stage-1') && !ids().includes('stage-2') && !ids().includes('loadout-assault'));
+  const summary = g.nodes.get('stage-menu').querySelector('summary');
+  padChoose(g, summary.id); assert(ids().includes('stage-1'));
+  padTap(g, 1); assert(!ids().includes('stage-1'));
+  padChoose(g, 'mode-survival'); padChoose(g, 'loadout-counter'); padTap(g, 9);
+  eq(g.state().mode, 'survival'); eq(g.state().loadout, 'counter'); eq(g.state().phase, 'playing');
+});
+
+test('controller menu A, B and Start are edge-triggered and destructive confirmation defaults to cancel', () => {
+  const g = createGame(); padChoose(g, 'mode-survival');
+  g.pad([0]); g.frames(90); eq(g.state().phase, 'title'); eq(g.state().titleView, 'survival');
+  padTap(g, 9); eq(g.state().phase, 'playing');
+  padTap(g, 9); eq(g.state().phase, 'pause');
+  padChoose(g, 'menu-home'); eq(g.state().phase, 'confirmRestart');
+  eq(g.document.activeElement.id, 'cancel-restart');
+  g.pad([0]); g.frames(90); eq(g.state().phase, 'pause', 'Held A must cancel once, never resume');
+  const before = g.state();
+  g.pad(); g.frames(2); g.pad([1]); g.frames(30);
+  eq(g.state().phase, 'playing'); eq(g.state().grenades, before.grenades); eq(g.state().shots, before.shots);
+  assert(g.state().ground); eq(g.state().tacticalUses, 0);
+});
+
+test('controller direction repeat waits before repeating and reversal responds immediately', () => {
+  const g = createGame(); g.pad(); g.frames(2);
+  g.pad([13]); g.frames(1); const first = g.document.activeElement;
+  g.frames(18); eq(g.document.activeElement.id, first.id);
+  g.frames(4); const second = g.document.activeElement; assert(second !== first);
+  g.frames(10); assert(g.document.activeElement !== second);
+  g.pad([12]); g.frames(1); eq(g.document.activeElement.id, second.id);
+  g.pad(); g.frames(2); g.pad([13]); g.frames(1); assert(g.document.activeElement !== second);
+});
+
+test('controller connect, replacement, hidden document and reconnect all require neutral including up', () => {
+  const g = createGame(); g.pad([0, 12, 9]); g.frames(20); eq(g.state().phase, 'title');
+  eq(g.document.activeElement, null); g.pad([12]); g.frames(20); eq(g.document.activeElement, null);
+  g.pad(); g.frames(2); g.pad([13]); g.frames(1); assert(g.document.activeElement);
+  const first = g.document.activeElement;
+  g.pad([13], [0, 0], 'replacement'); g.frames(30); eq(g.document.activeElement.id, first.id);
+  g.pad([], [0, 0], 'replacement'); g.frames(2); g.pad([13], [0, 0], 'replacement'); g.frames(1); assert(g.document.activeElement !== first);
+  g.visibility(true); g.pad([0]); g.frames(30); eq(g.state().phase, 'title'); assert(g.nodes.get('controller-hint').hidden);
+  g.visibility(false); g.frames(30); eq(g.state().phase, 'title');
+  g.noPad(); g.frames(2); g.pad([9]); g.frames(20); eq(g.state().phase, 'title');
+  padTap(g, 9); eq(g.state().phase, 'playing');
+});
+
+test('controller disconnect and connection never clear held keyboard movement', () => {
+  const g = createGame(); g.start(); g.key('d'); g.frames(4); const first = g.state().x;
+  g.pad([0]); g.frames(4); assert(g.state().x > first); const second = g.state().x;
+  g.noPad(); g.frames(4); assert(g.state().x > second); g.key('d', false);
+});
+
+test('controller focus yields to keyboard and pointer without idle focus stealing', () => {
+  const g = createGame(); padFocus(g, 'mode-survival'); const target = g.document.activeElement;
+  assert(target.classList.contains('gamepad-focus'));
+  g.key('Tab'); assert(!target.classList.contains('gamepad-focus'));
+  g.nodes.get('mode-campaign').focus(); g.pad(); g.frames(60); eq(g.document.activeElement.id, 'mode-campaign');
+  padFocus(g, 'mode-survival'); g.event('pointerdown'); assert(!target.classList.contains('gamepad-focus'));
+});
+
+test('controller-owned pause and automatic intermission show focus without stealing from keyboard', () => {
+  const g = createGame(); g.event('pointerdown'); padTap(g, 9); padTap(g, 9);
+  eq(g.state().phase, 'pause'); assert(g.nodes.get('start').classList.contains('gamepad-focus'));
+  padTap(g, 9); g.clear(); eq(g.state().phase, 'stageClear');
+  assert(g.nodes.get('upgrade-rapid').classList.contains('gamepad-focus'));
+  padTap(g, 0); padTap(g, 9); g.key('j'); g.key('j', false); g.clear();
+  eq(g.state().phase, 'stageClear'); assert(!g.nodes.get('upgrade-rapid').classList.contains('gamepad-focus'));
+});
+
+test('controller A selects chapter upgrade and Start continues only when ready', () => {
+  const g = createGame(); g.start(); g.clear(); eq(g.state().phase, 'stageClear');
+  padTap(g, 9); eq(g.state().phase, 'stageClear');
+  padTap(g, 0); eq(g.state().selectedUpgrade, 'rapid');
+  const before = g.state(); padTap(g, 1); eq(g.state().phase, 'confirmRestart');
+  padTap(g, 9); eq(g.state().phase, 'stageClear'); eq(g.state().selectedUpgrade, before.selectedUpgrade);
+  g.pad(); g.frames(2); g.pad([9, 0, 1, 2, 3, 4]); g.frames(8);
+  eq(g.state().stage, 2); eq(g.state().phase, 'playing'); eq(g.state().upgrades.rapid, 1);
+  eq(g.state().shots, 0); eq(g.state().grenades, Math.max(2, before.grenades)); assert(g.state().ground);
+});
+
+test('controller survival supply, reroll, commission, cancellation and next wave preserve state', () => {
+  const g = createGame(); padWaveMenu(g); padChoose(g, 'supply-1');
+  padFocus(g, 'supply-reroll'); g.pad([0]); g.frames(90);
+  eq(g.state().supplyRerolls, 0); eq(g.state().selectedSupply, null); eq(g.state().phase, 'waveClear');
+  assert(g.nodes.get('start').disabled); eq(g.document.activeElement.id, 'supply-0');
+  padTap(g, 0); const supply = g.state().selectedSupply; assert(supply);
+  padChoose(g, 'contract-summary'); padChoose(g, 'contract-recovery');
+  eq(g.state().selectedContract, 'recovery'); padTap(g, 1); assert(!g.nodes.get('contract-options').open);
+  const before = g.state(); padTap(g, 1); eq(g.state().phase, 'confirmRestart'); padTap(g, 1);
+  eq(g.state().phase, 'waveClear'); eq(g.state().selectedSupply, supply);
+  eq(g.state().selectedContract, 'recovery'); eq(g.state().supplyOffers, before.supplyOffers);
+  eq(g.state().supplyRerolls, 0); eq(g.state().survivalTime, before.survivalTime);
+  g.pad(); g.frames(2); g.pad([9, 0, 1, 2, 3, 4]); g.frames(8);
+  eq(g.state().survivalWave, 2); eq(g.state().phase, 'playing'); assert(g.state().fieldContract);
+  eq(g.state().shots, 0); eq(g.state().tacticalUses, 0); assert(g.state().ground);
+});
+
+test('controller Start reaches each challenge, boss intermission and terminal retry', () => {
+  for (const key of ['sprint', 'counter', 'bosses']) {
+    const g = createGame(); padChoose(g, 'mode-challenges'); padFocus(g, 'challenge-' + key); padTap(g, 9);
+    eq(g.state().challengeId, key); eq(g.state().phase, 'playing');
+  }
+  const boss = createGame(); boss.click('mode-challenges'); boss.click('challenge-bosses'); boss.clear();
+  eq(boss.state().phase, 'bossBreak'); padTap(boss, 9); eq(boss.state().stage, 2); eq(boss.state().phase, 'playing');
+  for (const tag of ['victory','gameOver','practiceClear','challengeClear','challengeFailed','survivalOver']) {
+    const g = createGame();
+    if(tag.startsWith('challenge'))g.click('challenge-sprint');
+    else if(tag==='survivalOver'){g.click('mode-survival');g.click('start');}
+    else g.start();
+    g.run(`showMenu('Result','Test','Retry','${tag}')`); padTap(g, 9); eq(g.state().phase, 'playing');
+    g.run(`showMenu('Result','Test','Retry','${tag}')`); padTap(g, 1); eq(g.state().phase, 'title');
   }
 });
 
