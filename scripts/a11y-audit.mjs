@@ -98,6 +98,8 @@ async function auditPage(browserInstance, route, theme) {
     await page.addStyleTag({
       content: '*,*::before,*::after{transition:none!important;animation:none!important}',
     });
+    // Inspect optional hall instructions too, not just the collapsed summary.
+    if (route === '/games/') await page.click('.game-guide summary');
     await page.addScriptTag({ content: axeSource });
     const report = await page.evaluate(async (skipFrames) => {
       /* 试玩页里的 iframe 是游戏本体，这里不进去——游戏自己的界面由

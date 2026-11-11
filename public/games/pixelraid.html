@@ -97,10 +97,61 @@
     }
     @media(max-width:360px){.controls{gap:6px}.controls .cluster{gap:4px}.controls button{min-width:42px}}
     @media(max-width:340px){.controls{flex-wrap:wrap}.controls .cluster{flex:1;justify-content:space-around}}
+    /* The command room shows decisions first. Combat chrome returns only once a run starts. */
+    .menu-intro{display:grid;justify-items:center;gap:10px;width:100%}
+    .menu-details{width:100%;border-top:1px solid #496079;text-align:left}
+    .menu-details summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:12px 0;cursor:pointer;color:#cbdbea;font-size:13px;font-weight:600;list-style:none}
+    .menu-details summary::-webkit-details-marker{display:none}
+    .menu-details summary::after{content:'＋';color:#91abc3;font-size:17px;font-weight:400}
+    .menu-details[open] summary::after{content:'−'}
+    .menu-details summary:focus-visible{outline:3px solid #fbd46d;outline-offset:3px;border-radius:4px}
+    .details-body{display:grid;gap:12px;padding:0 0 16px}
+    .overlay .details-body p{max-width:none;font-size:12px;line-height:1.8;color:#b8cbdf}
+    .details-body .rules-list{margin:0;padding-left:18px;color:#b8cbdf;font-size:12px;line-height:1.8}
+    .details-body .rules-list li+li{margin-top:8px}
+    .menu-extras{width:100%;display:grid}
+    .title-screen .hud,.title-screen .controls,.title-screen .legend,.title-screen #pause,.title-screen #restart,.title-screen canvas{display:none}
+    .title-screen .brand strong{font-size:12px;color:#a8bfd4;letter-spacing:.05em}
+    .title-screen .brand span{display:none}.title-screen #sound{min-height:44px}
+    .title-screen .frame{min-height:0;aspect-ratio:auto;border:1px solid #3f5770;flex:1}
+    .title-screen .overlay{position:relative;inset:auto;width:100%;align-items:center;overflow:visible;padding:36px 28px;text-align:left;background:linear-gradient(145deg,#101f32,#172d47)}
+    .title-screen .menu-content{max-width:760px;justify-items:stretch;gap:22px}
+    .title-screen .menu-intro{justify-items:start;gap:10px}
+    .title-screen .overlay h1{font-size:clamp(30px,4vw,42px);text-shadow:none;letter-spacing:.02em}
+    .title-screen #overlay-text{max-width:620px;color:#b8cbdf;font-size:13px;line-height:1.75}
+    .mode-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%;padding:0;border:0}
+    .overlay .mode-options button{display:grid;gap:5px;justify-items:start;padding:14px 16px;text-align:left;border-color:#49617b;background:#172d45;font-size:14px}
+    .mode-options button span{font-size:11px;font-weight:400;color:#a8bfd4}
+    .overlay .mode-options [aria-pressed="true"]{border-color:#e8c879;box-shadow:inset 0 0 0 1px #e8c879;background:#28394a}
+    .title-screen .section-label{text-align:left;color:#afc3d7}
+    #difficulty-options .option-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    #difficulty-options button{padding:12px;min-height:48px}
+    #difficulty-options button span{margin-left:8px;font-size:11px;font-weight:400;color:#b8cbdf}
+    .loadout-grid .choice{align-content:start;gap:8px;padding:15px;min-height:116px}
+    .loadout-grid .choice strong{font-size:14px;color:#edf4fc}
+    .loadout-grid .choice span{font-size:12px;line-height:1.65;color:#b8cbdf}
+    .overlay .loadout-grid [aria-pressed="true"] strong{color:#ffe4a0}
+    .overlay #loadout-status{font-size:12px;color:#c4d8e8;text-align:left}
+    .title-screen .primary-actions{display:grid;gap:10px;width:100%}
+    .title-screen .primary-actions:has(>#start[hidden]){display:none}
+    .title-screen #start{width:100%;min-height:50px;border-color:#f7d58b;background:#f7ce77;box-shadow:0 8px 22px #080f182b}
+    .title-screen #start:hover{background:#ffe097}
+    .overlay .lobby-footnote{font-size:11px;color:#91aac2;text-align:center;width:100%;max-width:none}
+    .overlay #survival-record{font-size:12px;color:#b8cbdf}
+    @media(max-width:600px){
+      .title-screen .overlay{padding:23px 17px}.title-screen .menu-content{gap:18px}
+      .title-screen .overlay h1{font-size:32px}.title-screen #overlay-text{font-size:12px}
+      .overlay .mode-options button{padding:11px 9px;font-size:12px;min-height:63px}.mode-options button span{font-size:10px}
+      .loadout-grid{grid-template-columns:1fr;gap:7px}.loadout-grid .choice{min-height:68px;padding:11px 13px;gap:4px}
+      .loadout-grid .choice span{font-size:11px}.loadout-grid .choice strong{font-size:13px}
+      #difficulty-options button{padding:10px 6px;font-size:13px}#difficulty-options button span{display:block;margin:4px 0 0;font-size:11px}
+      .menu-details summary{font-size:12px;min-height:46px}.title-screen .overlay .choice{padding:11px 13px}
+      .title-screen #start{min-height:48px}
+    }
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
   </style>
 </head>
-<body>
+<body id="game-page" class="title-screen">
   <header class="top">
     <div class="brand"><strong>PIXEL RAID / 像素突围</strong><span>三章远征 · 防线生存</span></div>
     <div class="top-actions">
@@ -142,42 +193,34 @@
     <canvas id="field" width="960" height="540" role="img" aria-label="像素突围游戏画面：横向移动、跳跃、射击，消灭基地首领后抵达终点"></canvas>
     <div class="overlay" id="overlay" role="group" aria-labelledby="overlay-title">
       <div class="menu-content">
-        <p class="eyebrow" id="overlay-kicker">EXPEDITION / 01—03</p>
-        <h1 id="overlay-title">像素突围</h1>
-        <p id="overlay-text">潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化；冲刺反弹敌弹，绕后击破盾卫，连击争取高分。</p>
+        <div class="menu-intro">
+          <p class="eyebrow" id="overlay-kicker">EXPEDITION / 01—03</p>
+          <h1 id="overlay-title">像素突围</h1>
+          <p id="overlay-text">穿越三章关卡，击败基地首领。沿途收集情报，在关间选择强化。</p>
+        </div>
         <div class="option-row mode-options" id="mode-options" role="group" aria-label="选择玩法">
-          <button id="mode-campaign" type="button" class="secondary" aria-pressed="true">三章远征</button>
-          <button id="mode-challenges" type="button" class="secondary" aria-pressed="false">作战挑战 · 3 项任务</button>
-          <button id="mode-survival" type="button" class="secondary" aria-pressed="false">防线生存 · 波次构筑</button>
+          <button id="mode-campaign" type="button" class="secondary" aria-pressed="true">三章远征<span>闯关 · 收集 · 强化</span></button>
+          <button id="mode-challenges" type="button" class="secondary" aria-pressed="false">作战挑战<span>三项短程任务</span></button>
+          <button id="mode-survival" type="button" class="secondary" aria-pressed="false">防线生存<span>守住你的纪录</span></button>
         </div>
         <section id="challenge-menu" class="menu-section" aria-label="作战挑战" hidden>
-          <p>固定标准难度与装具，无需解锁。挑战纪录独立，不影响远征星章。</p>
+          <p class="section-label">选一项任务，即刻出发</p>
           <div class="choice-grid challenge-grid">
             <button id="challenge-sprint" type="button" class="choice"><strong>01 · 闪电突袭 →</strong><span>90 秒内突破暮色边境并抵达出口。预装闪步模组，冲刺冷却 1.8 秒。</span><span class="record" id="challenge-record-sprint">尚未完成</span></button>
             <button id="challenge-counter" type="button" class="choice"><strong>02 · 反击专线 →</strong><span>在机械要塞反弹至少 5 枚敌弹，然后击败首领并抵达出口。冲刺冷却 1.2 秒，无限时。</span><span class="record" id="challenge-record-counter">尚未完成</span></button>
             <button id="challenge-bosses" type="button" class="choice"><strong>03 · 首领连战 →</strong><span>独立竞技场连续击败 3 位强化首领。7 体力、1 条命、5 枚手雷；关间恢复 2 体力与 2 手雷。</span><span class="record" id="challenge-record-bosses">尚未完成</span></button>
           </div>
-          <p class="small">点任务即开始。成功奖励 500 分；突袭剩余整秒 ×10 分，连战保留体力 ×100 分、手雷 ×25 分。最高分与最快用时独立记录。暂停与整备不计时；刷新页面会结束当前挑战。</p>
         </section>
         <section id="survival-menu" class="menu-section" aria-label="防线生存规则" hidden>
-          <p class="survival-summary">一条命，守住自己的纪录。双向增援与每三波首领战交替，搭配模组；还可自选战地回收，在火线中抢回数据换取额外补给。</p>
-          <div class="choice-grid survival-grid">
-            <div class="choice"><strong>守住防线</strong><span>开局装具决定体力与手雷，固定标准难度。普通波轮换三套地形；平台可下蹲 + 跳跃降层。增援预警 2.2 秒。</span></div>
-            <div class="choice"><strong>选择构筑</strong><span>六种永久模组，每种最多两级。两种模组各 1 级即可点亮组合：贯穿火力、反击回流、爆破回收。</span></div>
-            <div class="choice"><strong>每三波迎战首领</strong><span>三位首领轮换登场，无杂兵干扰。首领清场恢复 2 体力、2 手雷，额外奖励 500 分；普通波恢复各 1。</span></div>
-          </div>
           <div role="group" aria-label="选择开局装具" class="menu-section">
-            <p class="section-label">开局装具 · 三种打法，本局固定</p>
-            <div class="choice-grid survival-grid">
-              <button id="loadout-assault" type="button" class="choice" aria-pressed="true"><strong>机动突击</strong><span>6 体力 / 3 手雷。标准连射，适合走位、穿透与持续火力。</span></button>
-              <button id="loadout-counter" type="button" class="choice" aria-pressed="false"><strong>反击先锋</strong><span>5 体力 / 3 手雷。冲刺冷却少 0.4 秒，反弹伤害 +1；以更低体力换取反击能力。</span></button>
-              <button id="loadout-demolition" type="button" class="choice" aria-pressed="false"><strong>爆破专家</strong><span>6 体力 / 5 手雷。爆炸伤害 +2、范围 +24，可清敌弹；代价是射击间隔增加 25%。</span></button>
+            <p class="section-label">选择开局装具 · 本局固定</p>
+            <div class="choice-grid loadout-grid">
+              <button id="loadout-assault" type="button" class="choice" aria-pressed="true"><strong>机动突击</strong><span>6 体力 · 3 手雷 · 均衡连射</span></button>
+              <button id="loadout-counter" type="button" class="choice" aria-pressed="false"><strong>反击先锋</strong><span>5 体力 · 3 手雷 · 更快冲刺，更强反弹</span></button>
+              <button id="loadout-demolition" type="button" class="choice" aria-pressed="false"><strong>爆破专家</strong><span>6 体力 · 5 手雷 · 强化爆炸，射速较慢</span></button>
             </div>
             <p id="loadout-status" class="small" role="status"></p>
           </div>
-          <p id="tactical-help" class="small">装具主动技：机动突击可超频连射 6 秒；反击先锋可开启相位护盾 3 秒，免伤并反弹接触的敌弹；爆破专家可释放半径 220 的震荡脉冲，造成 8 点伤害并清敌弹。开局充满，E / 手柄 Y / 屏幕按钮释放。普通攻击每造成 1 点伤害充能 3，击杀 +12，冲刺反弹 +8；技能生效期间及技能弹不充能。波间保留能量，效果不跨波；增援预告中不能释放。</p>
-          <p id="survival-record" class="result-details">最高守住 0 波 · 最高 0 分</p>
-          <p class="small">没有终点。已守住的波数与对应清场得分自动记录；未清场的当前波不计入纪录。暂停和整备不计时。刷新会结束本局，不影响远征或挑战记录。</p>
         </section>
         <section id="survival-options" class="menu-section" role="group" aria-label="选择防线补给" hidden>
           <p>选择一项，再进入下一波。优先提供可点亮组合的模组；每波可免费重抽一次。永久模组仅本局有效，每种最多两级。</p>
@@ -198,11 +241,11 @@
           </details>
         </section>
         <div id="difficulty-options" class="menu-section" role="group" aria-label="远征难度">
+          <p class="section-label">选择远征难度</p>
           <div class="option-row">
-            <button id="difficulty-standard" type="button" class="secondary" aria-pressed="true">标准 · 原味挑战</button>
-            <button id="difficulty-relaxed" type="button" class="secondary" aria-pressed="false">轻松 · 额外体力与生命</button>
+            <button id="difficulty-standard" type="button" class="secondary" aria-pressed="true">标准<span>原味挑战</span></button>
+            <button id="difficulty-relaxed" type="button" class="secondary" aria-pressed="false">轻松<span>额外体力与生命</span></button>
           </div>
-          <p class="small">轻松模式：敌方弹速更慢，受伤保护更长。两种难度分别记录成绩。</p>
         </div>
         <p id="result-details" class="result-details" hidden></p>
         <div id="upgrade-options" class="menu-section" role="group" aria-label="选择下一关战术强化" hidden>
@@ -218,17 +261,56 @@
           <button id="cancel-restart" type="button" class="secondary" hidden>取消，保留进度</button>
           <button id="menu-home" type="button" class="secondary" hidden>返回指挥部</button>
         </div>
-        <section id="stage-menu" class="menu-section" aria-label="选关练习">
-          <p class="section-label">选关练习 · 通关前一章解锁 · 独立记录</p>
-          <div class="choice-grid">
-            <button id="stage-1" type="button" class="choice"><strong>01 · 暮色边境</strong><span id="record-1">远征 ☆☆☆ · 练习 ☆☆☆</span></button>
-            <button id="stage-2" type="button" class="choice" disabled><strong>02 · 机械要塞</strong><span id="record-2">通关暮色边境后解锁</span></button>
-            <button id="stage-3" type="button" class="choice" disabled><strong>03 · 赤焰反应堆</strong><span id="record-3">通关机械要塞后解锁</span></button>
-          </div>
-          <p class="small">每章三星：完成任务 / 收集 3 份情报 / 不损失生命。受伤不影响生命之星。</p>
-        </section>
-        <p class="small">战术提示：炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
-        <p id="overlay-help" class="small">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Start 暂停。手机使用下方按键；按住 ↓ 再点跳可降层。</p>
+        <p id="survival-record" class="result-details" hidden>最高守住 0 波 · 最高 0 分</p>
+        <div class="menu-extras">
+          <details id="stage-menu" class="menu-details" aria-label="选关练习">
+            <summary>选关练习与星章</summary>
+            <div class="details-body">
+              <p>通关前一章解锁下一章，练习成绩独立记录。</p>
+              <div class="choice-grid">
+                <button id="stage-1" type="button" class="choice"><strong>01 · 暮色边境</strong><span id="record-1">远征 ☆☆☆ · 练习 ☆☆☆</span></button>
+                <button id="stage-2" type="button" class="choice" disabled><strong>02 · 机械要塞</strong><span id="record-2">通关暮色边境后解锁</span></button>
+                <button id="stage-3" type="button" class="choice" disabled><strong>03 · 赤焰反应堆</strong><span id="record-3">通关机械要塞后解锁</span></button>
+              </div>
+              <p>每章三星：完成任务 / 收集 3 份情报 / 不损失生命。受伤不影响生命之星。</p>
+            </div>
+          </details>
+          <details id="campaign-guide" class="menu-details">
+            <summary>远征玩法与难度说明</summary>
+            <div class="details-body">
+              <p>从暮色边境出发，穿越机械要塞，最后摧毁赤焰反应堆。每章击败首领后抵达出口，关间选择一项强化。高台上藏有情报，收集它们争取三星。</p>
+              <p>轻松模式提供额外体力与生命，敌方弹速更慢，受伤保护更长。两种难度分别记录成绩。</p>
+            </div>
+          </details>
+          <details id="survival-guide" class="menu-details" hidden>
+            <summary>防线规则、装具与纪录</summary>
+            <div class="details-body">
+              <ul class="rules-list">
+                <li>一条命，固定标准难度。普通波轮换三套地形，双向增援提前 2.2 秒预警；平台可下蹲 + 跳跃降层。普通波清场恢复 1 体力、1 手雷。</li>
+                <li>每三波迎战一位首领，三位首领轮换，无杂兵干扰。首领清场恢复 2 体力、2 手雷，额外奖励 500 分。</li>
+                <li>六种永久模组，每种最多两级。两种模组各 1 级即可点亮组合：贯穿火力、反击回流、爆破回收。普通波还可自选战地回收委托，争取额外补给。</li>
+                <li>机动突击使用标准连射；反击先锋的冲刺冷却少 0.4 秒、反弹伤害 +1；爆破专家的爆炸伤害 +2、范围 +24，可清敌弹，射击间隔增加 25%。</li>
+              </ul>
+              <p id="tactical-help">装具主动技：机动突击可超频连射 6 秒；反击先锋可开启相位护盾 3 秒，免伤并反弹接触的敌弹；爆破专家可释放半径 220 的震荡脉冲，造成 8 点伤害并清敌弹。开局充满，E / 手柄 Y / 屏幕按钮释放。普通攻击每造成 1 点伤害充能 3，击杀 +12，冲刺反弹 +8；技能生效期间及技能弹不充能。波间保留能量，效果不跨波；增援预告中不能释放。</p>
+              <p>没有终点。已守住的波数与对应清场得分自动记录；未清场的当前波不计入纪录。暂停和整备不计时。刷新会结束本局，不影响远征或挑战记录。</p>
+            </div>
+          </details>
+          <details id="challenge-guide" class="menu-details" hidden>
+            <summary>挑战计分与纪录</summary>
+            <div class="details-body">
+              <p>固定标准难度与装具，无需解锁。挑战纪录独立，不影响远征星章。</p>
+              <p>成功奖励 500 分；突袭剩余整秒 ×10 分，连战保留体力 ×100 分、手雷 ×25 分。最高分与最快用时独立记录。暂停与整备不计时；刷新页面会结束当前挑战。</p>
+            </div>
+          </details>
+          <details id="controls-guide" class="menu-details">
+            <summary>操作按键与战术提示</summary>
+            <div class="details-body">
+              <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
+              <p>炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
+            </div>
+          </details>
+        </div>
+        <p id="lobby-save-status" class="lobby-footnote" role="status" aria-atomic="true">无需登录 · 记录保存在本机</p>
       </div>
     </div>
   </main>
@@ -449,6 +531,7 @@
       function updateSaveStatus(){
         const text=storageAvailable?'记录保存在本机':'未能保存 · 仅本次有效';
         if($('save-status').textContent!==text)$('save-status').textContent=text;
+        if($('lobby-save-status').textContent!=='无需登录 · '+text)$('lobby-save-status').textContent='无需登录 · '+text;
       }
       function saveProgress(){
         try{localStorage.setItem(STORAGE_KEY,JSON.stringify(progress));storageAvailable=true;}
@@ -486,18 +569,27 @@
       }
       function renderTitleView(){
         const titleOpen=phase==='title',challenges=titleView==='challenges',defense=titleView==='survival';
+        $('game-page').classList.toggle('title-screen',titleOpen);
         $('mode-options').hidden=!titleOpen;
+        $('lobby-save-status').hidden=!titleOpen;
+        $('survival-record').hidden=!titleOpen||!defense;
+        $('campaign-guide').hidden=!titleOpen||challenges||defense;
+        $('survival-guide').hidden=!titleOpen||!defense;
+        $('challenge-guide').hidden=!titleOpen||!challenges;
         $('difficulty-options').hidden=!titleOpen||challenges||defense;$('stage-menu').hidden=!titleOpen||challenges||defense;
         $('survival-menu').hidden=!titleOpen||!defense;
         $('challenge-menu').hidden=!titleOpen||!challenges;action.hidden=titleOpen&&challenges;
         for(const name of ['campaign','challenges','survival'])$('mode-'+name).setAttribute('aria-pressed',String(titleView===name));
         for(const key of Object.keys(LOADOUTS))$('loadout-'+key).setAttribute('aria-pressed',String(selectedLoadout===key));
-        $('loadout-status').textContent='已选 '+LOADOUTS[selectedLoadout].name+'。'+LOADOUTS[selectedLoadout].description+' 主动技：'+TACTICS[selectedLoadout].name+'，'+TACTICS[selectedLoadout].description+' 点击开始生效，可在下次开局更换。';
+        $('loadout-status').textContent='已选 '+LOADOUTS[selectedLoadout].name+' · 主动技：'+TACTICS[selectedLoadout].name+'（E / 手柄 Y）';
         if(titleOpen){
           kicker.textContent=defense?'SURVIVAL / BUILD YOUR RUN':challenges?'OPERATIONS / 01—03':'EXPEDITION / 01—03';
           action.textContent=defense?'开始防线生存':'开始三章远征';
-          message.textContent=defense?'每三波迎战一位首领。搭配模组点亮贯穿火力、反击回流或爆破回收，还可接取回收委托，在交火中争取额外补给。':challenges?'挑一项短程任务：竞速、反击或首领连战。固定规则、独立纪录，随时重试。':'潜入暮色边境，穿越机械要塞，摧毁赤焰反应堆。寻找高台情报，关间选择强化；冲刺反弹敌弹，绕后击破盾卫，连击争取高分。';
+          message.textContent=defense?'一条命，逐波守住防线。清场选择模组，每三波迎战一位首领。':challenges?'竞速、反击或首领连战。固定规则、独立纪录，随时重试。':'穿越三章关卡，击败基地首领。沿途收集情报，在关间选择强化。';
         }
+      }
+      function closeMenuDetails(){
+        for(const id of ['stage-menu','campaign-guide','survival-guide','challenge-guide','controls-guide'])$(id).open=false;
       }
       function renderContract(){
         const available=survival()&&phase==='waveClear'&&(survivalWave+1)%3!==0;
@@ -527,10 +619,12 @@
       }
       function selectTitleView(view){
         if(phase!=='title'||!['campaign','challenges','survival'].includes(view))return;
+        if(titleView!==view)closeMenuDetails();
         titleView=view;renderTitleView();
       }
       function showMenu(head,sub,label,tag){
         clearInput();lag=0;phase=tag;title.textContent=head;message.textContent=sub;action.textContent=label;action.disabled=false;
+        closeMenuDetails();
         kicker.textContent=tag==='title'?'EXPEDITION / 01—03':tag==='pause'?'PAUSED':tag==='stageClear'?'TACTICAL UPGRADE':tag==='victory'?'ALL CLEAR':tag==='confirmRestart'?'CONFIRM':tag==='practiceClear'?'PRACTICE COMPLETE':tag==='challengeClear'?'OPERATION COMPLETE':tag==='bossBreak'?'NEXT TARGET':'TRY AGAIN';
         renderTitleView();renderBuild();renderContract();renderTactical();
         $('upgrade-options').hidden=tag!=='stageClear';
@@ -547,8 +641,10 @@
         refreshRecords();announce(head+'。'+sub);
         // Keep keyboard focus in the menu, while leaving Space/Enter native to buttons.
         (tag==='waveClear'?$('supply-0'):tag==='stageClear'?$('upgrade-rapid'):tag==='confirmRestart'?$('cancel-restart'):tag==='title'&&titleView==='challenges'?$('challenge-sprint'):action).focus?.({preventScroll:true});
+        if(tag==='title')window.scrollTo(0,0);
       }
       function hideMenu(){
+        closeMenuDetails();$('game-page').classList.remove('title-screen');
         overlay.hidden=true;$('game-frame').classList.remove('menu-open');
         $('pause').textContent='暂停 P';document.activeElement?.blur?.();
       }
