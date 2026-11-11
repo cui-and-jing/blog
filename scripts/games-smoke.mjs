@@ -23,6 +23,7 @@ import { launchBrowser } from './lib/browser.mjs';
 import { checkRaidChallenges } from './lib/raid-challenges-browser.mjs';
 import { checkRaidSurvival } from './lib/raid-survival-browser.mjs';
 import { checkRaidLobby } from './lib/raid-lobby-browser.mjs';
+import { checkRaidController } from './lib/raid-controller-browser.mjs';
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -452,6 +453,7 @@ async function checkGame(browser, file) {
       await checkRaidChallenges(page, problems);
       await checkRaidSurvival(page, problems);
       await checkRaidLobby(page, problems);
+      await checkRaidController(page, problems);
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }

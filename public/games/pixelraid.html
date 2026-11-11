@@ -10,6 +10,7 @@
     html,body{margin:0;width:100%;min-height:100%;background:#101a27;color:#f0f6fd;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif}
     body{display:flex;flex-direction:column;gap:10px;min-height:100dvh;padding:10px;overflow-x:hidden}
     button{font:inherit;cursor:pointer}
+    .gamepad-focus{outline:3px solid #ffe097!important;outline-offset:4px;scroll-margin:18px}
     button:focus-visible{outline:3px solid #fbd46d;outline-offset:3px}
     .top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;max-width:1200px;width:100%;margin:0 auto}
     .brand{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
@@ -305,11 +306,12 @@
           <details id="controls-guide" class="menu-details">
             <summary>操作按键与战术提示</summary>
             <div class="details-body">
-              <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
+              <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。菜单中用方向键 / 左摇杆选择、A 确认、B 返回；按住方向可连续浏览。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
               <p>炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
             </div>
           </details>
         </div>
+        <p id="controller-hint" class="small" hidden>手柄菜单：方向键 / 左摇杆选择 · A 确认 · B 返回 · Start 开始 / 暂停 / 继续</p>
         <p id="lobby-save-status" class="lobby-footnote" role="status" aria-atomic="true">无需登录 · 记录保存在本机</p>
       </div>
     </div>
@@ -420,6 +422,7 @@
       let combo={count:0,timer:0,best:0},combatText='',combatTime=0,reflections=0;
       let points=0,best=0,shotsFired=0,jumpQueued=false,grenadeQueued=false,dashQueued=false,clock=0,shake=0,soundOn=false,audio=null;
       let frameLast=0,lag=0,bombPadLast=false,jumpPadLast=false,dashPadLast=false,pausePadLast=false,padBlocked=true;
+      let padMenuDirection=0,padMenuRepeatAt=0,padFocus=null,padIdentity=null,padUsing=false;
       let mode='campaign',difficulty='standard',upgrades={rapid:0,dash:0,armor:0},selectedUpgrade=null;
       let titleView='campaign',challengeId=null,challengeTime=0,challengeReflections=0,bossWins=0;
       let survivalWave=0,survivalCleared=0,survivalTime=0,spawnTime=0,supplyOffers=[],selectedSupply=null;
@@ -525,7 +528,7 @@
       function clearInput(){
         held.clear();padHeld.clear();touch.clear();jumpQueued=false;grenadeQueued=false;dashQueued=false;tacticalQueued=false;
         if(player)player.jumpBuffer=0;
-        bombPadLast=false;jumpPadLast=false;dashPadLast=false;pausePadLast=false;tacticalPadLast=false;padBlocked=true;
+        resetPadInput();
         document.querySelectorAll('[data-action]').forEach(btn=>btn.classList.remove('active'));
       }
       function updateSaveStatus(){
@@ -642,6 +645,7 @@
         // Keep keyboard focus in the menu, while leaving Space/Enter native to buttons.
         (tag==='waveClear'?$('supply-0'):tag==='stageClear'?$('upgrade-rapid'):tag==='confirmRestart'?$('cancel-restart'):tag==='title'&&titleView==='challenges'?$('challenge-sprint'):action).focus?.({preventScroll:true});
         if(tag==='title')window.scrollTo(0,0);
+        if(padUsing)focusPadControl(document.activeElement);
       }
       function hideMenu(){
         closeMenuDetails();$('game-page').classList.remove('title-screen');
@@ -1612,7 +1616,9 @@
         if(name==='dash')dashQueued=true;
         if(name==='tactical'&&survival()&&phase==='playing'&&spawnTime===0&&tacticalCharge>=100&&tacticalTime===0)tacticalQueued=true;
       }
+      window.addEventListener('pointerdown',()=>{padUsing=false;clearPadFocus();});
       window.addEventListener('keydown',e=>{
+        padUsing=false;clearPadFocus();
         if(e.ctrlKey||e.metaKey||e.altKey)return;
         const key=e.key.toLowerCase(),name=inputName(e.key);
         const controlFocused=['BUTTON','SUMMARY'].includes(e.target?.tagName);
@@ -1681,31 +1687,108 @@
       document.addEventListener('visibilitychange',()=>{
         if(document.hidden){clearInput();if(phase==='playing')togglePause();}
       });
+      function resetPadInput(){
+        padHeld.clear();bombPadLast=false;jumpPadLast=false;dashPadLast=false;pausePadLast=false;tacticalPadLast=false;padBlocked=true;
+        padMenuDirection=0;padMenuRepeatAt=0;clearPadFocus();
+      }
+      function clearPadFocus(){
+        padFocus?.classList.remove('gamepad-focus');padFocus=null;
+      }
+      function menuControlVisible(node){
+        if(typeof node.checkVisibility==='function')return node.checkVisibility();
+        // Gamepad API predates checkVisibility on Safari. Keep menus usable on
+        // those engines, including controls inside a closed native disclosure.
+        if(!node.getClientRects().length||getComputedStyle(node).visibility==='hidden')return false;
+        for(let parent=node.parentElement;parent;parent=parent.parentElement){
+          if(parent.hidden)return false;
+          if(parent.tagName==='DETAILS'&&!parent.open&&!parent.querySelector('summary')?.contains(node))return false;
+        }
+        return !node.hidden;
+      }
+      function menuControls(){
+        // Use the actual DOM: hidden modes, locked stages and children of closed
+        // disclosures must never enter the controller's focus order.
+        return Array.from(document.querySelectorAll('button, summary')).filter(node=>
+          !node.disabled&&menuControlVisible(node)&&!node.hasAttribute('data-action'));
+      }
+      function focusPadControl(node){
+        if(!node)return;
+        clearPadFocus();padFocus=node;node.classList.add('gamepad-focus');
+        node.focus({preventScroll:true});node.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+      }
+      function stepPadMenu(direction){
+        const controls=menuControls();if(!controls.length)return;
+        const index=controls.indexOf(document.activeElement);
+        focusPadControl(controls[index<0?(direction>0?0:controls.length-1):(index+direction+controls.length)%controls.length]);
+      }
+      function confirmPadMenu(){
+        const controls=menuControls(),focused=controls.includes(document.activeElement)?document.activeElement:null;
+        const target=focused||(controls.includes(action)?action:controls[0]);
+        if(!target)return;
+        focusPadControl(target);target.click();
+        if(phase!=='playing'&&menuControls().includes(document.activeElement))focusPadControl(document.activeElement);
+      }
+      function backPadMenu(){
+        const details=document.activeElement?.closest('details');
+        if(details?.open){details.open=false;focusPadControl(details.querySelector('summary'));return;}
+        if(phase==='confirmRestart')cancelConfirm();
+        else if(phase==='pause')resume();
+        else if(phase==='title'){
+          if(titleView!=='campaign'){selectTitleView('campaign');focusPadControl($('mode-campaign'));}
+        }else requestConfirm('home');
+        if(phase!=='playing'&&menuControls().includes(document.activeElement))focusPadControl(document.activeElement);
+      }
+      function startPadMenu(){
+        if(phase==='playing'||phase==='pause'||phase==='confirmRestart'){togglePause();return;}
+        if(phase==='title'&&titleView==='challenges'){
+          const focused=document.activeElement;
+          const target=Object.keys(CHALLENGES).map(key=>$('challenge-'+key)).includes(focused)?focused:$('challenge-sprint');
+          target.click();return;
+        }
+        activate();
+      }
       function pollGamepad(){
         const pads=navigator.getGamepads?.()||[];
         const pad=Array.from(pads).find(item=>item?.connected);
         padHeld.clear();
-        if(!pad||document.hidden){bombPadLast=false;jumpPadLast=false;dashPadLast=false;pausePadLast=false;tacticalPadLast=false;padBlocked=true;return;}
+        $('controller-hint').hidden=!pad||document.hidden||phase==='playing';
+        if(!pad||document.hidden){
+          if(padIdentity!==null)resetPadInput();
+          padIdentity=null;padUsing=false;padBlocked=true;return;
+        }
+        // A replacement pad must also return to neutral before controlling the run.
+        const identity=(pad.index??0)+':'+(pad.id??'');
+        if(identity!==padIdentity){resetPadInput();padIdentity=identity;padUsing=false;}
         const buttons=pad.buttons;
         const left=pad.axes[0]<-.35||buttons[14]?.pressed,right=pad.axes[0]>.35||buttons[15]?.pressed;
-        const down=pad.axes[1]>.45||buttons[13]?.pressed;
+        const down=pad.axes[1]>.45||buttons[13]?.pressed,up=pad.axes[1]<-.45||buttons[12]?.pressed;
         const jump=Boolean(buttons[0]?.pressed),bomb=Boolean(buttons[1]?.pressed),fire=Boolean(buttons[2]?.pressed||buttons[5]?.pressed);
         const tactical=Boolean(buttons[3]?.pressed),burst=Boolean(buttons[4]?.pressed),pause=Boolean(buttons[9]?.pressed);
-        const neutral=!left&&!right&&!down&&!jump&&!bomb&&!fire&&!burst&&!pause&&!tactical;
+        const neutral=!left&&!right&&!down&&!up&&!jump&&!bomb&&!fire&&!burst&&!pause&&!tactical;
         if(padBlocked){if(neutral)padBlocked=false;return;}
-        if(pause&&!pausePadLast){
-          if(phase==='title'&&titleView==='campaign')startNew();else if(phase==='title'&&titleView==='survival')beginSurvival();else if(phase!=='title')togglePause();
-          pausePadLast=pause;return;
+        if(!neutral)padUsing=true;
+        const confirm=jump&&!jumpPadLast,back=bomb&&!bombPadLast,start=pause&&!pausePadLast;
+        const throwBomb=back,dashPressed=burst&&!dashPadLast,tacticalPressed=tactical&&!tacticalPadLast;
+        // Store edges before dispatch: state transitions deliberately re-arm the
+        // neutral lock through clearInput, so held menu buttons cannot leak out.
+        pausePadLast=pause;jumpPadLast=jump;bombPadLast=bomb;dashPadLast=burst;tacticalPadLast=tactical;
+        if(start){startPadMenu();return;}
+        if(phase!=='playing'){
+          if(back){backPadMenu();return;}
+          if(confirm){confirmPadMenu();return;}
+          const direction=(right||down?1:0)-(left||up?1:0),now=performance.now();
+          if(!direction){padMenuDirection=0;padMenuRepeatAt=0;}
+          else if(direction!==padMenuDirection||now>=padMenuRepeatAt){
+            stepPadMenu(direction);padMenuRepeatAt=now+(direction!==padMenuDirection?350:160);padMenuDirection=direction;
+          }
+          return;
         }
-        pausePadLast=pause;
-        if(phase!=='playing'){bombPadLast=bomb;jumpPadLast=jump;dashPadLast=burst;tacticalPadLast=tactical;return;}
         if(left)padHeld.add('left');if(right)padHeld.add('right');if(down)padHeld.add('down');
         if(jump)padHeld.add('jump');if(fire)padHeld.add('fire');
-        if(jump&&!jumpPadLast)jumpQueued=true;
-        if(bomb&&!bombPadLast)grenadeQueued=true;
-        if(burst&&!dashPadLast)dashQueued=true;
-        if(tactical&&!tacticalPadLast)queueAction('tactical');
-        tacticalPadLast=tactical;jumpPadLast=jump;bombPadLast=bomb;dashPadLast=burst;
+        if(confirm)jumpQueued=true;
+        if(throwBomb)grenadeQueued=true;
+        if(dashPressed)dashQueued=true;
+        if(tacticalPressed)queueAction('tactical');
       }
       function loop(t){
         const delta=Math.min((t-frameLast)/1000||0,.06);frameLast=t;
