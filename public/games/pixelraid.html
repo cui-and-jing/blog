@@ -288,6 +288,7 @@
             <div class="details-body">
               <ul class="rules-list">
                 <li>一条命，固定标准难度。普通波轮换三套地形，双向增援提前 2.2 秒预警；平台可下蹲 + 跳跃降层。普通波清场恢复 1 体力、1 手雷。</li>
+                <li>普通波有两座黄色爆破装置：2 点伤害引爆，半径 145 内造成 4 点伤害并清敌弹，相邻装置可连锁。只伤敌，不伤自己；地面与平台上都有，可用射击、反弹弹、手雷或震荡脉冲引爆。每波只用一次，增援抵达前不可引爆。</li>
                 <li>每三波迎战一位首领，三位首领轮换，无杂兵干扰。首领清场恢复 2 体力、2 手雷，额外奖励 500 分。</li>
                 <li>六种永久模组，每种最多两级。两种模组各 1 级即可点亮组合：贯穿火力、反击回流、爆破回收。普通波还可自选战地回收委托，争取额外补给。</li>
                 <li>机动突击使用标准连射；反击先锋的冲刺冷却少 0.4 秒、反弹伤害 +1；爆破专家的爆炸伤害 +2、范围 +24，可清敌弹，射击间隔增加 25%。</li>
@@ -372,13 +373,13 @@
       const ARENAS=[
         {id:'steps',name:'中央阶台',hint:'从侧翼登上中央高台；下蹲 + 跳跃可降层。',
           platforms:[[210,325,155],[405,285,150],[640,325,155]],
-          slots:[140,790,260,670,370,550,90,840],drones:[300,460,620],spread:1,recovery:[0,2]},
+          devices:[[360,425],[600,425]],slots:[140,790,260,670,370,550,90,840],drones:[300,460,620],spread:1,recovery:[0,2]},
         {id:'flanks',name:'双翼高台',hint:'左右高台之间可借低台换位；散弹与数据分居两翼。',
           platforms:[[135,325,175],[350,365,105],[510,365,105],[650,325,175]],
-          slots:[105,825,320,610,215,710,70,870],drones:[240,720],spread:3,recovery:[0,0]},
+          devices:[[410,365],[540,365]],slots:[105,825,320,610,215,710,70,870],drones:[240,720],spread:3,recovery:[0,0]},
         {id:'bridge',name:'错层栈桥',hint:'沿错层平台逐级登高；降层可快速回到地面交战。',
           platforms:[[135,335,165],[340,295,150],[545,335,155],[745,305,145]],
-          slots:[90,835,315,675,185,560,750,60],drones:[240,600],spread:1,recovery:[0,2]}
+          devices:[[280,425],[570,335]],slots:[90,835,315,675,185,560,750,60],drones:[240,600],spread:1,recovery:[0,2]}
       ];
       const arenaForWave=wave=>wave%3===0?null:ARENAS[(wave-1-Math.floor(wave/3))%ARENAS.length];
       const ledgePoint=(arena,index,height)=>{const [x,y,w]=arena.platforms[index];return {x:x+w/2,y:y-height};};
@@ -415,6 +416,7 @@
         reflux:{name:'反击回流',pair:['dash','reflect'],description:'受伤时反弹敌弹恢复 1 体力，冷却 8 秒。'},
         recycle:{name:'爆破回收',pair:['armor','blast'],description:'手雷击杀返还 1 枚手雷，每次爆炸最多一次。'}
       };
+      const DEVICE_RADIUS=145,DEVICE_DAMAGE=4;
       const STORAGE_KEY='pixel-raid.progress.v1';
       const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches??false;
       const held=new Set(),padHeld=new Set(),touch=new Map();
@@ -428,6 +430,7 @@
       let survivalWave=0,survivalCleared=0,survivalTime=0,spawnTime=0,supplyOffers=[],selectedSupply=null;
       let refluxCooldown=0,selectedLoadout='assault',loadout='assault',supplyRerolls=0;
       let selectedContract='hold',fieldContract=null;
+      let devices=[],deviceBursts=[];
       let tacticalCharge=0,tacticalTime=0,tacticalQueued=false,tacticalPadLast=false,tacticalUses=0,tacticalPulse=null;
       const tactic=()=>TACTICS[loadout];
       const shieldActive=()=>survival()&&loadout==='counter'&&tacticalTime>0;
@@ -684,6 +687,7 @@
           const x=player.x+player.w/2,y=player.y+player.h/2,r=220;
           tacticalPulse={x,y,time:.45};
           for(const e of enemies)if(!e.dead&&!(e.arrival>0)&&circRect(x,y,r,e))damageEnemy(e,8,true);
+          for(const device of devices)if(circRect(x,y,r,device))damageDevice(device,2,true);
           if(!boss.dead&&circRect(x,y,r,boss))damageBoss(8,true);
           bullets=bullets.filter(b=>b.owner==='p'||Math.hypot(b.x-x,b.y-y)>=r);
         }
@@ -707,7 +711,7 @@
         const mission=currentChallenge();$('mission-hud').hidden=!mission&&!survival();
         if(survival()){
           $('mission-name').textContent='防线生存 · 第 '+survivalWave+' 波'+(bossWave()?' · 首领战':'');
-          $('mission-objective').textContent=(stage.arena?stage.arena.name+' · ':'')+'已守住 '+survivalCleared+' 波 · '+(spawnTime>0?(bossWave()?'首领':'增援')+' '+spawnTime.toFixed(1)+' 秒后抵达':bossWave()?(boss.dead?'首领已击败':stage.bossName+' · 体力 '+boss.hp+' / '+boss.maxHp):'剩余 '+activeEnemies()+' 名敌人');
+          $('mission-objective').textContent=(stage.arena?stage.arena.name+' · ':'')+'已守住 '+survivalCleared+' 波 · '+(spawnTime>0?(bossWave()?'首领':'增援')+' '+spawnTime.toFixed(1)+' 秒后抵达':bossWave()?(boss.dead?'首领已击败':stage.bossName+' · 体力 '+boss.hp+' / '+boss.maxHp):'剩余 '+activeEnemies()+' 名敌人 · 爆破装置 '+devices.filter(item=>!item.spent).length+' / 2');
           $('mission-time').textContent='用时 '+formatTime(survivalTime);
           $('mission-hud').setAttribute('data-urgent',String(player.hp<=2));
         }
@@ -723,7 +727,7 @@
       }
       function resetStage(index,carry){
         tacticalTime=0;tacticalPulse=null;if(!survival()){tacticalCharge=0;tacticalUses=0;}
-        fieldContract=null;selectedContract='hold';$('contract-options').open=false;
+        fieldContract=null;selectedContract='hold';devices=[];deviceBursts=[];$('contract-options').open=false;
         stageIndex=index;stage=STAGES[index];
         if(gauntlet())stage={...stage,name:'首领竞技场',width:W,gaps:[],checkpoints:[],
           platforms:[[260,320,170],[500,310,150]],intel:[],enemies:[],pickups:[]};
@@ -766,6 +770,7 @@
         boss=makeBoss(bossWave()?[32,44,56][stageIndex]+Math.min(48,Math.floor((survivalWave-1)/9)*12):0,790);
         player.x=W/2-player.w/2;player.h=44;player.y=G-44;player.vx=0;player.vy=0;player.ground=true;
         player.crouch=false;player.inv=1.2;player.shoot=0;player.dashTime=0;player.dashCooldown=0;player.jumpBuffer=0;player.coyote=.11;player.dropPlatform=null;player.dropTime=0;
+        devices=(arena?.devices||[]).map(([x,floor])=>({x:x-12,y:floor-36,w:24,h:36,hp:2,spent:false}));deviceBursts=[];
         const slots=arena?.slots||[],count=Math.min(8,3+Math.floor(survivalWave/2));
         const types=survivalWave===1?['walker']:survivalWave===2?['walker','drone']:['walker','turret','shield','drone'];
         let droneIndex=0;
@@ -786,7 +791,7 @@
         selectedContract='hold';
         combo={count:0,timer:0,best:0};combatText='';combatTime=0;selectedSupply=null;
         clearInput();lag=0;phase='playing';hideMenu();frameLast=performance.now();hud();
-        announce('第 '+survivalWave+' 波，'+(bossWave()?stage.bossName+'。首领 2.2 秒后抵达，右侧为竞技场边界。':arena.name+'，'+count+' 名敌人。增援 2.2 秒后抵达。'+arena.hint));
+        announce('第 '+survivalWave+' 波，'+(bossWave()?stage.bossName+'。首领 2.2 秒后抵达，右侧为竞技场边界。':arena.name+'，'+count+' 名敌人。增援 2.2 秒后抵达。'+arena.hint+'爆破装置可射击引爆，仅伤敌，可连锁。'));
       }
       function supplyDescription(key){
         const awaken=Object.entries(SYNERGIES).filter(([id,value])=>!synergy(id)&&value.pair.includes(key)&&value.pair.every(name=>name===key||upgrades[name]>0)).map(([,value])=>value.name);
@@ -812,7 +817,7 @@
         progress.survival.best=Math.max(progress.survival.best,bounded(points,9999999));
         best=progress.survival.best;saveProgress();
         player.hp=Math.min(maxHealth(),player.hp+(bossWave()?2:1));player.grenades=Math.min(7,player.grenades+(bossWave()?2:1));
-        bullets=[];bombs=[];spawnTime=0;
+        bullets=[];bombs=[];spawnTime=0;deviceBursts=[];
         supplyRerolls=MODULES.some(key=>upgrades[key]<2)?1:0;rollSupplies();
         selectedContract='hold';$('contract-options').open=false;
         $('result-details').textContent='已守住 '+survivalCleared+' 波 · 清场得分 '+points+'\n体力 '+player.hp+' / '+maxHealth()+' · 手雷 '+player.grenades+' · 用时 '+formatTime(survivalTime)+contractReward;
@@ -1072,7 +1077,26 @@
         }
         if(level)bullets=bullets.filter(b=>b.owner==='p'||Math.hypot(x-b.x,y-b.y)>=radius);
         if(!boss.dead&&Math.hypot(x-(boss.x+50),y-(boss.y+52))<135+24*level){damageBoss(7+2*level);if(boss.dead)defeated=true;}
+        for(const device of devices)if(circRect(x,y,radius,device))damageDevice(device,2);
         if(defeated&&synergy('recycle')){player.grenades=Math.min(7,player.grenades+1);combatNotice('爆破回收 · 返还 1 枚手雷');}
+      }
+      function damageDevice(device,damage,fromSkill=false){
+        if(!survival()||phase!=='playing'||spawnTime>0||device.spent)return;
+        device.hp=Math.max(0,device.hp-damage);
+        if(device.hp>0){spark(device.x+12,device.y+12,'#ffdd81',5);combatNotice('爆破装置受损 · 再造成 1 点伤害引爆');return;}
+        // Spend before propagating: close devices form one finite chain. Devices
+        // themselves grant no score, skill energy or grenade refunds.
+        const spentBefore=devices.filter(item=>item.spent).length;
+        device.spent=true;
+        const x=device.x+12,y=device.y+18;
+        deviceBursts.push({x,y,time:.4});spark(x,y,'#ffcf7d',24);shake=Math.max(shake,5);beep(160,.16,'triangle');
+        for(const e of enemies)if(!e.dead&&!(e.arrival>0)&&circRect(x,y,DEVICE_RADIUS,e))damageEnemy(e,DEVICE_DAMAGE,fromSkill);
+        // This can run inside the backwards projectile loop. Mark, never splice
+        // or replace that array here, so unrelated shots keep their own index.
+        for(const b of bullets)if(b.owner==='e'&&Math.hypot(b.x-x,b.y-y)<=DEVICE_RADIUS)b.life=0;
+        for(const other of devices)if(!other.spent&&Math.hypot(other.x+12-x,other.y+18-y)<=DEVICE_RADIUS)damageDevice(other,2,fromSkill);
+        const count=devices.filter(item=>item.spent).length-spentBefore;
+        combatNotice((count>1?'连锁爆破 ×'+count:'战术爆破')+' · 仅伤敌 / 清弹');
       }
       function damageEnemy(e,d,fromSkill=false){
         if(e.dead)return;
@@ -1135,6 +1159,7 @@
         if(survival()){
           tacticalTime=Math.max(0,tacticalTime-dt);
           if(tacticalPulse){tacticalPulse.time-=dt;if(tacticalPulse.time<=0)tacticalPulse=null;}
+          deviceBursts=deviceBursts.filter(burst=>(burst.time-=dt)>0);
           survivalTime+=dt;refluxCooldown=Math.max(0,refluxCooldown-dt);
           const spawning=spawnTime>0;spawnTime=Math.max(0,spawnTime-dt);
           if(spawning&&spawnTime===0)for(const e of enemies){
@@ -1291,11 +1316,15 @@
                 const at=shotImpact(x,y,b.x,b.y,b.r,e);if(at!==Infinity)contacts.push({target:e,at});
               }
               if(!boss.dead){const at=shotImpact(x,y,b.x,b.y,b.r,boss);if(at!==Infinity)contacts.push({target:boss,at});}
+              for(const device of devices)if(!device.spent){const at=shotImpact(x,y,b.x,b.y,b.r,device);if(at!==Infinity)contacts.push({target:device,at,device:true});}
             }
             // Array order must not allow a distant target to absorb the shot,
             // or let piercing bullets damage an enemy behind a frontal shield.
             contacts.sort((a,b)=>a.at-b.at);
-            for(const {target} of contacts){
+            for(const {target,device} of contacts){
+              if(target.dead||target.spent)continue;
+              // Devices absorb a shot even with piercing, like a solid target.
+              if(device){damageDevice(target,b.damage,b.tactical);struck=true;break;}
               if(target===boss){damageBoss(b.damage,b.tactical);struck=true;break;}
               const damaged=hitEnemy(target,b);
               if(!damaged||!(b.pierce>0)){struck=true;break;}
@@ -1316,6 +1345,7 @@
           if(b.y>=G-8&&!isGap(b.x)){b.y=G-8;b.vy*=-.4;b.vx*=.66;}
           if(b.timer<=0||b.y>H+20){boom(b.x,b.y);bombs.splice(i,1);}
         }
+        bullets=bullets.filter(b=>b.life>0);
         for(const p of pickups){
           if(p.done)continue;p.age+=dt;
           if(circRect(p.x,p.y,16,player)){
@@ -1510,6 +1540,26 @@
           rect(x+14,y-31,75*charging,4,'#ffdc84');
         }
       }
+      function drawDevices(){
+        for(const device of devices){
+          const x=device.x,y=device.y;
+          if(device.spent){rect(x,y+30,24,6,'#6c6260');continue;}
+          c.save();c.globalAlpha=spawnTime>0?.4:1;
+          if(device.hp===1){
+            c.strokeStyle='#ffd78a';c.globalAlpha=.35;c.setLineDash([7,8]);
+            c.beginPath();c.arc(x+12,y+18,DEVICE_RADIUS,0,Math.PI*2);c.stroke();c.setLineDash([]);c.globalAlpha=1;
+          }
+          rect(x,y,24,36,'#8a542c');rect(x+3,y+3,18,30,'#ffcf7d');
+          rect(x+3,y+9,18,5,'#48372c');rect(x+3,y+24,18,5,'#48372c');
+          rect(x+10,y+14,5,8,'#fff4d0');rect(x+7,y+17,11,3,'#fff4d0');
+          for(let i=0;i<device.hp;i++)rect(x+5+i*9,y-6,6,3,'#ffe7a7');
+          c.font='bold 11px system-ui';c.fillStyle='#ffe1a0';c.textAlign='center';c.fillText('爆破',x+12,y-12);c.restore();
+        }
+        for(const burst of deviceBursts){
+          c.save();c.strokeStyle='#ffe0a5';c.lineWidth=3;c.globalAlpha=burst.time/.4;
+          c.beginPath();c.arc(burst.x,burst.y,DEVICE_RADIUS*(reducedMotion?1:1-burst.time/.4),0,Math.PI*2);c.stroke();c.restore();
+        }
+      }
       function drawPickup(p){
         if(p.done)return;const y=p.y+Math.sin(p.age*4)*7;
         rect(p.x-13,y-13,27,27,p.kind==='heal'?'#60bb8c':p.kind==='grenade'?'#eeb468':
@@ -1528,7 +1578,7 @@
         if(stage){
           const dx=shake>0&&!reducedMotion?rng(-shake,shake):0;
           c.translate(Math.round(-cam+dx),0);
-          terrain();
+          terrain();drawDevices();
           for(const p of pickups)drawPickup(p);
           for(const item of intel)drawIntel(item);
           if(survival()&&fieldContract?.status==='active')for(const [index,node] of fieldContract.nodes.entries()){
@@ -1814,6 +1864,7 @@
         checkpoint:player?.checkpoint??64,maxHp:maxHealth(),selectedUpgrade,storageAvailable,
         crouch:player?.crouch??false,playerHeight:player?.h??44,coyote:player?.coyote??0,jumpBuffer:player?.jumpBuffer??0,dropTime:player?.dropTime??0,
         platforms:stage?.platforms.map(ledge=>[...ledge])||[],arena:survival()&&stage?.arena?{id:stage.arena.id,name:stage.arena.name,hint:stage.arena.hint}:null,
+        devices:devices.map(device=>({...device})),
         pickups:pickups.map(p=>({x:p.x,y:p.y,kind:p.kind,done:p.done})),
         bossAttackType:boss?.attackType??'volley',bossBeamTime:boss?.beamTime??0,bossBeamY:boss?.beamY??0,
         turretCharge:Math.max(0,...enemies.map(e=>e.dead?0:e.windup)),shieldCount:enemies.filter(e=>!e.dead&&e.type==='shield').length,
