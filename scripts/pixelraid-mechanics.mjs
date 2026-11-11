@@ -1724,6 +1724,7 @@ test('survival input controller escapes overlapping ground threats without oscil
 });
 
 test('all three loadouts clear four waves across varied timing and seeds using only genuine inputs', () => {
+  let totalReflections = 0;
   for (const randomSeed of [1, 42, 16437, 71901]) for (const loadout of ['assault', 'counter', 'demolition']) {
     for (const cadence of [5, 12]) {
       const g = defense({ randomSeed, loadout }), tap = key => { g.key(key); g.key(key, false); };
@@ -1759,10 +1760,12 @@ test('all three loadouts clear four waves across varied timing and seeds using o
         }
       }
       eq([...encountered].sort(), ['drone', 'shield', 'turret', 'walker']);
-      assert(reflected > 0 && decisions > 20); eq(g.state().progress.survival.wave, 4);
+      // Explosive devices can clear a route before a reflection opportunity.
+      totalReflections += reflected; assert(decisions > 20); eq(g.state().progress.survival.wave, 4);
       eq(g.state().progress.survival.best, g.state().score);
     }
   }
+  assert(totalReflections > 0, 'The replay set must still exercise live reflections');
 });
 
 
@@ -1957,9 +1960,10 @@ test('point-blank frontal shields remain closed and a real flank still works', (
 });
 
 test('swept rounds cannot tunnel and hit nearest targets rather than spawn-array order', () => {
+  // Isolate the original enemy/boss ordering contract; mixed device contacts are covered below.
   for (const face of [-1, 1]) for (const rank of [0, 1, 2]) {
     const g = defense(), nearX = face > 0 ? 310 : 490, farX = face > 0 ? 490 : 310;
-    g.run(`spawnTime=0;player.inv=100;player.x=700;upgrades.pierce=${rank};
+    g.run(`devices=[];spawnTime=0;player.inv=100;player.x=700;upgrades.pierce=${rank};
       enemies=[${farX},${nearX}].map(x=>({...makeEnemy(x,'turret'),w:10,shot:100,hp:20,maxHp:20}));
       projectile(${face > 0 ? 280 : 530},G-17,${face * 18000},0,'p');`);
     tick(g); eq(g.read('enemies.map(e=>e.hp)'), [rank ? 19 : 20, 19]);
@@ -1968,7 +1972,7 @@ test('swept rounds cannot tunnel and hit nearest targets rather than spawn-array
 
 test('a swept shield stops piercing before rear targets and boss contacts obey distance order', () => {
   const g = defense();
-  g.run(`spawnTime=0;player.inv=100;player.x=700;upgrades.pierce=2;
+  g.run(`devices=[];spawnTime=0;player.inv=100;player.x=700;upgrades.pierce=2;
     enemies=[{...makeEnemy(480,'turret'),shot:100},{...makeEnemy(320,'shield'),shot:100,face:-1}];
     projectile(280,G-17,18000,0,'p');`);
   tick(g); eq(g.read('enemies.map(e=>e.hp)'), [4, 5]); eq(g.state().bullets, 0);
@@ -2738,6 +2742,7 @@ test('phase reflected shots remain ineligible for charge after expiry and reflux
 
 test('shock pulse has fixed reach and damage, spares arriving targets, clears only nearby hostiles and never refunds grenades',()=>{
   const g=tacticalGame('demolition');
+  g.run('devices=[];'); // Isolate pulse geometry; device cascades have their own contract.
   g.run("upgrades.armor=2;upgrades.blast=2;const cx=player.x+player.w/2;enemies=[makeEnemy(cx+100,'shield'),makeEnemy(cx+221,'walker'),makeEnemy(cx-40,'walker'),makeEnemy(cx+50,'walker')];enemies[0].hp=20;enemies[3].arrival=.5;enemies.forEach(e=>e.shot=100);projectile(cx+30,player.y+20,0,0,'e');projectile(cx+221,player.y+20,0,0,'e');projectile(cx+20,player.y+20,0,0,'p');");
   const before=g.state();useSkill(g);
   eq(g.read('enemies.map(e=>e.hp)'),[12,3,-5,3]);eq(g.state().grenades,before.grenades);eq(g.state().tacticalCharge,0);
@@ -2813,6 +2818,7 @@ test('skill meter and charge snapshots are detached and never alter the saved re
 });
 
 test('active skills support all three loadouts through four real-input waves without changing baseline replays', () => {
+  let totalReflections = 0;
   for (const randomSeed of [1, 16437]) for (const loadout of ['assault', 'counter', 'demolition']) {
     for (const cadence of [8]) {
       const g = defense({ randomSeed, loadout }), tap = key => { g.key(key); g.key(key, false); };
@@ -2850,10 +2856,12 @@ test('active skills support all three loadouts through four real-input waves wit
       }
       assert(g.state().tacticalUses >= 2, 'Combat did not recharge a second use');
       eq([...encountered].sort(), ['drone', 'shield', 'turret', 'walker']);
-      assert(reflected > 0 && decisions > 20); eq(g.state().progress.survival.wave, 4);
+      // Explosive devices can clear a route before a reflection opportunity.
+      totalReflections += reflected; assert(decisions > 20); eq(g.state().progress.survival.wave, 4);
       eq(g.state().progress.survival.best, g.state().score);
     }
   }
+  assert(totalReflections > 0, 'The replay set must still exercise live reflections');
 });
 
 // Controller menu contracts use the source DOM hierarchy, not a fake list of
@@ -3016,6 +3024,110 @@ test('controller Start reaches each challenge, boss intermission and terminal re
     else g.start();
     g.run(`showMenu('Result','Test','Retry','${tag}')`); padTap(g, 9); eq(g.state().phase, 'playing');
     g.run(`showMenu('Result','Test','Retry','${tag}')`); padTap(g, 1); eq(g.state().phase, 'title');
+  }
+});
+
+// Tactical devices use the same production hit ordering and damage pipeline.
+function deviceGame() {
+  const g = defense();
+  g.run("spawnTime=0;player.inv=100;enemies=[{...makeEnemy(60,'turret'),hp:50,maxHp:50,shot:100}];");
+  return g;
+}
+
+test('devices follow supported arena geometry, reset per wave and never enter other modes', () => {
+  const g = defense();
+  for (const wave of [1, 2, 3, 4, 5, 6, 7, 99]) {
+    g.run(`survivalWave=${wave - 1};startWave();`);
+    const state = g.state(); eq(state.devices.length, wave % 3 ? 2 : 0);
+    for (const d of state.devices) {
+      eq(d.hp, 2); eq(d.spent, false);
+      assert(d.x >= 0 && d.x + d.w <= 960);
+      assert(d.y + d.h === 425 || state.platforms.some(([x,y,w]) => d.y+d.h === y && d.x >= x && d.x+d.w <= x+w));
+      for (const p of state.pickups) assert(Math.hypot(d.x+12-p.x,d.y+18-p.y)>32);
+    }
+  }
+  g.run('survivalWave=0;startWave();spawnTime=0;damageDevice(devices[0],2);');
+  assert(g.state().devices[0].spent);
+  g.key('r');g.click('start');eq(g.state().devices.map(d=>d.hp),[2,2]);eq(g.read('deviceBursts'),[]);
+  const snapshot = g.win.__raidState;snapshot.devices[0].hp=99;snapshot.devices.push({});eq(g.state().devices.length,2);eq(g.state().devices[0].hp,2);
+  g.run('openTitle();');eq(g.state().devices,[]);
+  g.click('mode-campaign');g.click('start');eq(g.state().devices,[]);
+  g.run('openTitle();');g.click('mode-challenges');g.click('challenge-bosses');eq(g.state().devices,[]);
+});
+
+test('device durability rejects ingress, enemy bullets, paused actions and repeated detonation', () => {
+  const g=defense();g.run('damageDevice(devices[1],99);boom(600,407);');eq(g.state().devices.map(d=>d.hp),[2,2]);
+  g.run("spawnTime=0;player.inv=100;enemies.forEach(e=>e.shot=100);projectile(600,407,0,0,'e');");tick(g);eq(g.state().devices[1].hp,2);
+  g.run("bullets=[];projectile(580,407,650,0,'p');");tick(g,2);eq(g.state().devices[1].hp,1);
+  g.key('p');const before=g.state();g.run('damageDevice(devices[1],2);');g.frames(30);eq(g.state(),before);
+  g.key('p',false);g.key('p');g.key('p',false);g.run("projectile(580,407,650,0,'p');");tick(g,2);
+  eq(g.state().devices[1].hp,0);assert(g.state().devices[1].spent);
+  assert(g.nodes.get('mission-objective').textContent.includes('爆破装置 1 / 2'), 'Detonation must refresh its HUD immediately');
+  const after=g.state();g.run('damageDevice(devices[1],99);damageDevice(devices[1],99);');eq(g.state(),after);
+  g.key('r');g.click('cancel-restart');eq(g.state().devices[1].spent,true);
+});
+
+test('swept device contacts respect nearest targets, shields, piercing and enhanced projectiles', () => {
+  const g=deviceGame();g.run("projectile(550,407,10000,0,'p');");tick(g);eq(g.state().devices[1].hp,1);eq(g.state().bullets,0);
+  g.run("devices[1].hp=2;enemies=[{...makeEnemy(560,'shield'),shot:100,face:-1}];projectile(550,407,10000,0,'p');");tick(g);
+  eq(g.state().devices[1].hp,2);eq(g.state().enemies[0].hp,5);
+  g.run("enemies=[{...makeEnemy(650,'turret'),hp:50,maxHp:50,shot:100}];upgrades.pierce=2;projectile(550,407,10000,0,'p');");tick(g);
+  eq(g.state().devices[1].hp,1);eq(g.state().enemies[0].hp,50);eq(g.state().bullets,0);
+  g.run("devices[1].hp=2;projectile(580,407,650,0,'p',2);");tick(g,2);
+  assert(g.state().devices[1].spent);eq(g.state().enemies[0].hp,46);eq(g.state().bullets,0);
+});
+
+test('natural ledge chain is finite, fixed-strength, safe for the player and skips arriving enemies', () => {
+  const g=deviceGame();
+  g.run(`survivalWave=1;startWave();spawnTime=0;player.inv=0;player.x=400;player.y=321;player.hp=3;
+    upgrades.blast=2;loadout='demolition';
+    enemies=[{...makeEnemy(460,'shield'),y:329,hp:30,maxHp:30,shot:100},
+      {...makeEnemy(460,'walker'),y:329,arrival:.6}];damageDevice(devices[0],2);`);
+  eq(g.state().devices.map(d=>d.spent),[true,true]);eq(g.read('deviceBursts.length'),2);assert(g.state().combatText.includes('连锁爆破 ×2'));
+  assert(g.nodes.get('mission-objective').textContent.includes('爆破装置 0 / 2'), 'Chain HUD must include every spent device');
+  eq(g.state().enemies.map(e=>e.hp),[22,3]);eq(g.state().hp,3);eq(g.state().score,0);eq(g.state().grenades,3);
+  g.run('damageDevice(devices[1],20);');eq(g.read('deviceBursts.length'),2);eq(g.state().enemies[0].hp,22);
+  g.key('p');const bursts=g.read('deviceBursts');g.frames(40);eq(g.read('deviceBursts'),bursts);
+  g.key('p',false);g.key('p');g.key('p',false);tick(g,30);eq(g.read('deviceBursts'),[]);
+});
+
+test('device blasts clear only nearby hostiles without corrupting either projectile iteration order', () => {
+  for (const reverse of [false,true]) {
+    const g=deviceGame();
+    g.run(`devices[1].hp=1;bullets=[];
+      projectile(700,407,0,0,'e');projectile(760,407,0,0,'e');
+      projectile(800,300,0,0,'p');projectile(580,407,650,0,'p');
+      ${reverse?'bullets.reverse();':''}`);
+    tick(g,2);assert(g.state().devices[1].spent);
+    eq(g.read("bullets.filter(b=>b.owner==='e').map(b=>b.x)"),[760]);
+    eq(g.read("bullets.filter(b=>b.owner==='p').map(b=>b.x)"),[800]);
+  }
+});
+
+test('device kills use normal rewards but empty devices and grenade chains never mint resources', () => {
+  const g=deviceGame();g.run('tacticalCharge=0;damageDevice(devices[0],2);');eq(g.state().score,0);eq(g.state().tacticalCharge,0);
+  g.run(`upgrades.armor=1;upgrades.blast=1;player.grenades=2;
+    enemies=[{...makeEnemy(730,'walker'),shot:100},{...makeEnemy(60,'turret'),shot:100}];boom(500,407);`);
+  eq(g.state().grenades,2);eq(g.state().score,100);eq(g.state().tacticalCharge,21);assert(g.state().devices[1].spent);
+  eq(g.state().progress.survival.wave,0);
+});
+
+test('pulse-triggered chains preserve skill provenance and cannot recharge their originating skill', () => {
+  const g=defense({loadout:'demolition'});
+  g.run(`survivalWave=1;startWave();spawnTime=0;player.x=190;player.y=321;
+    enemies=[{...makeEnemy(660,'walker'),y:329,shot:100},{...makeEnemy(60,'turret'),y:40,shot:100}];useTactical();`);
+  eq(g.state().devices.map(d=>d.spent),[true,true]);eq(g.state().tacticalCharge,0);eq(g.state().tacticalUses,1);
+  eq(g.state().score,100);eq(g.state().grenades,5);
+});
+
+test('a last-enemy device explosion does not save a simultaneous lethal trade', () => {
+  for (const reverse of [false,true]) {
+    const g=deviceGame();
+    g.run(`player.hp=1;player.inv=0;player.x=60;devices[1].hp=1;
+      enemies=[{...makeEnemy(650,'walker'),shot:100}];
+      projectile(60,400,0,0,'e');projectile(580,407,650,0,'p');
+      ${reverse?'bullets.reverse();':''}`);
+    tick(g,3);eq(g.state().phase,'survivalOver');eq(g.state().progress.survival,{wave:0,best:0});
   }
 });
 
