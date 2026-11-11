@@ -231,9 +231,10 @@ export async function checkRaidDevices(sourcePage, problems) {
       '触屏首发没有正确损伤装置或释放触点', mobileFirst);
     await shot('touch-320-damaged');
     await wait(180);
+    const mobileBeforeBlast = await read();
     await singleShot(true); await waitHit(0);
     state = await read();
-    check(state.hp === mobileFirst.hp && state.touchCount === 0 && state.shots === mobileFirst.shots + 1,
+    check(state.hp === mobileBeforeBlast.hp && state.touchCount === 0 && state.shots === mobileFirst.shots + 1,
       '触屏第二发未安全引爆或触点卡住', { mobileFirst, state });
     check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
       '320px 触屏页面横向溢出');
