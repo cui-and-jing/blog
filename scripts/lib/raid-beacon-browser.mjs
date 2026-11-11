@@ -11,7 +11,8 @@ export async function checkRaidBeacon(sourcePage, problems) {
   const read = () => page.evaluate(() => ({ ...window.__raidState }));
   const phase = value => page.waitForFunction(expected => window.__raidState?.phase === expected,
     { timeout: 5000 }, value);
-  let checkpoint = '初始化', client = null, contacts = new Map();
+  let checkpoint = '初始化', touchBaseline = null, sawIndependentJumpRelease = false;
+  const contacts = new Map();
   const keys = new Set();
   const check = (ok, message, details) => {
     if (!ok) problems.push('Pixel Raid 信标：' + message + (details ? ' ' + JSON.stringify(details) : ''));
@@ -48,28 +49,68 @@ export async function checkRaidBeacon(sourcePage, problems) {
     throw new Error('手柄方向导航不能抵达 ' + selector);
   };
   const choosePad = async selector => { await focusPad(selector); await pressPad(0); };
-  const release = async () => {
-    for (const name of [...keys]) await key(name, false);
-    if (contacts.size) {
-      await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-      contacts.clear();
+  const touchAudit = async (action, held, from, pointerId) => {
+    const result = await page.evaluate(index => ({
+      events: window.__raidBeaconTouchEvents.slice(index),
+      active: [...document.querySelectorAll('[data-action].active')].map(el => el.dataset.action).sort(),
+      state: { phase: window.__raidState.phase, touchCount: window.__raidState.touchCount,
+        shots: window.__raidState.shots, grenades: window.__raidState.grenades,
+        tacticalUses: window.__raidState.tacticalUses },
+    }), from);
+    const expected = [...contacts.keys()].sort(), event = result.events[0];
+    // A new finger must generate exactly one trusted down; ending that finger
+    // must generate exactly its up, with every other captured finger untouched.
+    // This catches stale coordinates and accidental skill presses immediately,
+    // rather than diagnosing them later as an inability to jump or stay alive.
+    if (!check(result.events.length === 1 && event.type === (held ? 'pointerdown' : 'pointerup') &&
+      event.action === action && event.trusted && (held || event.pointerId === pointerId) &&
+      (result.state.phase !== 'playing' || equal(result.active, expected) && result.state.touchCount === expected.length),
+    '真实触点的目标、独立释放或活动集合错误', { action, held, pointerId, expected, result })) {
+      throw new Error('触屏输入分发与预期动作不一致');
     }
+    if (touchBaseline && !check(Object.entries(touchBaseline).every(([name, value]) => result.state[name] === value),
+      '只移动和跳跃的触屏路线触发了射击、手雷或主动技', { touchBaseline, actual: result.state })) {
+      throw new Error('触屏路线触发了未请求的战斗动作');
+    }
+    return event.pointerId;
   };
   const touch = async (action, held) => {
     if (contacts.has(action) === held) return;
+    const from = await page.evaluate(() => window.__raidBeaconTouchEvents.length);
     if (!held) {
-      contacts.delete(action);
-      await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [...contacts.values()] });
+      const contact = contacts.get(action);
+      // Let Puppeteer end this exact native touch. Rebuilding a raw CDP event
+      // from the remaining contacts can end/re-press the wrong finger, especially
+      // when a wrapped HUD has moved the old coordinates over another button.
+      await contact.handle.end(); contacts.delete(action);
+      await touchAudit(action, false, from, contact.pointerId);
+      if (action === 'jump' && (contacts.has('left') || contacts.has('right'))) sawIndependentJumpRelease = true;
       return;
     }
     const point = await page.$eval('[data-action="' + action + '"]', el => {
-      const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      // Keep both rows in view before measuring; existing fingers retain their
+      // native pointer capture and are never re-sent at their old coordinates.
+      el.closest('.controls').scrollIntoView({ block: 'end' });
+      const r = el.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
+      const hit = document.elementFromPoint(x, y);
+      return { x, y, hit: hit === el || el.contains(hit), width: innerWidth, height: innerHeight };
     });
-    if (!check(point.x >= 0 && point.x < 320 && point.y >= 0 && point.y < 844,
-      '触控按键不在 320px 可触区域：' + action, point)) throw new Error('触控目标不可达');
-    point.id = ['left', 'right', 'down', 'jump', 'fire'].indexOf(action) + 1;
-    contacts.set(action, point);
-    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [...contacts.values()] });
+    if (!check(point.hit && point.x >= 0 && point.x < point.width && point.y >= 0 && point.y < point.height,
+      '触控按键不在 320px 可触区域或命中其他元素：' + action, point)) throw new Error('触控目标不可达');
+    const handle = await page.touchscreen.touchStart(point.x, point.y);
+    const contact = { handle, pointerId: null }; contacts.set(action, contact);
+    contact.pointerId = await touchAudit(action, true, from);
+  };
+  const release = async () => {
+    for (const name of [...keys]) await key(name, false);
+    // Release Jump before a held direction so the ordinary route verifies the
+    // regression explicitly: lift one finger while the other keeps moving.
+    const actions = [...contacts.keys()].sort((a, b) => Number(b === 'jump') - Number(a === 'jump'));
+    const errors = [];
+    for (const action of actions) {
+      try { await touch(action, false); } catch (error) { errors.push(error); }
+    }
+    if (errors.length) throw new AggregateError(errors, '触控释放或独立触点校验失败');
   };
   const drive = async (input, state, mobile = false) => {
     if (mobile) {
@@ -293,6 +334,17 @@ export async function checkRaidBeacon(sourcePage, problems) {
     await page.evaluateOnNewDocument(() => {
       // Only the browser input provider is substituted, never the game itself.
       window.__raidBeaconController = { connected: false, buttons: [] };
+      // Observe native browser delivery only. No game state, event dispatch,
+      // clock, RNG, input handler or storage implementation is replaced.
+      window.__raidBeaconTouchEvents = [];
+      for (const type of ['pointerdown', 'pointerup', 'pointercancel']) {
+        document.addEventListener(type, event => {
+          if (event.pointerType !== 'touch') return;
+          window.__raidBeaconTouchEvents.push({ type, pointerId: event.pointerId,
+            action: event.target.closest?.('[data-action]')?.dataset.action || null,
+            trusted: event.isTrusted, x: event.clientX, y: event.clientY });
+        }, true);
+      }
       Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => {
         const input = window.__raidBeaconController;
         return input.connected ? [{ connected: true, id: 'Beacon browser controller', index: 0,
@@ -341,12 +393,15 @@ export async function checkRaidBeacon(sourcePage, problems) {
 
     checkpoint = '320px 触屏与手柄委托选择';
     await begin(true); await chooseContract(true);
-    client = await page.createCDPSession();
+    const beforeTouch = await read();
+    touchBaseline = { shots: beforeTouch.shots, grenades: beforeTouch.grenades, tacticalUses: 0 };
+    check(beforeTouch.tacticalUses === 0, '纯移动触屏路线开始前意外释放了主动技', beforeTouch);
     await page.$eval('.controls', el => el.scrollIntoView({ block: 'end' }));
     checkpoint = '320px 真实触屏登台';
     state = await until(s => s.fieldContract.beacon.progress >= .6, beaconTactics(), { mobile: true });
     check(state.touchCount === 0 && state.fieldContract.beacon.progress < 5 && state.ground &&
-      state.y + state.playerHeight === 325, '触屏移动和跳跃未抵达信标或释放触点', state);
+      state.y + state.playerHeight === 325 && sawIndependentJumpRelease,
+    '触屏移动和跳跃未抵达信标、释放触点或单独抬起跳跃手指', state);
     await pixels('partial-touch-320');
     checkpoint = '触屏降层不继续夺控';
     await touch('down', true); await touch('jump', true);
@@ -361,6 +416,7 @@ export async function checkRaidBeacon(sourcePage, problems) {
     '信标下方实地误判为占领、持续累计或触控残留', state);
     check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), '320px 游戏画面横向溢出');
     await shot('below-beacon-touch-320');
+    touchBaseline = null;
     checkpoint = '未完成委托仍能正常清场';
     await observeSettlement(); state = await fight(2); await frames(); await settlement(false, state);
   } catch (error) {
@@ -368,7 +424,6 @@ export async function checkRaidBeacon(sourcePage, problems) {
     await shot('failure').catch(() => {});
   } finally {
     await release().catch(() => {});
-    if (client) await client.detach().catch(() => {});
     await context.close();
   }
 }
