@@ -3500,7 +3500,7 @@ test('real inputs capture all three beacon layouts and clear five waves across l
           }
           g.key('a', input.move === 'a'); g.key('d', input.move === 'd'); g.key('j', input.fire !== false); g.key('s', input.down === true);
           if (input.jump && state.ground) { g.key('w', false); g.key('w'); } else if (!input.jump) g.key('w', false);
-          if (input.dash) tap('l'); if (input.grenade) tap('k');
+          if (input.dash) tap('l'); if (input.grenade) tap('k'); if (input.tactical) tap('e');
         }
         tick(g); frames++;
       }
@@ -3521,6 +3521,170 @@ test('real inputs capture all three beacon layouts and clear five waves across l
     }
     eq([...layouts].sort(), ['bridge', 'flanks', 'steps']);
   }
+});
+
+// Mortar fixtures isolate support-level impact geometry. Real input runs above
+// and the published browser test still reach these waves without mutations.
+function mortarGame(options) {
+  const g=defense(options);
+  g.run(`survivalWave=4;startWave();spawnTime=0;devices=[];pickups=[];
+    enemies=[makeEnemy(800,'mortar')];enemies[0].shot=0;
+    player.x=465;player.inv=0;player.hp=maxHealth();`);
+  return g;
+}
+const mortar=g=>g.state().enemies.find(e=>e.type==='mortar');
+function launchMortar(g){tickUntil(g,'shells.length===1',65);assert(mortar(g).windup===0);}
+function impactMortar(g){tickUntil(g,'mortarBursts.length===1',60);}
+
+test('one mortar replaces a turret at wave five without displacing the charger or increasing the roster',()=>{
+  const g=defense();
+  for(const wave of [1,2,3,4,5,6,7,8,9,10,98,99]){
+    g.run(`survivalWave=${wave-1};startWave();`);
+    const s=g.state(),casters=s.enemies.filter(e=>e.type==='mortar');
+    eq(casters.length,wave>=5&&wave%3?1:0);
+    eq(s.enemies.length,wave%3?Math.min(8,3+Math.floor(wave/2)):0);
+    eq(s.enemies.filter(e=>e.type==='charger').length,wave>=4&&wave%3?1:0);
+    if(casters.length){eq(casters[0].hp,4+Math.min(6,Math.floor((wave-1)/4)));eq(casters[0].windup,0);assert(g.read('wavePreview(survivalWave)').includes('投弹兵'));}
+    eq(s.shells,[]);eq(s.mortarBursts,[]);
+  }
+  for(const mode of ['campaign','practice','challenge']){
+    g.run(`openTitle();mode='${mode}';`);
+    for(let index=0;index<3;index++){g.run(`resetStage(${index},null);`);assert(!g.state().enemies.some(e=>e.type==='mortar'));eq(g.state().shells,[]);}
+  }
+});
+
+test('mortar waits through ingress, relocation and airborne motion then locks the actual support level',()=>{
+  const g=mortarGame();g.run('spawnTime=1;');const waiting=mortar(g);tick(g,30);eq(mortar(g),waiting);
+  g.run('player.x=enemies[0].x;spawnTime=DT;');tick(g);assert(mortar(g).arrival>0);eq(mortar(g).windup,0);
+  tick(g,20);eq(mortar(g).windup,0);eq(g.state().shells,[]);
+  g.run('enemies[0].arrival=0;enemies[0].shot=0;player.x=465;player.inv=100;');
+  g.key('w');tick(g);g.key('w',false);assert(!g.state().ground);eq(mortar(g).windup,0);
+  for(let n=0;n<90&&!g.state().ground;n++){eq(mortar(g).windup,0);tick(g);}
+  assert(g.state().ground);near(mortar(g).windup,.9);near(mortar(g).aimY,g.state().y+g.state().playerHeight);
+  const support=mortar(g).aimY,lockedX=mortar(g).aimX;g.key('d');tick(g,30);g.key('d',false);
+  near(mortar(g).aimY,support);near(mortar(g).aimX,lockedX);eq(g.state().hostiles,[]);eq(g.state().turretCharge,0);
+});
+
+test('mortar retains the complete fixed warning, one harmless arc and an unscaled reload',()=>{
+  const g=mortarGame();tick(g);near(mortar(g).windup,.9);const x=mortar(g).aimX,y=mortar(g).aimY;
+  tick(g,53);assert(mortar(g).windup>0);eq(g.state().shells,[]);
+  launchMortar(g);let shot=g.state().shells[0];eq(shot.elapsed,0);near(mortar(g).shot,2.6);
+  eq([shot.aimX,shot.aimY],[x,y]);eq(shot.zone,{x:x-58,y:y-64,w:116,h:64});
+  const hp=g.state().hp;tick(g,25);shot=g.state().shells[0];assert(shot.y<shot.startY-100);eq(g.state().hp,hp);
+  tick(g,25);eq(g.state().shells.length,1);eq(g.state().hp,hp);
+  impactMortar(g);eq(g.state().shells,[]);eq(g.state().hp,hp-1);eq(g.state().mortarBursts.length,1);
+  tick(g,20);eq(g.state().hp,hp-1);eq(g.state().mortarBursts,[]);assert(mortar(g).shot>1);
+  g.run('survivalWave=98;enemies[0].shot=0;');tick(g);near(mortar(g).windup,.9);
+  launchMortar(g);near(mortar(g).shot,2.6);eq(g.state().hostiles,[]);
+});
+
+test('mortar support boxes match all three arena ledges, clamp wall edges and exclude players underneath',()=>{
+  for(const wave of [5,7,8]){
+    const g=mortarGame();g.run(`survivalWave=${wave-1};startWave();spawnTime=0;devices=[];pickups=[];
+      enemies=[makeEnemy(900,'mortar')];enemies[0].shot=0;player.inv=0;`);
+    for(const [x,y,w] of g.state().platforms){
+      g.run(`shells=[];enemies[0].windup=0;enemies[0].shot=0;player.x=${x+w/2-13.5};
+        player.y=${y-44};player.h=44;player.vy=0;player.vx=0;player.ground=true;player.inv=0;`);
+      tick(g);near(mortar(g).aimY,y);near(mortar(g).aimX,x+w/2);launchMortar(g);
+      const hp=g.state().hp;g.run('player.y=G-44;player.vy=0;player.ground=true;');impactMortar(g);eq(g.state().hp,hp);
+      g.run('mortarBursts=[];');
+    }
+  }
+  for(const [x,target] of [[8,58],[927,902]]){
+    const g=mortarGame();g.run(`player.x=${x};`);tick(g);near(mortar(g).aimX,target);
+    launchMortar(g);const box=g.state().shells[0].zone;assert(box.x>=0&&box.x+box.w<=960);
+  }
+});
+
+test('mortar box boundary uses the same rectangle as its warning and crouching does not evade it',()=>{
+  for(const [offset,damage] of [[-85,false],[-84.9,true],[58,false],[57.9,true]]){
+    const g=mortarGame();tick(g);const x=mortar(g).aimX;launchMortar(g);
+    g.run(`player.x=${x+offset};player.inv=0;`);const hp=g.state().hp;impactMortar(g);eq(g.state().hp,hp-Number(damage));
+  }
+  const g=mortarGame();g.key('s');tick(g);launchMortar(g);const hp=g.state().hp;impactMortar(g);eq(g.state().hp,hp-1);assert(g.state().crouch);
+});
+
+test('genuine walk, timed jump and platform drop evade the locked impact while preserving beacon progress',()=>{
+  for(const reducedMotion of [false,true]){
+    const walk=mortarGame({reducedMotion});tick(walk);const target=mortar(walk).aimX;walk.key('a');tick(walk,30);walk.key('a',false);
+    launchMortar(walk);const hp=walk.state().hp;impactMortar(walk);eq(walk.state().hp,hp);assert(walk.state().x+27<target-58);
+    const jump=mortarGame({reducedMotion});jump.run('stage.platforms=[];');launchMortar(jump);tick(jump,30);
+    const health=jump.state().hp;jump.key('w');tick(jump);jump.key('w',false);impactMortar(jump);eq(jump.state().hp,health);assert(jump.state().y+jump.state().playerHeight<361);
+    const drop=beaconDefense({wave:5,reducedMotion});standAtBeacon(drop);
+    drop.run("spawnTime=0;devices=[];pickups=[];enemies=[makeEnemy(100,'mortar')];enemies[0].shot=0;player.inv=0;fieldContract.beacon.progress=2;");
+    tick(drop,10);launchMortar(drop);const progress=beaconProgress(drop),healthBefore=drop.state().hp;
+    drop.key('s');drop.key('w');tick(drop);drop.key('w',false);drop.key('s',false);assert(drop.state().dropTime>0);
+    impactMortar(drop);eq(drop.state().hp,healthBefore);near(beaconProgress(drop),progress);assert(drop.state().y+drop.state().playerHeight>mortar(drop).aimY);
+  }
+});
+
+test('dash and phase shield protect from mortar without reflecting it or charging from its blast',()=>{
+  for(const kind of ['dash','shield']){
+    const g=mortarGame({loadout:'counter'});launchMortar(g);tick(g,49);
+    g.run('player.face=-1;tacticalCharge=100;');const hp=g.state().hp;
+    g.key(kind==='dash'?'l':'e');tick(g);g.key(kind==='dash'?'l':'e',false);impactMortar(g);
+    eq(g.state().hp,hp);eq(g.state().reflections,0);eq(g.state().hostiles,[]);
+    if(kind==='shield'){eq(g.state().tacticalUses,1);eq(g.state().tacticalCharge,0);}
+    else eq(g.state().tacticalCharge,100);
+  }
+});
+
+test('killing a mortar interrupts windup but never erases a launched shell, with ordinary reward and skill attribution',()=>{
+  for(const launched of [false,true]){
+    const g=mortarGame();g.run("enemies.push({...makeEnemy(60,'turret'),shot:100});tacticalCharge=0;");tick(g);if(launched)launchMortar(g);
+    const score=g.state().score;g.run('damageEnemy(enemies[0],4);damageEnemy(enemies[0],4);');
+    eq(g.state().score,score+160);eq(g.state().tacticalCharge,24);eq(g.read('enemies[0].windup'),0);
+    eq(g.state().shells.length,Number(launched));const hp=g.state().hp;tick(g,60);eq(g.state().hp,hp-Number(launched));
+  }
+  const skill=mortarGame({loadout:'demolition'});skill.run('enemies[0].x=600;');skill.key('e');tick(skill);skill.key('e',false);
+  eq(skill.state().enemies,[]);eq(skill.state().tacticalCharge,0);eq(skill.state().shells,[]);
+});
+
+test('lethal impact wins same-tick last-enemy trades and never pays clear or completed beacon rewards',()=>{
+  for(const order of [false,true]){
+    const g=beaconDefense({wave:5});standAtBeacon(g);
+    g.run("spawnTime=0;devices=[];pickups=[];enemies=[makeEnemy(100,'mortar')];enemies[0].shot=0;player.inv=0;fieldContract.beacon.progress=5;");
+    launchMortar(g);g.run(`player.hp=1;shells[0].elapsed=MORTAR.flight-DT/2;
+      projectile(95,407,650,0,'p',99);${order?'bullets.reverse();':''}`);
+    const before=g.state().progress.survival;tick(g);eq(g.state().phase,'survivalOver');eq(g.state().progress.survival,before);
+    eq(g.state().fieldContract.status,'missed');eq(g.state().shells,[]);eq(g.state().mortarBursts,[]);
+  }
+});
+
+test('warning and flight freeze on pause, confirmation, hidden tab and blur; snapshots and saves stay detached',()=>{
+  for(const launched of [false,true]){
+    const g=mortarGame();tick(g);if(launched)launchMortar(g);
+    g.key('p');g.key('p',false);const frozen=g.state();g.frames(120);eq(g.state(),frozen);
+    for(const name of ['restart','menu-home']){g.click(name);g.frames(30);g.click('cancel-restart');eq(g.state(),frozen);}
+    const snapshot=g.win.__raidState;if(launched){snapshot.shells[0].aimY=-999;snapshot.shells[0].zone.h=999;}else snapshot.enemies[0].aimX=-999;
+    eq(g.state(),frozen);g.run('saveProgress();');assert(!/mortar|shells|aimX/.test(JSON.stringify(g.state().progress)));
+    g.click('start');tick(g);g.visibility(true);const hidden=g.state();g.frames(60);eq(g.state(),hidden);g.visibility(false);g.click('start');tick(g);
+    g.event('blur');const blurred=g.state();g.frames(60);eq(g.state(),blurred);eq(g.state().phase,'pause');
+    g.key('r');g.click('start');eq(g.state().survivalWave,1);eq(g.state().shells,[]);eq(g.state().mortarBursts,[]);assert(!mortar(g));
+  }
+});
+
+test('clear, next boss wave and mode switch cancel all remaining mortar hazards',()=>{
+  for(const transition of ['clear','next','home']){
+    const g=mortarGame();launchMortar(g);
+    if(transition==='clear'){g.run('damageEnemy(enemies[0],99);');tick(g);eq(g.state().phase,'waveClear');}
+    if(transition==='next'){g.run('startWave();');eq(g.state().survivalWave,6);eq(g.state().enemies,[]);}
+    if(transition==='home'){g.run('openTitle();');eq(g.state().phase,'title');}
+    eq(g.state().shells,[]);eq(g.state().mortarBursts,[]);
+  }
+});
+
+test('last windup tick launches before ordinary shot collisions while earlier kills and immediate skills interrupt',()=>{
+  for(const ticks of [.5,1.5]){
+    const g=mortarGame();g.run(`enemies.push({...makeEnemy(60,'turret'),shot:100});
+      enemies[0].windup=DT*${ticks};enemies[0].aimX=player.x+13.5;enemies[0].aimY=G;
+      projectile(795,407,650,0,'p',4);`);
+    tick(g);assert(!mortar(g));eq(g.state().phase,'playing');eq(g.state().shells.length,ticks<1?1:0);
+    if(ticks<1)eq(g.state().shells[0].elapsed,0);
+  }
+  const g=mortarGame({loadout:'demolition'});
+  g.run("player.x=650;enemies[0].windup=DT/2;enemies.push({...makeEnemy(60,'turret'),shot:100});");
+  g.key('e');tick(g);g.key('e',false);assert(!mortar(g));eq(g.state().shells,[]);eq(g.state().phase,'playing');
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);

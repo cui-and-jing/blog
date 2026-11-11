@@ -26,6 +26,7 @@ import { checkRaidLobby } from './lib/raid-lobby-browser.mjs';
 import { checkRaidController } from './lib/raid-controller-browser.mjs';
 import { checkRaidDevices } from './lib/raid-devices-browser.mjs';
 import { checkRaidBeacon } from './lib/raid-beacon-browser.mjs';
+import { checkRaidMortar } from './lib/raid-mortar-browser.mjs';
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -458,6 +459,7 @@ async function checkGame(browser, file) {
       await checkRaidController(page, problems);
       await checkRaidDevices(page, problems);
       await checkRaidBeacon(page, problems);
+      await checkRaidMortar(page, problems);
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
