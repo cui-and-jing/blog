@@ -90,7 +90,7 @@ export async function checkRaidController(sourcePage, problems) {
     await frames();
   };
 
-  page.on('pageerror', error => check(false, '页面异常：' + error.message));
+  page.on('pageerror', error => check(false, '页面异常：' + error.message, { checkpoint, stack: error.stack }));
   try {
     await page.evaluateOnNewDocument(() => {
       window.__raidControllerInput = { connected: false, buttons: [], axes: [0, 0], id: 'Raid browser controller' };
@@ -159,31 +159,54 @@ export async function checkRaidController(sourcePage, problems) {
     check(await page.evaluate(() => document.activeElement === document.querySelector('#campaign-guide > summary')),
       '折叠后仍可导航到隐藏的练习按钮');
 
-    checkpoint = '缺少 checkVisibility 的兼容路径';
-    const visibilityDescriptor = await page.evaluateHandle(() =>
-      Object.getOwnPropertyDescriptor(Element.prototype, 'checkVisibility'));
+    checkpoint = 'checkVisibility 兼容路径 / 安装临时替身';
     try {
-      await page.evaluate(() => Object.defineProperty(Element.prototype, 'checkVisibility', {
-        configurable: true, writable: true, value: undefined,
-      }));
+      // Keep the native descriptor and restoration closure in the page. In
+      // particular, never return Element.prototype from Object.defineProperty:
+      // CDP cannot reliably serialize its native methods/accessors by value.
+      const installed = await page.evaluate(() => {
+        const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'checkVisibility');
+        window.__raidRestoreVisibility = () => {
+          if (descriptor) Object.defineProperty(Element.prototype, 'checkVisibility', descriptor);
+          else delete Element.prototype.checkVisibility;
+          delete window.__raidRestoreVisibility;
+          const restored = Object.getOwnPropertyDescriptor(Element.prototype, 'checkVisibility');
+          return descriptor ? restored?.value === descriptor.value && restored.writable === descriptor.writable &&
+            restored.enumerable === descriptor.enumerable && restored.configurable === descriptor.configurable : !restored;
+        };
+        Object.defineProperty(Element.prototype, 'checkVisibility', {
+          configurable: true, writable: true, value: undefined,
+        });
+        return typeof Element.prototype.checkVisibility === 'undefined';
+      });
+      check(installed, '兼容夹具未成功移除 checkVisibility');
+      checkpoint = 'checkVisibility 兼容路径 / 跳过关闭折叠内容';
       await focusTo('#stage-menu > summary'); await press(13);
       check(await page.evaluate(() => document.activeElement === document.querySelector('#campaign-guide > summary')),
         '兼容路径未跳过关闭折叠里的练习按钮');
+      checkpoint = 'checkVisibility 兼容路径 / 展开并访问可用练习';
       await choose('#stage-menu > summary'); await press(13);
       check(await focusKey() === 'stage-1', '兼容路径不能导航到展开后的可用练习');
+      checkpoint = 'checkVisibility 兼容路径 / 跳过禁用练习';
       await press(13);
       check(await page.evaluate(() => document.activeElement === document.querySelector('#campaign-guide > summary')),
         '兼容路径没有过滤禁用练习按钮');
+      checkpoint = 'checkVisibility 兼容路径 / B 收起折叠';
       await press(12); await press(1);
       check((await read()).phase === 'title' && await page.$eval('#stage-menu', n => !n.open),
         '缺少 checkVisibility 时菜单冻结或 B 无法收起折叠');
     } finally {
-      await page.evaluate(descriptor => {
-        if (descriptor) Object.defineProperty(Element.prototype, 'checkVisibility', descriptor);
-        else delete Element.prototype.checkVisibility;
-      }, visibilityDescriptor);
-      await visibilityDescriptor.dispose();
+      // Report restoration errors separately without hiding the original input
+      // failure or its precise subcheckpoint. Only a boolean crosses CDP.
+      try {
+        const restored = await page.evaluate(() => window.__raidRestoreVisibility?.() === true);
+        check(restored, '兼容夹具未完整恢复原生 checkVisibility', { checkpoint });
+      } catch (error) {
+        check(false, 'checkVisibility 兼容路径 / 恢复原生方法失败：' + error.message,
+          { checkpoint, stack: error.stack });
+      }
     }
+    checkpoint = 'checkVisibility 兼容路径 / 恢复后的焦点验证';
     await visibleFocus('恢复原生可见性检查后');
 
     checkpoint = '键盘鼠标交替';
@@ -366,7 +389,7 @@ export async function checkRaidController(sourcePage, problems) {
       state.tacticalUses === 0, '选好补给后 Start 未进入第二波或泄漏动作', state);
     await press(9); await phase('pause'); await shot('320-second-wave-paused');
   } catch (error) {
-    check(false, checkpoint + '检查中断：' + error.message);
+    check(false, checkpoint + '检查中断：' + error.message, { stack: error.stack ?? String(error) });
     await shot('failure').catch(() => {});
   } finally {
     await context.close();
