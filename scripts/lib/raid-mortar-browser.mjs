@@ -1,4 +1,5 @@
 /** Mortar counterplay, earned through real combat and unmodified game clocks. */
+import fs from 'node:fs';
 import path from 'node:path';
 import { survivalTactics } from './raid-survival-tactics.mjs';
 
@@ -24,9 +25,15 @@ export async function checkRaidMortar(sourcePage, problems) {
     const handle = await page.waitForFunction(predicate, { timeout: 7000, polling: 'raf' }, ...args);
     try { return await handle.jsonValue(); } finally { await handle.dispose(); }
   };
-  const shot = name => page.screenshot({
-    path: path.join(process.cwd(), '.shots', 'pixelraid-mortar-' + name + '.png'), fullPage: true,
-  });
+  const shot = async name => {
+    const prefix = path.join(process.cwd(), '.shots', 'pixelraid-mortar-');
+    await page.screenshot({ path: prefix + name + '.png', fullPage: true });
+    // The native pause overlay deliberately dims the field. Preserve the
+    // actual rendered canvas too, so visual review can inspect the warning,
+    // projectile and impact geometry without modifying DOM or game state.
+    const png = await page.$eval('#field', canvas => canvas.toDataURL('image/png').split(',')[1]);
+    fs.writeFileSync(prefix + 'field-' + name + '.png', Buffer.from(png, 'base64'));
+  };
   const key = async (name, held) => {
     if (keys.has(name) === held) return;
     await page.keyboard[held ? 'down' : 'up'](name);
