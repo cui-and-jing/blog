@@ -1096,7 +1096,7 @@
         for(const b of bullets)if(b.owner==='e'&&Math.hypot(b.x-x,b.y-y)<=DEVICE_RADIUS)b.life=0;
         for(const other of devices)if(!other.spent&&Math.hypot(other.x+12-x,other.y+18-y)<=DEVICE_RADIUS)damageDevice(other,2,fromSkill);
         const count=devices.filter(item=>item.spent).length-spentBefore;
-        combatNotice((count>1?'连锁爆破 ×'+count:'战术爆破')+' · 仅伤敌 / 清弹');
+        combatNotice((count>1?'连锁爆破 ×'+count:'战术爆破')+' · 仅伤敌 / 清弹');hud();
       }
       function damageEnemy(e,d,fromSkill=false){
         if(e.dead)return;

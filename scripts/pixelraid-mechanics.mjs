@@ -3062,6 +3062,7 @@ test('device durability rejects ingress, enemy bullets, paused actions and repea
   g.key('p');const before=g.state();g.run('damageDevice(devices[1],2);');g.frames(30);eq(g.state(),before);
   g.key('p',false);g.key('p');g.key('p',false);g.run("projectile(580,407,650,0,'p');");tick(g,2);
   eq(g.state().devices[1].hp,0);assert(g.state().devices[1].spent);
+  assert(g.nodes.get('mission-objective').textContent.includes('爆破装置 1 / 2'), 'Detonation must refresh its HUD immediately');
   const after=g.state();g.run('damageDevice(devices[1],99);damageDevice(devices[1],99);');eq(g.state(),after);
   g.key('r');g.click('cancel-restart');eq(g.state().devices[1].spent,true);
 });
@@ -3083,6 +3084,7 @@ test('natural ledge chain is finite, fixed-strength, safe for the player and ski
     enemies=[{...makeEnemy(460,'shield'),y:329,hp:30,maxHp:30,shot:100},
       {...makeEnemy(460,'walker'),y:329,arrival:.6}];damageDevice(devices[0],2);`);
   eq(g.state().devices.map(d=>d.spent),[true,true]);eq(g.read('deviceBursts.length'),2);assert(g.state().combatText.includes('连锁爆破 ×2'));
+  assert(g.nodes.get('mission-objective').textContent.includes('爆破装置 0 / 2'), 'Chain HUD must include every spent device');
   eq(g.state().enemies.map(e=>e.hp),[22,3]);eq(g.state().hp,3);eq(g.state().score,0);eq(g.state().grenades,3);
   g.run('damageDevice(devices[1],20);');eq(g.read('deviceBursts.length'),2);eq(g.state().enemies[0].hp,22);
   g.key('p');const bursts=g.read('deviceBursts');g.frames(40);eq(g.read('deviceBursts'),bursts);
