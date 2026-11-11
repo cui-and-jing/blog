@@ -208,7 +208,7 @@ jobs:
 
       - name: Upload accessibility report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: a11y-report
           # All paths below are explicit QA outputs; include the hidden .shots folder.
@@ -238,7 +238,7 @@ jobs:
 
       - name: Upload game hall layout screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: game-hall-layout
           include-hidden-files: true
