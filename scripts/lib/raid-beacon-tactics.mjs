@@ -1,3 +1,4 @@
+import { mortarJump } from './raid-mortar-tactics.mjs';
 /** Read-only platform route planning. Returned actions use ordinary player controls. */
 export function beaconTactics() {
   let waypoint = null;
@@ -22,7 +23,7 @@ export function beaconTactics() {
     return {
       ...idle,
       move: Math.abs(dx) > 9 ? dx > 0 ? 'd' : 'a' : '',
-      jump: state.ground && floor > waypoint.y + 1 && Math.abs(dx) < 150,
+      jump: mortarJump(state) || state.ground && floor > waypoint.y + 1 && Math.abs(dx) < 150,
     };
   };
 }

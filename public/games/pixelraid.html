@@ -422,6 +422,8 @@
       const beaconTime=value=>(Math.floor(value*10+1e-7)/10).toFixed(1);
       const DEVICE_RADIUS=145,DEVICE_DAMAGE=4;
       const CHARGER={windup:.8,speed:480,distance:216,recover:1.1,cooldown:1.7,range:240};
+      const MORTAR={windup:.9,flight:.85,cooldown:2.6,radius:58,height:64};
+      const mortarZone=shot=>({x:shot.aimX-MORTAR.radius,y:shot.aimY-MORTAR.height,w:MORTAR.radius*2,h:MORTAR.height});
       const STORAGE_KEY='pixel-raid.progress.v1';
       const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches??false;
       const held=new Set(),padHeld=new Set(),touch=new Map();
@@ -435,7 +437,7 @@
       let survivalWave=0,survivalCleared=0,survivalTime=0,spawnTime=0,supplyOffers=[],selectedSupply=null;
       let refluxCooldown=0,selectedLoadout='assault',loadout='assault',supplyRerolls=0;
       let selectedContract='hold',fieldContract=null;
-      let devices=[],deviceBursts=[];
+      let devices=[],deviceBursts=[],shells=[],mortarBursts=[];
       let tacticalCharge=0,tacticalTime=0,tacticalQueued=false,tacticalPadLast=false,tacticalUses=0,tacticalPulse=null;
       const tactic=()=>TACTICS[loadout];
       const shieldActive=()=>survival()&&loadout==='counter'&&tacticalTime>0;
@@ -444,7 +446,7 @@
       const bossWave=()=>survival()&&survivalWave>0&&survivalWave%3===0;
       const synergy=key=>survival()&&SYNERGIES[key].pair.every(name=>upgrades[name]>0);
       const activeSynergies=()=>Object.keys(SYNERGIES).filter(synergy);
-      const wavePreview=wave=>wave%3===0?'首领战 · '+STAGES[Math.floor((wave-1)/3)%3].bossName:'双向增援 · 第 '+wave+' 波 · '+arenaForWave(wave).name+(wave>=4?' · 冲锋兵加入':'');
+      const wavePreview=wave=>wave%3===0?'首领战 · '+STAGES[Math.floor((wave-1)/3)%3].bossName:'双向增援 · 第 '+wave+' 波 · '+arenaForWave(wave).name+(wave>=4?' · 冲锋兵加入':'')+(wave>=5?' · 投弹兵':'');
       const activeEnemies=()=>enemies.filter(e=>!e.dead).length;
       const dashDelay=()=>Math.max(1.2,2.4-upgrades.dash*.6-(survival()?kit().dash:0));
       const currentChallenge=()=>mode==='challenge'?CHALLENGES[challengeId]:null;
@@ -742,7 +744,7 @@
       }
       function resetStage(index,carry){
         tacticalTime=0;tacticalPulse=null;if(!survival()){tacticalCharge=0;tacticalUses=0;}
-        fieldContract=null;selectedContract='hold';devices=[];deviceBursts=[];$('contract-options').open=false;
+        fieldContract=null;selectedContract='hold';devices=[];deviceBursts=[];shells=[];mortarBursts=[];$('contract-options').open=false;
         stageIndex=index;stage=STAGES[index];
         if(gauntlet())stage={...stage,name:'首领竞技场',width:W,gaps:[],checkpoints:[],
           platforms:[[260,320,170],[500,310,150]],intel:[],enemies:[],pickups:[]};
@@ -763,8 +765,8 @@
         shot:1.3,phase:0,windup:0,chargeDuration:.72,attacks:0,lastVolley:0,warned:false,dead:hp===0,
         attackType:'volley',beamTime:0,beamY:G-22,flash:0};}
       function makeEnemy(x,type){return {x,y:type==='drone'?260:G-(type==='turret'?34:36),
-          w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='shield'?5:['turret','charger'].includes(type)?4:type==='drone'?2:3,
-          maxHp:type==='shield'?5:['turret','charger'].includes(type)?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false,
+          w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='shield'?5:['turret','charger','mortar'].includes(type)?4:type==='drone'?2:3,
+          maxHp:type==='shield'?5:['turret','charger','mortar'].includes(type)?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false,
           face:-1,windup:0,burst:0,burstTimer:0,aimX:0,aimY:0,flash:0,blockFlash:0,
           chargerPhase:'hunt',chargerTime:0,chargerEnd:0};}
       function beginSurvival(){
@@ -789,10 +791,12 @@
         devices=(arena?.devices||[]).map(([x,floor])=>({x:x-12,y:floor-36,w:24,h:36,hp:2,spent:false}));deviceBursts=[];
         const slots=arena?.slots||[],count=Math.min(8,3+Math.floor(survivalWave/2));
         const types=survivalWave===1?['walker']:survivalWave===2?['walker','drone']:['walker','turret','shield','drone'];
-        let droneIndex=0,chargerAdded=false;
+        let droneIndex=0,chargerAdded=false,mortarAdded=false;
         enemies=slots.slice(0,bossWave()?0:count).map((x,i)=>{
           let type=types[(i+survivalWave-1)%types.length];
           if(survivalWave>=4&&type==='walker'&&!chargerAdded){type='charger';chargerAdded=true;}
+          // Replace a turret, not a second walker: wave seven has only one walker.
+          if(survivalWave>=5&&type==='turret'&&!mortarAdded){type='mortar';mortarAdded=true;}
           const e=makeEnemy(x,type);
           // Air units patrol the current layout; all ground units have room to flank.
           if(type==='drone'){e.x=e.home=arena.drones[droneIndex++%arena.drones.length];e.y=240;}
@@ -801,7 +805,7 @@
         });
         pickups=[{...(arena?ledgePoint(arena,arena.spread,25):{x:480,y:260}),kind:'spread',done:false,age:0},
           {x:survivalWave%2?65:bossWave()?700:895,y:G-25,kind:'heal',done:false,age:0}];
-        bullets=[];bombs=[];sparks=[];intel=[];spawnTime=2.2;cam=0;shake=0;
+        bullets=[];bombs=[];shells=[];mortarBursts=[];sparks=[];intel=[];spawnTime=2.2;cam=0;shake=0;
         // A fresh, explicit choice for one ordinary wave. Never create nodes in
         // a boss arena or persist an unfinished commission across attempts.
         fieldContract=selectedContract==='recovery'&&!bossWave()?{status:'active',nodes:
@@ -813,7 +817,7 @@
         selectedContract='hold';
         combo={count:0,timer:0,best:0};combatText='';combatTime=0;selectedSupply=null;
         clearInput();lag=0;phase='playing';hideMenu();frameLast=performance.now();hud();
-        announce('第 '+survivalWave+' 波，'+(bossWave()?stage.bossName+'。首领 2.2 秒后抵达，右侧为竞技场边界。':arena.name+'，'+count+' 名敌人。增援 2.2 秒后抵达。'+arena.hint+'爆破装置可射击引爆，仅伤敌，可连锁。'+(chargerAdded?'橙色冲锋兵蓄力后沿标线突进，跳跃或冲刺避开，趁回气反击。':''))+(fieldContract?.beacon?'信标夺控：登上标记高台站稳累计 5 秒，离开保留进度，完成后活着清场。':''));
+        announce('第 '+survivalWave+' 波，'+(bossWave()?stage.bossName+'。首领 2.2 秒后抵达，右侧为竞技场边界。':arena.name+'，'+count+' 名敌人。增援 2.2 秒后抵达。'+arena.hint+'爆破装置可射击引爆，仅伤敌，可连锁。'+(chargerAdded?'橙色冲锋兵蓄力后沿标线突进，跳跃或冲刺避开，趁回气反击。':'')+(mortarAdded?'紫色投弹兵锁定落点后投掷，离开紫框或换层避开；出手前击败可打断，爆炸不能反弹。':''))+(fieldContract?.beacon?'信标夺控：登上标记高台站稳累计 5 秒，离开保留进度，完成后活着清场。':''));
       }
       function supplyDescription(key){
         const awaken=Object.entries(SYNERGIES).filter(([id,value])=>!synergy(id)&&value.pair.includes(key)&&value.pair.every(name=>name===key||upgrades[name]>0)).map(([,value])=>value.name);
@@ -845,7 +849,7 @@
         progress.survival.best=Math.max(progress.survival.best,bounded(points,9999999));
         best=progress.survival.best;saveProgress();
         player.hp=Math.min(maxHealth(),player.hp+(bossWave()?2:1));player.grenades=Math.min(7,player.grenades+(bossWave()?2:1));
-        bullets=[];bombs=[];spawnTime=0;deviceBursts=[];
+        bullets=[];bombs=[];shells=[];mortarBursts=[];spawnTime=0;deviceBursts=[];
         supplyRerolls=MODULES.some(key=>upgrades[key]<2)?1:0;rollSupplies();
         selectedContract='hold';$('contract-options').open=false;
         $('result-details').textContent='已守住 '+survivalCleared+' 波 · 清场得分 '+points+'\n体力 '+player.hp+' / '+maxHealth()+' · 手雷 '+player.grenades+' · 用时 '+formatTime(survivalTime)+contractReward;
@@ -902,7 +906,8 @@
       }
       function finishSurvival(){
         if(!survival()||phase!=='playing')return;
-        tacticalTime=0;tacticalPulse=null;
+        tacticalTime=0;tacticalPulse=null;shells=[];mortarBursts=[];
+        for(const e of enemies)if(e.type==='mortar')e.windup=0;
         if(fieldContract){fieldContract.status='missed';if(fieldContract.beacon)fieldContract.beacon.occupied=false;}
         $('result-details').textContent='本次守住 '+survivalCleared+' 波 · 倒在第 '+survivalWave+' 波\n最高守住 '+progress.survival.wave+' 波 · 最高清场分 '+progress.survival.best+'\n用时 '+formatTime(survivalTime)+' · 本波未计入纪录'+(fieldContract?'\n'+(fieldContract.beacon?'信标夺控':'回收委托')+'未结算 · 需要活着清场，无额外奖励':'');
         hud();showMenu('防线行动结束','已守住的波数与清场得分已保留。换一套构筑，再突破自己的纪录。','再次守住防线','survivalOver');
@@ -1130,7 +1135,7 @@
         if(e.dead)return;
         chargeTactical(Math.min(e.hp,d)*3+(d>=e.hp?12:0),fromSkill);
         e.hp-=d;e.flash=.12;spark(e.x+e.w/2,e.y+e.h/2,'#f5d48d',5);
-        if(e.hp<=0&&!e.dead){e.dead=true;e.windup=0;e.burst=0;e.chargerTime=0;rewardKill(e.type==='shield'?200:['turret','charger'].includes(e.type)?160:100);beep(180,.07);}
+        if(e.hp<=0&&!e.dead){e.dead=true;e.windup=0;e.burst=0;e.chargerTime=0;rewardKill(e.type==='shield'?200:['turret','charger','mortar'].includes(e.type)?160:100);beep(180,.07);}
       }
       function damageBoss(d,fromSkill=false){
         if(boss.dead||(survival()&&spawnTime>0))return;
@@ -1201,6 +1206,40 @@
           if(e.chargerTime===0){e.chargerPhase='hunt';e.shot=CHARGER.cooldown;}
         }
       }
+      function updateMortar(e,dt){
+        if(e.windup>0){
+          e.windup=Math.max(0,e.windup-dt);
+          if(e.windup===0){
+            // The arc is visual: only the exact marked support-level box hurts.
+            shells.push({x:e.x+e.w/2,y:e.y+6,startX:e.x+e.w/2,startY:e.y+6,
+              aimX:e.aimX,aimY:e.aimY,elapsed:0});
+            e.shot=MORTAR.cooldown;beep(190,.08,'triangle');
+          }
+        }else if(e.shot<=0&&player.ground){
+          e.aimX=clamp(player.x+player.w/2,MORTAR.radius,W-MORTAR.radius);
+          // Acquire only a grounded player's actual support line. A jump or
+          // drop never locks an airborne point or a ledge already being ignored.
+          e.aimY=player.y+player.h;
+          e.windup=MORTAR.windup;e.face=e.aimX>=e.x+e.w/2?1:-1;
+          announce('投弹预警：离开紫框或换层避开；出手前击败可打断，爆炸不能反弹。');
+        }
+      }
+      function updateShells(dt){
+        for(let i=shells.length-1;i>=0;i--){
+          const shot=shells[i];shot.elapsed=Math.min(MORTAR.flight,shot.elapsed+dt);
+          const t=shot.elapsed/MORTAR.flight;
+          shot.x=shot.startX+(shot.aimX-shot.startX)*t;
+          shot.y=shot.startY+(shot.aimY-8-shot.startY)*t-120*4*t*(1-t);
+          if(shot.elapsed>=MORTAR.flight){
+            shells.splice(i,1);mortarBursts.push({...mortarZone(shot),time:.24});
+            spark(shot.aimX,shot.aimY-12,'#e7b4ff',14);beep(110,.09,'sawtooth');
+            // Consume before hurt. A lethal impact must end the run before any
+            // same-tick clear reward, exactly like hostile projectile trades.
+            if(hit(player,mortarZone(shot)))hurt(1);
+            if(phase!=='playing')return;
+          }
+        }
+      }
       function aimAtPlayer(e,speed){
         const dx=player.x+12-(e.x+e.w/2),dy=player.y+20-(e.y+e.h/2),len=Math.hypot(dx,dy)||1;
         projectile(e.x+e.w/2,e.y+e.h/2,dx/len*speed,dy/len*speed,'e');
@@ -1212,6 +1251,7 @@
           tacticalTime=Math.max(0,tacticalTime-dt);
           if(tacticalPulse){tacticalPulse.time-=dt;if(tacticalPulse.time<=0)tacticalPulse=null;}
           deviceBursts=deviceBursts.filter(burst=>(burst.time-=dt)>0);
+          mortarBursts=mortarBursts.filter(burst=>(burst.time-=dt)>0);
           survivalTime+=dt;refluxCooldown=Math.max(0,refluxCooldown-dt);
           const spawning=spawnTime>0;spawnTime=Math.max(0,spawnTime-dt);
           if(spawning&&spawnTime===0)for(const e of enemies){
@@ -1289,6 +1329,9 @@
           }
         }
         if(!survival()&&boss.dead&&player.x>stage.width-115){finishStage();return;}
+        // Advance existing shells before new throws and projectile kills.
+        // Launched shells survive their thrower's death, not a wave transition.
+        updateShells(dt);if(phase!=='playing')return;
         // Moving threats remain near their patrol spawn; air units follow gentle sine paths.
         for(const e of enemies){
           if(e.dead||(survival()&&spawnTime>0))continue;
@@ -1307,6 +1350,7 @@
           }
           if(e.type==='drone'){e.x=e.home+Math.sin(e.age*1.4)*53;e.y=240+Math.sin(e.age*2.1)*26;}
           if(e.type==='charger')updateCharger(e,dt);
+          else if(e.type==='mortar')updateMortar(e,dt);
           else if(e.type==='turret')updateTurret(e,dt);
           else if((survival()||Math.abs(e.x-player.x)<570)&&e.shot<=0){
             aimAtPlayer(e,235);e.shot=rng(2.3,3.5)/(survival()?1+Math.min(12,survivalWave-1)*.05:1);
@@ -1565,6 +1609,14 @@
           rect(e.x+4,e.y+30,8,7,'#303349');rect(e.x+20,e.y+30,8,7,'#303349');
           rect(e.x+(e.face>0?22:2),e.y+4,6,4,'#342c38');
           rect(e.x+(e.face>0?-5:27),e.y+13,8,15,'#ffe0a0');
+        }else if(e.type==='mortar'){
+          rect(e.x+3,e.y,24,9,'#e6b4ff');rect(e.x,e.y+10,30,20,'#8855a6');
+          rect(e.x+4,e.y+30,8,7,'#303349');rect(e.x+20,e.y+30,8,7,'#303349');
+          rect(e.x+(e.face>0?20:2),e.y+3,7,4,'#31263f');
+          rect(e.x+(e.face>0?21:-4),e.y-9,12,27,'#d9b4ee');
+          rect(e.x+(e.face>0?24:-1),e.y-10,6,7,'#483455');
+          c.font='bold 11px system-ui';c.fillStyle='#efccff';
+          c.fillText(e.windup>0?'锁定 · 可打断':e.shot>MORTAR.cooldown-.9?'装填 · 反击':'投弹兵',e.x-16,e.y-20);
         }else if(e.type==='turret'){
           rect(e.x,e.y+12,30,23,'#48566b');
           rect(e.x-12,e.y+17,27,8,'#a5bbc1');
@@ -1656,6 +1708,23 @@
           rect(p.x-8,y-6,16,4,'#c3a9ff');rect(p.x-8,y,16,4,'#c3a9ff');rect(p.x-8,y+6,16,4,'#c3a9ff');
         }else{rect(p.x-7,y-2,15,6,'#a4eafd');rect(p.x+1,y-8,6,18,'#a4eafd');}
       }
+      function drawMortarWarnings(){
+        const warnings=[...enemies.filter(e=>!e.dead&&e.type==='mortar'&&e.windup>0)
+          .map(e=>({...e,remaining:e.windup+MORTAR.flight})),
+          ...shells.map(shot=>({...shot,remaining:MORTAR.flight-shot.elapsed}))];
+        for(const warning of warnings){
+          const zone=mortarZone(warning);
+          c.save();c.globalAlpha=.18;rect(zone.x,zone.y,zone.w,zone.h,'#d997f5');c.globalAlpha=1;
+          c.strokeStyle='#efccff';c.lineWidth=2;c.setLineDash([7,5]);c.strokeRect(zone.x,zone.y,zone.w,zone.h);c.setLineDash([]);
+          line(zone.x,warning.aimY-2,zone.x+zone.w,warning.aimY-2,'#efccff',3);
+          c.font='bold 12px system-ui';c.fillStyle='#efccff';c.textAlign='center';
+          c.fillText('投弹 '+warning.remaining.toFixed(1)+'s',warning.aimX,zone.y-8);
+          rect(zone.x,zone.y-5,zone.w*(1-warning.remaining/(MORTAR.windup+MORTAR.flight)),3,'#efccff');c.restore();
+        }
+        for(const burst of mortarBursts){
+          c.save();c.globalAlpha=.55*burst.time/.24;rect(burst.x,burst.y,burst.w,burst.h,'#efccff');c.restore();
+        }
+      }
       function draw(){
         if(!c)return;
         c.save();
@@ -1663,7 +1732,7 @@
         if(stage){
           const dx=shake>0&&!reducedMotion?rng(-shake,shake):0;
           c.translate(Math.round(-cam+dx),0);
-          terrain();drawDevices();
+          terrain();drawDevices();drawMortarWarnings();
           for(const p of pickups)drawPickup(p);
           for(const item of intel)drawIntel(item);
           if(survival()&&fieldContract?.status==='active'&&fieldContract.beacon){
@@ -1715,6 +1784,7 @@
             rect(b.x-5,b.y-2,10,4,b.reflected?'#80e5ff':b.owner==='p'?'#ffe6a4':'#ff8972');
             rect(b.x-2,b.y-5,4,10,b.owner==='p'?'#fffbd7':'#ffbcac');
           }
+          for(const shot of shells){rect(shot.x-6,shot.y-6,12,12,'#e7b4ff');rect(shot.x-3,shot.y-3,6,6,'#4f325f');}
           for(const b of bombs){rect(b.x-7,b.y-7,14,14,'#c3d0a4');rect(b.x-3,b.y-9,7,5,'#eabd65');}
           for(const s of sparks)rect(s.x,s.y,s.r,s.r,s.color);
           if(!boss.dead&&(gauntlet()||Math.abs(boss.x-player.x)<750)){
@@ -1964,14 +2034,15 @@
         crouch:player?.crouch??false,playerHeight:player?.h??44,coyote:player?.coyote??0,jumpBuffer:player?.jumpBuffer??0,dropTime:player?.dropTime??0,
         platforms:stage?.platforms.map(ledge=>[...ledge])||[],arena:survival()&&stage?.arena?{id:stage.arena.id,name:stage.arena.name,hint:stage.arena.hint}:null,
         devices:devices.map(device=>({...device})),
+        shells:shells.map(shot=>({...shot,zone:mortarZone(shot)})),mortarBursts:mortarBursts.map(burst=>({...burst})),
         pickups:pickups.map(p=>({x:p.x,y:p.y,kind:p.kind,done:p.done})),
         bossAttackType:boss?.attackType??'volley',bossBeamTime:boss?.beamTime??0,bossBeamY:boss?.beamY??0,
-        turretCharge:Math.max(0,...enemies.map(e=>e.dead?0:e.windup)),shieldCount:enemies.filter(e=>!e.dead&&e.type==='shield').length,
+        turretCharge:Math.max(0,...enemies.map(e=>e.dead||e.type!=='turret'?0:e.windup)),shieldCount:enemies.filter(e=>!e.dead&&e.type==='shield').length,
         combo:combo.count,comboTime:combo.timer,comboBest:combo.best,combatText:combatTime>0?combatText:'',reflections,
         survivalWave,survivalCleared,survivalTime,spawnTime,bossWave:bossWave(),bossMaxHp:boss?.maxHp??0,bossX:boss?.x??0,synergies:activeSynergies(),refluxCooldown,loadout,selectedLoadout,supplyRerolls,supplyOffers:[...supplyOffers],selectedSupply,
         tacticalCharge,tacticalTime,tacticalUses,tacticalName:survival()?tactic().name:'',
         selectedContract,fieldContract:fieldContract?{status:fieldContract.status,nodes:fieldContract.nodes.map(node=>({...node})),...(fieldContract.beacon?{beacon:{...fieldContract.beacon}}:{})}:null,
-        enemies:enemies.filter(e=>!e.dead).map(e=>({x:e.x,y:e.y,w:e.w,h:e.h,hp:e.hp,type:e.type,face:e.face,arrival:e.arrival||0,...(e.type==='charger'?{chargerPhase:e.chargerPhase,chargerTime:e.chargerTime,chargerEnd:e.chargerEnd}:{})})),
+        enemies:enemies.filter(e=>!e.dead).map(e=>({x:e.x,y:e.y,w:e.w,h:e.h,hp:e.hp,type:e.type,face:e.face,arrival:e.arrival||0,...(e.type==='charger'?{chargerPhase:e.chargerPhase,chargerTime:e.chargerTime,chargerEnd:e.chargerEnd}:{}),...(e.type==='mortar'?{windup:e.windup,shot:e.shot,aimX:e.aimX,aimY:e.aimY}:{})})),
         clock,runStars:[...runStars],progress:JSON.parse(JSON.stringify(progress))
       })});
       refreshRecords();

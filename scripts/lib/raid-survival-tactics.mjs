@@ -1,3 +1,4 @@
+import { mortarJump } from './raid-mortar-tactics.mjs';
 /** Read-only, player-like inputs shared by VM and published-build combat checks. */
 export function survivalTactics() {
   // Wave setup preserves facing, so orient with a real movement key first.
@@ -25,7 +26,9 @@ export function survivalTactics() {
     // the ledge instead of waiting above its head and oscillating left/right.
     if (descend && state.y + 20 >= descendY) descend = 0;
     if (!state.bossWave && !airborne && !descend && state.y + 20 < target.y) {
-      descend = state.x < 480 ? -1 : 1; descendY = target.y;
+      // Against a stationary mortar, leave the ledge away from its contact
+      // body rather than trapping the player between it and the arena wall.
+      descend = target.type === 'mortar' ? -direction : state.x < 480 ? -1 : 1; descendY = target.y;
     }
     let move = '';
     if (state.bossWave) {
@@ -38,9 +41,21 @@ export function survivalTactics() {
     if (move && state.dashTime === 0) facing = move === 'd' ? 1 : -1;
     const nearby = state.hostiles.some(bullet => Math.abs(bullet.x - center) < 100 &&
       bullet.y > state.y - 15 && bullet.y < state.y + state.playerHeight + 15);
-    const grenade = state.spawnTime === 0 && !retreat && !descend && !airborne && facing === direction &&
-      state.grenades > 0 && ['shield', 'boss'].includes(target.type) && distance > 200 && distance < 340 && state.survivalTime - lastGrenade > 1.4;
+    let grenade = state.spawnTime === 0 && !retreat && !descend && !airborne && facing === direction &&
+      state.grenades > 0 && ['shield', 'boss', 'mortar'].includes(target.type) && distance > 200 && distance < 340 && state.survivalTime - lastGrenade > 1.4;
+    if (state.survivalWave >= 5 && !descend && !airborne && state.spawnTime === 0 && state.grenades > 0 &&
+      ['shield', 'mortar'].includes(target.type) && distance > 90 && distance < 300 && state.survivalTime - lastGrenade > 1.4) {
+      // Turn with movement before throwing, then resume retreat on the next
+      // sample. Do not sit on six grenades while pinned behind a shield.
+      move = direction > 0 ? 'd' : 'a'; facing = direction; grenade = true;
+    }
     if (grenade) lastGrenade = state.survivalTime;
-    return { move, jump: airborne && !retreat && !descend, dash: state.dashCooldown === 0 && (nearby || gap < 65), grenade };
+    const chargerJump = state.survivalWave >= 5 && state.ground && state.enemies.some(e =>
+      e.type === 'charger' && e.chargerPhase === 'windup' && e.chargerTime <= .45 &&
+      state.y + state.playerHeight > e.y && state.x + 27 > Math.min(e.x, e.chargerEnd) &&
+      state.x < Math.max(e.x, e.chargerEnd) + e.w);
+    const tactical = state.survivalWave >= 5 && state.spawnTime === 0 && state.tacticalCharge >= 100 &&
+      state.tacticalTime === 0 && gap < 210;
+    return { tactical, move, jump: mortarJump(state) || chargerJump || airborne && !retreat && !descend, dash: state.dashCooldown === 0 && (nearby || gap < 65), grenade };
   };
 }
