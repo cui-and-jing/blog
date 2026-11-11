@@ -22,6 +22,7 @@ import sharp from 'sharp';
 import { launchBrowser } from './lib/browser.mjs';
 import { checkRaidChallenges } from './lib/raid-challenges-browser.mjs';
 import { checkRaidSurvival } from './lib/raid-survival-browser.mjs';
+import { checkRaidLobby } from './lib/raid-lobby-browser.mjs';
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -390,14 +391,10 @@ async function checkGame(browser, file) {
         const layout = await page.evaluate(() => ({
           viewport: innerWidth, width: document.documentElement.scrollWidth,
           start: document.getElementById('start').getBoundingClientRect().width,
-          controls: [...document.querySelectorAll('.controls [data-action]')].map((button) => ({
-            width: button.getBoundingClientRect().width, height: button.getBoundingClientRect().height,
-            name: button.getAttribute('aria-label'),
-          })),
+          combatControlsVisible: document.querySelector('.controls').checkVisibility(),
         }));
-        if (layout.width > layout.viewport + 1 || layout.start < 90 ||
-            layout.controls.some((control) => control.width < 36 || control.height < 44 || !control.name)) {
-          problems.push('Pixel Raid 手机菜单溢出或触屏控件不可用：' + JSON.stringify({ viewport, layout }));
+        if (layout.width > layout.viewport + 1 || layout.start < 90 || layout.combatControlsVisible) {
+          problems.push('Pixel Raid 手机菜单溢出或未隐藏战斗控件：' + JSON.stringify({ viewport, layout }));
         }
       }
       await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
@@ -417,6 +414,7 @@ async function checkGame(browser, file) {
       if (records.unlocked !== 3 || records.thirdLocked || !records.firstRecord.includes('★★★')) {
         problems.push('Pixel Raid 重载后的星级/选关记录不正确：' + JSON.stringify(records));
       }
+      await page.click('#stage-menu summary');
       await page.click('#stage-3');
       await page.waitForFunction(() => window.__raidState?.phase === 'playing', { timeout: 3000 });
       const practice = await page.evaluate(() => ({ ...window.__raidState }));
@@ -427,6 +425,7 @@ async function checkGame(browser, file) {
       // Later-stage enemies must behave in the minified build, not just the VM harness.
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => window.__raidReady === true, { timeout: 10000 });
+      await page.click('#stage-menu summary');
       await page.click('#stage-2');
       await page.waitForFunction(() => window.__raidState?.turretCharge > 0, { timeout: 4500 });
       await page.screenshot({ path: path.join(process.cwd(), '.shots', 'pixelraid-turret-charge.png'), fullPage: true });
@@ -452,6 +451,7 @@ async function checkGame(browser, file) {
       }
       await checkRaidChallenges(page, problems);
       await checkRaidSurvival(page, problems);
+      await checkRaidLobby(page, problems);
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }

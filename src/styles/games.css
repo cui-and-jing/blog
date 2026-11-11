@@ -1,379 +1,73 @@
-/* ==========================================================================
-   games.css — 游戏大厅与试玩外壳
-   顺序即层叠顺序，调整文件顺序会改变覆盖关系
-   ========================================================================== */
-/* ---------- games ---------- */
-/* 每张卡片在页面里用内联变量声明自己的两种主色，封面底色与按钮渐变都跟着它走，
-   这样加新游戏只需要在 GAMES 里填 accent，不用回来改样式 */
-.game-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
-  overflow: hidden;
-  box-shadow: var(--shadow-lg);
-}
-
-.game-art {
-  position: relative;
-  min-height: 360px;
-  background: linear-gradient(140deg, var(--game-a, #ff5f9e), var(--game-b, #ffa878));
-  overflow: hidden;
-}
-
-.game-art svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.game-art-badge {
-  position: absolute;
-  left: 18px;
-  bottom: 18px;
-  padding: 5px 13px;
-  border-radius: 999px;
-  background: rgba(255, 253, 248, 0.9);
-  color: #203653;
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  box-shadow: 0 2px 10px -4px rgba(32, 54, 83, 0.5);
-}
-
-.game-body {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 16px;
-  padding: 40px 42px;
-}
-
-.game-kicker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.game-tag {
-  padding: 3px 11px;
-  font-size: 11.5px;
-  letter-spacing: 0.02em;
-  color: var(--accent-2);
-  background: color-mix(in srgb, var(--accent-2) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent-2) 22%, transparent);
-  border-radius: 999px;
-}
-
-html[data-theme='dark'] .game-tag {
-  color: #9fd3c8;
-}
-
-.game-body h2 {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-weight: 400;
-  font-size: clamp(26px, 2.6vw, 34px);
-  letter-spacing: -0.01em;
-  line-height: 1.25;
-}
-
-.game-body h2 span {
-  display: block;
-  margin-top: 2px;
-  font-size: 0.56em;
-  letter-spacing: 0.06em;
-  color: var(--text-mute);
-}
-
-.game-body > p {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 14.5px;
-  line-height: 1.75;
-}
-
-.game-facts {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin: 4px 0 2px;
-  padding: 16px 0;
-  list-style: none;
-  border-top: 1px solid var(--line-soft);
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.game-facts li {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.game-facts b {
-  font-family: var(--font-mono);
-  font-size: 17px;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.game-facts span {
-  font-size: 11.5px;
-  color: var(--text-mute);
-}
-
-.game-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-top: 4px;
-}
-
-.game-play {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 26px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, var(--game-a, #ff5f9e), var(--game-b, #ff7a6b));
-  color: #fff;
-  font-size: 14px;
-  letter-spacing: 0.02em;
-  box-shadow: 0 14px 26px -16px color-mix(in srgb, var(--game-a, #ff4e95) 90%, transparent);
-  transition: transform 0.22s var(--ease), box-shadow 0.22s var(--ease), filter 0.22s var(--ease);
-}
-
-.game-play svg {
-  width: 15px;
-  height: 15px;
-  transition: transform 0.22s var(--ease);
-}
-
-.game-play:hover {
-  transform: translateY(-2px);
-  filter: saturate(1.08);
-  box-shadow: 0 18px 30px -16px color-mix(in srgb, var(--game-a, #ff4e95) 95%, transparent);
-}
-
-.game-play:hover svg {
-  transform: translateX(3px);
-}
-
-/* 文字链不做成主按钮：同一张卡上两个同权重按钮会让人犹豫点哪个 */
-.game-link {
-  font-size: 13px;
-  color: var(--text-soft);
-  text-decoration: underline;
-  text-underline-offset: 4px;
-  text-decoration-color: color-mix(in srgb, var(--text-soft) 40%, transparent);
-  transition: color 0.2s var(--ease), text-decoration-color 0.2s var(--ease);
-}
-
-.game-link:hover {
-  color: var(--accent);
-  text-decoration-color: color-mix(in srgb, var(--accent) 60%, transparent);
-}
-
-/* ---------- 动作游戏入口 ----------
-   两款游戏一大一小，第二张也使用横向卡片，避免一张小卡孤零零占四列。 */
-.game-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 22px;
-  margin: 22px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* 卡片整体可点：主链接（开始游戏）拉一层透明遮罩盖住整张卡，
-   这样读屏只遇到一个指向游戏的链接，鼠标点哪儿都进得去。
-   卡内其他链接要抬到遮罩之上（.game-link 的 position/z-index）。 */
-.game-card--mini {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.24s var(--ease), box-shadow 0.24s var(--ease);
-}
-
-.game-card--mini:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-lg);
-}
-
-.game-card--mini:focus-within {
-  box-shadow: var(--shadow-lg);
-}
-
-.game-card--mini .game-art {
-  min-height: 0;
-  aspect-ratio: 16 / 10;
-}
-
-.game-card--mini .game-body {
-  justify-content: flex-start;
-  gap: 12px;
-  padding: 22px 24px 24px;
-}
-
-.game-card--mini .game-body h2 {
-  font-size: clamp(21px, 1.9vw, 25px);
-}
-
-.game-card--mini .game-body > p {
-  font-size: 13.5px;
-  line-height: 1.75;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* The base .game-facts tracks also switch to two columns below 900px.
-   Do not restate four columns here: a more specific mini-card selector
-   would override the responsive rule and squeeze facts on phones. */
-.game-card--mini .game-facts {
-  gap: 8px;
-  padding: 12px 0;
-}
-
-.game-card--mini .game-facts b {
-  font-size: 15px;
-}
-
-.game-card--mini .game-actions {
-  margin-top: auto;
-  padding-top: 4px;
-}
-
-.game-card--mini .game-play {
-  padding: 10px 20px;
-  font-size: 13px;
-}
-
-.game-card--mini .game-play::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-}
-
-.game-card--mini .game-link {
-  position: relative;
-  z-index: 1;
-}
-
-.game-notes {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-  margin-top: 26px;
-}
-
-.game-note {
-  padding: 24px 24px 22px;
-}
-
-.game-note h3 {
-  margin: 0 0 10px;
-  font-family: var(--font-serif);
-  font-weight: 400;
-  font-size: 16px;
-}
-
-.game-note p {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 13.5px;
-  line-height: 1.8;
-}
-
-.keys {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.keys div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.keys dt {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 0;
-}
-
-.keys dd {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--text-soft);
-}
-
-/* 键帽全局样式在 settings.css 里已有，这里只把游戏说明里的稍微放大一点。
-   注意要限定作用域：写成裸 `kbd` 会连带改掉设置面板与快捷键表的键帽 */
-.game-note kbd {
-  display: inline-block;
-  min-width: 22px;
-  padding: 3px 7px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.3;
-  text-align: center;
-  border-radius: 6px;
-}
-
-.game-tail {
-  margin: 26px 0 0;
-  font-size: 13px;
-  color: var(--text-mute);
-}
-
-.game-tail a {
-  color: var(--accent);
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-}
-
-/* ---------- 游戏页的断点 ----------
-   这几个媒体查询特意留在这个文件里而不是 responsive.css：
-   后者先于本文件被引入，写在那边会被这里的基础规则盖掉。 */
-
+/* Games hall: equal choices first, optional detail second. No new JS required. */
+.game-hall { padding-top: 48px; }
+.game-hall-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
+.game-hall-kicker { margin: 0 0 14px; color: var(--accent-2); font: 500 12px/1.5 var(--font-mono); letter-spacing: .1em; }
+.game-hall-head h1 { margin: 0; font-family: var(--font-serif); font-size: clamp(28px, 3.2vw, 40px); font-weight: 400; line-height: 1.35; letter-spacing: -.02em; }
+.game-hall-intro { margin: 12px 0 0; color: var(--text-soft); font-size: 14px; line-height: 1.8; }
+.game-hall-count { flex: none; padding-bottom: 3px; color: var(--text-mute); font: 12px/1.7 var(--font-mono); }
+.game-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px; padding: 0; margin: 0; list-style: none; }
+.game-card { display: flex; flex-direction: column; min-width: 0; overflow: hidden; box-shadow: var(--shadow-sm); }
+.game-art { position: relative; overflow: hidden; aspect-ratio: 2 / 1; background: linear-gradient(140deg, var(--game-a, #ff5f9e), var(--game-b, #ffa878)); }
+.game-art svg { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
+.game-body { display: flex; flex: 1; flex-direction: column; align-items: flex-start; padding: 26px 28px 28px; }
+.game-kicker { margin: 0 0 10px; color: var(--text-mute); font-size: 12px; letter-spacing: .05em; }
+.game-body h2 { margin: 0; font-family: var(--font-serif); font-weight: 400; font-size: 28px; line-height: 1.3; }
+.game-body h2 span { display: block; margin-top: 6px; color: var(--text-mute); font: 11px/1.5 var(--font-mono); letter-spacing: .08em; }
+.game-description { margin: 16px 0 0; color: var(--text-soft); font-size: 14px; line-height: 1.8; }
+.game-meta { margin: auto 0 0; padding-top: 18px; color: var(--text-mute); font-size: 12px; line-height: 1.7; }
+.game-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; width: 100%; padding-top: 20px; margin-top: 18px; border-top: 1px solid var(--line-soft); }
+.game-play { display: inline-flex; align-items: center; justify-content: center; gap: 18px; min-height: 46px; padding: 11px 22px; border-radius: 10px; background: var(--text); color: var(--card); font-size: 14px; line-height: 1.6; transition: background .2s var(--ease); }
+.game-play svg { width: 16px; height: 16px; }
+.game-play:hover { background: var(--accent-2); }
+.game-link { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; color: var(--text-soft); font-size: 12px; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--line); }
+.game-link:hover { color: var(--accent); text-decoration-color: currentColor; }
+.game-guide { margin-top: 26px; overflow: hidden; }
+.game-guide summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 68px; padding: 18px 24px; cursor: pointer; list-style: none; color: var(--text); font-size: 14px; }
+.game-guide summary::-webkit-details-marker { display: none; }
+.game-guide summary:hover { background: var(--bg-soft); }
+.game-guide summary:focus-visible { outline-offset: -4px; }
+.game-guide-hint { display: flex; align-items: center; gap: 18px; color: var(--text-mute); font-size: 12px; }
+.game-guide-plus { font-size: 22px; font-weight: 300; line-height: 1; }
+.game-guide[open] .game-guide-plus { transform: rotate(45deg); }
+.game-guide-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; padding: 24px; border-top: 1px solid var(--line-soft); }
+.game-guide h3 { margin: 0 0 12px; font-family: var(--font-serif); font-size: 20px; font-weight: 400; }
+.game-guide p { margin: 0; color: var(--text-soft); font-size: 13px; line-height: 1.85; }
+.game-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 18px 0; margin: 16px 0; list-style: none; border-block: 1px solid var(--line-soft); }
+.game-facts li { display: flex; flex-direction: column; gap: 4px; }
+.game-facts b { color: var(--text); font: 500 16px/1.5 var(--font-mono); }
+.game-facts span { color: var(--text-mute); font-size: 12px; }
+.keys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; margin: 0; }
+.keys div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.keys dt { display: flex; align-items: center; gap: 4px; }
+.keys dd { margin: 0; color: var(--text-soft); font-size: 12px; }
+.game-note kbd { display: inline-block; min-width: 22px; padding: 3px 5px; font: 11px/1.3 var(--font-mono); text-align: center; border-radius: 5px; }
+.game-guide .game-guide-foot { grid-column: 1 / -1; padding-top: 20px; border-top: 1px solid var(--line-soft); font-size: 12px; }
+.game-tail { margin: 22px 0 0; color: var(--text-mute); font-size: 12px; }
+.game-tail a { color: var(--text-soft); text-decoration: underline; text-underline-offset: 4px; }
 @media (max-width: 900px) {
-  .game-card,
-  .game-card--mini,
-  .game-notes {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .game-art {
-    min-height: 250px;
-    aspect-ratio: 16 / 9;
-  }
-
-  .game-body {
-    padding: 30px 26px 34px;
-  }
-
-
-  .game-facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    row-gap: 14px;
-  }
+  .game-grid { gap: 20px; }
+  .game-body { padding: 22px; }
+  .game-art { aspect-ratio: 16 / 10; }
+  .game-actions { gap: 8px; }
+  .game-play { flex: 1; padding-inline: 14px; }
+  .game-link { justify-content: center; padding-inline: 4px; }
+  .game-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-
-@media (max-width: 560px) {
-  .game-body {
-    padding: 24px 20px 26px;
-  }
-
-  .game-play {
-    padding: 11px 22px;
-  }
+@media (max-width: 600px) {
+  .game-hall { padding-top: 30px; }
+  .game-hall-head { align-items: flex-start; gap: 10px; margin-bottom: 24px; }
+  .game-hall-count { display: none; }
+  .game-hall-intro { max-width: 24em; font-size: 13px; }
+  .game-grid, .game-guide-content { grid-template-columns: minmax(0, 1fr); }
+  .game-art { aspect-ratio: 2 / 1; }
+  .game-body { padding: 22px; }
+  .game-body h2 { font-size: 26px; }
+  .game-description { margin-top: 12px; }
+  .game-meta { padding-top: 14px; }
+  .game-actions { padding-top: 16px; margin-top: 16px; gap: 16px; }
+  .game-play { flex: initial; }
+  .game-guide { margin-top: 20px; }
+  .game-guide summary { min-height: 64px; padding: 18px; }
+  .game-guide-hint { gap: 10px; font-size: 11px; }
+  .game-guide-content { padding: 20px; gap: 24px; }
 }
-

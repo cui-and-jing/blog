@@ -2,139 +2,84 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCover from '../../components/GameCover.astro';
 import gamesCssSource from '../../styles/games.css?raw';
-import { GAMES, url, SITE } from '../../lib/site';
+import { GAMES, url } from '../../lib/site';
 
-// Inline only on the game hall; strip source comments to avoid shipping them in HTML.
+// The hall stays static: native links and disclosures work without JavaScript.
 const gamesCss = gamesCssSource.replace(/\/\*[\s\S]*?\*\//g, '');
-const [featured, ...rest] = GAMES;
+const introductions: Record<string, { kind: string; description: string; players: string }> = {
+  beanrush: {
+    kind: '3D 派对',
+    description: '在糖果岛屿闯关，与 AI 竞技，或和朋友双人同屏。',
+    players: '单人 / 本地双人',
+  },
+  pixelraid: {
+    kind: '像素动作',
+    description: '探索三章远征，挑战作战任务，或在防线生存中突破纪录。',
+    players: '单人 · 键盘 / 触屏',
+  },
+};
 ---
 
 <BaseLayout title="游戏" description="两款离线游戏，以派对竞技和像素动作玩法为主。">
   <style slot="head" is:inline set:html={gamesCss} />
-  <div class="page-head">
-    <div class="shell">
-      <h1>游戏</h1>
-      <p>两个游戏，各有自己的玩法。打开就能玩，不用登录，也不用下载。</p>
-    </div>
-  </div>
-
-  <div class="shell">
-    {/* 旗舰 3D 派对游戏保持原样，其他游戏采用横向动作卡片 */}
-    <article
-      class="game-card"
-      style={`--game-a:${featured.accent[0]};--game-b:${featured.accent[1]}`}
-    >
-      <div class="game-art">
-        <GameCover slug={featured.slug} />
-        <span class="game-art-badge">{featured.badge}</span>
+  <div class="shell game-hall">
+    <header class="game-hall-head">
+      <div>
+        <p class="game-hall-kicker">PLAY / 游戏</p>
+        <h1>挑一个，玩一会儿。</h1>
+        <p class="game-hall-intro">两种玩法，随时开始。不用登录，也不用下载。</p>
       </div>
+      <span class="game-hall-count">{String(GAMES.length).padStart(2, '0')} 款游戏</span>
+    </header>
 
-      <div class="game-body">
-        <div class="game-kicker">
-          {featured.tags.map((tag) => <span class="game-tag">{tag}</span>)}
-        </div>
-        <h2>
-          {featured.title}<span>{featured.subtitle}</span>
-        </h2>
-        <p>{featured.description}</p>
-
-        <ul class="game-facts">
-          {featured.facts.map((fact) => (
-            <li>
-              <b>{fact.value}</b>
-              <span>{fact.label}</span>
-            </li>
-          ))}
-        </ul>
-
-        <div class="game-actions">
-          <a class="game-play" href={url(`/games/${featured.slug}/`)}>
-            开始游戏
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M5 12h13M13 6l6 6-6 6" />
-            </svg>
-          </a>
-          <a class="game-link" href={url(featured.file)} target="_blank" rel="noopener">新窗口打开</a>
-        </div>
-      </div>
-    </article>
-
-    <ul class="game-grid" aria-label="动作游戏">
-      {rest.map((game) => (
-        <li
-          class="game-card game-card--mini"
-          style={`--game-a:${game.accent[0]};--game-b:${game.accent[1]}`}
-        >
-          <div class="game-art">
-            <GameCover slug={game.slug} />
-            <span class="game-art-badge">{game.badge}</span>
-          </div>
-
+    <ul class="game-grid" aria-label="选择游戏">
+      {GAMES.map((game) => (
+        <li class="game-card" aria-labelledby={`game-${game.slug}`} style={`--game-a:${game.accent[0]};--game-b:${game.accent[1]}`}>
+          <div class="game-art"><GameCover slug={game.slug} /></div>
           <div class="game-body">
-            <div class="game-kicker">
-              {game.tags.map((tag) => <span class="game-tag">{tag}</span>)}
-            </div>
-            <h2>
-              {game.title}<span>{game.subtitle}</span>
-            </h2>
-            <p>{game.description}</p>
-
-            <ul class="game-facts">
-              {game.facts.map((fact) => (
-                <li>
-                  <b>{fact.value}</b>
-                  <span>{fact.label}</span>
-                </li>
-              ))}
-            </ul>
-
+            <p class="game-kicker">{introductions[game.slug].kind}</p>
+            <h2 id={`game-${game.slug}`}>{game.subtitle}<span>{game.title}</span></h2>
+            <p class="game-description">{introductions[game.slug].description}</p>
+            <p class="game-meta">{introductions[game.slug].players}</p>
             <div class="game-actions">
-              <a class="game-play" href={url(`/games/${game.slug}/`)}>
+              <a class="game-play" href={url(`/games/${game.slug}/`)} aria-label={`开始游戏：${game.subtitle}`}>
                 开始游戏
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M5 12h13M13 6l6 6-6 6" />
-                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
               </a>
-              <a class="game-link" href={url(game.file)} target="_blank" rel="noopener">新窗口</a>
+              <a class="game-link" href={url(game.file)} target="_blank" rel="noopener" aria-label={`新窗口打开${game.subtitle}`}>新窗口打开 <span aria-hidden="true">↗</span></a>
             </div>
           </div>
         </li>
       ))}
     </ul>
 
-    <section class="game-notes">
-      <div class="game-note">
-        <h3>怎么玩</h3>
-        <p>
-          点「开始游戏」进入试玩页，右上角可以全屏。两款玩法不同，按各自提示操作。
-        </p>
+    <details class="game-note game-guide">
+      <summary><span>玩法与操作说明</span><span class="game-guide-hint">需要时再展开 <span class="game-guide-plus" aria-hidden="true">+</span></span></summary>
+      <div class="game-guide-content">
+        {GAMES.map((game) => (
+          <section aria-labelledby={`guide-${game.slug}`}>
+            <h3 id={`guide-${game.slug}`}>{game.subtitle}</h3>
+            <p>{game.description}</p>
+            <ul class="game-facts">
+              {game.facts.map((fact) => <li><b>{fact.value}</b><span>{fact.label}</span></li>)}
+            </ul>
+            {game.slug === 'beanrush' ? (
+              <p>进入游戏后选择关卡，按游戏内提示操作。支持单人和本地双人同屏。</p>
+            ) : (
+              <dl class="keys">
+                <div><dt><kbd>A</kbd><kbd>D</kbd></dt><dd>移动</dd></div>
+                <div><dt><kbd>W</kbd><kbd>空格</kbd></dt><dd>跳跃</dd></div>
+                <div><dt><kbd>J</kbd></dt><dd>射击</dd></div>
+                <div><dt><kbd>K</kbd></dt><dd>手雷</dd></div>
+                <div><dt><kbd>Shift</kbd><kbd>L</kbd></dt><dd>冲刺</dd></div>
+                <div><dt><kbd>P</kbd></dt><dd>暂停</dd></div>
+              </dl>
+            )}
+          </section>
+        ))}
+        <p class="game-guide-foot">试玩页右上角可全屏，手机按游戏内的触屏提示操作。两款游戏都在浏览器里运行，没有账号或统计脚本；成绩与进度只保存在当前浏览器，不跨设备同步。</p>
       </div>
-
-      <div class="game-note">
-        <h3>像素突围</h3>
-        <dl class="keys">
-          <div><dt><kbd>A</kbd><kbd>D</kbd></dt><dd>移动</dd></div>
-          <div><dt><kbd>W</kbd><kbd>空格</kbd></dt><dd>跳跃</dd></div>
-          <div><dt><kbd>J</kbd></dt><dd>连续出击</dd></div>
-          <div><dt><kbd>K</kbd></dt><dd>手雷</dd></div>
-          <div><dt><kbd>L</kbd></dt><dd>冲刺</dd></div>
-          <div><dt><kbd>P</kbd></dt><dd>暂停</dd></div>
-        </dl>
-      </div>
-
-      <div class="game-note">
-        <h3>说明</h3>
-        <p>
-          糖河奇遇可选择关卡，与 AI 一起完成挑战。像素突围可探索三章远征、挑战三项作战任务，或在防线生存中逐波选择模组、突破纪录，支持键盘和触屏操作。
-          两款游戏都不需要账号，单文件运行，没有 CDN、后端或统计脚本；成绩与进度保存在自己的浏览器里。
-        </p>
-      </div>
-    </section>
-
-    <p class="game-tail">
-      游戏和博客文章分开维护。源码在
-      <a href={SITE.github} target="_blank" rel="noopener noreferrer">GitHub</a>
-      上，欢迎提问题。
-    </p>
+    </details>
+    <p class="game-tail">游戏独立维护 · <a href="https://github.com/cui-and-jing/blog" target="_blank" rel="noopener noreferrer">查看源码</a></p>
   </div>
 </BaseLayout>

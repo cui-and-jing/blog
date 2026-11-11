@@ -236,6 +236,16 @@ jobs:
           fi
           exit $status
 
+      - name: Upload game hall layout screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-hall-layout
+          include-hidden-files: true
+          path: .shots/lobby-*.png
+          if-no-files-found: warn
+          retention-days: 7
+
       # 实测第一次访问要下多少字节，防止「文件没变大但每页多请求了字体」
       - name: First-visit transfer budget
         shell: bash

@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { launchBrowser } from './lib/browser.mjs';
+import { checkGameHall } from './lib/game-hall-browser.mjs';
 
 const base = (process.argv.includes('--base')
   ? process.argv[process.argv.indexOf('--base') + 1]
@@ -875,7 +876,7 @@ const check = (name, pass, detail = '') => {
     { route: '/series/', surfaces: [['.series-card', 'lg', 'sm']] },
     { route: '/notes/', surfaces: [['.note-card', 'normal', 'sm']] },
     { route: '/notes/2026-10-22-1015/', surfaces: [['.note-sheet', 'normal', 'card']] },
-    { route: '/games/', surfaces: [['.game-card', 'lg', 'lg'], ['.game-note', 'normal', 'sm']] },
+    { route: '/games/', surfaces: [['.game-card', 'lg', 'sm'], ['.game-note', 'normal', 'sm']] },
   ];
   const page = await browser.newPage();
   for (const width of [1280, 390]) {
@@ -1566,39 +1567,8 @@ const check = (name, pass, detail = '') => {
   await gallery.close();
 }
 
-/* ---------- 2.7b. 游戏大厅的平板 / 手机单列布局 ---------- */
-{
-  const page = await browser.newPage();
-  await page.setViewport({ width: 800, height: 900 });
-  await page.goto(base + '/games/', { waitUntil: 'load' });
-  const tablet = await page.evaluate(() => {
-    const cards = [...document.querySelectorAll('.game-card')];
-    return {
-      cards: cards.length,
-      columns: cards.map((card) => getComputedStyle(card).gridTemplateColumns.trim().split(/\s+/).length),
-      overflow: document.documentElement.scrollWidth - innerWidth,
-    };
-  });
-  check('800px 游戏大厅两张游戏卡都采用单列布局',
-    tablet.cards === 2 && tablet.columns.every((n) => n === 1) && tablet.overflow <= 0,
-    JSON.stringify(tablet));
-
-  /* Mini-card specificity must not override the fact-grid media query.
-     Test the actual computed columns at both sides of the 900px breakpoint. */
-  for (const width of [390, 800, 1280]) {
-    await page.setViewport({ width, height: 900, isMobile: width === 390, hasTouch: width === 390 });
-    const facts = await page.evaluate(() => ({
-      columns: [...document.querySelectorAll('.game-card .game-facts')]
-        .map((list) => getComputedStyle(list).gridTemplateColumns.trim().split(/\s+/).length),
-      overflow: document.documentElement.scrollWidth - innerWidth,
-    }));
-    const expected = width <= 900 ? 2 : 4;
-    check(`${width}px 两张游戏卡的参数网格均为 ${expected} 列且无横向溢出`,
-      facts.columns.length === 2 && facts.columns.every((n) => n === expected) && facts.overflow <= 0,
-      JSON.stringify(facts));
-  }
-  await page.close();
-}
+/* ---------- 2.7b. 游戏大厅：等权入口、渐进说明与原生导航 ---------- */
+await checkGameHall(browser, base, check);
 
 /* ---------- 2.8. 系列页面排版：简介不能继承元信息样式 ---------- */
 {
