@@ -290,7 +290,9 @@
               <ul class="rules-list">
                 <li>一条命，固定标准难度。普通波轮换三套地形，双向增援提前 2.2 秒预警；平台可下蹲 + 跳跃降层。普通波清场恢复 1 体力、1 手雷。</li>
                 <li>普通波有两座黄色爆破装置：2 点伤害引爆，半径 145 内造成 4 点伤害并清敌弹，相邻装置可连锁。只伤敌，不伤自己；地面与平台上都有，可用射击、反弹弹、手雷或震荡脉冲引爆。每波只用一次，增援抵达前不可引爆。</li>
+                <li>空中踏击：下落时从正上方踩中杂兵可造成 2 点伤害并弹起，短暂震停、打断未出手的攻击。盾卫与无人机也可踩，首领不可踩；侧面接触和已发射的弹药仍危险，不增加无敌时间。</li>
                 <li>第 4 波起，普通波有一名橙色冲锋兵：先沿标线蓄力 0.8 秒，再朝锁定方向突进，随后回气 1.1 秒。跳跃、登台或冲刺避开，再趁回气反击；冲锋兵不发射子弹。</li>
+                <li>第 5 波起，紫色投弹兵会锁定落脚层并投掷。离开紫框或换层避开，出手前击败或踏击可打断；已出手的投弹仍会落地，爆炸不能反弹。</li>
                 <li>每三波迎战一位首领，三位首领轮换，无杂兵干扰。首领清场恢复 2 体力、2 手雷，额外奖励 500 分。</li>
                 <li>六种永久模组，每种最多两级。两种模组各 1 级即可点亮组合：贯穿火力、反击回流、爆破回收。普通波还可自选战地回收或信标夺控委托，争取额外补给。信标需要在标记高台站稳累计 5 秒，可下蹲、开火或使用技能；跳跃、离开与暂停不累积，已有进度保留。</li>
                 <li>机动突击使用标准连射；反击先锋的冲刺冷却少 0.4 秒、反弹伤害 +1；爆破专家的爆炸伤害 +2、范围 +24，可清敌弹，射击间隔增加 25%。</li>
@@ -423,6 +425,7 @@
       const DEVICE_RADIUS=145,DEVICE_DAMAGE=4;
       const CHARGER={windup:.8,speed:480,distance:216,recover:1.1,cooldown:1.7,range:240};
       const MORTAR={windup:.9,flight:.85,cooldown:2.6,radius:58,height:64};
+      const STOMP={damage:2,rebound:400,stagger:.3};
       const mortarZone=shot=>({x:shot.aimX-MORTAR.radius,y:shot.aimY-MORTAR.height,w:MORTAR.radius*2,h:MORTAR.height});
       const STORAGE_KEY='pixel-raid.progress.v1';
       const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches??false;
@@ -437,7 +440,7 @@
       let survivalWave=0,survivalCleared=0,survivalTime=0,spawnTime=0,supplyOffers=[],selectedSupply=null;
       let refluxCooldown=0,selectedLoadout='assault',loadout='assault',supplyRerolls=0;
       let selectedContract='hold',fieldContract=null;
-      let devices=[],deviceBursts=[],shells=[],mortarBursts=[];
+      let devices=[],deviceBursts=[],shells=[],mortarBursts=[],stomps=0,stompBurst=null;
       let tacticalCharge=0,tacticalTime=0,tacticalQueued=false,tacticalPadLast=false,tacticalUses=0,tacticalPulse=null;
       const tactic=()=>TACTICS[loadout];
       const shieldActive=()=>survival()&&loadout==='counter'&&tacticalTime>0;
@@ -744,7 +747,7 @@
       }
       function resetStage(index,carry){
         tacticalTime=0;tacticalPulse=null;if(!survival()){tacticalCharge=0;tacticalUses=0;}
-        fieldContract=null;selectedContract='hold';devices=[];deviceBursts=[];shells=[];mortarBursts=[];$('contract-options').open=false;
+        fieldContract=null;selectedContract='hold';devices=[];deviceBursts=[];shells=[];mortarBursts=[];stomps=0;stompBurst=null;$('contract-options').open=false;
         stageIndex=index;stage=STAGES[index];
         if(gauntlet())stage={...stage,name:'首领竞技场',width:W,gaps:[],checkpoints:[],
           platforms:[[260,320,170],[500,310,150]],intel:[],enemies:[],pickups:[]};
@@ -768,7 +771,7 @@
           w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='shield'?5:['turret','charger','mortar'].includes(type)?4:type==='drone'?2:3,
           maxHp:type==='shield'?5:['turret','charger','mortar'].includes(type)?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false,
           face:-1,windup:0,burst:0,burstTimer:0,aimX:0,aimY:0,flash:0,blockFlash:0,
-          chargerPhase:'hunt',chargerTime:0,chargerEnd:0};}
+          chargerPhase:'hunt',chargerTime:0,chargerEnd:0,stagger:0};}
       function beginSurvival(){
         mode='survival';titleView='survival';difficulty='standard';challengeId=null;loadout=selectedLoadout;
         challengeTime=0;challengeReflections=0;bossWins=0;points=0;shotsFired=0;runStars=[];
@@ -778,7 +781,7 @@
         best=progress.survival.best;resetStage(0,{hp:kit().hp,lives:1,grenades:kit().grenades});startWave();
       }
       function startWave(){
-        tacticalTime=0;tacticalPulse=null;
+        tacticalTime=0;tacticalPulse=null;stomps=0;stompBurst=null;
         $('supply-reroll').hidden=true;
         survivalWave++;stageIndex=Math.floor((survivalWave-1)/3)%3;
         const arena=arenaForWave(survivalWave);
@@ -817,7 +820,7 @@
         selectedContract='hold';
         combo={count:0,timer:0,best:0};combatText='';combatTime=0;selectedSupply=null;
         clearInput();lag=0;phase='playing';hideMenu();frameLast=performance.now();hud();
-        announce('第 '+survivalWave+' 波，'+(bossWave()?stage.bossName+'。首领 2.2 秒后抵达，右侧为竞技场边界。':arena.name+'，'+count+' 名敌人。增援 2.2 秒后抵达。'+arena.hint+'爆破装置可射击引爆，仅伤敌，可连锁。'+(chargerAdded?'橙色冲锋兵蓄力后沿标线突进，跳跃或冲刺避开，趁回气反击。':'')+(mortarAdded?'紫色投弹兵锁定落点后投掷，离开紫框或换层避开；出手前击败可打断，爆炸不能反弹。':''))+(fieldContract?.beacon?'信标夺控：登上标记高台站稳累计 5 秒，离开保留进度，完成后活着清场。':''));
+        announce('第 '+survivalWave+' 波，'+(bossWave()?stage.bossName+'。首领 2.2 秒后抵达，右侧为竞技场边界。':arena.name+'，'+count+' 名敌人。增援 2.2 秒后抵达。'+arena.hint+'爆破装置可射击引爆，仅伤敌，可连锁。'+(survivalWave===1?'从上方落在杂兵头顶可踏击弹起，侧面接触仍会受伤。':'')+(chargerAdded?'橙色冲锋兵蓄力后沿标线突进，跳跃或冲刺避开，趁回气反击。':'')+(mortarAdded?'紫色投弹兵锁定落点后投掷，离开紫框或换层避开；出手前击败可打断，爆炸不能反弹。':''))+(fieldContract?.beacon?'信标夺控：登上标记高台站稳累计 5 秒，离开保留进度，完成后活着清场。':''));
       }
       function supplyDescription(key){
         const awaken=Object.entries(SYNERGIES).filter(([id,value])=>!synergy(id)&&value.pair.includes(key)&&value.pair.every(name=>name===key||upgrades[name]>0)).map(([,value])=>value.name);
@@ -849,7 +852,7 @@
         progress.survival.best=Math.max(progress.survival.best,bounded(points,9999999));
         best=progress.survival.best;saveProgress();
         player.hp=Math.min(maxHealth(),player.hp+(bossWave()?2:1));player.grenades=Math.min(7,player.grenades+(bossWave()?2:1));
-        bullets=[];bombs=[];shells=[];mortarBursts=[];spawnTime=0;deviceBursts=[];
+        bullets=[];bombs=[];shells=[];mortarBursts=[];spawnTime=0;deviceBursts=[];stompBurst=null;
         supplyRerolls=MODULES.some(key=>upgrades[key]<2)?1:0;rollSupplies();
         selectedContract='hold';$('contract-options').open=false;
         $('result-details').textContent='已守住 '+survivalCleared+' 波 · 清场得分 '+points+'\n体力 '+player.hp+' / '+maxHealth()+' · 手雷 '+player.grenades+' · 用时 '+formatTime(survivalTime)+contractReward;
@@ -906,7 +909,7 @@
       }
       function finishSurvival(){
         if(!survival()||phase!=='playing')return;
-        tacticalTime=0;tacticalPulse=null;shells=[];mortarBursts=[];
+        tacticalTime=0;tacticalPulse=null;shells=[];mortarBursts=[];stompBurst=null;
         for(const e of enemies)if(e.type==='mortar')e.windup=0;
         if(fieldContract){fieldContract.status='missed';if(fieldContract.beacon)fieldContract.beacon.occupied=false;}
         $('result-details').textContent='本次守住 '+survivalCleared+' 波 · 倒在第 '+survivalWave+' 波\n最高守住 '+progress.survival.wave+' 波 · 最高清场分 '+progress.survival.best+'\n用时 '+formatTime(survivalTime)+' · 本波未计入纪录'+(fieldContract?'\n'+(fieldContract.beacon?'信标夺控':'回收委托')+'未结算 · 需要活着清场，无额外奖励':'');
@@ -1199,12 +1202,44 @@
           const previous=e.x;
           e.x+=Math.sign(e.chargerEnd-e.x)*Math.min(Math.abs(e.chargerEnd-e.x),CHARGER.speed*dt);
           // Sweep the body too: a fast rush must not tunnel through a player.
-          if(hit(player,{x:Math.min(previous,e.x),y:e.y,w:e.w+Math.abs(e.x-previous),h:e.h}))hurt(1);
+          const body={x:Math.min(previous,e.x),y:e.y,w:e.w+Math.abs(e.x-previous),h:e.h};
           if(e.x===e.chargerEnd){e.chargerPhase='recover';e.chargerTime=CHARGER.recover;}
+          return body;
         }else{
           e.chargerTime=Math.max(0,e.chargerTime-dt);
           if(e.chargerTime===0){e.chargerPhase='hunt';e.shot=CHARGER.cooldown;}
         }
+      }
+      function stompContact(motion,tracks){
+        if(!survival()||phase!=='playing'||spawnTime>0||player.dashTime>0||motion.dy<=0)return null;
+        let first=null;
+        for(const track of tracks){
+          const e=track.enemy;
+          if(e.dead||e.arrival>0||motion.bottom>track.y)continue;
+          const relative=motion.dy-(e.y-track.y);
+          if(relative<=0)continue;
+          const t=(track.y-motion.bottom)/relative;
+          if(t<0||t>motion.limit)continue;
+          const x=motion.x+(motion.endX-motion.x)*t,ex=track.x+(e.x-track.x)*t;
+          // Evaluate horizontal overlap AT the crossing, not at either frame's
+          // endpoint. Fast chargers and moving drones cannot create side stomps.
+          if(x+player.w<=ex||x>=ex+e.w)continue;
+          if(!first||t<first.t||t===first.t&&ex<first.ex)first={enemy:e,t,x,ex,y:track.y+(e.y-track.y)*t};
+        }
+        return first;
+      }
+      function applyStomp(contact){
+        const e=contact.enemy;
+        player.x=contact.x;player.y=contact.y-player.h;player.vy=-STOMP.rebound;player.ground=false;
+        player.coyote=0;player.jumpBuffer=0;stomps++;
+        // Interrupt unlaunched attacks only. Existing shells/projectiles still
+        // resolve normally, and neither the rebound nor stun grants immunity.
+        e.windup=0;e.burst=0;e.stagger=STOMP.stagger;e.shot=Math.max(.35,e.shot);
+        if(e.type==='charger'){e.chargerPhase='recover';e.chargerTime=STOMP.stagger;}
+        damageEnemy(e,STOMP.damage);
+        stompBurst={x:contact.x+player.w/2,y:contact.y,time:.28};
+        spark(stompBurst.x,stompBurst.y,'#b9ffe2',12);beep(680,.08,'triangle');
+        combatNotice('空中踏击 · '+(e.dead?combatText:'2 点伤害 / 弹起反击'));hud();
       }
       function updateMortar(e,dt){
         if(e.windup>0){
@@ -1252,6 +1287,7 @@
           if(tacticalPulse){tacticalPulse.time-=dt;if(tacticalPulse.time<=0)tacticalPulse=null;}
           deviceBursts=deviceBursts.filter(burst=>(burst.time-=dt)>0);
           mortarBursts=mortarBursts.filter(burst=>(burst.time-=dt)>0);
+          if(stompBurst&&(stompBurst.time-=dt)<=0)stompBurst=null;
           survivalTime+=dt;refluxCooldown=Math.max(0,refluxCooldown-dt);
           const spawning=spawnTime>0;spawnTime=Math.max(0,spawnTime-dt);
           if(spawning&&spawnTime===0)for(const e of enemies){
@@ -1303,10 +1339,12 @@
         if(tacticalQueued){tacticalQueued=false;useTactical();}
         if(grenadeQueued){grenadeQueued=false;throwBomb();}
         if(pressed('fire'))fire();
+        const motion={x:player.x,bottom:player.y+player.h,limit:1};
         player.x=clamp(player.x+player.vx*dt,8,gauntlet()||bossWave()?boss.x-player.w-14:stage.width-player.w-6);
         const oldBottom=player.y+player.h;
         if(player.dashTime>0){player.vy=0;}else player.vy=clamp(player.vy+GRAV*dt,-800,MAX_FALL);
         player.y+=player.vy*dt;player.ground=false;
+        motion.endX=player.x;motion.dy=player.y+player.h-motion.bottom;
         const cx=player.x+player.w/2;
         if(player.vy>=0){
           let landing=Infinity;
@@ -1316,7 +1354,7 @@
             const [x,y,w]=ledge;
             if(player.x+player.w>x+3&&player.x<x+w-3&&oldBottom<=y+8&&player.y+player.h>=y)landing=Math.min(landing,y);
           }
-          if(landing!==Infinity){player.y=landing-player.h;player.vy=0;player.ground=true;}
+          if(landing!==Infinity){motion.limit=motion.dy>0?clamp((landing-motion.bottom)/motion.dy,0,1):0;player.y=landing-player.h;player.vy=0;player.ground=true;}
         }
         if(player.y>H+70){
           player.inv=0;player.dashTime=0;hurt(2);
@@ -1332,10 +1370,18 @@
         // Advance existing shells before new throws and projectile kills.
         // Launched shells survive their thrower's death, not a wave transition.
         updateShells(dt);if(phase!=='playing')return;
+        // Resolve all top crossings before body damage, including charger sweeps.
+        const enemyTracks=[];
         // Moving threats remain near their patrol spawn; air units follow gentle sine paths.
         for(const e of enemies){
           if(e.dead||(survival()&&spawnTime>0))continue;
           if(e.arrival>0){e.arrival=Math.max(0,e.arrival-dt);continue;}
+          const track={enemy:e,x:e.x,y:e.y,body:null};enemyTracks.push(track);
+          if(e.stagger>0){
+            e.stagger=Math.max(0,e.stagger-dt);e.flash=Math.max(0,e.flash-dt);
+            if(e.type==='charger')e.chargerTime=Math.max(0,e.chargerTime-dt);
+            continue;
+          }
           e.age+=dt;e.shot-=dt;e.flash=Math.max(0,e.flash-dt);e.blockFlash=Math.max(0,e.blockFlash-dt);
           if(e.type==='walker'||e.type==='shield'){
             if(survival()){
@@ -1349,14 +1395,21 @@
             }else e.x=e.home+Math.sin(e.age*1.15)*36;
           }
           if(e.type==='drone'){e.x=e.home+Math.sin(e.age*1.4)*53;e.y=240+Math.sin(e.age*2.1)*26;}
-          if(e.type==='charger')updateCharger(e,dt);
+          if(e.type==='charger')track.body=updateCharger(e,dt);
           else if(e.type==='mortar')updateMortar(e,dt);
           else if(e.type==='turret')updateTurret(e,dt);
           else if((survival()||Math.abs(e.x-player.x)<570)&&e.shot<=0){
             aimAtPlayer(e,235);e.shot=rng(2.3,3.5)/(survival()?1+Math.min(12,survivalWave-1)*.05:1);
           }
-          if(phase!=='playing')return;
-          if(hit(player,e))hurt(1);
+          // Preserve campaign/challenge contact order; aerial counterplay is
+          // confined to survival and must not change their existing timings.
+          if(!survival()){if(hit(player,e))hurt(1);if(phase!=='playing')return;}
+        }
+        const stomp=stompContact(motion,enemyTracks);
+        if(stomp)applyStomp(stomp);
+        for(const track of survival()?enemyTracks:[]){
+          if(track.enemy.dead||track.enemy===stomp?.enemy)continue;
+          if(hit(player,track.body||track.enemy))hurt(1);
           if(phase!=='playing')return;
         }
         boss.phase+=dt;
@@ -1639,6 +1692,7 @@
             if(e.chargerPhase==='windup'){rect(e.x,e.y-15,e.w,4,'#352e32');rect(e.x,e.y-15,e.w*(1-e.chargerTime/CHARGER.windup),4,'#ffe0a0');}
           }
         }
+        if(e.stagger>0){c.font='bold 11px system-ui';c.fillStyle='#b9ffe2';c.fillText('震停',e.x+2,e.y-26);}
         if(e.type==='shield'){
           const x=e.face===-1?e.x-6:e.x+e.w-2;
           rect(x,e.y+4,8,31,e.blockFlash>0?'#efffff':'#87d4ec');
@@ -1708,6 +1762,13 @@
           rect(p.x-8,y-6,16,4,'#c3a9ff');rect(p.x-8,y,16,4,'#c3a9ff');rect(p.x-8,y+6,16,4,'#c3a9ff');
         }else{rect(p.x-7,y-2,15,6,'#a4eafd');rect(p.x+1,y-8,6,18,'#a4eafd');}
       }
+      function drawStomp(){
+        if(!stompBurst)return;
+        const {x,y}=stompBurst;
+        // The static cross and solid outline also work with reduced motion.
+        c.strokeStyle='#b9ffe2';c.lineWidth=3;c.beginPath();c.ellipse(x,y,24,7,0,0,Math.PI*2);c.stroke();
+        line(x-9,y-17,x,y-24,'#b9ffe2',3);line(x,y-24,x+9,y-17,'#b9ffe2',3);
+      }
       function drawMortarWarnings(){
         const warnings=[...enemies.filter(e=>!e.dead&&e.type==='mortar'&&e.windup>0)
           .map(e=>({...e,remaining:e.windup+MORTAR.flight})),
@@ -1732,7 +1793,7 @@
         if(stage){
           const dx=shake>0&&!reducedMotion?rng(-shake,shake):0;
           c.translate(Math.round(-cam+dx),0);
-          terrain();drawDevices();drawMortarWarnings();
+          terrain();drawDevices();drawMortarWarnings();drawStomp();
           for(const p of pickups)drawPickup(p);
           for(const item of intel)drawIntel(item);
           if(survival()&&fieldContract?.status==='active'&&fieldContract.beacon){
@@ -2020,7 +2081,7 @@
       }
       // Detached snapshots only. The shipped game has no mutable test hooks.
       Object.defineProperty(window,'__raidState',{get:()=>({
-        ready:true,phase,stage:stageIndex+1,stageName:stage?.name??'',x:player?.x??0,y:player?.y??0,hp:player?.hp??0,
+        ready:true,phase,stage:stageIndex+1,stageName:stage?.name??'',x:player?.x??0,y:player?.y??0,vy:player?.vy??0,hp:player?.hp??0,
         lives:player?.lives??0,score:points,shots:shotsFired,bullets:bullets.length,
         hostiles:bullets.filter(b=>b.owner==='e').map(b=>({x:b.x,y:b.y})),
         grenades:player?.grenades??0,bossHp:boss?.hp??0,ground:player?.ground??false,
@@ -2033,7 +2094,7 @@
         checkpoint:player?.checkpoint??64,maxHp:maxHealth(),selectedUpgrade,storageAvailable,
         crouch:player?.crouch??false,playerHeight:player?.h??44,coyote:player?.coyote??0,jumpBuffer:player?.jumpBuffer??0,dropTime:player?.dropTime??0,
         platforms:stage?.platforms.map(ledge=>[...ledge])||[],arena:survival()&&stage?.arena?{id:stage.arena.id,name:stage.arena.name,hint:stage.arena.hint}:null,
-        devices:devices.map(device=>({...device})),
+        devices:devices.map(device=>({...device})),stomps,stompBurst:stompBurst?{...stompBurst}:null,
         shells:shells.map(shot=>({...shot,zone:mortarZone(shot)})),mortarBursts:mortarBursts.map(burst=>({...burst})),
         pickups:pickups.map(p=>({x:p.x,y:p.y,kind:p.kind,done:p.done})),
         bossAttackType:boss?.attackType??'volley',bossBeamTime:boss?.beamTime??0,bossBeamY:boss?.beamY??0,
@@ -2042,7 +2103,7 @@
         survivalWave,survivalCleared,survivalTime,spawnTime,bossWave:bossWave(),bossMaxHp:boss?.maxHp??0,bossX:boss?.x??0,synergies:activeSynergies(),refluxCooldown,loadout,selectedLoadout,supplyRerolls,supplyOffers:[...supplyOffers],selectedSupply,
         tacticalCharge,tacticalTime,tacticalUses,tacticalName:survival()?tactic().name:'',
         selectedContract,fieldContract:fieldContract?{status:fieldContract.status,nodes:fieldContract.nodes.map(node=>({...node})),...(fieldContract.beacon?{beacon:{...fieldContract.beacon}}:{})}:null,
-        enemies:enemies.filter(e=>!e.dead).map(e=>({x:e.x,y:e.y,w:e.w,h:e.h,hp:e.hp,type:e.type,face:e.face,arrival:e.arrival||0,...(e.type==='charger'?{chargerPhase:e.chargerPhase,chargerTime:e.chargerTime,chargerEnd:e.chargerEnd}:{}),...(e.type==='mortar'?{windup:e.windup,shot:e.shot,aimX:e.aimX,aimY:e.aimY}:{})})),
+        enemies:enemies.filter(e=>!e.dead).map(e=>({x:e.x,y:e.y,w:e.w,h:e.h,hp:e.hp,type:e.type,face:e.face,stagger:e.stagger,arrival:e.arrival||0,...(e.type==='charger'?{chargerPhase:e.chargerPhase,chargerTime:e.chargerTime,chargerEnd:e.chargerEnd}:{}),...(e.type==='mortar'?{windup:e.windup,shot:e.shot,aimX:e.aimX,aimY:e.aimY}:{})})),
         clock,runStars:[...runStars],progress:JSON.parse(JSON.stringify(progress))
       })});
       refreshRecords();

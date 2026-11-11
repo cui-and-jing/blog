@@ -3240,7 +3240,7 @@ test('dash and phase shield counter a rush using the existing damage pipeline',(
 });
 
 test('rush body sweep cannot tunnel and a lethal contact cannot award wave completion',()=>{
-  const g=chargerGame();g.run("enemies[0].chargerPhase='rush';enemies[0].chargerEnd=434;player.x=550;updateCharger(enemies[0],.45);");
+  const g=chargerGame();g.run("enemies[0].chargerPhase='rush';enemies[0].chargerEnd=434;player.x=550;update(.45);");
   eq(g.state().hp,5);eq(charger(g).x,434);
   const lethal=chargerGame();lethal.run("enemies[0].chargerPhase='rush';enemies[0].chargerEnd=434;player.x=630;player.hp=1;");
   tick(lethal);eq(lethal.state().phase,'survivalOver');eq(lethal.state().progress.survival,{wave:0,best:0});
@@ -3685,6 +3685,179 @@ test('last windup tick launches before ordinary shot collisions while earlier ki
   const g=mortarGame({loadout:'demolition'});
   g.run("player.x=650;enemies[0].windup=DT/2;enemies.push({...makeEnemy(60,'turret'),shot:100});");
   g.key('e');tick(g);g.key('e',false);assert(!mortar(g));eq(g.state().shells,[]);eq(g.state().phase,'playing');
+});
+
+
+// Aerial counterplay runs through the real update and collision pipeline. The
+// fixture isolates geometry, while controls-only routes below retain all foes.
+function stompGame(type='walker',options={}){
+  const g=createGame(options);g.click('mode-survival');g.click('start');
+  g.run(`spawnTime=0;devices=[];pickups=[];stage.platforms=[];tacticalCharge=0;
+    enemies=[{...makeEnemy(480,'${type}'),age:0,shot:100}, {...makeEnemy(100,'turret'),shot:100}];
+    player.x=485;player.y=enemies[0].y-player.h-4;player.vy=300;player.ground=false;player.inv=0;
+    player.dashCooldown=1;`);
+  if(type==='drone')g.run('enemies[0].y=240;player.y=240-player.h-4;');
+  return g;
+}
+
+test('descending aerial stomps hit every ordinary type for 2 and rebound without resources or immunity',()=>{
+  for(const type of ['walker','shield','turret','charger','mortar','drone']){
+    const g=stompGame(type),before=g.state(),enemy=g.read('({...enemies[0]})');
+    tick(g);const after=g.state();eq(after.stomps,1);eq(after.vy,-400);eq(after.ground,false);
+    eq(g.read('enemies[0].hp'),enemy.hp-2);eq(after.hp,before.hp);eq(g.read('player.inv'),0);
+    eq(after.grenades,before.grenades);eq(after.shots,0);near(after.dashCooldown,1-1/60);
+    eq(after.score,type==='drone'?100:0);eq(after.tacticalCharge,type==='drone'?18:6);
+    eq(g.read('player.coyote'),0);eq(g.read('player.jumpBuffer'),0);assert(after.stompBurst);
+    eq(g.read('enemies[0].stagger'),.3);assert(after.combatText.includes('空中踏击'));
+    tick(g,5);eq(g.state().stomps,1);assert(g.state().y<after.y);eq(g.read('enemies[0].hp'),enemy.hp-2);
+  }
+});
+
+test('stomp uses normal lethal rewards once, bypasses front shield and never grants module refunds',()=>{
+  const g=stompGame('shield');g.run('enemies[0].hp=1;upgrades.armor=1;upgrades.blast=1;upgrades.reflect=2;upgrades.pierce=2;');
+  tick(g);eq(g.state().score,200);eq(g.state().tacticalCharge,15);eq(g.state().grenades,3);
+  assert(g.state().combatText.includes('空中踏击 · 1 连击 · +200'));
+  eq(g.read('enemies[0].dead'),true);tick(g,20);eq(g.state().stomps,1);eq(g.state().score,200);
+  const active=stompGame();active.run('tacticalTime=1;');tick(active);eq(active.state().tacticalCharge,0);
+});
+
+test('rising, lateral, standing and dashing contacts do not become aerial stomps',()=>{
+  for(const setup of [
+    'player.y=385;player.vy=-300;player.ground=false;',
+    'player.x=458;player.y=381;player.vy=0;player.ground=true;held.add("right");',
+    'player.y=381;player.vy=0;player.ground=true;',
+    'player.dashTime=.18;player.dashDir=1;'
+  ]){
+    const g=stompGame('turret');g.run(setup);tick(g);eq(g.state().stomps,0);eq(g.read('enemies[0].hp'),4);
+    if(!setup.includes('dashTime'))eq(g.state().hp,5);
+  }
+});
+
+test('stomp remains survival-only and does not affect bosses or invulnerable ingress bodies',()=>{
+  for(const kind of ['campaign','practice','challenge']){
+    const g=stompGame();g.run(`mode='${kind}';${kind==='challenge'?"challengeId='counter';":''}`);tick(g);
+    eq(g.state().stomps,0);eq(g.read('enemies[0].hp'),3);eq(g.state().hp,5);
+  }
+  for(const setup of ['spawnTime=1;','enemies[0].arrival=.001;','enemies[0].dead=true;']){
+    const g=stompGame();g.run(setup);tick(g);eq(g.state().stomps,0);eq(g.state().hp,6);
+  }
+  const boss=stompGame();boss.run('enemies=[];boss=makeBoss(32,480);boss.shot=100;player.x=485;player.y=boss.y-player.h-4;');
+  tick(boss);eq(boss.state().stomps,0);eq(boss.state().bossHp,32);eq(boss.state().hp,5);
+});
+
+test('maximum descent cannot tunnel through an enemy top and platforms win earlier crossings',()=>{
+  const fast=stompGame('shield');fast.run('player.vy=720;player.y=enemies[0].y-player.h-11;');tick(fast);
+  eq(fast.state().stomps,1);eq(fast.state().hp,6);eq(fast.state().vy,-400);
+  const blocked=stompGame('shield');blocked.run('stage.platforms=[[470,385,100]];player.vy=720;player.y=380-player.h;');tick(blocked);
+  eq(blocked.state().stomps,0);eq(blocked.state().ground,true);eq(blocked.state().y+44,385);eq(blocked.read('enemies[0].hp'),5);
+  const drop=stompGame('shield');drop.run('stage.platforms=[[470,385,100]];player.dropPlatform=stage.platforms[0];player.dropTime=.2;player.vy=720;player.y=380-player.h;');tick(drop);
+  eq(drop.state().stomps,1);eq(drop.state().ground,false);assert(drop.read('player.dropPlatform')!==null);
+});
+
+test('stomp selection is nearest physical top, not enemy array order, and resolves only once',()=>{
+  for(const reversed of [false,true]){
+    const g=stompGame('turret');g.run(`enemies=[{...makeEnemy(480,'shield'),y:387,stagger:1},
+      {...makeEnemy(480,'turret'),y:392,stagger:1}];player.y=380-player.h;player.vy=720;
+      ${reversed?'enemies.reverse();':''}`);
+    tick(g);eq(g.state().stomps,1);eq(g.read("enemies.find(e=>e.type==='shield').hp"),3);
+    eq(g.read("enemies.find(e=>e.type==='turret').hp"),4);eq(g.state().hp,6);
+  }
+  for(const reversed of [false,true]){
+    const g=stompGame('turret');g.run(`enemies=[{...makeEnemy(480,'shield'),y:389,stagger:1},
+      {...makeEnemy(490,'turret'),y:389,stagger:1}];${reversed?'enemies.reverse();':''}`);
+    tick(g);eq(g.state().stomps,1);eq(g.read("enemies.find(e=>e.type==='shield').hp"),3);
+    eq(g.read("enemies.find(e=>e.type==='turret').hp"),4);
+  }
+});
+
+test('moving charger top crossing wins its body sweep while a late side overlap still hurts',()=>{
+  const g=stompGame('charger');g.run("enemies[0].chargerPhase='rush';enemies[0].chargerEnd=264;enemies[0].face=-1;");
+  tick(g);eq(g.state().stomps,1);eq(g.state().hp,6);eq(g.state().vy,-400);
+  eq(g.read('enemies[0].chargerPhase'),'recover');eq(g.read('enemies[0].stagger'),.3);
+  const side=stompGame('charger');side.run("enemies[0].chargerPhase='rush';enemies[0].chargerEnd=264;player.x=446;player.y=388.8-player.h;");
+  tick(side);eq(side.state().stomps,0);eq(side.state().hp,5);
+});
+
+test('horizontal overlap is evaluated at impact time for moving targets, including exact edges',()=>{
+  const g=stompGame('turret');
+  const contact=code=>g.read(`(()=>{const e={...makeEnemy(480,'turret'),x:472,y:389};
+    return stompContact(${code},[{enemy:e,x:480,y:389}])?.t??null;})()`);
+  // Endpoint-only overlap would turn this late side collision into a stomp.
+  eq(contact('{x:446,endX:450,bottom:388.8,dy:6,limit:1}'),null);
+  assert(contact('{x:475,endX:479,bottom:385,dy:6,limit:1}')!==null);
+  // At t=.5 enemy left is476 and player right is exactly476: touching is not overlap.
+  eq(contact('{x:449,endX:449,bottom:386,dy:6,limit:1}'),null);
+});
+
+test('stagger cancels turret bursts, mortar windups and rushes, but launched ammunition persists',()=>{
+  for(const type of ['turret','mortar','charger']){
+    const g=stompGame(type);g.run("enemies[0].windup=.6;enemies[0].burst=2;enemies[0].burstTimer=1;enemies[0].chargerPhase='rush';enemies[0].chargerEnd=700;");
+    tick(g);eq(g.state().stomps,1);eq(g.read('enemies[0].windup'),0);eq(g.read('enemies[0].burst'),0);
+    const x=g.read('enemies[0].x'),y=g.read('enemies[0].y');tick(g,15);
+    eq(g.read('enemies[0].x'),x);eq(g.read('enemies[0].y'),y);eq(g.state().hostiles,[]);eq(g.state().shells,[]);
+  }
+  const launched=stompGame('mortar');launched.run(`shells=[{x:100,y:100,startX:100,startY:100,aimX:100,aimY:425,elapsed:0}];
+    projectile(50,50,10,0,'e');`);tick(launched);
+  eq(launched.state().stomps,1);eq(launched.state().shells.length,1);eq(launched.state().hostiles.length,1);
+  assert(launched.state().shells[0].elapsed>0);
+  const finalTick=stompGame('mortar');finalTick.run('enemies[0].windup=DT/2;enemies[0].aimX=100;enemies[0].aimY=425;');tick(finalTick);
+  eq(finalTick.state().stomps,1);eq(finalTick.state().shells.length,1);eq(finalTick.state().shells[0].elapsed,0);
+});
+
+test('stunned side contact remains dangerous and rebound grants no protection from projectiles',()=>{
+  const side=stompGame('shield');side.run('enemies[0].stagger=.3;player.y=381;player.vy=0;player.ground=true;');
+  tick(side);eq(side.state().stomps,0);eq(side.state().hp,5);
+  const shot=stompGame();shot.run("projectile(492,360,0,0,'e');");tick(shot);
+  eq(shot.state().stomps,1);eq(shot.state().hp,5);eq(shot.state().reflections,0);
+});
+
+test('lethal projectile or shell trades suppress clear and completed-commission rewards',()=>{
+  const g=stompGame();g.run(`enemies.length=1;enemies[0].hp=2;player.hp=1;projectile(492,360,0,0,'e');
+    fieldContract={status:'active',nodes:[],beacon:{x:480,y:325,radius:48,progress:5,occupied:false}};`);
+  tick(g);eq(g.state().phase,'survivalOver');eq(g.state().stomps,1);eq(g.state().progress.survival,{wave:0,best:0});
+  eq(g.state().fieldContract.status,'missed');eq(g.state().stompBurst,null);
+  const shell=stompGame();shell.run(`enemies.length=1;enemies[0].hp=2;player.hp=1;
+    shells=[{x:492,y:360,startX:492,startY:360,aimX:492,aimY:389,elapsed:MORTAR.flight-DT/2}];`);
+  tick(shell);eq(shell.state().phase,'survivalOver');eq(shell.state().stomps,0);eq(shell.state().progress.survival,{wave:0,best:0});
+});
+
+test('stomp effects freeze through pause and canceled confirms, detach snapshots and reset safely',()=>{
+  const g=stompGame();tick(g);g.key('p');g.key('p',false);const before=g.state();g.frames(60);eq(g.state(),before);
+  for(const id of ['restart','menu-home']){g.click(id);g.frames(30);g.click('cancel-restart');eq(g.state(),before);}
+  const copy=g.win.__raidState;copy.stompBurst.time=999;copy.enemies[0].stagger=999;eq(g.state(),before);
+  g.run('saveProgress();');assert(!/stomp|stagger/.test(JSON.stringify(g.state().progress)));
+  g.click('start');tick(g);g.visibility(true);const hidden=g.state();g.frames(30);eq(g.state(),hidden);
+  g.visibility(false);g.click('start');tick(g);g.event('blur');const blur=g.state();g.frames(30);eq(g.state(),blur);
+  g.key('r');g.click('start');eq(g.state().stomps,0);eq(g.state().stompBurst,null);assert(g.state().enemies.every(e=>e.stagger===0));
+  const next=stompGame();tick(next);next.run('startWave();');eq(next.state().stomps,0);eq(next.state().stompBurst,null);
+  const home=stompGame();tick(home);home.run('openTitle();');eq(home.state().stomps,0);eq(home.state().stompBurst,null);
+});
+
+test('last-enemy stomp clears once and removes transient effects before the supply menu',()=>{
+  const g=stompGame();g.run('enemies.length=1;enemies[0].hp=2;');tick(g);
+  eq(g.state().phase,'waveClear');eq(g.state().survivalCleared,1);eq(g.state().stompBurst,null);
+  const result=g.state();tick(g,20);eq(g.state(),result);
+});
+
+
+test('all three loadouts can earn a first-wave stomp through ordinary keyboard or controller jumps',()=>{
+  for(const loadout of ['assault','counter','demolition'])for(const randomSeed of [1,16437,99991]){
+    for(const lag of [0,5])for(const input of ['keyboard','controller']){
+      const g=createGame({randomSeed});g.click('mode-survival');g.click('loadout-'+loadout);g.click('start');
+      g.key('a');until(g,()=>g.state().x<=400,100);g.frames(lag);g.key('a',false);
+      until(g,()=>{const s=g.state();return s.spawnTime===0&&Math.min(...s.enemies.map(e=>Math.abs(e.x+e.w/2-s.x-13.5)))<=47;},500);
+      g.frames(lag);
+      if(input==='controller'){g.pad();g.frames(1);}
+      const before=g.state();
+      if(input==='controller')g.pad([0]);else g.key('w');
+      g.frames(1);if(input==='controller')g.pad();else g.key('w',false);
+      until(g,()=>g.state().stomps>0,70);const after=g.state();
+      eq(after.stomps,1);eq(after.hp,before.hp);eq(after.enemies.filter(e=>e.hp===1).length,1);
+      for(const key of ['score','shots','grenades','tacticalUses','reflections'])eq(after[key],before[key]);
+      eq(after.dashTime,0);eq(after.score,0);eq(after.ground,false);eq(after.survivalCleared,0);
+      near(after.vy,-400+1250*(.28-after.stompBurst.time));
+    }
+  }
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
