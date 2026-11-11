@@ -289,6 +289,7 @@
               <ul class="rules-list">
                 <li>一条命，固定标准难度。普通波轮换三套地形，双向增援提前 2.2 秒预警；平台可下蹲 + 跳跃降层。普通波清场恢复 1 体力、1 手雷。</li>
                 <li>普通波有两座黄色爆破装置：2 点伤害引爆，半径 145 内造成 4 点伤害并清敌弹，相邻装置可连锁。只伤敌，不伤自己；地面与平台上都有，可用射击、反弹弹、手雷或震荡脉冲引爆。每波只用一次，增援抵达前不可引爆。</li>
+                <li>第 4 波起，普通波有一名橙色冲锋兵：先沿标线蓄力 0.8 秒，再朝锁定方向突进，随后回气 1.1 秒。跳跃、登台或冲刺避开，再趁回气反击；冲锋兵不发射子弹。</li>
                 <li>每三波迎战一位首领，三位首领轮换，无杂兵干扰。首领清场恢复 2 体力、2 手雷，额外奖励 500 分。</li>
                 <li>六种永久模组，每种最多两级。两种模组各 1 级即可点亮组合：贯穿火力、反击回流、爆破回收。普通波还可自选战地回收委托，争取额外补给。</li>
                 <li>机动突击使用标准连射；反击先锋的冲刺冷却少 0.4 秒、反弹伤害 +1；爆破专家的爆炸伤害 +2、范围 +24，可清敌弹，射击间隔增加 25%。</li>
@@ -417,6 +418,7 @@
         recycle:{name:'爆破回收',pair:['armor','blast'],description:'手雷击杀返还 1 枚手雷，每次爆炸最多一次。'}
       };
       const DEVICE_RADIUS=145,DEVICE_DAMAGE=4;
+      const CHARGER={windup:.8,speed:480,distance:216,recover:1.1,cooldown:1.7,range:240};
       const STORAGE_KEY='pixel-raid.progress.v1';
       const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches??false;
       const held=new Set(),padHeld=new Set(),touch=new Map();
@@ -439,7 +441,7 @@
       const bossWave=()=>survival()&&survivalWave>0&&survivalWave%3===0;
       const synergy=key=>survival()&&SYNERGIES[key].pair.every(name=>upgrades[name]>0);
       const activeSynergies=()=>Object.keys(SYNERGIES).filter(synergy);
-      const wavePreview=wave=>wave%3===0?'首领战 · '+STAGES[Math.floor((wave-1)/3)%3].bossName:'双向增援 · 第 '+wave+' 波 · '+arenaForWave(wave).name;
+      const wavePreview=wave=>wave%3===0?'首领战 · '+STAGES[Math.floor((wave-1)/3)%3].bossName:'双向增援 · 第 '+wave+' 波 · '+arenaForWave(wave).name+(wave>=4?' · 冲锋兵加入':'');
       const activeEnemies=()=>enemies.filter(e=>!e.dead).length;
       const dashDelay=()=>Math.max(1.2,2.4-upgrades.dash*.6-(survival()?kit().dash:0));
       const currentChallenge=()=>mode==='challenge'?CHALLENGES[challengeId]:null;
@@ -748,9 +750,10 @@
         shot:1.3,phase:0,windup:0,chargeDuration:.72,attacks:0,lastVolley:0,warned:false,dead:hp===0,
         attackType:'volley',beamTime:0,beamY:G-22,flash:0};}
       function makeEnemy(x,type){return {x,y:type==='drone'?260:G-(type==='turret'?34:36),
-          w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='shield'?5:type==='turret'?4:type==='drone'?2:3,
-          maxHp:type==='shield'?5:type==='turret'?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false,
-          face:-1,windup:0,burst:0,burstTimer:0,aimX:0,aimY:0,flash:0,blockFlash:0};}
+          w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='shield'?5:['turret','charger'].includes(type)?4:type==='drone'?2:3,
+          maxHp:type==='shield'?5:['turret','charger'].includes(type)?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false,
+          face:-1,windup:0,burst:0,burstTimer:0,aimX:0,aimY:0,flash:0,blockFlash:0,
+          chargerPhase:'hunt',chargerTime:0,chargerEnd:0};}
       function beginSurvival(){
         mode='survival';titleView='survival';difficulty='standard';challengeId=null;loadout=selectedLoadout;
         challengeTime=0;challengeReflections=0;bossWins=0;points=0;shotsFired=0;runStars=[];
@@ -773,9 +776,11 @@
         devices=(arena?.devices||[]).map(([x,floor])=>({x:x-12,y:floor-36,w:24,h:36,hp:2,spent:false}));deviceBursts=[];
         const slots=arena?.slots||[],count=Math.min(8,3+Math.floor(survivalWave/2));
         const types=survivalWave===1?['walker']:survivalWave===2?['walker','drone']:['walker','turret','shield','drone'];
-        let droneIndex=0;
+        let droneIndex=0,chargerAdded=false;
         enemies=slots.slice(0,bossWave()?0:count).map((x,i)=>{
-          const type=types[(i+survivalWave-1)%types.length],e=makeEnemy(x,type);
+          let type=types[(i+survivalWave-1)%types.length];
+          if(survivalWave>=4&&type==='walker'&&!chargerAdded){type='charger';chargerAdded=true;}
+          const e=makeEnemy(x,type);
           // Air units patrol the current layout; all ground units have room to flank.
           if(type==='drone'){e.x=e.home=arena.drones[droneIndex++%arena.drones.length];e.y=240;}
           e.hp+=Math.min(6,Math.floor((survivalWave-1)/4));e.maxHp=e.hp;
@@ -791,7 +796,7 @@
         selectedContract='hold';
         combo={count:0,timer:0,best:0};combatText='';combatTime=0;selectedSupply=null;
         clearInput();lag=0;phase='playing';hideMenu();frameLast=performance.now();hud();
-        announce('第 '+survivalWave+' 波，'+(bossWave()?stage.bossName+'。首领 2.2 秒后抵达，右侧为竞技场边界。':arena.name+'，'+count+' 名敌人。增援 2.2 秒后抵达。'+arena.hint+'爆破装置可射击引爆，仅伤敌，可连锁。'));
+        announce('第 '+survivalWave+' 波，'+(bossWave()?stage.bossName+'。首领 2.2 秒后抵达，右侧为竞技场边界。':arena.name+'，'+count+' 名敌人。增援 2.2 秒后抵达。'+arena.hint+'爆破装置可射击引爆，仅伤敌，可连锁。'+(chargerAdded?'橙色冲锋兵蓄力后沿标线突进，跳跃或冲刺避开，趁回气反击。':'')));
       }
       function supplyDescription(key){
         const awaken=Object.entries(SYNERGIES).filter(([id,value])=>!synergy(id)&&value.pair.includes(key)&&value.pair.every(name=>name===key||upgrades[name]>0)).map(([,value])=>value.name);
@@ -1102,7 +1107,7 @@
         if(e.dead)return;
         chargeTactical(Math.min(e.hp,d)*3+(d>=e.hp?12:0),fromSkill);
         e.hp-=d;e.flash=.12;spark(e.x+e.w/2,e.y+e.h/2,'#f5d48d',5);
-        if(e.hp<=0&&!e.dead){e.dead=true;e.windup=0;e.burst=0;rewardKill(e.type==='shield'?200:e.type==='turret'?160:100);beep(180,.07);}
+        if(e.hp<=0&&!e.dead){e.dead=true;e.windup=0;e.burst=0;e.chargerTime=0;rewardKill(e.type==='shield'?200:['turret','charger'].includes(e.type)?160:100);beep(180,.07);}
       }
       function damageBoss(d,fromSkill=false){
         if(boss.dead||(survival()&&spawnTime>0))return;
@@ -1147,6 +1152,30 @@
             projectile(x,y,dx/len*315,dy/len*315,'e');
             e.burst--;e.burstTimer=.14;e.shot=2.1/(survival()?1+Math.min(12,survivalWave-1)*.05:1);
           }
+        }
+      }
+      function updateCharger(e,dt){
+        // A locked, visible lane is the promise: no homing after windup begins.
+        if(e.chargerPhase==='hunt'){
+          const dx=player.x+player.w/2-e.x-e.w/2;
+          e.face=Math.sign(dx)||e.face;
+          if(e.shot<=0&&Math.abs(dx)<=CHARGER.range){
+            e.chargerPhase='windup';e.chargerTime=CHARGER.windup;
+            e.chargerEnd=clamp(e.x+e.face*CHARGER.distance,60,W-e.w-60);
+            announce('冲锋兵蓄力：跳跃、登台或冲刺穿过标线，趁回气反击。');
+          }else e.x=clamp(e.x+e.face*42*dt,60,W-e.w-60);
+        }else if(e.chargerPhase==='windup'){
+          e.chargerTime=Math.max(0,e.chargerTime-dt);
+          if(e.chargerTime===0){e.chargerPhase='rush';beep(240,.09,'sawtooth');}
+        }else if(e.chargerPhase==='rush'){
+          const previous=e.x;
+          e.x+=Math.sign(e.chargerEnd-e.x)*Math.min(Math.abs(e.chargerEnd-e.x),CHARGER.speed*dt);
+          // Sweep the body too: a fast rush must not tunnel through a player.
+          if(hit(player,{x:Math.min(previous,e.x),y:e.y,w:e.w+Math.abs(e.x-previous),h:e.h}))hurt(1);
+          if(e.x===e.chargerEnd){e.chargerPhase='recover';e.chargerTime=CHARGER.recover;}
+        }else{
+          e.chargerTime=Math.max(0,e.chargerTime-dt);
+          if(e.chargerTime===0){e.chargerPhase='hunt';e.shot=CHARGER.cooldown;}
         }
       }
       function aimAtPlayer(e,speed){
@@ -1254,10 +1283,12 @@
             }else e.x=e.home+Math.sin(e.age*1.15)*36;
           }
           if(e.type==='drone'){e.x=e.home+Math.sin(e.age*1.4)*53;e.y=240+Math.sin(e.age*2.1)*26;}
-          if(e.type==='turret')updateTurret(e,dt);
+          if(e.type==='charger')updateCharger(e,dt);
+          else if(e.type==='turret')updateTurret(e,dt);
           else if((survival()||Math.abs(e.x-player.x)<570)&&e.shot<=0){
             aimAtPlayer(e,235);e.shot=rng(2.3,3.5)/(survival()?1+Math.min(12,survivalWave-1)*.05:1);
           }
+          if(phase!=='playing')return;
           if(hit(player,e))hurt(1);
           if(phase!=='playing')return;
         }
@@ -1492,6 +1523,11 @@
           rect(e.x+5,e.y,28,8,'#b1a1a0');
           rect(e.x,e.y+9,38,13,'#7f5961');rect(e.x+14,e.y+13,10,6,'#f7b078');
           rect(e.x-5,e.y+14,8,4,'#c6d3d1');rect(e.x+34,e.y+14,8,4,'#c6d3d1');
+        }else if(e.type==='charger'){
+          rect(e.x+3,e.y,24,10,'#ffc77c');rect(e.x,e.y+10,30,20,'#bd612d');
+          rect(e.x+4,e.y+30,8,7,'#303349');rect(e.x+20,e.y+30,8,7,'#303349');
+          rect(e.x+(e.face>0?22:2),e.y+4,6,4,'#342c38');
+          rect(e.x+(e.face>0?-5:27),e.y+13,8,15,'#ffe0a0');
         }else if(e.type==='turret'){
           rect(e.x,e.y+12,30,23,'#48566b');
           rect(e.x-12,e.y+17,27,8,'#a5bbc1');
@@ -1501,6 +1537,18 @@
           rect(e.x+5,e.y,22,10,'#d4a386');rect(e.x+2,e.y+10,27,20,'#aa5460');
           rect(e.x+4,e.y+30,8,8,'#303349');rect(e.x+20,e.y+30,8,8,'#303349');
           rect(e.x-10,e.y+18,17,5,'#c7c4b0');rect(e.x+11,e.y+5,8,5,'#312e3d');
+        }
+        if(e.type==='charger'){
+          c.font='bold 11px system-ui';c.fillStyle='#ffe0a0';
+          c.fillText(e.chargerPhase==='windup'?'蓄力 · 跳跃避开':e.chargerPhase==='recover'?'回气 · 反击':e.chargerPhase==='rush'?'冲锋':'冲锋兵',e.x-18,e.y-18);
+          if(e.chargerPhase==='windup'||e.chargerPhase==='rush'){
+            const x=Math.min(e.x,e.chargerEnd),width=Math.abs(e.chargerEnd-e.x)+e.w;
+            c.save();c.globalAlpha=.2;rect(x,e.y,width,e.h,'#ffb661');c.restore();
+            c.setLineDash([8,6]);line(x,G-2,x+width,G-2,'#ffe0a0',3);c.setLineDash([]);
+            const tip=e.chargerEnd+(e.face>0?e.w:0);
+            line(tip-e.face*10,G-9,tip,G-2,'#ffe0a0',2);
+            if(e.chargerPhase==='windup'){rect(e.x,e.y-15,e.w,4,'#352e32');rect(e.x,e.y-15,e.w*(1-e.chargerTime/CHARGER.windup),4,'#ffe0a0');}
+          }
         }
         if(e.type==='shield'){
           const x=e.face===-1?e.x-6:e.x+e.w-2;
@@ -1872,7 +1920,7 @@
         survivalWave,survivalCleared,survivalTime,spawnTime,bossWave:bossWave(),bossMaxHp:boss?.maxHp??0,bossX:boss?.x??0,synergies:activeSynergies(),refluxCooldown,loadout,selectedLoadout,supplyRerolls,supplyOffers:[...supplyOffers],selectedSupply,
         tacticalCharge,tacticalTime,tacticalUses,tacticalName:survival()?tactic().name:'',
         selectedContract,fieldContract:fieldContract?{status:fieldContract.status,nodes:fieldContract.nodes.map(node=>({...node}))}:null,
-        enemies:enemies.filter(e=>!e.dead).map(e=>({x:e.x,y:e.y,w:e.w,h:e.h,hp:e.hp,type:e.type,face:e.face,arrival:e.arrival||0})),
+        enemies:enemies.filter(e=>!e.dead).map(e=>({x:e.x,y:e.y,w:e.w,h:e.h,hp:e.hp,type:e.type,face:e.face,arrival:e.arrival||0,...(e.type==='charger'?{chargerPhase:e.chargerPhase,chargerTime:e.chargerTime,chargerEnd:e.chargerEnd}:{})})),
         clock,runStars:[...runStars],progress:JSON.parse(JSON.stringify(progress))
       })});
       refreshRecords();

@@ -1759,7 +1759,7 @@ test('all three loadouts clear four waves across varied timing and seeds using o
           g.click('supply-' + Math.max(0, choice)); g.click('start');
         }
       }
-      eq([...encountered].sort(), ['drone', 'shield', 'turret', 'walker']);
+      eq([...encountered].sort(), ['charger', 'drone', 'shield', 'turret', 'walker']);
       // Explosive devices can clear a route before a reflection opportunity.
       totalReflections += reflected; assert(decisions > 20); eq(g.state().progress.survival.wave, 4);
       eq(g.state().progress.survival.best, g.state().score);
@@ -2855,7 +2855,7 @@ test('active skills support all three loadouts through four real-input waves wit
         }
       }
       assert(g.state().tacticalUses >= 2, 'Combat did not recharge a second use');
-      eq([...encountered].sort(), ['drone', 'shield', 'turret', 'walker']);
+      eq([...encountered].sort(), ['charger', 'drone', 'shield', 'turret', 'walker']);
       // Explosive devices can clear a route before a reflection opportunity.
       totalReflections += reflected; assert(decisions > 20); eq(g.state().progress.survival.wave, 4);
       eq(g.state().progress.survival.best, g.state().score);
@@ -3129,6 +3129,159 @@ test('a last-enemy device explosion does not save a simultaneous lethal trade', 
       ${reverse?'bullets.reverse();':''}`);
     tick(g,3);eq(g.state().phase,'survivalOver');eq(g.state().progress.survival,{wave:0,best:0});
   }
+});
+
+// Charger fixtures isolate geometry; the existing multi-seed four-wave runs
+// above still exercise the actual roster using only ordinary player inputs.
+function chargerGame(options) {
+  const g=defense(options);
+  g.run(`survivalWave=3;startWave();spawnTime=0;devices=[];pickups=[];
+    enemies=[makeEnemy(650,'charger')];enemies[0].shot=0;
+    player.x=480;player.inv=0;player.hp=maxHealth();`);
+  return g;
+}
+const charger = g => g.state().enemies.find(e=>e.type==='charger');
+
+test('one charger replaces a walker only after the first survival boss with bounded health',()=>{
+  const g=defense();
+  for(const wave of [1,2,3,4,5,6,7,8,9,10,98,99]){
+    g.run(`survivalWave=${wave-1};startWave();`);
+    const state=g.state(),rushers=state.enemies.filter(e=>e.type==='charger');
+    eq(rushers.length,wave>=4&&wave%3?1:0);
+    eq(state.enemies.length,wave%3?Math.min(8,3+Math.floor(wave/2)):0);
+    if(rushers.length){
+      eq(rushers[0].hp,4+Math.min(6,Math.floor((wave-1)/4)));
+      eq(rushers[0].chargerPhase,'hunt');eq(rushers[0].chargerTime,0);
+      assert(g.read('wavePreview(survivalWave)').includes('冲锋兵加入'));
+    }
+  }
+  g.run('openTitle();');g.click('mode-campaign');g.click('start');
+  for(let i=0;i<3;i++){g.run(`resetStage(${i},null);`);assert(!g.state().enemies.some(e=>e.type==='charger'));}
+  g.run('openTitle();');g.click('mode-challenges');g.click('challenge-bosses');eq(g.state().enemies,[]);
+});
+
+test('charger freezes during ingress and relocation protection before starting its readable warning',()=>{
+  const g=chargerGame();g.run('spawnTime=1;');const first=charger(g);tick(g,30);
+  eq(charger(g),first);eq(g.state().hostiles,[]);
+  g.run('player.x=enemies[0].x;spawnTime=DT;');tick(g);
+  const relocated=charger(g);assert(relocated.arrival>0);eq(relocated.chargerPhase,'hunt');eq(relocated.chargerTime,0);
+  tick(g,20);eq(charger(g).x,relocated.x);eq(charger(g).chargerPhase,'hunt');eq(g.state().hostiles,[]);
+  g.run('player.x=260;');tickUntil(g,"enemies[0].chargerPhase==='windup'",160);
+  near(charger(g).chargerTime,.8);
+});
+
+test('charger commits stationary windup, exact lane and recovery without tracking or bullets',()=>{
+  const g=chargerGame();tick(g);const locked=charger(g);
+  eq(locked.chargerPhase,'windup');eq(locked.face,-1);eq(locked.chargerEnd,434);near(locked.chargerTime,.8);
+  // Crossing to the opposite side cannot retarget the visible lane.
+  g.run('player.x=850;');tick(g,47);
+  eq(charger(g).x,locked.x);eq(charger(g).face,-1);eq(charger(g).chargerEnd,434);
+  assert(charger(g).chargerTime>0);eq(g.state().hostiles,[]);
+  tickUntil(g,"enemies[0].chargerPhase==='rush'",3);eq(charger(g).x,650);
+  tickUntil(g,"enemies[0].chargerPhase==='recover'",30);
+  eq(charger(g).x,434);near(charger(g).chargerTime,1.1);eq(g.state().hostiles,[]);
+  tick(g,65);eq(charger(g).x,434);eq(charger(g).chargerPhase,'recover');
+  tickUntil(g,"enemies[0].chargerPhase==='hunt'",3);near(g.read('enemies[0].shot'),1.7);
+  tick(g);assert(charger(g).x>434);eq(g.state().hostiles,[]);
+  g.run('enemies[0].hp=1000;enemies[0].maxHp=1000;player.inv=100;');tick(g,600);
+  eq(g.state().hostiles,[]);eq(g.state().turretCharge,0);
+});
+
+test('charger clamps both wall endpoints and always recovers rather than bouncing',()=>{
+  for(const [x,px,end,face] of [[100,8,60,-1],[840,927,870,1]]){
+    const g=chargerGame();g.run(`enemies[0].x=${x};player.x=${px};player.inv=100;`);tick(g);
+    eq(charger(g).face,face);eq(charger(g).chargerEnd,end);
+    tickUntil(g,"enemies[0].chargerPhase==='recover'",100);
+    eq(charger(g).x,end);eq(charger(g).face,face);tick(g,30);eq(charger(g).x,end);
+  }
+});
+
+test('grounded and crouching players take one rush hit, while real jumps reach a safe ledge',()=>{
+  for(const crouch of [false,true]){
+    const g=chargerGame();const hp=g.state().hp;if(crouch)g.key('s');
+    tickUntil(g,"enemies[0].chargerPhase==='recover'",100);
+    eq(g.state().hp,hp-1);eq(g.state().lives,1);eq(g.state().hostiles,[]);
+  }
+  for(const reducedMotion of [false,true]){
+    const g=chargerGame({reducedMotion});g.run('player.x=580;');tick(g,31);
+    assert(charger(g).chargerPhase==='windup');const hp=g.state().hp;
+    g.key('w');tick(g);g.key('w',false);
+    tickUntil(g,"enemies[0].chargerPhase==='recover'",80);
+    eq(g.state().hp,hp);assert(g.state().y+g.state().playerHeight<=335);
+    tick(g,30);eq(g.state().hp,hp);near(g.state().y+g.state().playerHeight,335);
+  }
+});
+
+test('a late-windup ground jump clears the actual rushing body without a platform',()=>{
+  const g=chargerGame();g.run('stage.platforms=[];');tick(g,37);
+  eq(charger(g).chargerPhase,'windup');assert(charger(g).chargerTime>.15&&charger(g).chargerTime<.25);
+  const hp=g.state().hp;g.key('w');tick(g);g.key('w',false);
+  let crossed=false;
+  for(let frame=0;frame<70;frame++){
+    tick(g);const s=g.state(),e=charger(g);
+    if(e.x<s.x+27&&e.x+e.w>s.x&&e.chargerPhase==='rush'){
+      crossed=true;assert(s.y+s.playerHeight<e.y);
+    }
+  }
+  assert(crossed,'The enemy must actually pass under the jumping player');eq(g.state().hp,hp);
+  assert(g.state().ground);near(g.state().y+g.state().playerHeight,425);
+});
+
+test('dash and phase shield counter a rush using the existing damage pipeline',()=>{
+  const g=chargerGame();g.run("player.x=580;player.face=1;");tickUntil(g,"enemies[0].chargerPhase==='rush'",60);
+  const hp=g.state().hp;g.key('l');tick(g);g.key('l',false);tick(g,12);
+  eq(g.state().hp,hp);assert(g.state().x>charger(g).x+charger(g).w);
+  const shield=chargerGame({loadout:'counter'});shield.run('player.x=580;');
+  tickUntil(shield,"enemies[0].chargerPhase==='rush'",60);
+  const shieldHp=shield.state().hp;shield.key('e');tick(shield);shield.key('e',false);
+  tickUntil(shield,"enemies[0].chargerPhase==='recover'",40);eq(shield.state().hp,shieldHp);
+  assert(shield.state().tacticalTime>0);eq(shield.state().tacticalUses,1);
+});
+
+test('rush body sweep cannot tunnel and a lethal contact cannot award wave completion',()=>{
+  const g=chargerGame();g.run("enemies[0].chargerPhase='rush';enemies[0].chargerEnd=434;player.x=550;updateCharger(enemies[0],.45);");
+  eq(g.state().hp,5);eq(charger(g).x,434);
+  const lethal=chargerGame();lethal.run("enemies[0].chargerPhase='rush';enemies[0].chargerEnd=434;player.x=630;player.hp=1;");
+  tick(lethal);eq(lethal.state().phase,'survivalOver');eq(lethal.state().progress.survival,{wave:0,best:0});
+});
+
+test('charger can be stopped during windup or rush and its defeat pays once',()=>{
+  for(const phase of ['windup','rush','recover']){
+    const g=chargerGame();tickUntil(g,`enemies[0].chargerPhase==='${phase}'`,100);
+    const before=g.state().score;g.run("damageEnemy(enemies[0],4);damageEnemy(enemies[0],4);");
+    eq(g.state().score,before+160);eq(g.state().enemies,[]);eq(g.read('enemies[0].chargerTime'),0);
+    const x=g.read('enemies[0].x');tick(g,10);eq(g.read('enemies[0].x'),x);eq(g.state().phase,'waveClear');eq(g.state().survivalCleared,4);
+  }
+});
+
+test('charger takes normal bullet, grenade, device and tactical damage without adding armor',()=>{
+  for(const source of ['bullet','grenade','device','skill']){
+    const g=chargerGame({loadout:'demolition'});g.run('player.x=600;player.inv=100;');tick(g);
+    if(source==='bullet'){
+      g.run("projectile(630,407,650,0,'p',4);");tick(g,3);
+    }else if(source==='grenade')g.run('boom(665,407);');
+    else if(source==='device')g.run("devices=[{x:600,y:389,w:24,h:36,hp:2,spent:false}];damageDevice(devices[0],2);");
+    else {g.key('e');tick(g);g.key('e',false);eq(g.state().tacticalCharge,0);}
+    eq(g.state().enemies,[]);assert(g.state().score>=160);eq(g.state().grenades,g.state().phase==='waveClear'?6:5);
+  }
+});
+
+test('warning and recovery survive pause, canceled confirmations, blur and reset cleanly on retry',()=>{
+  for(const stage of ['windup','rush','recover']){
+    const g=chargerGame();tickUntil(g,`enemies[0].chargerPhase==='${stage}'`,100);
+    g.key('p');g.key('p',false);const frozen=g.state();g.frames(40);eq(g.state(),frozen);
+    for(const control of ['restart','menu-home']){g.click(control);g.frames(10);g.click('cancel-restart');eq(g.state(),frozen);}
+    g.click('start');tick(g);assert(g.state().survivalTime>frozen.survivalTime);
+    g.event('blur');eq(g.state().phase,'pause');const blurred=g.state();g.frames(20);eq(g.state(),blurred);
+    g.key('r');g.click('start');eq(g.state().survivalWave,1);assert(!g.state().enemies.some(e=>e.type==='charger'));
+  }
+});
+
+test('charger snapshots are detached and no attack state is written to saved records',()=>{
+  const g=chargerGame();tick(g);const first=charger(g),snapshot=g.win.__raidState;
+  snapshot.enemies[0].chargerEnd=9999;snapshot.enemies[0].chargerPhase='rush';snapshot.enemies.splice(0,1);
+  eq(charger(g),first);g.run('saveProgress();');
+  assert(!JSON.stringify(g.state().progress).includes('charger'));
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
