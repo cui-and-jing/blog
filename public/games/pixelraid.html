@@ -45,7 +45,10 @@
     .choice strong{color:#ffe4a0;font-size:14px}.choice span{font-size:11px;font-weight:500;line-height:1.6}
     .menu-section{display:grid;gap:10px;width:100%}.overlay .small{font-size:11px;color:#b8cbdf;line-height:1.65}
     .overlay .section-label{font-size:12px;color:#b8cbdf}.overlay .result-details{color:#ffe093;font-size:15px;white-space:pre-line}
-    #save-status{font-weight:400;color:#b8cbdf}.controls button[data-action="dash"]{background:#674d8b;border-color:#b89ed9}
+    #save-status{font-weight:400;color:#b8cbdf}.controls button[data-action="dash"]{position:relative;background:#674d8b;border-color:#b89ed9;overflow:hidden}
+    .controls button[data-action="dash"][data-ready="true"]{border-color:#b9ffe2}
+    #dash-meter{position:absolute;left:0;bottom:0;height:4px;background:#d8c7ff;pointer-events:none}
+    [data-ready="true"]>#dash-meter{background:#b9ffe2}
     .mission{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;max-width:1200px;width:100%;margin:0 auto;padding:9px 12px;border:1px solid #649caf;border-radius:8px;background:#173447;font-size:12px;line-height:1.5}
     .mission strong{color:#a9f2e4}.mission b{color:#ffe097;font-variant-numeric:tabular-nums}.mission[data-urgent="true"]{border-color:#ffae88;background:#492e36}
     .challenge-grid .choice{align-content:start;gap:9px}.challenge-grid .record{color:#a9f2e4}.mode-options{padding:5px;border:1px solid #4c6680;border-radius:12px}
@@ -313,7 +316,7 @@
             <div class="details-body">
               <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。菜单中用方向键 / 左摇杆选择、A 确认、B 返回；按住方向可连续浏览。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
               <p>空中按住 S / ↓ 再开火可朝前下方俯射，松开下键恢复原方向；按住跳跃可仰射，同时按下时优先俯射。落地后仍是下蹲平射。手柄方向下 + 射击、触屏 ↓ + 射击同样适用，可从跳台、降层或踏击弹起中反击。</p>
-              <p>炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
+              <p>冲刺冷却结束前 0.12 秒内可提前按一次，到点自动冲刺；长按不会连冲，暂停或重开会清除预输入。触屏冲刺键底部短条显示恢复进度，亮绿表示就绪。炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
             </div>
           </details>
         </div>
@@ -333,7 +336,7 @@
       <button type="button" data-action="down" aria-label="下蹲，配合跳跃可从平台降层，空中配合射击可俯射">↓</button>
     </div>
     <div class="cluster">
-      <button type="button" data-action="dash" aria-label="向面朝方向冲刺">冲</button>
+      <button id="dash-control" type="button" data-action="dash" aria-label="向面朝方向冲刺，已就绪"><span aria-hidden="true">冲</span><i id="dash-meter" aria-hidden="true"></i></button>
       <button type="button" data-action="grenade" aria-label="投掷手雷">雷</button>
       <button type="button" data-action="jump" aria-label="跳跃">跳</button>
       <button type="button" data-action="fire" aria-label="连续射击">射</button>
@@ -348,7 +351,7 @@
   <script>
     (() => {
       'use strict';
-      const W=960,H=540,G=425,DT=1/60,GRAV=1250,MAX_FALL=720;
+      const W=960,H=540,G=425,DT=1/60,GRAV=1250,MAX_FALL=720,DASH_BUFFER=.12;
       const $=id=>document.getElementById(id);
       const canvas=$('field'),c=canvas.getContext('2d',{alpha:false});
       const overlay=$('overlay'),title=$('overlay-title'),kicker=$('overlay-kicker'),message=$('overlay-text'),action=$('start');
@@ -541,7 +544,7 @@
       function announce(text){$('announcer').textContent=text;}
       function clearInput(){
         held.clear();keyboardKeys.clear();padHeld.clear();touch.clear();jumpQueued=false;grenadeQueued=false;dashQueued=false;tacticalQueued=false;
-        if(player)player.jumpBuffer=0;
+        if(player){player.jumpBuffer=0;player.dashBuffer=0;}
         resetPadInput();
         document.querySelectorAll('[data-action]').forEach(btn=>btn.classList.remove('active'));
       }
@@ -725,7 +728,13 @@
         $('weapon').textContent=player?.weaponTime>0?'散弹 '+Math.ceil(player.weaponTime)+'s':(player?.boost>0?'步枪 · 连射':'步枪');
         $('score').textContent=String(points).padStart(5,'0');$('best').textContent=String(best).padStart(5,'0');
         $('intel').textContent=gauntlet()||survival()?'—':collected()+' / 3';
-        $('dash-status').textContent=player?.dashCooldown>0?player.dashCooldown.toFixed(1)+'s':'就绪';
+        const dashRemaining=player?.dashCooldown??0,dashReady=dashRemaining===0;
+        // Round up: a still-cooling dash must never read as 0.0 seconds/ready.
+        const dashText=dashReady?'就绪':(Math.ceil(dashRemaining*10)/10).toFixed(1)+'s';
+        $('dash-status').textContent=dashText;
+        $('dash-control').setAttribute('data-ready',String(dashReady));
+        $('dash-control').setAttribute('aria-label','向面朝方向冲刺，'+(dashReady?'已就绪':'冷却 '+dashText));
+        $('dash-meter').style.width=(100*clamp(1-dashRemaining/dashDelay(),0,1))+'%';
         $('combo-status').textContent=combo.count?combo.count+' 连 · ×'+comboMultiplier()+' · '+combo.timer.toFixed(1)+'s':'待命';
         $('run-label').textContent=(difficulty==='relaxed'?'轻松':'标准')+' · '+(survival()?'防线 · '+kit().name:mode==='challenge'?'挑战':mode==='practice'?'练习':'远征');
         renderBuild();renderContract();
@@ -754,7 +763,7 @@
           platforms:[[260,320,170],[500,310,150]],intel:[],enemies:[],pickups:[]};
         player={x:64,y:G-44,w:27,h:44,vx:0,vy:0,face:1,hp:clamp(carry?.hp??maxHealth(),1,maxHealth()),
           lives:carry?.lives??(difficulty==='relaxed'?4:3),grenades:carry?.grenades??3,ground:true,inv:1.2,shoot:0,boost:0,
-          weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashDir:1,coyote:.1,jumpBuffer:0,crouch:false,dropPlatform:null,dropTime:0};
+          weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashBuffer:0,dashDir:1,coyote:.1,jumpBuffer:0,crouch:false,dropPlatform:null,dropTime:0};
         enemies=stage.enemies.map(([x,type])=>makeEnemy(x,type));
         pickups=stage.pickups.map(([x,kind])=>({x,y:kind==='spread'?G-45:G-93,kind,done:false,age:0}));
         intel=stage.intel.map(([x,y])=>({x,y,done:false}));
@@ -791,7 +800,7 @@
         if(bossWave())stage={...stage,platforms:[[260,320,170],[500,310,150]]};
         boss=makeBoss(bossWave()?[32,44,56][stageIndex]+Math.min(48,Math.floor((survivalWave-1)/9)*12):0,790);
         player.x=W/2-player.w/2;player.h=44;player.y=G-44;player.vx=0;player.vy=0;player.ground=true;
-        player.crouch=false;player.inv=1.2;player.shoot=0;player.dashTime=0;player.dashCooldown=0;player.jumpBuffer=0;player.coyote=.11;player.dropPlatform=null;player.dropTime=0;
+        player.crouch=false;player.inv=1.2;player.shoot=0;player.dashTime=0;player.dashBuffer=0;player.dashCooldown=0;player.jumpBuffer=0;player.coyote=.11;player.dropPlatform=null;player.dropTime=0;
         devices=(arena?.devices||[]).map(([x,floor])=>({x:x-12,y:floor-36,w:24,h:36,hp:2,spent:false}));deviceBursts=[];
         const slots=arena?.slots||[],count=Math.min(8,3+Math.floor(survivalWave/2));
         const types=survivalWave===1?['walker']:survivalWave===2?['walker','drone']:['walker','turret','shield','drone'];
@@ -1061,7 +1070,7 @@
             saveBest();hud();showMenu('行动失败','本次得分 '+points+'。试试冲刺穿过弹幕，或回指挥部切换轻松模式。','再试一次','gameOver');
             return;
           }
-          player.hp=maxHealth();player.x=player.checkpoint;player.h=44;player.y=G-player.h;player.vx=0;player.vy=0;player.ground=true;player.inv=2.2;player.dashTime=0;player.jumpBuffer=0;player.dropPlatform=null;player.dropTime=0;
+          player.hp=maxHealth();player.x=player.checkpoint;player.h=44;player.y=G-player.h;player.vx=0;player.vy=0;player.ground=true;player.inv=2.2;player.dashTime=0;player.dashBuffer=0;player.jumpBuffer=0;player.dropPlatform=null;player.dropTime=0;
           bullets=bullets.filter(b=>b.owner==='p');
           announce('失去一条生命，从检查点继续。');
         }
@@ -1069,7 +1078,7 @@
       }
       function dash(){
         if(player.dashCooldown>0||phase!=='playing')return;
-        player.dashTime=.18;player.dashDir=player.face;player.dashCooldown=dashDelay();
+        player.dashBuffer=0;player.dashTime=.18;player.dashDir=player.face;player.dashCooldown=dashDelay();
         spark(player.x+player.w/2,player.y+player.h/2,'#9ecaff',10);beep(520,.08,'triangle');hud();
       }
       function projectile(x,y,vx,vy,owner,damage=1){
@@ -1337,7 +1346,11 @@
         }
         if(axis&&player.dashTime<=0)player.face=axis;
         player.dashCooldown=Math.max(0,player.dashCooldown-dt);
-        if(dashQueued){dashQueued=false;dash();}
+        player.dashBuffer=Math.max(0,player.dashBuffer-dt);
+        // An edge may wait briefly for cooldown, never shorten it or auto-repeat.
+        // All input methods share this path; clearInput cancels menu interruptions.
+        if(dashQueued){dashQueued=false;player.dashBuffer=DASH_BUFFER;}
+        if(player.dashBuffer>0&&player.dashCooldown===0)dash();
         player.vx=player.dashTime>0?player.dashDir*650:axis*(crouch?110:255);
         player.shoot=Math.max(0,player.shoot-dt);
         player.inv=Math.max(0,player.inv-dt);player.boost=Math.max(0,player.boost-dt);
@@ -1363,7 +1376,7 @@
           if(landing!==Infinity){motion.limit=motion.dy>0?clamp((landing-motion.bottom)/motion.dy,0,1):0;player.y=landing-player.h;player.vy=0;player.ground=true;}
         }
         if(player.y>H+70){
-          player.inv=0;player.dashTime=0;hurt(2);
+          player.inv=0;player.dashTime=0;player.dashBuffer=0;hurt(2);
           if(phase!=='playing')return;
           player.x=player.checkpoint;player.y=G-player.h;player.vy=0;player.vx=0;player.ground=true;player.coyote=.11;
         }
@@ -2119,7 +2132,7 @@
         lastVolley:player?.lastVolley??0,bossCharge:boss?.windup??0,
         bossAttacks:boss?.attacks??0,bossLastVolley:boss?.lastVolley??0,bossRage:!!boss&&boss.hp<=boss.maxHp*.5,
         mode,difficulty,intel:collected(),intelTotal:intel.length,challengeId,challengeTime,challengeReflections,bossWins,titleView,stageDeaths,stageStars,unlocked:progress.unlocked,
-        upgrades:{...upgrades},dashCooldown:player?.dashCooldown??0,dashTime:player?.dashTime??0,
+        upgrades:{...upgrades},dashCooldown:player?.dashCooldown??0,dashTime:player?.dashTime??0,dashBuffer:player?.dashBuffer??0,
         checkpoint:player?.checkpoint??64,maxHp:maxHealth(),selectedUpgrade,storageAvailable,
         crouch:player?.crouch??false,playerHeight:player?.h??44,coyote:player?.coyote??0,jumpBuffer:player?.jumpBuffer??0,dropTime:player?.dropTime??0,
         platforms:stage?.platforms.map(ledge=>[...ledge])||[],arena:survival()&&stage?.arena?{id:stage.arena.id,name:stage.arena.name,hint:stage.arena.hint}:null,

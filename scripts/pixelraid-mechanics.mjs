@@ -4076,4 +4076,95 @@ test('every rifle pose points along its existing shot and ends at the actual muz
   }
 });
 
+test('dash pre-input waits for the full cooldown, then consumes exactly one edge',()=>{
+  for(const setup of ["beginRun(0,'campaign')","beginRun(1,'practice')","beginChallenge('counter')","beginSurvival()"]){
+    const g=createGame();g.run(`${setup};player.inv=100;player.dashCooldown=.1;player.face=1;`);
+    const before=g.state();g.key('l');tick(g);g.key('l',false);
+    eq(g.state().dashTime,0);assert(g.state().dashBuffer>0);near(g.state().x,before.x);
+    while(g.state().dashCooldown>1/60+1e-7){tick(g);eq(g.state().dashTime,0);}
+    // Allow one extra fixed step for floating-point cooldown residue.
+    tickUntil(g,'player.dashTime>0',2);
+    eq(g.state().dashBuffer,0);near(g.state().dashCooldown,g.read('dashDelay()'));
+    eq(g.state().grenades,before.grenades);eq(g.state().score,before.score);eq(g.state().tacticalCharge,before.tacticalCharge);
+    tick(g,160);eq(g.state().dashTime,0);eq(g.state().dashCooldown,0);
+  }
+});
+
+test('dash buffering expires, and held keys/repeats/aliases never refresh it',()=>{
+  const g=createGame();g.start();g.run('player.dashCooldown=.3;');
+  g.key('Shift');tick(g);assert(g.state().dashBuffer>0);
+  for(let i=0;i<25;i++){g.key('Shift',true,true);if(i===9)g.key('l');tick(g);eq(g.state().dashTime,0);}
+  eq(g.state().dashCooldown,0);eq(g.state().dashBuffer,0);
+  g.key('Shift',false);eq(g.read('pressed("dash")'),true);tick(g);eq(g.state().dashTime,0);
+  g.key('l',false);g.key('l');tick(g);assert(g.state().dashTime>0);g.key('l',false);
+});
+
+test('dash buffer uses the execution-facing direction and never stacks charges',()=>{
+  const g=createGame();g.start();g.run('player.x=500;player.face=1;player.dashCooldown=.1;');
+  g.key('l');tick(g);g.key('l',false);g.key('a');
+  tickUntil(g,'player.dashTime>0',8);eq(g.read('player.dashDir'),-1);assert(g.state().x<500);
+  g.key('a',false);const used=g.state().dashCooldown;
+  g.key('l');tick(g);g.key('l',false);tick(g,160);
+  assert(used>0);eq(g.state().dashTime,0);eq(g.state().dashBuffer,0);eq(g.state().dashCooldown,0);
+});
+
+test('touch and controller dash pre-input share the same once-only window',()=>{
+  for(const input of ['touch','pad']){
+    const g=createGame();g.start();if(input==='pad'){g.pad();g.frames(2);}
+    g.run('player.dashCooldown=.1;');
+    if(input==='touch')g.nodes.get('dash-control').dispatch('pointerdown',{pointerId:501});
+    else g.pad([4]);
+    g.frames(2);assert(g.state().dashBuffer>0);eq(g.state().dashTime,0);
+    until(g,()=>g.state().dashTime>0,10);eq(g.state().dashBuffer,0);
+    g.frames(170);eq(g.state().dashTime,0);eq(g.state().dashCooldown,0);
+    if(input==='touch')g.nodes.get('dash-control').dispatch('pointerup',{pointerId:501});else g.pad();
+    g.frames(2);eq(g.state().touchCount,0);
+  }
+});
+
+test('pause, confirmation, focus loss and background cancel waiting dash input',()=>{
+  for(const interrupt of ['pause','restart','home','blur','hidden']){
+    const g=createGame();g.start();g.run('player.dashCooldown=.1;');g.key('l');tick(g);assert(g.state().dashBuffer>0);
+    if(interrupt==='pause')g.key('p');
+    else if(interrupt==='restart')g.click('restart');
+    else if(interrupt==='home')g.click('menu-home');
+    else if(interrupt==='blur')g.event('blur');
+    else g.visibility(true);
+    eq(g.state().dashBuffer,0);const stopped=g.state();g.frames(30);eq(g.state(),stopped);
+    if(interrupt==='hidden')g.visibility(false);
+    if(['restart','home'].includes(interrupt))g.click('cancel-restart');else g.click('start');
+    g.key('l',true,true);tick(g,12);eq(g.state().dashTime,0);eq(g.state().dashBuffer,0);
+    near(g.state().x,stopped.x);g.key('l',false);g.key('l');tick(g);assert(g.state().dashTime>0);
+  }
+});
+
+test('death, nonfatal fall, new wave, restart and stage reset cannot inherit a waiting dash',()=>{
+  for(const reset of ['death','fall','wave','restart','stage']){
+    const g=reset==='wave'?defense():createGame();if(reset!=='wave')g.start();
+    g.run('player.dashCooldown=.1;');g.key('l');tick(g);assert(g.state().dashBuffer>0);
+    if(reset==='death')g.run('player.hp=1;player.inv=0;hurt();');
+    if(reset==='fall'){g.run('player.y=H+80;player.inv=0;');tick(g);eq(g.state().stageDeaths,0);eq(g.state().hp,g.state().maxHp-2);}
+    if(reset==='wave')g.run('startWave();');
+    if(reset==='restart'){g.click('restart');g.click('start');}
+    if(reset==='stage')g.run('resetStage(1,null);');
+    eq(g.state().dashBuffer,0);g.key('l',true,true);tick(g,12);eq(g.state().dashTime,0);
+  }
+});
+
+test('dash recovery meter and ready label use the actual loadout and upgraded cooldown',()=>{
+  for(const loadout of ['assault','counter','demolition'])for(const level of [0,1,2]){
+    const g=defense({loadout});g.run(`upgrades.dash=${level};dash();`);
+    const button=g.nodes.get('dash-control'),meter=g.nodes.get('dash-meter'),status=g.nodes.get('dash-status');
+    eq(button.getAttribute('data-ready'),'false');eq(meter.style.width,'0%');eq(button.disabled,false);
+    near(g.state().dashCooldown,g.read('dashDelay()'));
+    g.run('player.dashCooldown=dashDelay()/2;hud();');eq(meter.style.width,'50%');
+    for(const remaining of [.1,.049,.001]){
+      g.run(`player.dashCooldown=${remaining};hud();`);eq(status.textContent,'0.1s');
+      eq(button.getAttribute('data-ready'),'false');assert(button.getAttribute('aria-label').includes('冷却 0.1s'));
+    }
+    g.run('player.dashCooldown=0;hud();');eq(status.textContent,'就绪');eq(meter.style.width,'100%');
+    eq(button.getAttribute('data-ready'),'true');assert(button.getAttribute('aria-label').includes('已就绪'));
+  }
+});
+
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
