@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { survivalTactics } from './lib/raid-survival-tactics.mjs';
 import { recoveryTactics } from './lib/raid-recovery-tactics.mjs';
 import { beaconTactics } from './lib/raid-beacon-tactics.mjs';
+import { captureRaidCombatProof, validRaidCombatProof } from './lib/raid-combat-proof.mjs';
 
 const source = fs.readFileSync(new URL('../public/games/pixelraid.html', import.meta.url), 'utf8');
 const inline = source.match(/<script>\s*([\s\S]*?)<\/script>/i)?.[1];
@@ -4440,6 +4441,101 @@ test('reservation hints are scene-only, detached snapshots and blocked storage r
     const state=g.win.__raidState;state.pickups[0].done=true;tick(g);eq(g.state().pickups[0].done,false);
     assert(!JSON.stringify(g.state().progress).includes('reserveHinted'));
   }
+});
+
+// The browser proof and the deterministic suite share the exact capture/check
+// functions, so fixes to the smoke predicate cannot silently weaken assertions.
+test('combat proof accepts actual kill and damage in either order within one update',()=>{
+  for(const damageFirst of [false,true]){
+    const g=recapGame({mode:'campaign'});g.run('combo={count:0,timer:0,best:0};enemies[0].hp=1;hud();');
+    const before=g.state();
+    const kill=()=>g.run("projectile(enemies[0].x+12,enemies[0].y+15,0,0,'p',2);");
+    if(damageFirst){kill();arrangeRecapHit(g,'bullet');}else{arrangeRecapHit(g,'bullet');kill();}
+    tick(g);eq(g.read('enemies[0].dead'),true);eq(g.state().hp,before.hp-1);
+    eq(g.state().combo,damageFirst?1:0);eq(g.state().comboBest,1);
+    const proof=captureRaidCombatProof(before.comboBest,g.state(),g.nodes.get('combo-status').textContent);
+    assert(validRaidCombatProof(proof,before),JSON.stringify(proof));
+    // Later gameplay cannot alter the evidence already captured at the kill.
+    tick(g,120);assert(validRaidCombatProof(proof,before));
+  }
+});
+test('combat proof rejects missing kills, stale runs, wrong HUD and invented damage',()=>{
+  const g=recapGame({mode:'campaign'});g.run('combo={count:0,timer:0,best:0};hud();');const before=g.state();
+  arrangeRecapHit(g,'bullet');tick(g);
+  eq(captureRaidCombatProof(before.comboBest,g.state(),g.nodes.get('combo-status').textContent),false);
+  g.run("enemies[0].hp=1;projectile(enemies[0].x+12,enemies[0].y+15,0,0,'p',2);");tick(g);
+  const proof=captureRaidCombatProof(before.comboBest,g.state(),g.nodes.get('combo-status').textContent);
+  assert(validRaidCombatProof(proof,before));
+  for(const patch of [{comboBest:0},{stage:2},{phase:'title'},{mode:'survival'},{label:'待命'},
+    {label:'1 连 · ×3 · 5.0s'},{combatText:''},{combatText:'敌方子弹 · 连击中断'}])
+    eq(validRaidCombatProof({...proof,...patch},before),false,JSON.stringify(patch));
+  const interrupted={...proof,combo:0,comboTime:0,label:'待命',combatText:'敌方子弹 · 连击中断'};
+  assert(validRaidCombatProof(interrupted,before));
+  eq(validRaidCombatProof({...interrupted,hp:before.hp,lives:before.lives},before),false);
+  eq(validRaidCombatProof({...interrupted,comboTime:1},before),false);
+  eq(captureRaidCombatProof(proof.comboBest,g.state(),proof.label),false);
+});
+test('first-patrol smoke proof survives 300 seeded real-input timing replays',()=>{
+  let interrupted=0,active=0;
+  for(let seed=1;seed<=30;seed++)for(const delay of [0,1,2,3,5,8,12,18,24,36]){
+    const g=createGame({randomSeed:seed*997});g.click('start');const before=g.state();
+    g.key('d');until(g,()=>g.state().weapon==='spread',180);g.key('d',false);
+    g.frames(delay);g.key('j');let proof=false;
+    for(let frame=0;frame<270&&!proof;frame++){
+      g.frames();proof=captureRaidCombatProof(before.comboBest,g.state(),g.nodes.get('combo-status').textContent);
+    }
+    g.key('j',false);assert(validRaidCombatProof(proof,before),JSON.stringify({seed,delay,proof,state:g.state()}));
+    if(proof.combo===0)interrupted++;else active++;
+  }
+  assert(active>0);console.log(`  300 input replays: ${active} active combo, ${interrupted} damage interruption`);
+});
+
+test('weapon readout exposes independent scatter and rapid-fire clocks in all modes',()=>{
+  for(const options of pickupModes)for(const [scatter,rapid,label] of [
+    [0,0,'步枪'],[12,0,'散弹 12s'],[0,12,'步枪 · 连射 12s'],[20,12,'散弹 20s · 连射 12s'],
+    [12,20,'散弹 12s · 连射 20s'],[.001,.001,'散弹 1s · 连射 1s'],
+  ]){
+    const g=recapGame(options);g.run(`player.weaponTime=${scatter};player.boost=${rapid};hud();`);
+    eq(g.nodes.get('weapon').textContent,label);near(g.state().boostTime,rapid);near(g.state().weaponTime,scatter);
+    assert(!g.nodes.get('weapon').hasAttribute('aria-live'),'Per-second clocks must not spam live announcements');
+    g.run("announce('重要战斗消息');hud();");eq(g.nodes.get('announcer').textContent,'重要战斗消息');
+  }
+});
+test('independent and simultaneous expiry restore the correct weapon without altering fire rate',()=>{
+  for(const [scatter,rapid,after] of [[.1,4,'步枪 · 连射 4s'],[4,.1,'散弹 4s'],[.1,.1,'步枪']]){
+    const g=recapGame({mode:'campaign'});g.run(`player.weaponTime=${scatter};player.boost=${rapid};player.inv=100;`);
+    tick(g,12);g.run('hud();');eq(g.nodes.get('weapon').textContent,after);
+    g.run('player.shoot=0;fire();');eq(g.state().lastVolley,scatter>1?3:1);
+    near(g.read('player.shoot'),scatter>1?.33:rapid>1?.075:.15);
+  }
+});
+test('both clocks and readout freeze across pause and canceled confirmation',()=>{
+  const g=pickupGame('boost');g.run('player.weaponTime=8;player.boost=12;hud();');
+  g.key('p');const state=g.state(),label=g.nodes.get('weapon').textContent;g.frames(120);
+  near(g.state().weaponTime,state.weaponTime);near(g.state().boostTime,state.boostTime);eq(g.nodes.get('weapon').textContent,label);
+  g.click('restart');g.frames(120);g.click('cancel-restart');g.frames(120);
+  near(g.state().weaponTime,state.weaponTime);near(g.state().boostTime,state.boostTime);eq(g.nodes.get('weapon').textContent,label);
+  g.click('start');g.frames(12);assert(g.state().weaponTime<state.weaponTime&&g.state().boostTime<state.boostTime);
+});
+test('pickup protection immediately refreshes both visible clocks without shortening either effect',()=>{
+  for(const kind of ['boost','spread'])for(const duration of [3,20]){
+    const g=pickupGame(kind);g.run(`player.weaponTime=${duration};player.boost=${duration};`);tick(g);
+    const s=g.state();near(kind==='boost'?s.boostTime:s.weaponTime,Math.max(duration-1/60,12));
+    eq(g.nodes.get('weapon').textContent,`散弹 ${Math.ceil(s.weaponTime)}s · 连射 ${Math.ceil(s.boostTime)}s`);
+    eq(s.score,75);eq(s.pickups[0].done,true);
+  }
+});
+test('readout follows existing retry, wave and stage carry rules without new saved fields',()=>{
+  const g=pickupGame('boost');g.run('player.weaponTime=8;player.boost=12;hud();');
+  finishDefenseWave(g);const cleared=g.state(),label=g.nodes.get('weapon').textContent;g.frames(120);
+  near(g.state().weaponTime,cleared.weaponTime);near(g.state().boostTime,cleared.boostTime);eq(g.nodes.get('weapon').textContent,label);
+  g.click('supply-0');g.click('start');near(g.state().weaponTime,cleared.weaponTime);near(g.state().boostTime,cleared.boostTime);
+  g.click('restart');g.click('start');eq(g.state().weaponTime,0);eq(g.state().boostTime,0);eq(g.nodes.get('weapon').textContent,'步枪');
+  const c=pickupGame('boost',{mode:'campaign'});c.run('player.weaponTime=8;player.boost=12;hud();');c.clear();
+  const remaining=c.state().weaponTime;c.click('upgrade-rapid');c.click('start');
+  near(c.state().weaponTime,remaining);eq(c.state().boostTime,0);eq(c.nodes.get('weapon').textContent,'散弹 '+Math.ceil(remaining)+'s');
+  const snapshot=c.win.__raidState;snapshot.boostTime=999;eq(c.state().boostTime,0);
+  assert(!JSON.stringify(c.state().progress).includes('boostTime'));
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);

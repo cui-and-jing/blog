@@ -736,7 +736,10 @@
         const hp=player?.hp??maxHealth();
         $('hp').textContent=('♥ '.repeat(hp)+'♡ '.repeat(maxHealth()-hp)).trim();
         $('ammo').textContent=String(player?.grenades??3);
-        $('weapon').textContent=player?.weaponTime>0?'散弹 '+Math.ceil(player.weaponTime)+'s':(player?.boost>0?'步枪 · 连射':'步枪');
+        // These effects can overlap and expire independently. Keep both clocks
+        // in the existing weapon slot; never hide rapid fire behind scatter.
+        $('weapon').textContent=(player?.weaponTime>0?'散弹 '+Math.ceil(player.weaponTime)+'s':'步枪')+
+          (player?.boost>0?' · 连射 '+Math.ceil(player.boost)+'s':'');
         $('score').textContent=String(points).padStart(5,'0');$('best').textContent=String(best).padStart(5,'0');
         $('intel').textContent=gauntlet()||survival()?'—':collected()+' / 3';
         const dashRemaining=player?.dashCooldown??0,dashReady=dashRemaining===0;
@@ -2158,7 +2161,7 @@
         playerProjectiles:bullets.filter(b=>b.owner==='p').map(b=>({x:b.x,y:b.y,vx:b.vx,vy:b.vy,damage:b.damage,reflected:b.reflected,tactical:!!b.tactical})),
         grenades:player?.grenades??0,bossHp:boss?.hp??0,ground:player?.ground??false,
         cam,worldWidth:stage?.width??0,touchCount:touch.size,
-        weapon:player?.weaponTime>0?'spread':'rifle',weaponTime:player?.weaponTime??0,
+        weapon:player?.weaponTime>0?'spread':'rifle',weaponTime:player?.weaponTime??0,boostTime:player?.boost??0,
         lastVolley:player?.lastVolley??0,bossCharge:boss?.windup??0,
         bossAttacks:boss?.attacks??0,bossLastVolley:boss?.lastVolley??0,bossRage:!!boss&&boss.hp<=boss.maxHp*.5,
         mode,difficulty,intel:collected(),intelTotal:intel.length,challengeId,challengeTime,challengeReflections,bossWins,titleView,stageDeaths,stageStars,unlocked:progress.unlocked,
