@@ -430,6 +430,16 @@
       const CHARGER={windup:.8,speed:480,distance:216,recover:1.1,cooldown:1.7,range:240};
       const MORTAR={windup:.9,flight:.85,cooldown:2.6,radius:58,height:64};
       const STOMP={damage:2,rebound:400,stagger:.3};
+      const HIT_SOURCES={
+        bullet:{name:'敌方子弹',tip:'冲刺接触敌弹可反弹，也可跳跃或换层避开弹道。'},
+        contact:{name:'敌人接触',tip:'拉开距离再开火，或用冲刺穿过敌人。'},
+        charger:{name:'冲锋兵接触',tip:'看到橙色标线就起跳或冲刺避开，趁回气时反击。'},
+        mortar:{name:'投弹爆炸',tip:'离开紫色框或换层避开落点；爆炸不能反弹。'},
+        lowBeam:{name:'低位激光',tip:'看到低位蓄力线就跳跃或冲刺避开；激光不能反弹。'},
+        highBeam:{name:'高位激光',tip:'看到高位蓄力线就下蹲或冲刺避开；激光不能反弹。'},
+        boss:{name:'首领接触',tip:'与首领保持距离，留出观察蓄力和闪避的空间。'},
+        fall:{name:'坠落深坑',tip:'从坑前起跳，空中冲刺可延长跨越距离。'}
+      };
       const mortarZone=shot=>({x:shot.aimX-MORTAR.radius,y:shot.aimY-MORTAR.height,w:MORTAR.radius*2,h:MORTAR.height});
       const STORAGE_KEY='pixel-raid.progress.v1';
       const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches??false;
@@ -917,13 +927,13 @@
         if(key==='boost'){player.boost=20;player.weaponTime=20;}
         startWave();
       }
-      function finishSurvival(){
+      function finishSurvival(recap=''){
         if(!survival()||phase!=='playing')return;
         tacticalTime=0;tacticalPulse=null;shells=[];mortarBursts=[];stompBurst=null;
         for(const e of enemies)if(e.type==='mortar')e.windup=0;
         if(fieldContract){fieldContract.status='missed';if(fieldContract.beacon)fieldContract.beacon.occupied=false;}
         $('result-details').textContent='本次守住 '+survivalCleared+' 波 · 倒在第 '+survivalWave+' 波\n最高守住 '+progress.survival.wave+' 波 · 最高清场分 '+progress.survival.best+'\n用时 '+formatTime(survivalTime)+' · 本波未计入纪录'+(fieldContract?'\n'+(fieldContract.beacon?'信标夺控':'回收委托')+'未结算 · 需要活着清场，无额外奖励':'');
-        hud();showMenu('防线行动结束','已守住的波数与清场得分已保留。换一套构筑，再突破自己的纪录。','再次守住防线','survivalOver');
+        hud();showMenu('防线行动结束',recap+'已守住的波数与清场得分已保留。','再次守住防线','survivalOver');
       }
       function beginRun(index,kind){
         clearInput();mode=kind;challengeId=null;challengeTime=0;challengeReflections=0;bossWins=0;points=0;shotsFired=0;runStars=[];upgrades={rapid:0,dash:0,armor:0};
@@ -1057,17 +1067,21 @@
         const reward=base*comboMultiplier();addPoints(reward);
         combatNotice(combo.count+' 连击 · +'+reward+(combo.count>=2?' · 得分 ×'+comboMultiplier():''));
       }
-      function hurt(damage=1){
+      function hurt(damage=1,source='contact'){
         if(phase!=='playing'||player.inv>0||player.dashTime>0||shieldActive())return;
-        combo.count=0;combo.timer=0;combatNotice('受到攻击 · 连击中断');
+        // Attribute only damage actually taken. Carry the lethal hit directly
+        // into this result, never a cached earlier hit or a persistent record.
+        const cause=HIT_SOURCES[source]||HIT_SOURCES.contact;
+        combo.count=0;combo.timer=0;combatNotice(cause.name+' · 连击中断');
         player.hp=Math.max(0,player.hp-damage);player.inv=difficulty==='relaxed'?1.9:1.45;shake=8;beep(170,.2,'sawtooth');
         spark(player.x+12,player.y+20,'#f6a174',13);
         if(player.hp===0){
           player.lives--;stageDeaths++;
           if(player.lives<=0){
-            if(survival()){finishSurvival();return;}
-            if(mode==='challenge'){finishChallenge(false,'生命耗尽。重试会从本项挑战起点开始，已完成的挑战纪录不会丢失。');return;}
-            saveBest();hud();showMenu('行动失败','本次得分 '+points+'。试试冲刺穿过弹幕，或回指挥部切换轻松模式。','再试一次','gameOver');
+            const recap='致命来源：'+cause.name+'。'+cause.tip;
+            if(survival()){finishSurvival(recap);return;}
+            if(mode==='challenge'){finishChallenge(false,recap+'重试从本项挑战起点开始，已完成纪录保留。');return;}
+            saveBest();hud();showMenu('行动失败',recap+'本次得分 '+points+'，也可回指挥部切换轻松模式。','再试一次','gameOver');
             return;
           }
           player.hp=maxHealth();player.x=player.checkpoint;player.h=44;player.y=G-player.h;player.vx=0;player.vy=0;player.ground=true;player.inv=2.2;player.dashTime=0;player.dashBuffer=0;player.jumpBuffer=0;player.dropPlatform=null;player.dropTime=0;
@@ -1285,7 +1299,7 @@
             spark(shot.aimX,shot.aimY-12,'#e7b4ff',14);beep(110,.09,'sawtooth');
             // Consume before hurt. A lethal impact must end the run before any
             // same-tick clear reward, exactly like hostile projectile trades.
-            if(hit(player,mortarZone(shot)))hurt(1);
+            if(hit(player,mortarZone(shot)))hurt(1,'mortar');
             if(phase!=='playing')return;
           }
         }
@@ -1376,7 +1390,7 @@
           if(landing!==Infinity){motion.limit=motion.dy>0?clamp((landing-motion.bottom)/motion.dy,0,1):0;player.y=landing-player.h;player.vy=0;player.ground=true;}
         }
         if(player.y>H+70){
-          player.inv=0;player.dashTime=0;player.dashBuffer=0;hurt(2);
+          player.inv=0;player.dashTime=0;player.dashBuffer=0;hurt(2,'fall');
           if(phase!=='playing')return;
           player.x=player.checkpoint;player.y=G-player.h;player.vy=0;player.vx=0;player.ground=true;player.coyote=.11;
         }
@@ -1428,13 +1442,13 @@
         if(stomp)applyStomp(stomp);
         for(const track of survival()?enemyTracks:[]){
           if(track.enemy.dead||track.enemy===stomp?.enemy)continue;
-          if(hit(player,track.body||track.enemy))hurt(1);
+          if(hit(player,track.body||track.enemy))hurt(1,track.enemy.type==='charger'?'charger':'contact');
           if(phase!=='playing')return;
         }
         boss.phase+=dt;
         if(boss.beamTime>0){
           boss.beamTime=Math.max(0,boss.beamTime-dt);
-          if(!boss.dead&&hit(player,{x:boss.x-760,y:boss.beamY-5,w:760,h:10}))hurt(1);
+          if(!boss.dead&&hit(player,{x:boss.x-760,y:boss.beamY-5,w:760,h:10}))hurt(1,boss.beamY>G-20?'lowBeam':'highBeam');
           if(phase!=='playing')return;
         }
         if(!boss.dead&&(!survival()||spawnTime===0)&&(gauntlet()||survival()||Math.abs(boss.x-player.x)<780)){
@@ -1470,7 +1484,7 @@
           boss.windup=0;boss.beamTime=0;
           boss.shot=Math.max(.35,boss.shot-dt);
         }
-        if(!boss.dead&&(!survival()||spawnTime===0)&&hit(player,boss))hurt(1);
+        if(!boss.dead&&(!survival()||spawnTime===0)&&hit(player,boss))hurt(1,'boss');
         if(phase!=='playing')return;
         for(let i=bullets.length-1;i>=0;i--){
           const b=bullets[i],x=b.traceX??b.x,y=b.traceY??b.y;
@@ -1503,7 +1517,7 @@
           }else if(shotImpact(x,y,b.x,b.y,b.r,player)!==Infinity){
             if(player.dashTime>0||shieldActive()){reflectBullet(b);continue;}
             // Damage may replace the projectile list on respawn; consume first.
-            bullets.splice(i,1);hurt(1);
+            bullets.splice(i,1);hurt(1,'bullet');
             if(phase!=='playing')return;
             if(i>=bullets.length)i=bullets.length;
             continue;

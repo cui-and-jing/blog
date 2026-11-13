@@ -4167,4 +4167,182 @@ test('dash recovery meter and ready label use the actual loadout and upgraded co
   }
 });
 
+// Arrange collision boundaries only: every attribution below is resolved by
+// production update(), not by directly calling hurt or a result-menu helper.
+const recapSources={
+  bullet:['敌方子弹','冲刺接触敌弹可反弹'],contact:['敌人接触','拉开距离再开火'],
+  charger:['冲锋兵接触','趁回气时反击'],mortar:['投弹爆炸','爆炸不能反弹'],
+  lowBeam:['低位激光','跳跃或冲刺避开'],highBeam:['高位激光','下蹲或冲刺避开'],
+  boss:['首领接触','与首领保持距离'],fall:['坠落深坑','从坑前起跳'],
+};
+function recapGame({mode='survival',difficulty='standard',loadout='assault',blocked=false,reducedMotion=false}={}){
+  const g=createGame({blocked,reducedMotion});
+  if(mode==='survival'){g.click('mode-survival');g.click('loadout-'+loadout);g.click('start');}
+  else if(mode==='challenge')g.run("beginChallenge('sprint');");
+  else{g.click('difficulty-'+difficulty);g.run(`beginRun(0,${JSON.stringify(mode)});`);}
+  g.run(`clearInput();spawnTime=0;devices=[];pickups=[];bullets=[];bombs=[];shells=[];fieldContract=null;
+    stage.platforms=[];stage.gaps=[];enemies=[{...makeEnemy(70,'turret'),shot:100}];
+    boss.dead=true;boss.windup=0;boss.beamTime=0;boss.shot=100;
+    player.x=465;player.y=G-44;player.h=44;player.vx=0;player.vy=0;player.ground=true;
+    player.inv=0;player.dashTime=0;player.dashBuffer=0;player.hp=maxHealth();player.lives=1;
+    combo.count=3;combo.timer=5;combatText='';combatTime=0;`);
+  return g;
+}
+function arrangeRecapHit(g,source){
+  if(source==='bullet')g.run("projectile(player.x+player.w/2,player.y+20,0,0,'e');");
+  else if(source==='contact')g.run("enemies.push({...makeEnemy(player.x+6,'walker'),shot:100,age:0});");
+  else if(source==='charger')g.run("enemies.push({...makeEnemy(player.x+6,'charger'),shot:100,chargerPhase:'rush',chargerEnd:player.x+170});");
+  else if(source==='mortar')g.run(`shells.push({x:player.x,y:player.y,startX:70,startY:100,
+    aimX:player.x+player.w/2,aimY:G,elapsed:MORTAR.flight-DT/2});`);
+  else if(source==='lowBeam'||source==='highBeam')g.run(`boss.dead=false;boss.x=700;boss.beamTime=.5;boss.beamY=G-${source==='lowBeam'?12:36};`);
+  else if(source==='boss')g.run('boss.dead=false;boss.x=player.x+8;boss.y=G-boss.h;');
+  else if(source==='fall')g.run('player.y=H+80;player.ground=false;');
+  else throw new Error('Unknown recap fixture '+source);
+}
+function assertRecap(g,source,phase){
+  const [name,tip]=recapSources[source],sub=g.nodes.get('overlay-text').textContent;
+  eq(g.state().phase,phase);assert(sub.startsWith('致命来源：'+name+'。'),sub);assert(sub.includes(tip),sub);
+  eq(g.nodes.get('announcer').textContent,g.nodes.get('overlay-title').textContent+'。'+sub);
+  eq(g.nodes.get('overlay').hidden,false);eq(g.document.activeElement,g.nodes.get('start'));
+}
+
+test('all eight actual damage paths report the source and preserve damage, combo and invulnerability rules',()=>{
+  for(const source of Object.keys(recapSources))for(const reducedMotion of [false,true]){
+    const g=recapGame({reducedMotion}),hp=g.state().hp;arrangeRecapHit(g,source);tick(g);
+    eq(g.state().phase,'playing',source);eq(g.state().hp,hp-(source==='fall'?2:1),source);
+    eq(g.state().stageDeaths,0);eq(g.state().combo,0);eq(g.state().comboTime,0);
+    eq(g.state().combatText,recapSources[source][0]+' · 连击中断');
+    eq(g.nodes.get('announcer').textContent,g.state().combatText);near(g.read('player.inv'),1.45);
+    assert(!g.nodes.get('announcer').textContent.includes('致命来源'));
+  }
+});
+
+test('all eight lethal paths supply their own counterplay to the existing failure menu and live region',()=>{
+  for(const source of Object.keys(recapSources))for(const loadout of ['assault','counter','demolition']){
+    const g=recapGame({loadout});g.run('player.hp=1;');arrangeRecapHit(g,source);tick(g);
+    assertRecap(g,source,'survivalOver');eq(g.state().hp,0);eq(g.state().lives,0);eq(g.state().stageDeaths,1);
+    eq(g.state().progress.survival,{wave:0,best:0});assert(g.nodes.get('result-details').textContent.includes('本波未计入纪录'));
+    const state=g.state(),sub=g.nodes.get('overlay-text').textContent;tick(g,10);g.frames(10);
+    eq(g.state(),state);eq(g.nodes.get('overlay-text').textContent,sub);
+  }
+});
+
+test('campaign, practice and challenges retain their difficulty and result behavior with source recaps',()=>{
+  for(const mode of ['campaign','practice','challenge'])for(const difficulty of ['standard','relaxed']){
+    for(const source of ['bullet','contact','lowBeam','highBeam','boss','fall'])for(const lethal of [false,true]){
+      const g=recapGame({mode,difficulty});if(lethal)g.run('player.hp=1;');
+      const hp=g.state().hp;arrangeRecapHit(g,source);tick(g);
+      if(lethal){
+        assertRecap(g,source,mode==='challenge'?'challengeFailed':'gameOver');
+        if(mode==='challenge')assert(g.nodes.get('result-details').textContent.includes('不计入挑战纪录'));
+      }else{
+        eq(g.state().phase,'playing');eq(g.state().hp,hp-(source==='fall'?2:1));
+        eq(g.state().combatText,recapSources[source][0]+' · 连击中断');
+        near(g.read('player.inv'),mode!=='challenge'&&difficulty==='relaxed'?1.9:1.45);
+      }
+      eq(g.state().difficulty,mode==='challenge'?'standard':difficulty);
+    }
+  }
+});
+
+test('invulnerability, dash and phase shield never turn blocked collisions into damage or fatal recaps',()=>{
+  for(const source of Object.keys(recapSources).filter(source=>source!=='fall'))for(const protection of ['inv','dash','shield']){
+    const g=recapGame({loadout:'counter'});g.run("player.hp=1;combatNotice('保留提示');");
+    if(protection==='inv')g.run('player.inv=1;');
+    else if(protection==='dash')g.run('player.dashTime=.18;player.dashDir=1;');
+    else g.run('tacticalTime=1;');
+    arrangeRecapHit(g,source);tick(g);eq(g.state().hp,1);eq(g.state().phase,'playing');eq(g.state().combo,3);
+    eq(g.state().stageDeaths,0);assert(!g.state().combatText.includes('连击中断'));
+    assert(!g.nodes.get('announcer').textContent.includes('致命来源'));
+    if(source==='bullet'&&protection!=='inv'){eq(g.state().reflections,1);assert(g.state().combatText.includes('反弹'));}
+    else eq(g.state().combatText,'保留提示');
+  }
+  // Falling deliberately cancels invulnerability/dash in existing gameplay;
+  // attribution must not accidentally turn it into an ordinary blocked hit.
+  for(const protection of ['inv','dash','shield']){
+    const g=recapGame({loadout:'counter'});g.run("combatNotice('保留提示');player.inv=1;player.dashTime=.18;player.dashDir=1;");
+    if(protection==='shield')g.run('tacticalTime=1;');
+    const hp=g.state().hp;arrangeRecapHit(g,'fall');tick(g);
+    eq(g.state().hp,hp-(protection==='shield'?0:2));
+    eq(g.state().combatText,protection==='shield'?'保留提示':'坠落深坑 · 连击中断');
+    eq(g.state().x,g.state().checkpoint);eq(g.state().dashTime,0);
+  }
+});
+
+test('losing a nonfinal life keeps checkpoint recovery separate from a later final source',()=>{
+  for(const mode of ['campaign','practice']){
+    const g=recapGame({mode});g.run('player.hp=1;player.lives=2;player.checkpoint=100;');
+    arrangeRecapHit(g,'bullet');tick(g);eq(g.state().phase,'playing');eq(g.state().lives,1);
+    eq(g.state().x,100);eq(g.state().hp,g.state().maxHp);near(g.read('player.inv'),2.2);
+    eq(g.nodes.get('announcer').textContent,'失去一条生命，从检查点继续。');
+    g.run('player.inv=0;player.hp=1;');arrangeRecapHit(g,'fall');tick(g);assertRecap(g,'fall','gameOver');
+    assert(!g.nodes.get('overlay-text').textContent.includes('敌方子弹'));
+  }
+});
+
+test('timeout and insufficient-reflection exits never promote previous damage to a lethal recap',()=>{
+  for(const key of ['sprint','counter']){
+    const g=recapGame({mode:'challenge'});
+    if(key==='counter')g.run("challengeId='counter';");
+    arrangeRecapHit(g,'bullet');tick(g);assert(g.state().hp>0);eq(g.state().stageDeaths,0);
+    if(key==='sprint')g.run('challengeTime=90-DT/2;');
+    else g.run('boss.dead=true;player.x=stage.width-90;challengeReflections=4;');
+    tick(g);eq(g.state().phase,'challengeFailed');
+    const sub=g.nodes.get('overlay-text').textContent;assert(sub.includes(key==='sprint'?'90 秒已到':'反弹不足 5 枚'),sub);
+    assert(!sub.includes('致命来源'));assert(!sub.includes('敌方子弹'));eq(g.state().stageDeaths,0);
+    assert(!g.nodes.get('announcer').textContent.includes('致命来源'));
+    eq(g.state().progress.challenges[key].clears,0);
+  }
+});
+
+test('retry, home, new wave and stage transitions do not carry old combat or fatal messages',()=>{
+  for(const mode of ['campaign','practice','challenge','survival'])for(const next of ['retry','home']){
+    const g=recapGame({mode});g.run('player.hp=1;');arrangeRecapHit(g,'bullet');tick(g);
+    assert(g.nodes.get('overlay-text').textContent.includes('致命来源'));
+    g.click(next==='retry'?'start':'menu-home');eq(g.state().combatText,'');eq(g.state().stageDeaths,0);
+    eq(g.state().phase,next==='retry'?'playing':'title');
+    assert(!g.nodes.get('announcer').textContent.includes('致命来源'));
+    if(next==='retry'){g.key('p');assert(!g.nodes.get('overlay-text').textContent.includes('致命来源'));}
+    else assert(!g.nodes.get('overlay-text').textContent.includes('致命来源'));
+  }
+  for(const transition of ['wave','stage','mode']){
+    const g=recapGame();arrangeRecapHit(g,'bullet');tick(g);
+    if(transition==='wave')g.run('startWave();');
+    else if(transition==='stage')g.run('resetStage(1,null);');
+    else g.run("beginRun(0,'campaign');");
+    eq(g.state().combatText,'');g.key('p');assert(!g.nodes.get('overlay-text').textContent.includes('敌方子弹'));
+  }
+});
+
+test('first lethal collision wins same-tick competing sources without changing damage resolution order',()=>{
+  for(const [first,later] of [['fall','mortar'],['mortar','contact'],['contact','lowBeam'],['lowBeam','bullet'],['boss','bullet']]){
+    const g=recapGame();g.run('player.hp=1;');arrangeRecapHit(g,later);arrangeRecapHit(g,first);tick(g);
+    assertRecap(g,first,'survivalOver');eq(g.state().stageDeaths,1);
+    assert(!g.nodes.get('overlay-text').textContent.includes('致命来源：'+recapSources[later][0]));
+  }
+});
+
+test('lethal projectile and mortar recaps cannot settle same-tick clear or completed commission rewards',()=>{
+  for(const source of ['bullet','mortar'])for(const order of [false,true]){
+    const g=recapGame();g.run(`enemies=[{...makeEnemy(100,'turret'),hp:1,shot:100}];player.hp=1;
+      fieldContract={status:'active',nodes:[],beacon:{x:465,y:G,radius:48,progress:5,occupied:true}};
+      projectile(110,G-18,0,0,'p',99);`);
+    arrangeRecapHit(g,source);if(order)g.run('bullets.reverse();');
+    const before=g.state().progress;tick(g);assertRecap(g,source,'survivalOver');
+    eq(g.state().progress,before);eq(g.state().survivalCleared,0);eq(g.state().fieldContract.status,'missed');
+    eq(g.state().shells,[]);eq(g.state().mortarBursts,[]);
+    const score=g.state().score;tick(g,30);eq(g.state().score,score);
+  }
+});
+
+test('damage-source feedback adds no saved fields and works when storage is unavailable',()=>{
+  for(const blocked of [false,true])for(const source of Object.keys(recapSources)){
+    const g=recapGame({blocked}),before=g.state().progress;g.run('player.hp=1;');arrangeRecapHit(g,source);tick(g);
+    assertRecap(g,source,'survivalOver');g.run('saveProgress();');eq(g.state().progress,before);
+    assert(!/lastHit|hitSource|fatal|recap|致命|敌方子弹|投弹爆炸/.test(JSON.stringify(g.state().progress)));
+    if(!blocked)eq(JSON.parse(g.values.get(STORE)),before);
+    else eq(g.state().storageAvailable,false);
+  }
+});
+
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
