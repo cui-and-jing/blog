@@ -4345,4 +4345,101 @@ test('damage-source feedback adds no saved fields and works when storage is unav
   }
 });
 
+// Pickups are reserved in the current scene, never in persisted progress.
+function pickupGame(kind,options={}){
+  const g=recapGame(options);
+  g.run(`pickups=[{x:player.x+player.w/2,y:G-22,kind:${JSON.stringify(kind)},done:false,age:0}];
+    player.grenades=7;player.inv=100;combo={count:0,timer:0,best:0};`);
+  return g;
+}
+const pickupModes=[
+  ...['standard','relaxed'].flatMap(difficulty=>['campaign','practice'].map(mode=>({mode,difficulty}))),
+  {mode:'challenge'},...['assault','counter','demolition'].map(loadout=>({loadout})),
+];
+test('full finite pickups reserve across modes, difficulties and armor without scoring or changing saves',()=>{
+  for(const options of pickupModes)for(const kind of ['heal','grenade'])for(const armor of [0,2]){
+    const g=pickupGame(kind,options);g.run(`upgrades.armor=${armor};player.hp=maxHealth();`);
+    const before=g.state(),saved=g.state().progress;tick(g,130);
+    eq(g.state().pickups[0].done,false);eq(g.state().hp,before.hp);eq(g.state().grenades,7);eq(g.state().score,0);
+    eq(g.state().progress,saved);eq(g.state().combatText,'');assert(g.read('pickups[0].reserveHinted'));
+    g.run('player.x+=160;');tick(g);g.run('player.x-=160;');tick(g);
+    eq(g.state().pickups[0].done,false);eq(g.state().score,0);eq(g.state().combatText,'','Reentering must not repeat reservation feedback');
+  }
+});
+test('finite pickups restore only missing resources with one original 75 point reward',()=>{
+  for(const options of pickupModes)for(const kind of ['heal','grenade'])for(const missing of [1,2,3]){
+    const g=pickupGame(kind,options);
+    g.run(kind==='heal'?`player.hp=maxHealth()-${missing};`:`player.grenades=7-${missing};`);tick(g);
+    eq(g.state().pickups[0].done,true);eq(g.state().score,75);
+    eq(kind==='heal'?g.state().maxHp-g.state().hp:7-g.state().grenades,Math.max(0,missing-2));
+    tick(g,20);eq(g.state().score,75);
+  }
+});
+test('reserved pickup feedback waits for existing combat feedback and announces only once',()=>{
+  for(const kind of ['heal','grenade']){
+    const g=pickupGame(kind);g.run("combatNotice('敌方子弹 · 连击中断');");tick(g,30);
+    eq(g.state().combatText,'敌方子弹 · 连击中断');eq(g.nodes.get('announcer').textContent,'敌方子弹 · 连击中断');
+    assert(!g.read('pickups[0].reserveHinted'));tick(g,80);assert(g.state().combatText.includes('已满'));
+    eq(g.nodes.get('announcer').textContent,g.state().combatText);
+    g.run("announce('另一个消息');");tick(g,130);eq(g.nodes.get('announcer').textContent,'另一个消息');eq(g.state().combatText,'');
+  }
+});
+test('a real projectile hit or grenade press makes an overlapping reserved pickup useful immediately',()=>{
+  const heal=pickupGame('heal');tick(heal);heal.run('player.inv=0;');arrangeRecapHit(heal,'bullet');tick(heal);
+  eq(heal.state().hp,heal.state().maxHp);eq(heal.state().score,75);eq(heal.state().pickups[0].done,true);
+  eq(heal.state().combatText,'敌方子弹 · 连击中断');eq(heal.state().lives,1);
+  const ammo=pickupGame('grenade');tick(ammo);ammo.key('k');tick(ammo);ammo.key('k',false);
+  eq(ammo.state().grenades,7);eq(ammo.state().score,75);eq(ammo.state().pickups[0].done,true);eq(ammo.read('bombs.length'),1);
+});
+test('spawn warnings preserve full medical pickups but allow useful healing under the existing rules',()=>{
+  for(const missing of [0,1]){
+    const g=defense();g.run(`const p=pickups.find(p=>p.kind==='heal');player.x=p.x-player.w/2;player.hp=maxHealth()-${missing};`);
+    tick(g);assert(g.state().spawnTime>0);eq(g.state().pickups.find(p=>p.kind==='heal').done,missing===1);eq(g.state().score,missing*75);
+  }
+});
+test('lethal damage wins over overlapping medical and same-frame clear rewards',()=>{
+  for(const source of ['bullet','mortar']){
+    const g=pickupGame('heal');g.run('player.hp=1;player.inv=0;enemies[0].hp=1;');
+    arrangeRecapHit(g,source);g.run("projectile(enemies[0].x+15,enemies[0].y+15,0,0,'p',2);");tick(g);
+    eq(g.state().phase,'survivalOver');eq(g.state().hp,0);eq(g.state().pickups[0].done,false);eq(g.state().survivalCleared,0);
+    assert(!g.nodes.get('overlay-text').textContent.includes('医疗'));assert(g.state().score<250);
+    const after=g.state();tick(g,60);eq(g.state(),after);
+  }
+});
+test('nonlethal damage, useful medical pickup and ordinary wave settlement retain their order',()=>{
+  const g=pickupGame('heal');g.run('player.hp=3;player.inv=0;enemies[0].hp=1;');
+  // Reverse iteration processes enemy damage before the final friendly shot.
+  g.run("projectile(enemies[0].x+15,enemies[0].y+15,0,0,'p',2);");arrangeRecapHit(g,'bullet');tick(g);
+  eq(g.state().phase,'waveClear');eq(g.state().hp,5);eq(g.state().pickups[0].done,true);
+  eq(g.state().score,485,'160 turret + 75 pickup + 250 clear');const frozen=g.state();tick(g,60);eq(g.state(),frozen);
+});
+test('timed pickups never shorten longer effects or stack, and pause freezes the retained duration',()=>{
+  for(const kind of ['spread','boost'])for(const initial of [0,6,12,20]){
+    const g=pickupGame(kind),field=kind==='spread'?'weaponTime':'boost';g.run(`player.${field}=${initial};`);tick(g);
+    near(g.read(`player.${field}`),Math.max(initial-1/60,12));eq(g.state().score,75);eq(g.state().pickups[0].done,true);
+    g.key('p');const remaining=g.read(`player.${field}`);tick(g,60);near(g.read(`player.${field}`),remaining);
+    g.click('start');tick(g);near(g.read(`player.${field}`),remaining-1/60);eq(g.state().score,75);
+  }
+});
+test('pause, cancel and respawn retain reserved pickups while retry, new waves and stages rebuild them',()=>{
+  const g=pickupGame('heal');tick(g);const reserved=g.read('pickups');g.key('p');g.click('restart');g.click('cancel-restart');
+  tick(g,60);eq(g.read('pickups'),reserved);g.click('start');tick(g);eq(g.state().pickups[0].done,false);
+  g.click('restart');g.click('start');eq(g.state().survivalWave,1);assert(g.read('pickups.every(p=>!p.done&&!p.reserveHinted)'));
+  tick(g);finishDefenseWave(g);g.click('supply-0');g.click('start');eq(g.state().survivalWave,2);assert(g.read('pickups.every(p=>!p.done&&!p.reserveHinted)'));
+  for(const spent of [false,true]){
+    const c=pickupGame('heal',{mode:'campaign'});if(spent){c.run('player.hp=1;');tick(c);}else tick(c);
+    c.run('player.hp=1;player.inv=0;player.lives=2;');arrangeRecapHit(c,'bullet');tick(c);
+    eq(c.state().lives,1);eq(c.state().pickups[0].done,spent);eq(c.state().score,spent?75:0);
+    c.clear();c.click('upgrade-rapid');c.click('start');eq(c.state().stage,2);assert(c.read('pickups.every(p=>!p.done&&!p.reserveHinted)'));
+  }
+});
+test('reservation hints are scene-only, detached snapshots and blocked storage remain safe',()=>{
+  for(const blocked of [false,true]){
+    const g=pickupGame('heal',{blocked});const before=g.state().progress;tick(g);g.run('saveProgress();');eq(g.state().progress,before);
+    if(!blocked)eq(JSON.parse(g.values.get(STORE)),before);else eq(g.state().storageAvailable,false);
+    const state=g.win.__raidState;state.pickups[0].done=true;tick(g);eq(g.state().pickups[0].done,false);
+    assert(!JSON.stringify(g.state().progress).includes('reserveHinted'));
+  }
+});
+
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);

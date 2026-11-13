@@ -32,6 +32,7 @@ import { checkRaidDivefire } from './lib/raid-divefire-browser.mjs';
 import { checkRaidInput } from './lib/raid-input-browser.mjs';
 import { checkRaidDash } from './lib/raid-dash-browser.mjs';
 import { checkRaidRecap } from './lib/raid-recap-browser.mjs';
+import { checkRaidPickups } from './lib/raid-pickups-browser.mjs';
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -470,6 +471,7 @@ async function checkGame(browser, file) {
       await checkRaidInput(page, problems);
       await checkRaidDash(page, problems);
       await checkRaidRecap(page, problems);
+      await checkRaidPickups(page, problems);
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
