@@ -312,6 +312,7 @@
             <summary>操作按键与战术提示</summary>
             <div class="details-body">
               <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。菜单中用方向键 / 左摇杆选择、A 确认、B 返回；按住方向可连续浏览。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
+              <p>空中按住 S / ↓ 再开火可朝前下方俯射，松开下键恢复原方向；按住跳跃可仰射，同时按下时优先俯射。落地后仍是下蹲平射。手柄方向下 + 射击、触屏 ↓ + 射击同样适用，可从跳台、降层或踏击弹起中反击。</p>
               <p>炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
             </div>
           </details>
@@ -329,7 +330,7 @@
     <div class="cluster">
       <button type="button" data-action="left" aria-label="向左移动">◀</button>
       <button type="button" data-action="right" aria-label="向右移动">▶</button>
-      <button type="button" data-action="down" aria-label="下蹲，配合跳跃可从平台降层">↓</button>
+      <button type="button" data-action="down" aria-label="下蹲，配合跳跃可从平台降层，空中配合射击可俯射">↓</button>
     </div>
     <div class="cluster">
       <button type="button" data-action="dash" aria-label="向面朝方向冲刺">冲</button>
@@ -1075,20 +1076,25 @@
         if(owner==='e'&&difficulty==='relaxed'){vx*=.78;vy*=.78;}
         bullets.push({x,y,vx,vy,owner,damage,pierce:owner==='p'?(upgrades.pierce||0):0,hitEnemies:[],sourceX:x,sourceY:y,reflected:false,life:owner==='p'?1.7:3.7,r:owner==='p'?5:6});
       }
+      // Reuse down, rather than adding a new aim button. It takes priority
+      // over a held jump during a drop or rebound; grounding keeps crouch fire.
+      function fireAim(){
+        return player.ground?0:pressed('down')?1:pressed('jump')?-1:0;
+      }
       function fire(){
         if(player.shoot>0)return;
         const scatter=player.weaponTime>0;
         player.shoot=(scatter?(player.boost>0?.19:.33):(player.boost>0?.075:.15))*Math.pow(.8,upgrades.rapid)*(survival()?kit().fire:1)*(survival()&&loadout==='assault'&&tacticalTime>0?.55:1);
-        const y=player.y+(player.crouch?14:20);
-        const up=pressed('jump')&&!player.ground;
-        const vx=player.face*(up?480:650),vy=up?-340:0;
+        const aim=fireAim(),bodyY=player.y+(player.crouch?14:20);
+        const y=bodyY+(aim>0?14:0);
+        const vx=player.face*(aim?480:650),vy=aim*340;
         const spread=scatter?[-1,0,1]:[0];
         for(const offset of spread){
-          projectile(player.x+(player.face===1?player.w+4:-4),y,vx,vy+offset*(up?88:145),'p');
+          projectile(player.x+(player.face===1?player.w+4:-4),y,vx,vy+offset*(aim?88:145),'p');
           // Trace the forward half of the body through the muzzle on the first
           // tick, while keeping the visible bullet at the actual muzzle.
           bullets[bullets.length-1].tactical=survival()&&loadout==='assault'&&tacticalTime>0;
-          bullets[bullets.length-1].traceX=player.x+player.w/2;bullets[bullets.length-1].traceY=y;
+          bullets[bullets.length-1].traceX=player.x+player.w/2;bullets[bullets.length-1].traceY=bodyY;
         }
         if(!scatter&&synergy('piercing'))bullets[bullets.length-1].damage++;
         player.lastVolley=spread.length;
@@ -1618,6 +1624,13 @@
         rect(stage.width-162,G-118,51,12,boss.dead?'#97d6a0':'#b47863');
         if(boss.dead){rect(stage.width-154,G-156,32,32,'#9de5a7');}
       }
+      function drawRifle(y,grip){
+        if(fireAim()>0){
+          // Match fire() even on the crouched first tick of a platform drop.
+          c.save();c.translate(player.w/2+4,y+14);c.rotate(Math.atan2(340,480));
+          rect(-23,-3,23,6,'#25394e');rect(-7,-3,7,3,'#bfcbd0');rect(-19,2,8,5,'#f2c09e');c.restore();
+        }else{rect(8,y,23,6,'#25394e');rect(26,y,11,3,'#bfcbd0');rect(8,y+grip,8,5,'#f2c09e');}
+      }
       function drawSoldier(){
         if(survival()&&(tacticalTime>0||tacticalPulse)){
           c.save();c.strokeStyle=tactic().color;c.lineWidth=3;
@@ -1635,12 +1648,13 @@
         if(crouch){
           rect(-11,0,23,7,'#e5b85e');rect(-9,5,19,10,'#efc5a7');rect(-13,14,27,10,'#5bb4a5');
           rect(-13,24,27,4,'#243c52');rect(5,8,6,4,'#2a3c4b');
-          rect(8,14,23,6,'#25394e');rect(26,14,11,3,'#bfcbd0');rect(8,16,8,5,'#f2c09e');
+          drawRifle(14,2);
         }else{
           rect(-11,0,23,7,'#e5b85e');rect(-9,6,19,11,'#efc5a7');rect(-13,18,27,15,'#5bb4a5');
           rect(-11,33,8,8+run,'#243c52');rect(4,33,8,8-run,'#243c52');
           rect(-13,40+run,11,3,'#d3e9d6');rect(3,40-run,11,3,'#d3e9d6');
-          rect(5,10,6,4,'#2a3c4b');rect(8,20,23,6,'#25394e');rect(26,20,11,3,'#bfcbd0');rect(8,23,8,5,'#f2c09e');
+          rect(5,10,6,4,'#2a3c4b');
+          drawRifle(20,3);
         }
         c.restore();
       }
@@ -2084,6 +2098,8 @@
         ready:true,phase,stage:stageIndex+1,stageName:stage?.name??'',x:player?.x??0,y:player?.y??0,vy:player?.vy??0,hp:player?.hp??0,
         lives:player?.lives??0,score:points,shots:shotsFired,bullets:bullets.length,
         hostiles:bullets.filter(b=>b.owner==='e').map(b=>({x:b.x,y:b.y})),
+        fireAim:player?fireAim():0,face:player?.face??1,
+        playerProjectiles:bullets.filter(b=>b.owner==='p').map(b=>({x:b.x,y:b.y,vx:b.vx,vy:b.vy,damage:b.damage,reflected:b.reflected,tactical:!!b.tactical})),
         grenades:player?.grenades??0,bossHp:boss?.hp??0,ground:player?.ground??false,
         cam,worldWidth:stage?.width??0,touchCount:touch.size,
         weapon:player?.weaponTime>0?'spread':'rifle',weaponTime:player?.weaponTime??0,

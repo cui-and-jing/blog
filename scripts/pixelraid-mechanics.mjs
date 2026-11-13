@@ -3860,4 +3860,104 @@ test('all three loadouts can earn a first-wave stomp through ordinary keyboard o
   }
 });
 
+
+// Airborne aiming adds no new action: down takes priority over the existing
+// held-jump upward shot. Fixtures isolate exact contacts; the last contract
+// below uses only ordinary input from an untouched first-wave save.
+test('airborne down-fire mirrors both directions across modes without changing rifle or scatter cadence',()=>{
+  for(const factory of [()=>{const g=createGame();g.start();return g;},()=>operation('sprint'),()=>defense()]){
+    for(const face of [-1,1])for(const scatter of [false,true])for(const aim of [-1,0,1]){
+      const g=factory();g.run(`player.x=400;player.y=200;player.ground=false;player.face=${face};player.weaponTime=${scatter?12:0};player.shoot=0;bullets=[];`);
+      if(aim!==0)g.key('w');if(aim===1)g.key('s');
+      const before=g.state();g.run('fire();');const shots=g.read('bullets');
+      eq(g.read('fireAim()'),aim);eq(shots.length,scatter?3:1);
+      eq(shots.map(b=>b.vx),Array(shots.length).fill(face*(aim?480:650)));
+      eq(shots.map(b=>b.vy),(scatter?[-1,0,1]:[0]).map(offset=>aim*340+offset*(aim?88:145)));
+      near(g.read('player.shoot'),scatter?.33:.15);eq(g.state().weaponTime,before.weaponTime);
+      for(const field of ['hp','grenades','score','tacticalCharge','progress'])eq(g.state()[field],before[field]);
+      assert(shots.every(b=>b.damage===1&&!b.reflected));
+      g.run('fire();');eq(g.state().shots,before.shots+shots.length,'Held fire cannot bypass cooldown');
+    }
+  }
+});
+
+test('ground crouch stays horizontal, ledge descent fires down immediately, and released down restores aim',()=>{
+  const g=onLedge();g.key('s');g.key('j');tick(g);
+  eq(g.state().crouch,true);eq(g.read('fireAim()'),0);eq(g.read('bullets.at(-1).vy'),0);
+  g.key('w');g.run('player.shoot=0;');tick(g);
+  assert(g.state().dropTime>0&&!g.state().ground);eq(g.read('fireAim()'),1);eq(g.read('bullets.at(-1).vy'),340);
+  g.key('s',false);eq(g.read('fireAim()'),-1);
+  g.key('w',false);eq(g.read('fireAim()'),0);
+  g.key('j',false);g.key('s');tick(g,50);eq(g.state().ground,true);eq(g.read('fireAim()'),0);
+  g.run('player.shoot=0;fire();');eq(g.read('bullets.at(-1).vy'),0);
+});
+
+test('touch and gamepad can aim down during a jump and release aim independently from shooting',()=>{
+  const touch=onLedge();const action=name=>[...touch.nodes.values()].find(node=>node.dataset.action===name);
+  action('jump').dispatch('pointerdown',{pointerId:31});tick(touch);
+  action('jump').dispatch('pointerup',{pointerId:31});
+  action('down').dispatch('pointerdown',{pointerId:32});action('fire').dispatch('pointerdown',{pointerId:33});tick(touch);
+  eq(touch.read('fireAim()'),1);eq(touch.read('bullets.at(-1).vy'),340);eq(touch.state().touchCount,2);
+  action('down').dispatch('pointercancel',{pointerId:32});eq(touch.read('fireAim()'),0);eq(touch.state().touchCount,1);
+  touch.run('player.shoot=0;');tick(touch);eq(touch.read('bullets.at(-1).vy'),0);
+  action('fire').dispatch('pointerup',{pointerId:33});eq(touch.state().touchCount,0);
+  const pad=onLedge();pad.pad();pad.frames(2);pad.pad([0]);pad.frames(1);pad.pad([2,13]);pad.frames(1);
+  eq(pad.read('fireAim()'),1);eq(pad.read('bullets.at(-1).vy'),340);
+  pad.pad([2]);pad.frames(1);eq(pad.read('fireAim()'),0);
+  pad.noPad();pad.frames(1);eq(pad.read('fireAim()'),0);
+});
+
+test('airborne down-fire clears on pause, canceled restart, blur and hidden-document interruption',()=>{
+  for(const interrupt of ['pause','blur','hidden']){
+    const g=onLedge();g.key('w');tick(g);g.key('w',false);g.key('s');g.key('j');tick(g);
+    eq(g.read('fireAim()'),1);
+    if(interrupt==='pause'){g.key('p');g.key('p',false);}else if(interrupt==='blur')g.event('blur');else g.visibility(true);
+    eq(g.state().phase,'pause');eq(g.read('fireAim()'),0);const paused=g.state();g.frames(20);eq(g.state(),paused);
+    g.click('restart');g.frames(10);g.click('cancel-restart');eq(g.state(),paused);
+    if(interrupt==='hidden')g.visibility(false);g.click('start');g.frames(2);
+    eq(g.read('fireAim()'),0);eq(g.state().shots,paused.shots);
+  }
+});
+
+function diveCollision({shield=false,face=1,skill=false,arrival=0}={}){
+  const g=defense();g.run(`spawnTime=0;devices=[];pickups=[];tacticalCharge=0;tacticalTime=${skill?6:0};
+    stage={...stage,platforms:[]};player.x=400;player.y=250;player.ground=false;player.vy=0;player.face=${face};player.inv=100;
+    upgrades.pierce=1;enemies=[{...makeEnemy(${face===1?480:292},'${shield?'shield':'turret'}'),y:302,stagger:10,face:${-face},arrival:${arrival}},
+      {...makeEnemy(${face===1?550:222},'turret'),y:351,stagger:10}];enemies.reverse();`);
+  g.key('s');g.run('fire();');g.key('s',false);return g;
+}
+
+test('descending bullets retain distance-ordered piercing, single-hit budgets and frontal shield blocking',()=>{
+  for(const face of [-1,1])for(const shield of [false,true]){
+    const g=diveCollision({face,shield});const initial=g.read('enemies.map(e=>e.hp)');tick(g,20);
+    const after=g.read('enemies.map(e=>e.hp)');
+    eq(after,shield?initial:initial.map(hp=>hp-1));
+    eq(g.state().tacticalCharge,shield?0:6);eq(g.state().score,0);eq(g.state().reflections,0);
+    tick(g,5);eq(g.read('enemies.map(e=>e.hp)'),after,'Piercing may not hit a target twice');
+  }
+});
+
+test('down-fire respects arrival protection and late overclock projectile charging isolation',()=>{
+  const protectedTarget=diveCollision({arrival:1});const hp=protectedTarget.read('enemies[1].hp');tick(protectedTarget,20);
+  eq(protectedTarget.read('enemies[1].hp'),hp);eq(protectedTarget.state().tacticalCharge,3);
+  const active=diveCollision({skill:true});eq(active.read('bullets[0].tactical'),true);
+  active.run('tacticalTime=0;');tick(active,20);eq(active.read('enemies.map(e=>e.hp)'),[3,3]);eq(active.state().tacticalCharge,0);
+});
+
+test('three loadouts hit a first-wave enemy with pure airborne down-fire through genuine delayed input',()=>{
+  for(const loadout of ['assault','counter','demolition'])for(const randomSeed of [1,16437,99991])for(const lag of [0,1,2,3]){
+    const g=defense({loadout,randomSeed});g.key('a');until(g,()=>g.state().x<=400,100);g.frames(lag);g.key('a',false);
+    until(g,()=>{const s=g.state();return s.spawnTime===0&&s.enemies.some(e=>e.x<s.x&&s.x+13.5-e.x-e.w/2<=155);},250);
+    const before=g.state(),hp=before.enemies.reduce((sum,e)=>sum+e.hp,0);
+    g.key('w');until(g,()=>g.state().y<=300,30);g.frames(lag);assert(!g.state().ground);
+    g.key('s');g.frames(lag);g.key('j');until(g,()=>g.state().shots>0,5);g.frames(lag);g.key('w',false);
+    const bullets=g.read("bullets.filter(b=>b.owner==='p')");assert(bullets.length>0&&bullets.every(b=>b.vx===-480&&b.vy===340));
+    until(g,()=>g.state().enemies.reduce((sum,e)=>sum+e.hp,0)<hp,40);
+    g.key('j',false);g.key('s',false);const hit=g.state();
+    eq(hit.ground,false);eq(hit.stomps,0);eq(hit.enemies.length,before.enemies.length);eq(hit.hp,before.hp);eq(hit.devices,before.devices);
+    eq(hit.tacticalUses,0);eq(hit.grenades,before.grenades);eq(hit.reflections,0);eq(hit.score,0);
+    assert(hit.shots>0);eq(hit.progress,before.progress);
+  }
+});
+
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
