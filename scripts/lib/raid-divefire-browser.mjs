@@ -104,11 +104,14 @@ export async function checkRaidDivefire(sourcePage, problems) {
       const fresh = await read();
       require(fresh.survivalWave === 1 && fresh.hp === 6 && fresh.shots === 0 && fresh.stomps === 0,
         '没有从全新第一波开始', fresh);
-      await control('left', true);
-      await observe(() => { const s = window.__raidState; return s.x <= 400 ? s : false; });
-      await control('left', false);
+      // Crouch-walk during ingress: at 110px/s, even eight simulation frames
+      // of release latency fit the verified 388–405px corridor. A full-speed
+      // release could overshoot into an unachievable enemy-gap wait.
+      await control('down', true); await control('left', true);
+      await observe(() => { const s = window.__raidState; return s.x <= 405 ? s : false; });
+      await control('left', false); await control('down', false);
       const positioned = await read();
-      require(positioned.x >= 362 && positioned.x <= 405 && positioned.ground,
+      require(positioned.x >= 388 && positioned.x <= 405 && positioned.ground && positioned.face === -1,
         '没有站在跳跃不会被平台接住的位置', positioned);
       checkpoint = label + ' 纯俯射命中';
       await observe(() => {
@@ -172,10 +175,51 @@ export async function checkRaidDivefire(sourcePage, problems) {
         return s.crouch && s.fireAim === 0 && s.playerProjectiles.some(b => b.vx === -650 && b.vy === 0) ? s : false;
       });
       check(crouched.ground && crouched.playerHeight === 28, '地面下键不再保持原有蹲射', crouched);
-      // Interrupt held controls rather than only pausing an idle character.
-      const paused = await pause();
+      // A third finger is not a primary pointer, so tapping a plain pause
+      // button while two action fingers remain down need not synthesize click.
+      // Test the real background/blur interruption instead, without dispatching
+      // a synthetic DOM event or disguising a mouse click as touchscreen input.
+      let paused;
+      if (mobile) {
+        const from = await page.evaluate(() => window.__raidDivefireTouches.length);
+        const heldContacts = [...contacts.entries()];
+        const background = await context.newPage();
+        try {
+          checkpoint = label + ' 持触点切后台自动暂停';
+          await background.bringToFront();
+          // Background tabs may suspend RAF; observe with a timed poll instead.
+          await page.waitForFunction(() => window.__raidState?.phase === 'pause',
+            { timeout: 5000, polling: 100 });
+          paused = await read();
+          check(await page.evaluate(() => document.hidden || !document.hasFocus()),
+            '没有真正切到后台就声称中断了触控');
+          check(paused.touchCount === 0 && paused.fireAim === 0,
+            '真实切后台没有清除仍按住的触点和瞄准', paused);
+          await page.bringToFront();
+          // End each real native contact exactly once. Chromium may already
+          // have sent pointercancel during the background transition; otherwise
+          // ending the still-captured contact must generate pointerup.
+          for (const [action, contact] of heldContacts) {
+            await contact.handle.end(); contacts.delete(action);
+          }
+          const ended = await page.evaluate(index => ({
+            events: window.__raidDivefireTouches.slice(index),
+            active: [...document.querySelectorAll('[data-action].active')].map(el => el.dataset.action),
+            count: window.__raidState.touchCount,
+          }), from);
+          check(ended.active.length === 0 && ended.count === 0 && heldContacts.every(([action, contact]) => {
+            const terminal = ended.events.filter(e => e.pointerId === contact.pointerId &&
+              e.action === action && ['pointerup', 'pointercancel'].includes(e.type));
+            return terminal.length === 1 && terminal[0].trusted;
+          }), '后台中断后的原生触点未恰好结束一次或仍有粘键', ended);
+        } finally {
+          await background.close(); await page.bringToFront();
+        }
+      } else {
+        paused = await pause(); await release();
+      }
       check(paused.touchCount === 0 && paused.fireAim === 0, '暂停没有清理俯射和触控输入', paused);
-      await release(); await wait(220);
+      await wait(220);
       check(equal(await read(), paused), '暂停没有冻结弹道和敌人');
       await shot('paused-downshot');
       for (const selector of ['#restart', '#menu-home']) {
@@ -189,6 +233,7 @@ export async function checkRaidDivefire(sourcePage, problems) {
       const resumedShots = (await read()).shots; await wait(190);
       check((await read()).shots === resumedShots && (await read()).touchCount === 0,
         '继续后仍残留自动开火或触点');
+      checkpoint = label + ' 松开触点后原生暂停按钮与重开';
       await pause();
       await activate('#restart'); await phase('confirmRestart'); await activate('#start'); await phase('playing');
       const restarted = await read();

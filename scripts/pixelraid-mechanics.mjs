@@ -3945,15 +3945,26 @@ test('down-fire respects arrival protection and late overclock projectile chargi
 });
 
 test('three loadouts hit a first-wave enemy with pure airborne down-fire through genuine delayed input',()=>{
-  for(const loadout of ['assault','counter','demolition'])for(const randomSeed of [1,16437,99991])for(const lag of [0,1,2,3]){
-    const g=defense({loadout,randomSeed});g.key('a');until(g,()=>g.state().x<=400,100);g.frames(lag);g.key('a',false);
-    until(g,()=>{const s=g.state();return s.spawnTime===0&&s.enemies.some(e=>e.x<s.x&&s.x+13.5-e.x-e.w/2<=155);},250);
+  for(const loadout of ['assault','counter','demolition'])for(const randomSeed of [1,16437,99991])for(const lag of [0,1,2,3,4,5,6,7,8]){
+    const g=defense({loadout,randomSeed});g.key('s');g.key('a');
+    until(g,()=>g.state().x<=405,100);g.frames(lag);g.key('a',false);g.key('s',false);
+    assert(g.state().x>=388&&g.state().x<=405);eq(g.state().face,-1);
+    until(g,()=>{const s=g.state(),target=s.enemies.filter(e=>e.x<s.x).sort((a,b)=>b.x-a.x)[0];
+      const gap=target?s.x+13.5-target.x-target.w/2:Infinity;
+      return s.spawnTime===0&&s.ground&&gap>=120&&gap<=155;},250);
     const before=g.state(),hp=before.enemies.reduce((sum,e)=>sum+e.hp,0);
+    // Like the browser's RAF observer, capture the first damage even while an
+    // input tool is delayed. This observes snapshots without editing the game.
+    let firstDamage=null;const frames=g.frames.bind(g);
+    g.frames=(count=1)=>{for(let frame=0;frame<count;frame++){
+      frames();const state=g.state();
+      if(!firstDamage&&state.enemies.reduce((sum,e)=>sum+e.hp,0)<hp)firstDamage=state;
+    }};
     g.key('w');until(g,()=>g.state().y<=300,30);g.frames(lag);assert(!g.state().ground);
     g.key('s');g.frames(lag);g.key('j');until(g,()=>g.state().shots>0,5);g.frames(lag);g.key('w',false);
     const bullets=g.read("bullets.filter(b=>b.owner==='p')");assert(bullets.length>0&&bullets.every(b=>b.vx===-480&&b.vy===340));
     until(g,()=>g.state().enemies.reduce((sum,e)=>sum+e.hp,0)<hp,40);
-    g.key('j',false);g.key('s',false);const hit=g.state();
+    g.key('j',false);g.key('s',false);const hit=firstDamage;assert(hit);
     eq(hit.ground,false);eq(hit.stomps,0);eq(hit.enemies.length,before.enemies.length);eq(hit.hp,before.hp);eq(hit.devices,before.devices);
     eq(hit.tacticalUses,0);eq(hit.grenades,before.grenades);eq(hit.reflections,0);eq(hit.score,0);
     assert(hit.shots>0);eq(hit.progress,before.progress);
