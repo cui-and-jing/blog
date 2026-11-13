@@ -78,6 +78,10 @@ export async function checkRaidMortar(sourcePage, problems) {
     }
   };
   const drive = async (input, state) => {
+    // Stop firing before a movement event can turn the player. CDP calls may
+    // straddle an animation frame; releasing J after D can fire one wrong-way
+    // volley into an enemy this scenario deliberately needs to keep alive.
+    if (input.fire === false) await key('j', false);
     await key('a', input.move === 'a'); await key('d', input.move === 'd');
     await key('s', input.down === true); await key('j', input.fire !== false);
     if (input.jump && state.ground) { await key('w', false); await key('w', true); }
@@ -186,14 +190,22 @@ export async function checkRaidMortar(sourcePage, problems) {
     '真实震荡脉冲的能量或安全位置错误', state);
     await page.keyboard.press('e');
     await observe(() => { const s = window.__raidState; return s.tacticalUses === 1 ? s : false; });
-    const decide = survivalTactics(); let isolationFacing = -1;
+    const decide = survivalTactics();
     state = await until(s => s.enemies.length === 1 && mortar(s), s => {
       // Filtering a detached observation only changes our choice of controls.
-      // Never shoot right through a killed target into the mortar. Reflected
-      // bullets are excluded too: use jumps, not dash reflection, for this fight.
+      // The general combat controller can retreat past its target. Keep this
+      // particular fight left of the mortar instead: "shoot left" is not safe
+      // once the player has crossed to its right. A 180px boundary also leaves
+      // ample room for one normal input sampling interval before the turn.
       const input = decide({ ...s, enemies: s.enemies.filter(e => e.type !== 'mortar') });
-      if (input.move && s.dashTime === 0) isolationFacing = input.move === 'a' ? -1 : 1;
-      return { ...input, fire: isolationFacing < 0, grenade: input.grenade && isolationFacing < 0, dash: false };
+      const protectedEnemy = mortar(s);
+      require(protectedEnemy?.hp === 5, '隔离过程中投弹兵被误伤', s);
+      const move = s.x >= protectedEnemy.x - 180 ? 'a' : input.move;
+      // Use observed facing, not a prediction based on a key just sent. Do not
+      // enable fire on either side of a right turn; drive releases it first.
+      // No explosive arcs, reflections or contact/stomp can reach the mortar.
+      return { ...input, move, fire: s.face < 0 && move !== 'd' && s.x + 27 < protectedEnemy.x - 100,
+        grenade: false, dash: false };
     });
     require(mortar(state)?.hp === 5 && state.hp > 0 && state.stageDeaths === 0 && state.tacticalUses === 1,
       '未用真实战斗留下满血投弹兵', state);
