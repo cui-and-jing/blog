@@ -316,6 +316,7 @@
             <div class="details-body">
               <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。菜单中用方向键 / 左摇杆选择、A 确认、B 返回；按住方向可连续浏览。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
               <p>空中按住 S / ↓ 再开火可朝前下方俯射，松开下键恢复原方向；按住跳跃可仰射，同时按下时优先俯射。落地后仍是下蹲平射。手柄方向下 + 射击、触屏 ↓ + 射击同样适用，可从跳台、降层或踏击弹起中反击。</p>
+              <p>满血时医疗包、手雷满 7 枚时弹药留在原处，需要时再碰触领取；实际拾取才加 75 分。散弹与连射拾取后至少保留 12 秒，已有更长效果不会缩短。留存补给仅在当前场景有效。</p>
               <p>冲刺冷却结束前 0.12 秒内可提前按一次，到点自动冲刺；长按不会连冲，暂停或重开会清除预输入。触屏冲刺键底部短条显示恢复进度，亮绿表示就绪。炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
             </div>
           </details>
@@ -1533,13 +1534,20 @@
         for(const p of pickups){
           if(p.done)continue;p.age+=dt;
           if(circRect(p.x,p.y,16,player)){
+            // Reserve finite resources until useful. Do not score, consume or
+            // repeatedly announce a full pickup, nor replace combat feedback.
+            const reserved=pickupReserve(p);
+            if(reserved){
+              if(!p.reserveHinted&&combatTime===0){combatNotice(reserved);p.reserveHinted=true;}
+              continue;
+            }
             p.done=true;if(p.kind==='heal')player.hp=Math.min(maxHealth(),player.hp+2);
             if(p.kind==='grenade')player.grenades=Math.min(7,player.grenades+2);
-            if(p.kind==='boost')player.boost=12;
-            if(p.kind==='spread')player.weaponTime=12;
+            if(p.kind==='boost')player.boost=Math.max(player.boost,12);
+            if(p.kind==='spread')player.weaponTime=Math.max(player.weaponTime,12);
             addPoints(75);hud();beep(780,.13,'triangle');
             announce(p.kind==='heal'?'恢复体力。':p.kind==='grenade'?'取得手雷。':
-              p.kind==='spread'?'获得散弹武器，持续十二秒。':'强化连射。');
+              p.kind==='spread'?'获得散弹武器，持续至少十二秒。':'强化连射，持续至少十二秒。');
           }
         }
         for(const item of intel){
@@ -1792,6 +1800,10 @@
           c.beginPath();c.arc(burst.x,burst.y,DEVICE_RADIUS*(reducedMotion?1:1-burst.time/.4),0,Math.PI*2);c.stroke();c.restore();
         }
       }
+      function pickupReserve(p){
+        return p.kind==='heal'&&player.hp>=maxHealth()?'体力已满 · 医疗包留待受伤后领取':
+          p.kind==='grenade'&&player.grenades>=7?'手雷已满 · 弹药留待使用后领取':'';
+      }
       function drawPickup(p){
         if(p.done)return;const y=p.y+Math.sin(p.age*4)*7;
         rect(p.x-13,y-13,27,27,p.kind==='heal'?'#60bb8c':p.kind==='grenade'?'#eeb468':
@@ -1802,6 +1814,10 @@
         else if(p.kind==='spread'){
           rect(p.x-8,y-6,16,4,'#c3a9ff');rect(p.x-8,y,16,4,'#c3a9ff');rect(p.x-8,y+6,16,4,'#c3a9ff');
         }else{rect(p.x-7,y-2,15,6,'#a4eafd');rect(p.x+1,y-8,6,18,'#a4eafd');}
+        if(pickupReserve(p)&&circRect(p.x,p.y,70,player)){
+          c.font='bold 12px system-ui';c.fillStyle='#d9f6e4';c.textAlign='center';
+          c.fillText('已满 · 留存',p.x,y-23);c.textAlign='left';
+        }
       }
       function drawStomp(){
         if(!stompBurst)return;
