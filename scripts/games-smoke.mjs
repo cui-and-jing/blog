@@ -33,6 +33,8 @@ import { checkRaidInput } from './lib/raid-input-browser.mjs';
 import { checkRaidDash } from './lib/raid-dash-browser.mjs';
 import { checkRaidRecap } from './lib/raid-recap-browser.mjs';
 import { checkRaidPickups } from './lib/raid-pickups-browser.mjs';
+import { captureRaidCombatProof, validRaidCombatProof } from './lib/raid-combat-proof.mjs';
+import { checkRaidFirepower } from './lib/raid-firepower-browser.mjs';
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -326,14 +328,15 @@ async function checkGame(browser, file) {
         }
       }
       // Defeat the first patrol through real input and check live combat feedback.
+      // Damage may reset a kill's combo in the same update. Wait only for the
+      // persistent kill proof, capture that frame, then judge its HUD separately.
+      let combo;
       await page.keyboard.down('j');
       try {
-        await page.waitForFunction(() => window.__raidState?.combo > 0, { timeout: 4500 });
+        const proof = await page.waitForFunction(captureRaidCombatProof, { timeout: 4500 }, restarted.comboBest);
+        try { combo = await proof.jsonValue(); } finally { await proof.dispose(); }
       } finally { await page.keyboard.up('j'); }
-      const combo = await page.evaluate(() => ({
-        ...window.__raidState, label: document.getElementById('combo-status').textContent,
-      }));
-      if (combo.comboBest < 1 || !combo.label.includes('连') || !combo.combatText.includes('连击')) {
+      if (!validRaidCombatProof(combo, restarted)) {
         problems.push('Pixel Raid 连击状态或命中反馈错误：' + JSON.stringify(combo));
       }
       await page.screenshot({ path: path.join(process.cwd(), '.shots', 'pixelraid-combo.png'), fullPage: true });
@@ -472,6 +475,7 @@ async function checkGame(browser, file) {
       await checkRaidDash(page, problems);
       await checkRaidRecap(page, problems);
       await checkRaidPickups(page, problems);
+      await checkRaidFirepower(page, problems);
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
