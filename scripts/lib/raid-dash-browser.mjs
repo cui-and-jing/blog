@@ -77,26 +77,40 @@ export async function checkRaidDash(sourcePage, problems) {
       await down();await frames(2);await up();
       const start = await page.evaluate(() => window.__dashFrames.length);
       await wait(() => window.__raidState.dashCooldown <= .115 && window.__raidState.dashCooldown > .03);
-      await down();await wait(() => window.__raidState.dashCooldown > 2);await up();
+      await down();
+      // The observer runs before the game's RAF. Wait for recorded evidence,
+      // not a current-state predicate that can win one frame ahead of the log.
+      await wait(() => window.__dashFrames.some(s => s.clock > window.__dashInputs.at(-1).clock && s.cooldown > 2 && s.dash > 0));
+      await up();
       const evidence = await page.evaluate(from => ({ frames: window.__dashFrames.slice(from), input: window.__dashInputs.at(-1), state: window.__raidState }), start);
       require(evidence.input.trusted && !evidence.input.repeat && evidence.input.cooldown > 0 && evidence.input.cooldown <= .12,
         '未在真实冷却窗口中输入', evidence.input);
       const queued = evidence.frames.findIndex(s => s.buffer > 0 && s.cooldown > 0 && s.dash === 0);
       require(queued >= 0 && evidence.frames.slice(queued + 1).some(s => s.cooldown > 2 && s.buffer === 0 && s.dash > 0),
-        '未验证先等待再冲刺的完整过程', evidence);
+        '未验证先等待再冲刺的完整过程', { input: evidence.input, frames: evidence.frames.filter(s => s.buffer > 0 || s.clock > evidence.input.clock).slice(-20) });
       await shot('buffered-dash');
 
-      checkpoint = '暂停和取消重开不遗留冲刺';
+      checkpoint = '中断等待中的输入';
       await wait(() => window.__raidState.dashCooldown < .45 && window.__raidState.dashCooldown > .2);await down();
-      await tap('#pause');await wait(() => window.__raidState.phase === 'pause');
-      require((await read()).dashBuffer === 0, '暂停没有清除预输入');await up();
+      if (mobile) {
+        // A second finger on a normal click button need not generate a click.
+        // Interrupt the still-held native contact through a real tab switch.
+        const background = await context.newPage();await background.bringToFront();
+        await page.waitForFunction(() => window.__raidState.phase === 'pause', { timeout: 6000, polling: 100 });
+        require(await page.evaluate(() => document.hidden || !document.hasFocus()), '未真正进入后台');
+        await page.bringToFront();await background.close();
+      } else { await tap('#pause');await wait(() => window.__raidState.phase === 'pause'); }
+      require((await read()).dashBuffer === 0, '中断没有清除预输入');await up();
       const frozen = await read();await frames(5);require(JSON.stringify(await read()) === JSON.stringify(frozen), '暂停计时没有冻结');
+      checkpoint = '继续不遗留冲刺';
       await tap('#start');await wait(() => window.__raidState.phase === 'playing');
       await wait(() => window.__raidState.dashCooldown === 0);require((await read()).dashTime === 0, '继续后突然冲刺');
+      checkpoint = '取消重开';
       await tap('#restart');await wait(() => window.__raidState.phase === 'confirmRestart');await tap('#cancel-restart');
       await wait(() => window.__raidState.phase === 'playing');await frames(3);
       require((await read()).dashTime === 0 && (await read()).dashBuffer === 0 && (await read()).touchCount === 0, '取消重开残留动作');
       require(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), '屏幕产生横向溢出');
+      checkpoint = '松开触点后原生暂停与返回大厅';
       await tap('#pause');await wait(() => window.__raidState.phase === 'pause');
       await tap('#menu-home');await wait(() => window.__raidState.phase === 'confirmRestart');await tap('#start');await wait(() => window.__raidState.phase === 'title');
       require(await page.evaluate(() => !document.querySelector('#controls-guide').open && !document.querySelector('#survival-guide').open), '大厅说明自动展开');
