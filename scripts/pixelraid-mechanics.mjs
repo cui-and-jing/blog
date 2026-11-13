@@ -130,7 +130,7 @@ function createGame({ storage = {}, blocked = false, reducedMotion = false, rand
   vm.runInNewContext(injected, context, { timeout: 5000 });
   assert(win.__raidReady && win.__raidQA, 'Game failed to initialize');
   const game = {
-    win, nodes, values, document,
+    win, nodes, values, document, graphics,
     state: () => clone(win.__raidState),
     read: (code) => clone(win.__raidQA(code)),
     run: (code) => win.__raidQA(code),
@@ -141,8 +141,8 @@ function createGame({ storage = {}, blocked = false, reducedMotion = false, rand
         queued = null; now += 1000 / 60; current(now);
       }
     },
-    key(key, down = true, repeat = false) {
-      events.get(down ? 'keydown' : 'keyup')?.({ key, repeat, target: document.activeElement, preventDefault() {} });
+    key(key, down = true, repeat = false, options = {}) {
+      events.get(down ? 'keydown' : 'keyup')?.({ key, repeat, target: document.activeElement, preventDefault() {}, ...options });
     },
     click(id) { assert(nodes.has(id), 'Missing DOM node #' + id); node(id).click(); },
     event(name) { events.get(name)?.(); },
@@ -3968,6 +3968,111 @@ test('three loadouts hit a first-wave enemy with pure airborne down-fire through
     eq(hit.ground,false);eq(hit.stomps,0);eq(hit.enemies.length,before.enemies.length);eq(hit.hp,before.hp);eq(hit.devices,before.devices);
     eq(hit.tacticalUses,0);eq(hit.grenades,before.grenades);eq(hit.reflections,0);eq(hit.score,0);
     assert(hit.shots>0);eq(hit.progress,before.progress);
+  }
+});
+
+// Physical-key ownership: aliases may overlap during a direction or aim handoff.
+test('releasing one keyboard alias keeps its still-held action in both release orders',()=>{
+  const aliases=[['a','ArrowLeft','left'],['d','ArrowRight','right'],['s','ArrowDown','down'],
+    ['w',' ','jump'],['ArrowUp','w','jump'],['j','z','fire'],['k','x','grenade'],['Shift','l','dash']];
+  for(const [first,second,name] of aliases)for(const reverse of [false,true]){
+    const g=defense();g.key(first);g.key(second);eq(g.read(`pressed('${name}')`),true);
+    g.key(reverse?second:first,false);
+    eq(g.read(`pressed('${name}')`),true,`${name} stopped while another alias was held`);
+    g.key(reverse?first:second,false);eq(g.read(`pressed('${name}')`),false);
+  }
+});
+
+test('physical codes survive changed key values, opposite shifts and modified releases',()=>{
+  const g=defense();g.key('a',true,false,{code:'KeyA'});
+  g.key('q',true,true,{code:'KeyA'}); // A layout/repeat change cannot replace ownership.
+  g.key('Q',false,false,{code:'KeyA',ctrlKey:true});eq(g.read('held.size'),0);
+  g.key('Shift',true,false,{code:'ShiftLeft'});g.key('Shift',true,false,{code:'ShiftRight'});
+  g.key('Shift',false,false,{code:'ShiftLeft'});eq(g.read('pressed("dash")'),true);
+  g.key('Shift',false,false,{code:'ShiftRight'});eq(g.read('held.size'),0);
+  for(const modifier of ['ctrlKey','metaKey','altKey']){
+    g.key('j',true,false,{code:'KeyJ',[modifier]:true});eq(g.read('pressed("fire")'),false);
+    g.key('j',false,false,{code:'KeyJ'});
+  }
+});
+
+test('alias handoff does not repeat grenades, jumps, dashes or tactical edges',()=>{
+  for(const [first,second,action] of [['k','x','grenadeQueued'],['w','ArrowUp','jumpQueued'],['Shift','l','dashQueued']]){
+    const g=defense();g.key(first);eq(g.read(action),true);g.run(`${action}=false;`);
+    g.key(second);g.key(first,false);g.key(second,true,true);eq(g.read(action),false);
+    g.key(second,false);g.key(first);eq(g.read(action),true);
+  }
+  const g=defense();g.run('spawnTime=0;');g.key('e');eq(g.read('tacticalQueued'),true);
+  g.run('tacticalQueued=false;');g.key('E',true,true);eq(g.read('tacticalQueued'),false);
+});
+
+test('interrupted held keys cannot re-arm from OS repeats after resume or a canceled restart',()=>{
+  for(const interrupt of ['pause','blur','hidden','restart']){
+    const g=defense();g.key('s');g.key('ArrowDown');g.key('j');g.key('z');g.key('k');
+    if(interrupt==='pause'){g.key('p');g.key('p',false);}
+    else if(interrupt==='blur')g.event('blur');
+    else if(interrupt==='hidden')g.visibility(true);
+    else g.click('restart');
+    eq(g.read('held.size'),0);eq(g.read('keyboardKeys.size'),0);
+    if(interrupt==='restart')g.click('cancel-restart');
+    else {if(interrupt==='hidden')g.visibility(false);g.click('start');}
+    for(const key of ['s','ArrowDown','j','z','k'])g.key(key,true,true);
+    eq(g.read('held.size'),0);eq(g.read('keyboardKeys.size'),0);
+    eq(g.read('grenadeQueued'),false);eq(g.read('pressed("fire")'),false);
+    for(const key of ['s','ArrowDown','j','z','k'])g.key(key,false);
+    g.key('j');eq(g.read('pressed("fire")'),true);g.key('j',false);
+  }
+});
+
+test('keyboard aliases remain independent from native touch and controller holds',()=>{
+  const g=defense(),button=[...g.nodes.values()].find(n=>n.dataset.action==='fire');
+  button.dispatch('pointerdown',{pointerId:201});g.key('j');g.key('z');g.key('j',false);
+  button.dispatch('pointerup',{pointerId:201});eq(g.read('pressed("fire")'),true);
+  g.key('z',false);eq(g.read('pressed("fire")'),false);
+  g.pad();g.frames(2);g.pad([2]);g.frames();g.key('j');g.key('z');g.key('j',false);
+  g.noPad();g.frames();eq(g.read('pressed("fire")'),true);
+  g.key('z',false);eq(g.read('pressed("fire")'),false);
+  button.dispatch('pointerdown',{pointerId:202});button.dispatch('pointerdown',{pointerId:203});
+  button.dispatch('pointercancel',{pointerId:202});eq(g.state().touchCount,1);
+  eq(button.classList.contains('active'),true);eq(g.read('pressed("fire")'),true);
+  button.dispatch('lostpointercapture',{pointerId:203});eq(g.state().touchCount,0);
+  eq(button.classList.contains('active'),false);eq(g.read('pressed("fire")'),false);
+});
+
+test('three jump aliases and unidentified codes retain ownership until the final release',()=>{
+  const g=defense();g.run('player.ground=false;');
+  for(const key of ['w','ArrowUp',' '])g.key(key,true,false,{code:'Unidentified'});
+  for(const key of ['ArrowUp','w']){g.key(key,false,false,{code:'Unidentified'});eq(g.state().fireAim,-1);}
+  g.key(' ',false,false,{code:'Unidentified'});eq(g.state().fireAim,0);
+  g.key(' ',true,false,{code:'Unidentified'});eq(g.state().fireAim,-1);
+});
+
+test('confirmed restart and home-mode changes clear old key ownership but allow fresh presses',()=>{
+  for(const home of [false,true]){
+    const g=defense();g.key('j');g.key('z');g.key('d');g.key('k');
+    g.click(home?'menu-home':'restart');g.click('start');
+    if(home){g.click('mode-campaign');g.click('start');}
+    eq(g.state().phase,'playing');eq(g.read('keyboardKeys.size'),0);eq(g.read('held.size'),0);
+    const before=g.state();for(const key of ['j','z','d','k'])g.key(key,true,true);tick(g,20);
+    eq(g.state().shots,before.shots);eq(g.state().grenades,before.grenades);eq(g.state().x,before.x);
+    for(const key of ['j','z','d','k'])g.key(key,false);
+    g.key('j');tick(g,2);assert(g.state().shots>before.shots);g.key('j',false);
+  }
+});
+
+test('every rifle pose points along its existing shot and ends at the actual muzzle',()=>{
+  for(const face of [-1,1])for(const crouch of [false,true])for(const aim of [-1,0,1]){
+    const g=defense();g.run(`player.face=${face};player.crouch=${crouch};player.h=${crouch?28:44};
+      player.ground=false;player.shoot=0;player.weaponTime=0;bullets=[];`);
+    if(aim===1)g.key('s');if(aim===-1)g.key('w');g.run('fire();');
+    const b=g.read('bullets[0]'),transforms=[],rotations=[],rects=[];
+    g.graphics.translate=(x,y)=>transforms.push([x,y]);g.graphics.rotate=a=>rotations.push(a);
+    g.graphics.fillRect=(...args)=>rects.push(args);
+    g.run(`drawRifle(${crouch?14:20});`);
+    eq(transforms.length,1);eq(rotations.length,1);
+    near(g.state().x+27/2+face*transforms[0][0],b.x);near(g.state().y+transforms[0][1],b.y);
+    near(rotations[0],Math.atan2(b.vy,Math.abs(b.vx)));
+    assert(rects.some(([x,y,w,h])=>x+w===0&&y<0&&y+h>0),'Gun barrel must end at the shot origin');
   }
 });
 
