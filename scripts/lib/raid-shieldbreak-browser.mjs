@@ -104,7 +104,7 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
         deviceScaleFactor: 1, isMobile: mobile, hasTouch: mobile });
       await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
       await page.evaluateOnNewDocument(() => {
-        const evidence = window.__shieldbreakObservations = { inputs: [], broken: null };
+        const evidence = window.__shieldbreakObservations = { inputs: [], broken: null, missionLayouts: {} };
         for (const type of ['keydown', 'pointerdown', 'pointerup', 'pointercancel', 'click']) {
           document.addEventListener(type, event => {
             const target = event.target.closest?.('[data-action], button');
@@ -123,6 +123,15 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
         }
         function observe() {
           const s = window.__raidState, guard = s?.enemies.find(e => e.type === 'shield' && e.shieldBreak > 0);
+          if (s?.phase === 'playing' && s.survivalWave <= 3) {
+            const mission = document.getElementById('mission-hud'), objective = document.getElementById('mission-objective');
+            const warning = objective.textContent.includes('后抵达'), key = s.survivalWave + (warning ? '-warning' : '-live');
+            if (!evidence.missionLayouts[key] && (warning || s.spawnTime === 0)) {
+              const rect = mission.getBoundingClientRect();
+              evidence.missionLayouts[key] = { height: rect.height, width: rect.width, text: objective.textContent,
+                clock: s.clock, warning, overflow: objective.scrollHeight > objective.clientHeight + 1 };
+            }
+          }
           if (s?.survivalWave === 4 && guard && !evidence.broken) {
             evidence.broken = { state: s, guard };
             // Keep image bytes out of the diagnostic object and failure logs.
@@ -183,6 +192,15 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
         let choice = cleared.supplyOffers.indexOf('armor');
         if (choice < 0) choice = cleared.hp < 4 ? cleared.supplyOffers.indexOf('heal') : 0;
         await activate('#supply-' + Math.max(0, choice));await activate('#start');await phase('playing');
+      }
+      if (mobile) {
+        const layouts = await page.evaluate(() => window.__shieldbreakObservations.missionLayouts);
+        for (const wave of [1, 2, 3]) {
+          const warning = layouts[wave + '-warning'], live = layouts[wave + '-live'];
+          require(warning && live && warning.warning && !live.warning && !warning.overflow && !live.overflow &&
+            Math.abs(warning.height - live.height) < 1, '任务预警切换实战时改变高度并推移触屏按键', { wave, warning, live });
+        }
+        fs.writeFileSync(path.join(process.cwd(), '.shots', `pixelraid-shieldbreak-${label}-mission-layout.json`), JSON.stringify(layouts, null, 2));
       }
       combatWave = null;
       stage = '第4波真实走位到平台间隙';
