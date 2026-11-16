@@ -293,7 +293,7 @@
               <ul class="rules-list">
                 <li>一条命，固定标准难度。普通波轮换三套地形，双向增援提前 2.2 秒预警；平台可下蹲 + 跳跃降层。普通波清场恢复 1 体力、1 手雷。</li>
                 <li>普通波有两座黄色爆破装置：2 点伤害引爆，半径 145 内造成 4 点伤害并清敌弹，相邻装置可连锁。只伤敌，不伤自己；地面与平台上都有，可用射击、反弹弹、手雷或震荡脉冲引爆。每波只用一次，增援抵达前不可引爆。</li>
-                <li>空中踏击：下落时从正上方踩中杂兵可造成 2 点伤害并弹起，短暂震停、打断未出手的攻击。盾卫与无人机也可踩，首领不可踩；侧面接触和已发射的弹药仍危险，不增加无敌时间。</li>
+                <li>空中踏击：下落时从正上方踩中杂兵可造成 2 点伤害并弹起，短暂震停、打断未出手的攻击。盾卫与无人机也可踩，首领不可踩。踩中存活的盾卫会破防 1.2 秒，正面射击也能命中；绿条结束后恢复格挡，重复踏击只刷新时长。侧面接触和已发射的弹药仍危险，不增加无敌时间。</li>
                 <li>第 4 波起，普通波有一名橙色冲锋兵：先沿标线蓄力 0.8 秒，再朝锁定方向突进，随后回气 1.1 秒。跳跃、登台或冲刺避开，再趁回气反击；冲锋兵不发射子弹。</li>
                 <li>第 5 波起，紫色投弹兵会锁定落脚层并投掷。离开紫框或换层避开，出手前击败或踏击可打断；已出手的投弹仍会落地，爆炸不能反弹。</li>
                 <li>每三波迎战一位首领，三位首领轮换，无杂兵干扰。首领清场恢复 2 体力、2 手雷，额外奖励 500 分。</li>
@@ -433,6 +433,7 @@
       const CHARGER={windup:.8,speed:480,distance:216,recover:1.1,cooldown:1.7,range:240};
       const MORTAR={windup:.9,flight:.85,cooldown:2.6,radius:58,height:64};
       const STOMP={damage:2,rebound:400,stagger:.3};
+      const SHIELD_BREAK_SECONDS=1.2;
       const BOSS_BREACH_SECONDS=1.5;
       const HIT_SOURCES={
         bullet:{name:'敌方子弹',tip:'冲刺接触敌弹可反弹，也可跳跃或换层避开弹道。'},
@@ -797,7 +798,7 @@
       function makeEnemy(x,type){return {x,y:type==='drone'?260:G-(type==='turret'?34:36),
           w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='shield'?5:['turret','charger','mortar'].includes(type)?4:type==='drone'?2:3,
           maxHp:type==='shield'?5:['turret','charger','mortar'].includes(type)?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false,
-          face:-1,windup:0,burst:0,burstTimer:0,aimX:0,aimY:0,flash:0,blockFlash:0,
+          face:-1,windup:0,burst:0,burstTimer:0,aimX:0,aimY:0,flash:0,blockFlash:0,shieldBreak:0,
           chargerPhase:'hunt',chargerTime:0,chargerEnd:0,stagger:0};}
       function beginSurvival(){
         mode='survival';titleView='survival';difficulty='standard';challengeId=null;loadout=selectedLoadout;
@@ -1178,7 +1179,7 @@
         if(e.dead)return;
         chargeTactical(Math.min(e.hp,d)*3+(d>=e.hp?12:0),fromSkill);
         e.hp-=d;e.flash=.12;spark(e.x+e.w/2,e.y+e.h/2,'#f5d48d',5);
-        if(e.hp<=0&&!e.dead){e.dead=true;e.windup=0;e.burst=0;e.chargerTime=0;rewardKill(e.type==='shield'?200:['turret','charger','mortar'].includes(e.type)?160:100);beep(180,.07);}
+        if(e.hp<=0&&!e.dead){e.dead=true;e.windup=0;e.burst=0;e.chargerTime=0;e.shieldBreak=0;rewardKill(e.type==='shield'?200:['turret','charger','mortar'].includes(e.type)?160:100);beep(180,.07);}
       }
       function damageBoss(d,fromSkill=false){
         if(boss.dead||(survival()&&spawnTime>0))return;
@@ -1201,7 +1202,7 @@
         }
       }
       function hitEnemy(e,b){
-        if(e.type==='shield'&&!b.reflected&&b.vx*e.face<0){
+        if(e.type==='shield'&&!(e.shieldBreak>0)&&!b.reflected&&b.vx*e.face<0){
           e.blockFlash=.18;spark(b.x,b.y,'#91dbff',4);
           combatNotice('盾牌格挡 · 绕后 / 手雷 / 反弹弹');return false;
         }
@@ -1288,9 +1289,10 @@
         e.windup=0;e.burst=0;e.stagger=STOMP.stagger;e.shot=Math.max(.35,e.shot);
         if(e.type==='charger'){e.chargerPhase='recover';e.chargerTime=STOMP.stagger;}
         damageEnemy(e,STOMP.damage);
+        if(!e.dead&&e.type==='shield')e.shieldBreak=SHIELD_BREAK_SECONDS;
         stompBurst={x:contact.x+player.w/2,y:contact.y,time:.28};
         spark(stompBurst.x,stompBurst.y,'#b9ffe2',12);beep(680,.08,'triangle');
-        combatNotice('空中踏击 · '+(e.dead?combatText:'2 点伤害 / 弹起反击'));hud();
+        combatNotice('空中踏击 · '+(e.dead?combatText:e.type==='shield'?'盾卫破防 1.2 秒 / 正面可射击':'2 点伤害 / 弹起反击'));hud();
       }
       function updateMortar(e,dt){
         if(e.windup>0){
@@ -1431,6 +1433,7 @@
         for(const e of enemies){
           if(e.dead||(survival()&&spawnTime>0))continue;
           if(e.arrival>0){e.arrival=Math.max(0,e.arrival-dt);continue;}
+          e.shieldBreak=Math.max(0,(e.shieldBreak||0)-dt);if(e.shieldBreak<1e-7)e.shieldBreak=0;
           const track={enemy:e,x:e.x,y:e.y,body:null};enemyTracks.push(track);
           if(e.stagger>0){
             e.stagger=Math.max(0,e.stagger-dt);e.flash=Math.max(0,e.flash-dt);
@@ -1762,12 +1765,21 @@
             if(e.chargerPhase==='windup'){rect(e.x,e.y-15,e.w,4,'#352e32');rect(e.x,e.y-15,e.w*(1-e.chargerTime/CHARGER.windup),4,'#ffe0a0');}
           }
         }
-        if(e.stagger>0){c.font='bold 11px system-ui';c.fillStyle='#b9ffe2';c.fillText('震停',e.x+2,e.y-26);}
+        if(e.stagger>0&&!(e.type==='shield'&&e.shieldBreak>0)){c.font='bold 11px system-ui';c.fillStyle='#b9ffe2';c.fillText('震停',e.x+2,e.y-26);}
         if(e.type==='shield'){
           const x=e.face===-1?e.x-6:e.x+e.w-2;
-          rect(x,e.y+4,8,31,e.blockFlash>0?'#efffff':'#87d4ec');
-          rect(x+2,e.y+8,4,22,'#294e76');
-          c.font='bold 11px system-ui';c.fillStyle='#b5efff';c.fillText(survival()&&e.turnTime<.6?'转向…':'盾',e.x+8,e.y-17);
+          c.save();
+          if(e.shieldBreak>0){
+            // Split shield pieces and a steady timer remain legible with reduced motion.
+            rect(x-2,e.y+8,6,10,'#b9ffe2');rect(x+4,e.y+24,6,10,'#87d4ec');
+            rect(e.x,e.y-27,e.w,3,'#244447');rect(e.x,e.y-27,e.w*e.shieldBreak/SHIELD_BREAK_SECONDS,3,'#b9ffe2');
+            c.font='bold 11px system-ui';c.fillStyle='#b9ffe2';c.textAlign='center';c.fillText('破防 · 可射击',e.x+e.w/2,e.y-33);
+          }else{
+            rect(x,e.y+4,8,31,e.blockFlash>0?'#efffff':'#87d4ec');
+            rect(x+2,e.y+8,4,22,'#294e76');
+            c.font='bold 11px system-ui';c.fillStyle='#b5efff';c.fillText(survival()&&e.turnTime<.6?'转向…':'盾',e.x+8,e.y-17);
+          }
+          c.restore();
         }
         if(e.type==='turret'&&(e.windup>0||e.burst>0)){
           c.setLineDash([8,7]);line(e.x+e.w/2,e.y+e.h/2,e.aimX,e.aimY,'#ffd584',2);c.setLineDash([]);
@@ -2206,7 +2218,7 @@
         survivalWave,survivalCleared,survivalTime,spawnTime,bossWave:bossWave(),bossMaxHp:boss?.maxHp??0,bossX:boss?.x??0,synergies:activeSynergies(),refluxCooldown,loadout,selectedLoadout,supplyRerolls,supplyOffers:[...supplyOffers],selectedSupply,
         tacticalCharge,tacticalTime,tacticalUses,tacticalName:survival()?tactic().name:'',
         selectedContract,fieldContract:fieldContract?{status:fieldContract.status,nodes:fieldContract.nodes.map(node=>({...node})),...(fieldContract.beacon?{beacon:{...fieldContract.beacon}}:{})}:null,
-        enemies:enemies.filter(e=>!e.dead).map(e=>({x:e.x,y:e.y,w:e.w,h:e.h,hp:e.hp,type:e.type,face:e.face,stagger:e.stagger,arrival:e.arrival||0,...(e.type==='charger'?{chargerPhase:e.chargerPhase,chargerTime:e.chargerTime,chargerEnd:e.chargerEnd}:{}),...(e.type==='mortar'?{windup:e.windup,shot:e.shot,aimX:e.aimX,aimY:e.aimY}:{})})),
+        enemies:enemies.filter(e=>!e.dead).map(e=>({x:e.x,y:e.y,w:e.w,h:e.h,hp:e.hp,type:e.type,face:e.face,stagger:e.stagger,arrival:e.arrival||0,...(e.type==='shield'?{shieldBreak:e.shieldBreak||0}:{}),...(e.type==='charger'?{chargerPhase:e.chargerPhase,chargerTime:e.chargerTime,chargerEnd:e.chargerEnd}:{}),...(e.type==='mortar'?{windup:e.windup,shot:e.shot,aimX:e.aimX,aimY:e.aimY}:{})})),
         clock,runStars:[...runStars],progress:JSON.parse(JSON.stringify(progress))
       })});
       refreshRecords();

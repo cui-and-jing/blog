@@ -37,6 +37,7 @@ import { captureRaidCombatProof, validRaidCombatProof } from './lib/raid-combat-
 import { checkRaidFirepower } from './lib/raid-firepower-browser.mjs';
 import { checkRaidGrenades } from './lib/raid-grenade-browser.mjs';
 import { checkRaidBreach } from './lib/raid-breach-browser.mjs';
+import { checkRaidShieldbreak } from './lib/raid-shieldbreak-browser.mjs';
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -480,6 +481,7 @@ async function checkGame(browser, file) {
       await checkRaidFirepower(page, problems);
       await checkRaidGrenades(page, problems);
       await checkRaidBreach(page, problems);
+      await checkRaidShieldbreak(page, problems);
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
