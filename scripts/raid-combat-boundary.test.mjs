@@ -1,7 +1,7 @@
 /** Deterministic scheduling tests of the QA driver, not mutable game fixtures. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { combatPhase, auditCombatTouch, dispatchCombatTouch } from './lib/raid-combat-boundary.mjs';
+import { combatPhase, auditCombatTouch, dispatchCombatTouch, waitForCombatPointer } from './lib/raid-combat-boundary.mjs';
 
 const playing = (extra = {}) => ({ mode: 'survival', phase: 'playing', survivalWave: 2, survivalCleared: 1, hp: 5, touchCount: 0, ...extra });
 const settled = (extra = {}) => playing({ phase: 'waveClear', survivalCleared: 2, ...extra });
@@ -78,4 +78,46 @@ test('native releases keep their exact actual target and pointer identity across
   for (const change of [{ action: 'fire' }, { pointerId: 8 }, { id: 'supply-1' }, { trusted: false }]) {
     assert.throws(() => auditCombatTouch({ ...base, audit: audit({ events: [{ ...release, ...change }], state: settled(), active: [] }) }));
   }
+});
+
+
+// These model the observation transport's scheduling only; no published game
+// state is edited, and the callback never sends another input to recover.
+test('pointer observation waits for delayed DOM delivery after transport acknowledgement', async () => {
+  let clock = 0, reads = 0, dispatches = 0;
+  const expected = audit();
+  const result = await dispatchCombatTouch({ action: 'jump', wave: 2,
+    measure: async () => ({ x: 240, y: 600, w: 50, h: 48, hit: true, state: playing() }),
+    beforeDispatch: async () => ({ index: 4, state: playing() }),
+    dispatch: async () => { dispatches++;return {}; }, track: () => {}, heldActions: () => ['jump'],
+    observe: async index => { assert.equal(index, 4);return waitForCombatPointer(async () => {
+      reads++;return clock < 30 ? audit({ events: [], state: playing(), active: [] }) : expected;
+    }, { timeout: 100, interval: 10, now: () => clock, pause: async ms => { clock += ms; } }); }
+  });
+  assert.equal(result, true);assert.equal(reads, 4);assert.equal(dispatches, 1);
+});
+test('an absent native event reaches a bounded failure rather than being accepted or re-dispatched', async () => {
+  let clock = 0, reads = 0;
+  await assert.rejects(waitForCombatPointer(async () => {
+    reads++;return audit({ events: [], state: playing(), active: [] });
+  }, { timeout: 30, interval: 10, now: () => clock, pause: async ms => { clock += ms; } }), /Native pointer event did not arrive before timeout/);
+  assert.equal(clock, 30);assert.equal(reads, 4);
+});
+test('waiting returns wrong targets and duplicate events immediately for strict audit, not a retry', async () => {
+  for (const events of [[event({ action: undefined, id: 'field', targetTag: 'CANVAS' })], [event(), event()]]) {
+    let reads = 0;
+    const observed = await waitForCombatPointer(async () => { reads++;return audit({ events }); },
+      { pause: async () => { throw new Error('Must not wait past an unexpected event'); } });
+    assert.equal(reads, 1);
+    assert.throws(() => auditCombatTouch({ kind: 'down', action: 'jump', wave: 2, heldActions: ['jump'], audit: observed }));
+  }
+});
+test('native pointerup delivery may also be delayed but still needs the exact contact identity', async () => {
+  let clock = 0;
+  const contact = event(), ended = audit({ events: [{ ...contact, type: 'pointerup' }], state: playing(), active: [] });
+  const observed = await waitForCombatPointer(async () => clock === 0 ? audit({ events: [] }) : ended,
+    { timeout: 30, now: () => clock, pause: async ms => { clock += ms; } });
+  assert.equal(auditCombatTouch({ kind: 'up', action: 'jump', contact, wave: 2, heldActions: [], audit: observed }).phase, 'playing');
+  assert.throws(() => auditCombatTouch({ kind: 'up', action: 'jump', contact: { ...contact, pointerId: 99 },
+    wave: 2, heldActions: [], audit: observed }), /different contact/);
 });

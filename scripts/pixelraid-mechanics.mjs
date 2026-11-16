@@ -4980,6 +4980,12 @@ test('roll explosions preserve damage bonuses rather than awarding contact damag
     tick(g,36);eq(g.state().grenadeProjectiles,[]);eq(g.read('enemies[0].hp'),100-damage);eq(g.state().grenades,6);
   }
 });
+test('nearby roll explosions cannot damage the player even without invulnerability',()=>{
+  const g=rollGame({mode:'campaign'});g.run('enemies=[];player.inv=0;');const before=g.state();
+  g.key('s');g.key('k');tick(g,60);const b=g.state().grenadeProjectiles[0];
+  assert(Math.hypot(b.x-(g.state().x+14),b.y-(g.state().y+14))<112);
+  tick(g,6);eq(g.state().grenadeProjectiles,[]);eq(g.state().hp,before.hp);eq(g.state().lives,before.lives);
+});
 test('rolling grenades freeze through pause and confirmation and clear on restart without stale edges',()=>{
   const g=rollGame();g.key('s');g.key('k');tick(g);g.key('p');const frozen=g.state();g.frames(60);
   eq(g.state().grenadeProjectiles,frozen.grenadeProjectiles);g.click('restart');g.frames(20);g.click('cancel-restart');

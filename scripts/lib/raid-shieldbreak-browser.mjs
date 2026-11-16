@@ -2,14 +2,14 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { survivalTactics } from './raid-survival-tactics.mjs';
-import { combatPhase, auditCombatTouch, dispatchCombatTouch } from './raid-combat-boundary.mjs';
+import { combatPhase, auditCombatTouch, dispatchCombatTouch, waitForCombatPointer } from './raid-combat-boundary.mjs';
 
 export async function checkRaidShieldbreak(sourcePage, problems) {
   for (const mobile of [false, true]) {
     const context = await sourcePage.browser().createBrowserContext();
     const page = await context.newPage(), held = new Map(), decisions = [];
     const label = mobile ? 'touch-320' : 'keyboard-1280';
-    let stage = '初始化', checkpoint = '初始化', combatWave = null;
+    let stage = '初始化', checkpoint = '初始化', combatWave = null, lastTouch = null;
     const require = (ok, message, details) => {
       if (!ok) throw new Error(message + (details === undefined ? '' : ' ' + JSON.stringify(details)));
     };
@@ -35,21 +35,35 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
       if (held.has(action)) return true;
       checkpoint = stage + '：按住 ' + action;
       if (mobile) {
+        lastTouch = { action, measured: null, beforeDispatch: null, firstObservation: null, observation: null };
         return dispatchCombatTouch({ action, wave: combatWave,
-          measure: () => page.$eval(`[data-action="${action}"]`, element => {
+          measure: async () => lastTouch.measured = await page.$eval(`[data-action="${action}"]`, element => {
             // Keep both rows in the same viewport while other fingers are held.
             element.closest('.controls').scrollIntoView({ block: 'end', behavior: 'instant' });
             const r = element.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
             const hit = document.elementFromPoint(x, y);
-            return { x, y, w: r.width, h: r.height, hit: hit === element || element.contains(hit), state: window.__raidState };
+            return { x, y, w: r.width, h: r.height, rect: r.toJSON(), hit: hit === element || element.contains(hit),
+              hitTarget: { tag: hit?.tagName, id: hit?.id, action: hit?.closest?.('[data-action]')?.dataset.action },
+              scrollY, viewport: { width: innerWidth, height: innerHeight }, state: window.__raidState };
           }),
-          beforeDispatch: () => page.evaluate(() => ({ index: window.__shieldbreakObservations.inputs.length, state: window.__raidState })),
+          beforeDispatch: async () => lastTouch.beforeDispatch = await page.evaluate(() => ({ index: window.__shieldbreakObservations.inputs.length, state: window.__raidState })),
           dispatch: point => page.touchscreen.touchStart(point.x, point.y),
-          observe: from => page.evaluate(index => ({
-            events: window.__shieldbreakObservations.inputs.slice(index).filter(event => event.type === 'pointerdown'),
-            active: [...document.querySelectorAll('[data-action].active')].map(el => el.dataset.action).sort(),
-            state: window.__raidState
-          }), from),
+          observe: from => waitForCombatPointer(async () => {
+            const audit = await page.evaluate(({ index, action, point }) => {
+              const element = document.querySelector(`[data-action="${action}"]`), rect = element?.getBoundingClientRect();
+              const hit = document.elementFromPoint(point.x, point.y);
+              return {
+                events: window.__shieldbreakObservations.inputs.slice(index).filter(event => event.type === 'pointerdown'),
+                active: [...document.querySelectorAll('[data-action].active')].map(el => el.dataset.action).sort(),
+                state: window.__raidState,
+                geometry: { rect: rect?.toJSON(), atMeasuredPoint: { tag: hit?.tagName, id: hit?.id,
+                  action: hit?.closest?.('[data-action]')?.dataset.action, matches: hit === element || !!element?.contains(hit) },
+                  scrollY, viewport: { width: innerWidth, height: innerHeight } }
+              };
+            }, { index: from, action, point: { x: lastTouch.measured.x, y: lastTouch.measured.y } });
+            lastTouch.firstObservation ??= audit;lastTouch.observation = audit;
+            return audit;
+          }),
           // Track the actual target too: a boundary contact can land on a supply
           // card, whose native pointerup must still be audited and released.
           track: (handle, event) => held.set(action, { handle, pointerId: event?.pointerId, action: event?.action, id: event?.id }),
@@ -66,10 +80,10 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
       if (mobile) {
         const contact = held.get(action), index = await page.evaluate(() => window.__shieldbreakObservations.inputs.length);
         await contact.handle.end();held.delete(action);
-        const audit = await page.evaluate(from => ({
+        const audit = await waitForCombatPointer(() => page.evaluate(from => ({
           events: window.__shieldbreakObservations.inputs.slice(from).filter(event => event.type === 'pointerup' || event.type === 'pointercancel'),
           active: [...document.querySelectorAll('[data-action].active')].map(el => el.dataset.action).sort(), state: window.__raidState
-        }), index);
+        }), index));
         return auditCombatTouch({ kind: 'up', action, contact, audit, heldActions: [...held.keys()], wave: combatWave }).phase === 'playing';
       } else {
         await page.keyboard.up(keys[action]);held.delete(action);
@@ -94,8 +108,11 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
         for (const type of ['keydown', 'pointerdown', 'pointerup', 'pointercancel', 'click']) {
           document.addEventListener(type, event => {
             const target = event.target.closest?.('[data-action], button');
-            if (type === 'keydown' && ['a', 'd', 's', 'w', 'l', 'j', 'k'].includes(event.key) || target) {
-              evidence.inputs.push({ type, key: event.key, action: target?.dataset.action, id: target?.id,
+            // Record even a hit on canvas/body/background. Omitting non-buttons
+            // made a real missed target indistinguishable from delayed delivery.
+            if (type.startsWith('pointer') || type === 'keydown' && ['a', 'd', 's', 'w', 'l', 'j', 'k'].includes(event.key) || target) {
+              evidence.inputs.push({ type, key: event.key, action: target?.dataset.action, id: target?.id ?? event.target?.id,
+                targetTag: event.target?.tagName, targetId: event.target?.id, x: event.clientX, y: event.clientY,
                 pointerId: event.pointerId, primary: event.isPrimary, trusted: event.isTrusted,
                 // Capture before target handlers and later RAF ticks. A wrong
                 // hit while playing must not be excused by a later settlement.
@@ -233,7 +250,12 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
       const evidence = await page.evaluate(() => ({ state: window.__raidState, observation: window.__shieldbreakObservations,
         active: [...document.querySelectorAll('[data-action].active')].map(el => el.dataset.action)
       })).catch(diagnosticError => ({ error: diagnosticError.message }));
-      problems.push(`Pixel Raid 踏击破盾 ${label}：${checkpoint}：${error.message} · evidence=${JSON.stringify({ ...evidence, decisions })}`);
+      const diagnostic = { label, stage, checkpoint, error: { message: error.message, stack: error.stack },
+        ...evidence, decisions, lastTouch, held: [...held.keys()] };
+      // Keep the complete evidence outside log truncation, including measured
+      // and observed hit geometry. This is diagnostic only, not a retry gate.
+      fs.writeFileSync(path.join(process.cwd(), '.shots', `pixelraid-shieldbreak-${label}-diagnostic.json`), JSON.stringify(diagnostic, null, 2));
+      problems.push(`Pixel Raid 踏击破盾 ${label}：${checkpoint}：${error.message} · evidence=${JSON.stringify(diagnostic)}`);
       await shot('error').catch(() => {});
     } finally { await release().catch(() => {});await context.close(); }
   }

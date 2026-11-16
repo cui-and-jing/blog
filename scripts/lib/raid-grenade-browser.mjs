@@ -80,7 +80,7 @@ export async function checkRaidGrenades(sourcePage, problems) {
           if (state?.phase === 'playing' && previous?.phase === 'playing' && state.grenades < previous.grenades) {
             evidence.launches.push({ grenade: state.grenadeProjectiles.at(-1), ammo: state.grenades,
               ground: state.ground, face: state.face, x: state.x, feet: state.y + state.playerHeight,
-              clock: state.clock, hp: state.hp });
+              clock: state.clock, hp: state.hp, lives: state.lives });
           }
           if (state?.phase === 'playing' && evidence.launches.length === 1 && state.grenadeProjectiles.length === 1) {
             const grenade = state.grenadeProjectiles[0], canvas = document.getElementById('field');
@@ -106,7 +106,7 @@ export async function checkRaidGrenades(sourcePage, problems) {
             const prior = evidence.rollFrames.at(-1), canvas = document.getElementById('field');
             if (grenade) {
               const frame = { ...grenade, clock: state.clock, ammo: state.grenades,
-                playerX: state.x, feet: state.y + state.playerHeight, hp: state.hp };
+                playerX: state.x, feet: state.y + state.playerHeight, hp: state.hp, lives: state.lives };
               evidence.rollFrames.push(frame);
               if (!window.__grenadeRollLaunchCanvas)
                 window.__grenadeRollLaunchCanvas = canvas.toDataURL('image/png').split(',')[1];
@@ -118,7 +118,7 @@ export async function checkRaidGrenades(sourcePage, problems) {
                 window.__grenadeRollBounceCanvas = canvas.toDataURL('image/png').split(',')[1];
             } else if (prior && !evidence.rollEnd) {
               evidence.rollEnd = { clock: state.clock, phase: state.phase, ammo: state.grenades,
-                hp: state.hp, lastTimer: prior.timer, elapsedSinceLast: state.clock - prior.clock,
+                hp: state.hp, lives: state.lives, lastTimer: prior.timer, elapsedSinceLast: state.clock - prior.clock,
                 remaining: state.grenadeProjectiles.length };
               window.__grenadeRollExplosionCanvas = canvas.toDataURL('image/png').split(',')[1];
             }
@@ -182,11 +182,14 @@ export async function checkRaidGrenades(sourcePage, problems) {
         Math.abs(frame.vx) < Math.abs(all[i - 1].vx) * .9 && frame.vy < 0 && frame.y >= ground.feet - 12);
       const originX = ground.x + 14;
       const range = rolled.frames.map(frame => (frame.x - originX) * ground.face);
+      // Enemies keep attacking during this real play route: a nonlethal hit
+      // is allowed, but losing a life/restarting must never masquerade as fuse
+      // expiry. The no-self-damage rule has a separate isolated combat test.
       require(rolled.frames.length >= 4 && bounce && range.every(distance => distance >= 0 && distance < 110) &&
         range.at(-1) > range[0] && rolled.frames.every(frame => frame.y >= ground.feet - 14 &&
-          frame.y <= ground.feet - 8 && frame.ammo === initialAmmo - 2 && frame.hp === ground.hp) &&
+          frame.y <= ground.feet - 8 && frame.ammo === initialAmmo - 2 && frame.hp > 0 && frame.lives === ground.lives) &&
         rolled.end.phase === 'playing' && rolled.end.remaining === 0 && rolled.end.ammo === initialAmmo - 2 &&
-        rolled.end.hp === ground.hp && rolled.end.lastTimer > 0 && rolled.end.lastTimer <= .07 &&
+        rolled.end.hp > 0 && rolled.end.lives === ground.lives && rolled.end.lastTimer > 0 && rolled.end.lastTimer <= .07 &&
         rolled.end.elapsedSinceLast + .000001 >= rolled.end.lastTimer,
       '滚雷未保持低位近距、自然地面反弹或在完整引信后引爆', { ground, rolled });
       require((await read()).grenades === initialAmmo - 2 && (await launches()).length === 2, '长按手雷重复消耗弹药');

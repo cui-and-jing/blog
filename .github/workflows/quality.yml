@@ -220,6 +220,7 @@ jobs:
             .shots/a11y.json
             .shots/a11y.log
             .shots/pixelraid-*.png
+            .shots/pixelraid-*.json
           if-no-files-found: warn
           retention-days: 7
 
