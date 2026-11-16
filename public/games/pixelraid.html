@@ -325,6 +325,7 @@
               <p>反弹弹命中首领后可打出 1.5 秒破甲：趁头顶绿条持续时用步枪或散弹追击，每发额外造成 1 点伤害。再次反弹命中只刷新时长；反弹弹、手雷与震荡脉冲保持原伤害。破甲不会打断首领出招，仍需闪避。</p>
               <p>空中按住 S / ↓ 再投手雷可向前下方俯掷，适合跳台上清除近处地面敌人；松开下键恢复远距离抛投。地面或平台上按住下键则贴脚低抛，手雷沿支撑面弹跳、滚落边缘，适合近距离爆破；不按下键仍是远抛。三种轨迹的引信、伤害与消耗相同。手雷上方短条显示剩余引信，最后 0.3 秒变亮但不闪烁。手柄方向下 + B、触屏 ↓ + 雷同样适用。</p>
               <p>满血时医疗包、手雷满 7 枚时弹药留在原处，需要时再碰触领取；实际拾取才加 75 分。散弹与连射拾取后至少保留 12 秒，已有更长效果不会缩短。留存补给仅在当前场景有效。</p>
+              <p>空中按住 S / ↓ 再冲刺可向面朝方向斜下俯冲，快速换层或落地；松开下键不改变本次方向。地面冲刺、不按下键的空中冲刺保持水平。平台仍会接住俯冲；要穿过当前平台，先按下键 + 跳跃降层，再冲刺。俯冲不追加伤害或冷却优惠，注意深坑。键盘、触屏与手柄共用此组合。</p>
               <p>冲刺冷却结束前 0.12 秒内可提前按一次，到点自动冲刺；长按不会连冲，暂停或重开会清除预输入。触屏冲刺键底部短条显示恢复进度，亮绿表示就绪。炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
             </div>
           </details>
@@ -788,7 +789,7 @@
           platforms:[[260,320,170],[500,310,150]],intel:[],enemies:[],pickups:[]};
         player={x:64,y:G-44,w:27,h:44,vx:0,vy:0,face:1,hp:clamp(carry?.hp??maxHealth(),1,maxHealth()),
           lives:carry?.lives??(difficulty==='relaxed'?4:3),grenades:carry?.grenades??3,ground:true,inv:1.2,shoot:0,boost:0,
-          weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashBuffer:0,dashDir:1,coyote:.1,jumpBuffer:0,crouch:false,dropPlatform:null,dropTime:0};
+          weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashBuffer:0,dashDir:1,dashDive:false,coyote:.1,jumpBuffer:0,crouch:false,dropPlatform:null,dropTime:0};
         enemies=stage.enemies.map(([x,type])=>makeEnemy(x,type));
         pickups=stage.pickups.map(([x,kind])=>({x,y:kind==='spread'?G-45:G-93,kind,done:false,age:0}));
         intel=stage.intel.map(([x,y])=>({x,y,done:false}));
@@ -825,7 +826,7 @@
         if(bossWave())stage={...stage,platforms:[[260,320,170],[500,310,150]]};
         boss=makeBoss(bossWave()?[32,44,56][stageIndex]+Math.min(48,Math.floor((survivalWave-1)/9)*12):0,790);
         player.x=W/2-player.w/2;player.h=44;player.y=G-44;player.vx=0;player.vy=0;player.ground=true;
-        player.crouch=false;player.inv=1.2;player.shoot=0;player.dashTime=0;player.dashBuffer=0;player.dashCooldown=0;player.jumpBuffer=0;player.coyote=.11;player.dropPlatform=null;player.dropTime=0;
+        player.crouch=false;player.inv=1.2;player.shoot=0;player.dashTime=0;player.dashDive=false;player.dashBuffer=0;player.dashCooldown=0;player.jumpBuffer=0;player.coyote=.11;player.dropPlatform=null;player.dropTime=0;
         devices=(arena?.devices||[]).map(([x,floor])=>({x:x-12,y:floor-36,w:24,h:36,hp:2,spent:false}));deviceBursts=[];
         const slots=arena?.slots||[],count=Math.min(8,3+Math.floor(survivalWave/2));
         const types=survivalWave===1?['walker']:survivalWave===2?['walker','drone']:['walker','turret','shield','drone'];
@@ -1099,7 +1100,7 @@
             saveBest();hud();showMenu('行动失败',recap+'本次得分 '+points+'，也可回指挥部切换轻松模式。','再试一次','gameOver');
             return;
           }
-          player.hp=maxHealth();player.x=player.checkpoint;player.h=44;player.y=G-player.h;player.vx=0;player.vy=0;player.ground=true;player.inv=2.2;player.dashTime=0;player.dashBuffer=0;player.jumpBuffer=0;player.dropPlatform=null;player.dropTime=0;
+          player.hp=maxHealth();player.x=player.checkpoint;player.h=44;player.y=G-player.h;player.vx=0;player.vy=0;player.ground=true;player.inv=2.2;player.dashTime=0;player.dashDive=false;player.dashBuffer=0;player.jumpBuffer=0;player.dropPlatform=null;player.dropTime=0;
           bullets=bullets.filter(b=>b.owner==='p');
           announce('失去一条生命，从检查点继续。');
         }
@@ -1107,7 +1108,10 @@
       }
       function dash(){
         if(player.dashCooldown>0||phase!=='playing')return;
-        player.dashBuffer=0;player.dashTime=.18;player.dashDir=player.face;player.dashCooldown=dashDelay();
+        player.dashBuffer=0;player.dashTime=.18;player.dashDir=player.face;
+        // Read the posture when the dash actually starts (including buffering),
+        // then keep its trajectory even if down or direction is released.
+        player.dashDive=!player.ground&&pressed('down');player.dashCooldown=dashDelay();
         spark(player.x+player.w/2,player.y+player.h/2,'#9ecaff',10);beep(520,.08,'triangle');hud();
       }
       function projectile(x,y,vx,vy,owner,damage=1){
@@ -1410,22 +1414,28 @@
         const motion={x:player.x,bottom:player.y+player.h,limit:1};
         player.x=clamp(player.x+player.vx*dt,8,gauntlet()||bossWave()?boss.x-player.w-14:stage.width-player.w-6);
         const oldBottom=player.y+player.h;
-        if(player.dashTime>0){player.vy=0;}else player.vy=clamp(player.vy+GRAV*dt,-800,MAX_FALL);
+        if(player.dashTime>0){player.vy=player.dashDive?650:0;}else player.vy=clamp(player.vy+GRAV*dt,-800,MAX_FALL);
         player.y+=player.vy*dt;player.ground=false;
         motion.endX=player.x;motion.dy=player.y+player.h-motion.bottom;
-        const cx=player.x+player.w/2;
         if(player.vy>=0){
           let landing=Infinity;
-          if(!isGap(cx)&&oldBottom<=G+12&&player.y+player.h>=G)landing=G;
+          const diving=player.dashTime>0&&player.dashDive;
+          // Diagonal speed can cross a thin ledge and its side in one frame.
+          // Test horizontal coverage at the top crossing, not the end position;
+          // never pull a dive up from below. Ordinary jumps keep their tolerance.
+          const landingX=y=>diving&&motion.dy>0?motion.x+(motion.endX-motion.x)*(y-oldBottom)/motion.dy:player.x;
+          if(oldBottom<=G+(diving?0:12)&&player.y+player.h>=G&&!isGap(landingX(G)+player.w/2))landing=G;
           for(const ledge of stage.platforms){
             if(ledge===player.dropPlatform)continue;
             const [x,y,w]=ledge;
-            if(player.x+player.w>x+3&&player.x<x+w-3&&oldBottom<=y+8&&player.y+player.h>=y)landing=Math.min(landing,y);
+            if(oldBottom>y+(diving?0:8)||player.y+player.h<y)continue;
+            const px=landingX(y);
+            if(px+player.w>x+3&&px<x+w-3)landing=Math.min(landing,y);
           }
           if(landing!==Infinity){motion.limit=motion.dy>0?clamp((landing-motion.bottom)/motion.dy,0,1):0;player.y=landing-player.h;player.vy=0;player.ground=true;}
         }
         if(player.y>H+70){
-          player.inv=0;player.dashTime=0;player.dashBuffer=0;hurt(2,'fall');
+          player.inv=0;player.dashTime=0;player.dashDive=false;player.dashBuffer=0;hurt(2,'fall');
           if(phase!=='playing')return;
           player.x=player.checkpoint;player.y=G-player.h;player.vy=0;player.vx=0;player.ground=true;player.coyote=.11;
         }
@@ -1627,7 +1637,7 @@
           if(s.life<=0)sparks.splice(i,1);
         }
         if(survival()&&spawnTime===0&&activeEnemies()===0&&boss.dead){finishWave();return;}
-        player.dashTime=Math.max(0,player.dashTime-dt);
+        player.dashTime=Math.max(0,player.dashTime-dt);if(player.dashTime===0)player.dashDive=false;
         shake=Math.max(0,shake-28*dt);
         cam=clamp(player.x-290,0,stage.width-W);
         if(Math.floor(clock*10)!==Math.floor((clock-dt)*10))hud();
@@ -1716,11 +1726,13 @@
           if(tacticalTime>0){c.strokeRect(player.x-7,player.y-6,player.w+14,player.h+12);}
           c.restore();
         }
-        if(player.inv>0&&Math.floor(clock*13)%2===0)return;
         if(player.dashTime>0){
-          for(let i=1;i<=3;i++){c.globalAlpha=.3/i;rect(player.x-player.dashDir*i*17,player.y+4,player.w,player.h-4,'#8dd9ff');}
+          for(let i=1;i<=3;i++){c.globalAlpha=.3/i;rect(player.x-player.dashDir*i*17,player.y+4-(player.dashDive&&!player.ground?i*17:0),player.w,player.h-4,'#8dd9ff');}
           c.globalAlpha=1;
+          if(player.dashDive){c.font='bold 11px system-ui';c.fillStyle='#a6eaff';c.fillText('俯冲',player.x-1,player.y-9);}
         }
+        // Movement intent stays readable even during the body's respawn blink.
+        if(player.inv>0&&Math.floor(clock*13)%2===0)return;
         c.save();c.translate(player.x+player.w/2,player.y);c.scale(player.face,1);
         const crouch=player.crouch,run=Math.sin(clock*18)*3*(Math.abs(player.vx)>5?1:0);
         if(crouch){
@@ -2237,7 +2249,7 @@
         bossBreachTime:boss?.breach??0,
         bossAttacks:boss?.attacks??0,bossLastVolley:boss?.lastVolley??0,bossRage:!!boss&&boss.hp<=boss.maxHp*.5,
         mode,difficulty,intel:collected(),intelTotal:intel.length,challengeId,challengeTime,challengeReflections,bossWins,titleView,stageDeaths,stageStars,unlocked:progress.unlocked,
-        upgrades:{...upgrades},dashCooldown:player?.dashCooldown??0,dashTime:player?.dashTime??0,dashBuffer:player?.dashBuffer??0,
+        upgrades:{...upgrades},dashCooldown:player?.dashCooldown??0,dashTime:player?.dashTime??0,dashDive:player?.dashDive??false,dashBuffer:player?.dashBuffer??0,
         checkpoint:player?.checkpoint??64,maxHp:maxHealth(),selectedUpgrade,storageAvailable,
         crouch:player?.crouch??false,playerHeight:player?.h??44,coyote:player?.coyote??0,jumpBuffer:player?.jumpBuffer??0,dropTime:player?.dropTime??0,
         platforms:stage?.platforms.map(ledge=>[...ledge])||[],arena:survival()&&stage?.arena?{id:stage.arena.id,name:stage.arena.name,hint:stage.arena.hint}:null,
