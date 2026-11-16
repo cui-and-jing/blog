@@ -316,6 +316,7 @@
             <div class="details-body">
               <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。菜单中用方向键 / 左摇杆选择、A 确认、B 返回；按住方向可连续浏览。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
               <p>空中按住 S / ↓ 再开火可朝前下方俯射，松开下键恢复原方向；按住跳跃可仰射，同时按下时优先俯射。落地后仍是下蹲平射。手柄方向下 + 射击、触屏 ↓ + 射击同样适用，可从跳台、降层或踏击弹起中反击。</p>
+              <p>反弹弹命中首领后可打出 1.5 秒破甲：趁头顶绿条持续时用步枪或散弹追击，每发额外造成 1 点伤害。再次反弹命中只刷新时长；反弹弹、手雷与震荡脉冲保持原伤害。破甲不会打断首领出招，仍需闪避。</p>
               <p>空中按住 S / ↓ 再投手雷可向前下方俯掷，适合跳台上清除近处地面敌人；松开下键恢复远距离抛投。地面下蹲仍是普通抛投，引信、伤害与消耗不变。手柄方向下 + B、触屏 ↓ + 雷同样适用。</p>
               <p>满血时医疗包、手雷满 7 枚时弹药留在原处，需要时再碰触领取；实际拾取才加 75 分。散弹与连射拾取后至少保留 12 秒，已有更长效果不会缩短。留存补给仅在当前场景有效。</p>
               <p>冲刺冷却结束前 0.12 秒内可提前按一次，到点自动冲刺；长按不会连冲，暂停或重开会清除预输入。触屏冲刺键底部短条显示恢复进度，亮绿表示就绪。炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
@@ -432,6 +433,7 @@
       const CHARGER={windup:.8,speed:480,distance:216,recover:1.1,cooldown:1.7,range:240};
       const MORTAR={windup:.9,flight:.85,cooldown:2.6,radius:58,height:64};
       const STOMP={damage:2,rebound:400,stagger:.3};
+      const BOSS_BREACH_SECONDS=1.5;
       const HIT_SOURCES={
         bullet:{name:'敌方子弹',tip:'冲刺接触敌弹可反弹，也可跳跃或换层避开弹道。'},
         contact:{name:'敌人接触',tip:'拉开距离再开火，或用冲刺穿过敌人。'},
@@ -791,7 +793,7 @@
       }
       function makeBoss(hp,x){return {x,y:G-104,w:105,h:104,hp,maxHp:hp,
         shot:1.3,phase:0,windup:0,chargeDuration:.72,attacks:0,lastVolley:0,warned:false,dead:hp===0,
-        attackType:'volley',beamTime:0,beamY:G-22,flash:0};}
+        attackType:'volley',beamTime:0,beamY:G-22,flash:0,breach:0};}
       function makeEnemy(x,type){return {x,y:type==='drone'?260:G-(type==='turret'?34:36),
           w:type==='drone'?38:30,h:type==='drone'?26:36,type,hp:type==='shield'?5:['turret','charger','mortar'].includes(type)?4:type==='drone'?2:3,
           maxHp:type==='shield'?5:['turret','charger','mortar'].includes(type)?4:type==='drone'?2:3,home:x,age:rng(0,6),shot:rng(.7,2),dead:false,
@@ -1081,7 +1083,7 @@
         player.hp=Math.max(0,player.hp-damage);player.inv=difficulty==='relaxed'?1.9:1.45;shake=8;beep(170,.2,'sawtooth');
         spark(player.x+12,player.y+20,'#f6a174',13);
         if(player.hp===0){
-          player.lives--;stageDeaths++;
+          boss.breach=0;player.lives--;stageDeaths++;
           if(player.lives<=0){
             const recap='致命来源：'+cause.name+'。'+cause.tip;
             if(survival()){finishSurvival(recap);return;}
@@ -1183,8 +1185,19 @@
         chargeTactical(Math.min(boss.hp,d)*3+(d>=boss.hp?12:0),fromSkill);
         boss.hp=Math.max(0,boss.hp-d);boss.flash=.12;spark(boss.x+rng(10,90),boss.y+rng(10,85),'#f9cb65',5);
         if(boss.hp===0){
-          boss.dead=true;boss.beamTime=0;boss.windup=0;addPoints(1300);spark(boss.x+50,boss.y+45,'#ffc65c',60);
+          boss.dead=true;boss.beamTime=0;boss.windup=0;boss.breach=0;addPoints(1300);spark(boss.x+50,boss.y+45,'#ffc65c',60);
           announce(gauntlet()||survival()?'首领已击败，准备结算。':'首领已击败，向右前往终点。');beep(620,.35,'triangle');
+        }
+      }
+      function hitBoss(b){
+        if(boss.dead||(survival()&&spawnTime>0))return;
+        // Reward a returned projectile reaching the boss, not merely a dash.
+        // Only gunfire profits: reflected rounds keep their own build damage.
+        const bonus=!b.reflected&&boss.breach>0?1:0;
+        damageBoss(b.damage+bonus,b.tactical);
+        if(b.reflected&&!boss.dead){
+          boss.breach=BOSS_BREACH_SECONDS;
+          combatNotice('首领破甲 · 1.5 秒射击 +1');
         }
       }
       function hitEnemy(e,b){
@@ -1342,7 +1355,7 @@
           if(gauntlet()&&boss.dead){finishStage();return;}
         }
         combo.timer=Math.max(0,combo.timer-dt);if(combo.timer===0)combo.count=0;
-        combatTime=Math.max(0,combatTime-dt);boss.flash=Math.max(0,boss.flash-dt);
+        combatTime=Math.max(0,combatTime-dt);boss.flash=Math.max(0,boss.flash-dt);boss.breach=Math.max(0,boss.breach-dt);if(boss.breach<1e-7)boss.breach=0;
         const left=pressed('left'),right=pressed('right'),down=pressed('down');
         const axis=(right?1:0)-(left?1:0);
         // The crouched body is the actual collision box, not only a visual pose.
@@ -1518,7 +1531,7 @@
               if(target.dead||target.spent)continue;
               // Devices absorb a shot even with piercing, like a solid target.
               if(device){damageDevice(target,b.damage,b.tactical);struck=true;break;}
-              if(target===boss){damageBoss(b.damage,b.tactical);struck=true;break;}
+              if(target===boss){hitBoss(b);struck=true;break;}
               const damaged=hitEnemy(target,b);
               if(!damaged||!(b.pierce>0)){struck=true;break;}
               b.pierce--;b.hitEnemies.push(target);
@@ -1780,6 +1793,14 @@
         const enraged=boss.hp<=boss.maxHp*.5;
         rect(x+14,y-20,75,7,'#182738');
         rect(x+14,y-20,75*boss.hp/boss.maxHp,7,enraged?'#ff7068':'#f1ad65');
+        if(boss.breach>0){
+          c.save();
+          rect(x+14,y-43,75,4,'#213e46');
+          rect(x+14,y-43,75*boss.breach/BOSS_BREACH_SECONDS,4,'#b9ffe2');
+          c.font='bold 12px monospace';c.fillStyle='#b9ffe2';c.fillText('破甲 · 射击+1',x+5,y-49);
+          // A steady outline communicates the opening even with reduced motion.
+          c.strokeStyle='#b9ffe2';c.lineWidth=2;c.strokeRect(x+34,y+38,35,30);c.restore();
+        }
         if(boss.windup>0){
           const charging=1-boss.windup/boss.chargeDuration;
           rect(x-27,y+47,29,15,'#e36c59');
@@ -2169,6 +2190,7 @@
         cam,worldWidth:stage?.width??0,touchCount:touch.size,
         weapon:player?.weaponTime>0?'spread':'rifle',weaponTime:player?.weaponTime??0,boostTime:player?.boost??0,
         lastVolley:player?.lastVolley??0,bossCharge:boss?.windup??0,
+        bossBreachTime:boss?.breach??0,
         bossAttacks:boss?.attacks??0,bossLastVolley:boss?.lastVolley??0,bossRage:!!boss&&boss.hp<=boss.maxHp*.5,
         mode,difficulty,intel:collected(),intelTotal:intel.length,challengeId,challengeTime,challengeReflections,bossWins,titleView,stageDeaths,stageStars,unlocked:progress.unlocked,
         upgrades:{...upgrades},dashCooldown:player?.dashCooldown??0,dashTime:player?.dashTime??0,dashBuffer:player?.dashBuffer??0,

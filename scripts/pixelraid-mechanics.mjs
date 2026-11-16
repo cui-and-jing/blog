@@ -4610,4 +4610,91 @@ test('empty ammo, snapshot mutation and persisted progress do not manufacture gr
   assert(!JSON.stringify(g.state().progress).includes('grenadeProjectiles'));
 });
 
+// Reflected hits open a temporary, non-stacking gunfire follow-up window.
+function breachGame(options={}){
+  const g=options.survival?defenseBoss(3,{loadout:options.loadout||'assault'}):operation('bosses',options);
+  g.run('spawnTime=0;player.x=680;player.y=G-44;player.ground=true;player.inv=100;boss.hp=boss.maxHp=100;boss.shot=100;bullets=[];');
+  return g;
+}
+function breachHit(g,{reflected=true,damage=reflected?2:1,tactical=false}={}){
+  // Launch a real projectile into the boss collision pipeline.
+  g.run(`projectile(boss.x-8,boss.y+50,650,0,'p',${damage});
+    Object.assign(bullets[bullets.length-1],{reflected:${reflected},tactical:${tactical}});`);tick(g);
+}
+test('only a reflected round reaching a live boss opens breach, a dash or enemy hit cannot',()=>{
+  const g=breachGame();g.key('l');tick(g);g.key('l',false);eq(g.state().bossBreachTime,0);
+  g.run("projectile(player.x+24,player.y+20,0,0,'e');Object.assign(bullets[bullets.length-1],{sourceX:boss.x+40,sourceY:boss.y+50});");
+  tick(g);eq(g.state().reflections,1);eq(g.state().bossBreachTime,0);
+  tickUntil(g,'boss.breach>0');eq(g.state().bossHp,98);near(g.state().bossBreachTime,1.5);
+  eq(g.state().combatText,'首领破甲 · 1.5 秒射击 +1');
+  const other=breachGame();other.run("enemies=[makeEnemy(725,'walker')];projectile(720,405,650,0,'p',2);bullets[0].reflected=true;");tick(other,3);eq(other.state().bossBreachTime,0);
+});
+test('campaign and practice breach applies to all three bosses in both difficulties',()=>{
+  for(const mode of ['campaign','practice'])for(const difficulty of ['standard','relaxed'])for(const stage of [0,1,2]){
+    const g=createGame();g.run(`difficulty='${difficulty}';beginRun(${stage},'${mode}');enemies=[];pickups=[];boss.shot=100;player.inv=100;player.x=boss.x-200;`);
+    const hp=g.state().bossHp;breachHit(g);eq(g.state().bossHp,hp-2);near(g.state().bossBreachTime,1.5);
+    breachHit(g,{reflected:false});eq(g.state().bossHp,hp-4);eq(g.state().mode,mode);eq(g.state().difficulty,difficulty);
+  }
+});
+test('ordinary, piercing, scatter and overclock gunfire gain exactly one damage only during breach',()=>{
+  for(const damage of [1,2,3])for(const tactical of [false,true]){
+    const g=breachGame({survival:true});g.run('tacticalCharge=0;');
+    breachHit(g,{reflected:false,damage,tactical});eq(g.state().bossHp,100-damage);eq(g.state().bossBreachTime,0);
+    breachHit(g);const before=g.state().bossHp;breachHit(g,{reflected:false,damage,tactical});eq(g.state().bossHp,before-damage-1);
+    const expires=g.state().bossBreachTime;assert(expires>1.4&&expires<1.5);
+  }
+  const scatter=breachGame();breachHit(scatter);scatter.run('player.weaponTime=10;player.shoot=0;');const hp=scatter.state().bossHp;
+  scatter.key('j');tick(scatter);scatter.key('j',false);tick(scatter,15);eq(scatter.state().lastVolley,3);eq(scatter.state().bossHp,hp-6);
+});
+test('repeated reflected rounds refresh rather than stack and do not receive gunfire bonus',()=>{
+  const g=breachGame();breachHit(g);tick(g,40);assert(g.state().bossBreachTime<.9);
+  breachHit(g,{damage:5});eq(g.state().bossHp,93);near(g.state().bossBreachTime,1.5);
+  breachHit(g,{damage:3,tactical:true});eq(g.state().bossHp,90);near(g.state().bossBreachTime,1.5);
+});
+test('grenade and pulse retain base blast damage, existing charging and module bonuses during breach',()=>{
+  for(const loadout of ['assault','counter','demolition']){
+    const g=breachGame({survival:true,loadout});breachHit(g);g.run('tacticalCharge=0;');
+    const before=g.state();g.run('boom(boss.x+50,boss.y+52);');const damage=loadout==='demolition'?9:7;
+    eq(g.state().bossHp,before.bossHp-damage);eq(g.state().tacticalCharge,damage*3);near(g.state().bossBreachTime,before.bossBreachTime);
+  }
+  const pulse=breachGame({survival:true,loadout:'demolition'});breachHit(pulse);pulse.run('tacticalCharge=100;');
+  const hp=pulse.state().bossHp;pulse.key('e');tick(pulse);pulse.key('e',false);eq(pulse.state().bossHp,hp-8);eq(pulse.state().tacticalCharge,0);
+});
+test('breach charges from effective gun damage, never skill damage or overkill',()=>{
+  for(const tactical of [false,true]){
+    const g=breachGame({survival:true});breachHit(g);g.run('tacticalCharge=0;');breachHit(g,{reflected:false,tactical});
+    eq(g.state().tacticalCharge,tactical?0:6);
+    g.run('boss.hp=1;tacticalCharge=0;');breachHit(g,{reflected:false,damage:8,tactical});eq(g.state().tacticalCharge,tactical?0:15);
+    eq(g.state().bossBreachTime,0);const score=g.state().score;g.run('hitBoss({damage:99,reflected:true});');eq(g.state().score,score);eq(g.state().bossBreachTime,0);
+  }
+});
+test('breach expires on simulation time, with no bonus on the first tick at zero',()=>{
+  const g=breachGame();breachHit(g);tick(g,89);assert(g.state().bossBreachTime>0&&g.state().bossBreachTime<1/60+.00001);
+  const hp=g.state().bossHp;breachHit(g,{reflected:false});eq(g.state().bossBreachTime,0);eq(g.state().bossHp,hp-1);
+});
+test('breach freezes in pause and canceled confirmation and clears on retries and new boss rounds',()=>{
+  const g=breachGame();breachHit(g);g.key('p');const timer=g.state().bossBreachTime;g.frames(100);near(g.state().bossBreachTime,timer);
+  g.click('restart');g.click('cancel-restart');g.frames(10);near(g.state().bossBreachTime,timer);g.click('start');tick(g);assert(g.state().bossBreachTime<timer);
+  g.click('restart');g.click('start');eq(g.state().bossBreachTime,0);breachHit(g);g.run('damageBoss(999);');tick(g);
+  eq(g.state().bossBreachTime,0);g.click('start');eq(g.state().bossBreachTime,0);
+});
+test('losing a life or dying clears breach but a surviving hit does not',()=>{
+  for(const lives of [1,2]){
+    const g=breachGame();breachHit(g);g.run(`player.lives=${lives};player.hp=2;player.inv=0;hurt(1);`);assert(g.state().bossBreachTime>0);
+    g.run('player.inv=0;hurt(1);');eq(g.state().bossBreachTime,0);eq(g.state().lives,lives-1);
+  }
+});
+test('breach never skips spawn protection, changes attack clocks or interrupts beam windup',()=>{
+  const g=breachGame({survival:true});g.run("spawnTime=1;boss.windup=.6;boss.shot=2;boss.attackType='beam';boss.beamTime=.12;");
+  g.run('hitBoss({damage:2,reflected:true});');eq(g.state().bossBreachTime,0);eq(g.state().bossHp,100);
+  g.run('spawnTime=0;hitBoss({damage:2,reflected:true});');eq(g.state().bossHp,98);near(g.read('boss.windup'),.6);near(g.read('boss.shot'),2);near(g.state().bossBeamTime,.12);
+});
+test('breach snapshots, render labels and records stay detached and reduced-motion friendly',()=>{
+  for(const reducedMotion of [false,true]){
+    const g=breachGame({reducedMotion});const labels=[];g.graphics.fillText=text=>labels.push(text);breachHit(g);g.run('draw();');
+    assert(labels.includes('破甲 · 射击+1'));const timer=g.state().bossBreachTime;g.win.__raidState.bossBreachTime=999;near(g.state().bossBreachTime,timer);
+    assert(!JSON.stringify(g.state().progress).includes('breach'));labels.length=0;g.run('boss.breach=0;draw();');assert(!labels.includes('破甲 · 射击+1'));
+  }
+});
+
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
