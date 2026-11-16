@@ -15,10 +15,10 @@ export async function checkRaidStomp(sourcePage, problems) {
 
   // Each input method gets its own genuinely empty profile. No storage seed,
   // game-state writes, synthetic combat events, RNG or clock overrides.
-  for (const mobile of [false, true]) {
+  for (const mobile of [false, true]) for (const boosted of [false, true]) {
     const context = await sourcePage.browser().createBrowserContext();
     const page = await context.newPage();
-    const label = mobile ? 'touch-320' : 'keyboard-1280';
+    const label = (mobile ? 'touch-320' : 'keyboard-1280') + (boosted ? '-high' : '-low');
     const prefix = path.join(process.cwd(), '.shots', 'pixelraid-stomp-' + label);
     const keys = new Set(), contacts = new Map();
     let checkpoint = label + ' 初始化';
@@ -75,7 +75,7 @@ export async function checkRaidStomp(sourcePage, problems) {
       for (const name of [...keys]) await key(name, false);
       for (const action of [...contacts.keys()]) await touch(action, false);
     };
-    const control = (action, held) => mobile ? touch(action, held) : key(action === 'left' ? 'a' : 'w', held);
+    const control = (action, held) => mobile ? touch(action, held) : key(({ left: 'a', right: 'd', jump: 'w' })[action], held);
     const pause = async () => {
       if (mobile) await activate('#pause'); else await page.keyboard.press('p');
       await phase('pause'); return read();
@@ -162,7 +162,7 @@ export async function checkRaidStomp(sourcePage, problems) {
       const jumping = await observe(() => { const s = window.__raidState;
         return !s.ground && s.vy < 0 && s.stomps === 0 ? s : false;
       });
-      await control('jump', false);
+      if (!boosted) await control('jump', false);
       check(jumping.y < ready.y && (mobile ? jumping.touchCount === 1 : jumping.touchCount === 0),
         '原生跳跃没有使玩家起跳', { ready, jumping });
       const impact = await observe(() => window.__raidStompObserved || false);
@@ -179,7 +179,8 @@ export async function checkRaidStomp(sourcePage, problems) {
       // rather than demanding the very first simulation step arrive over CDP.
       const impactAge = after.stompBurst ? .28 - after.stompBurst.time : Infinity;
       check(before.vy > 0 && !before.ground && !after.ground && after.vy < 0 &&
-        Math.abs(after.vy - (-400 + 1250 * impactAge)) < .001 &&
+        Math.abs(after.vy - (-(boosted ? 560 : 400) + 1250 * impactAge)) < .001 &&
+        after.stompBurst?.boosted === boosted &&
         after.y + after.playerHeight <= target.y && target.stagger > 0 &&
         Math.abs(target.stagger - (.3 - impactAge)) < .001 &&
         after.stompBurst?.time > 0 && after.stompBurst.time <= .28 &&
@@ -187,10 +188,24 @@ export async function checkRaidStomp(sourcePage, problems) {
       '踏击没有从上方下降、向上弹起、短暂停敌或显示提示', { before, after });
       check(['hp', 'shots', 'grenades', 'score', 'stageDeaths', 'tacticalUses', 'tacticalCharge', 'reflections']
         .every(name => ready[name] === after[name]) && after.shots === 0 && after.score === 0 &&
-        after.dashTime === 0 && after.dashCooldown === 0 && after.tacticalTime === 0 && after.touchCount === 0,
+        after.dashTime === 0 && after.dashCooldown === 0 && after.tacticalTime === 0 && after.touchCount === (mobile && boosted ? 1 : 0),
       '首次非致命踏击受伤、消耗资源、额外奖励或借用了其他动作', { ready, after });
       check(impact.mintPixels >= 35, '实际画布没有踏击的薄荷色轮廓', { mintPixels: impact.mintPixels, burst: after.stompBurst });
       fs.writeFileSync(prefix + '-field-impact.png', Buffer.from(impact.png, 'base64'));
+
+      if (boosted) {
+        checkpoint = label + ' 跃升后真实走位登上高台';
+        await control('jump', false);await control('right', true);
+        await observe(() => window.__raidState.x >= 445 ? window.__raidState : false);
+        await control('right', false);
+        const landed = await observe(() => window.__raidState.ground ? window.__raidState : false);
+        require(landed.y + landed.playerHeight === 285 && landed.stomps === 1 &&
+          landed.x >= 405 && landed.x < 540 && landed.hp === ready.hp && landed.shots === 0 &&
+          landed.grenades === 3 && landed.tacticalUses === 0 && landed.dashTime === 0,
+        '跃升未通过真实移动登上普通跳跃和短弹无法到达的中央高台', landed);
+        await shot('upper-ledge');
+        fs.writeFileSync(prefix + '-route.json', JSON.stringify({ ready, jumping, before, after, landed }, null, 2));
+      }
 
       checkpoint = label + ' 暂停、重开和取消';
       const paused = await pause(); await wait(250);
