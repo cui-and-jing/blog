@@ -4697,4 +4697,80 @@ test('breach snapshots, render labels and records stay detached and reduced-moti
   }
 });
 
+// Shield breaking is earned by an actual top crossing, not proximity or a jump.
+function brokenShield(options={}){
+  const g=stompGame('shield',options);tick(g);
+  // Separate timer/projectile fixtures from an automatic second stomp on landing.
+  g.run('player.inv=100;player.x=200;');
+  return g;
+}
+function shieldShot(g,{front=true,reflected=false,damage=1,pierce=0}={}){
+  g.run(`const e=enemies[0],direction=${front?'-e.face':'e.face'};
+    projectile(direction>0?e.x-8:e.x+e.w+8,e.y+18,direction*650,0,'p',${damage});
+    Object.assign(bullets[bullets.length-1],{reflected:${reflected},pierce:${pierce}});`);tick(g);
+}
+test('a real shield stomp retains damage and rebound while opening a short frontal follow-up',()=>{
+  for(const face of [-1,1]){
+    const g=stompGame('shield');g.run(`enemies[0].face=${face};`);const before=g.state();tick(g);
+    eq(g.state().stomps,1);eq(g.state().vy,-400);eq(g.read('enemies[0].hp'),3);near(g.read('enemies[0].shieldBreak'),1.2);
+    eq(g.state().hp,before.hp);eq(g.state().grenades,before.grenades);eq(g.state().score,before.score);
+    assert(g.state().combatText.includes('盾卫破防'));shieldShot(g);eq(g.read('enemies[0].hp'),2);
+  }
+});
+test('intact shield still blocks front fire and retains rear and reflected damage',()=>{
+  for(const front of [false,true])for(const reflected of [false,true]){
+    const g=stompGame('shield');g.run('player.y=G-player.h;player.x=200;player.inv=100;player.vy=0;player.ground=true;');
+    shieldShot(g,{front,reflected,damage:2});eq(g.read('enemies[0].hp'),front&&!reflected?5:3);eq(g.read('enemies[0].shieldBreak'),0);
+  }
+});
+test('shield break does not amplify rifle, spread, reflected or blast damage',()=>{
+  for(const reflected of [false,true])for(const damage of [1,2,4]){
+    const g=brokenShield();g.run('enemies[0].hp=20;');shieldShot(g,{reflected,damage});eq(g.read('enemies[0].hp'),20-damage);
+  }
+  const blast=brokenShield();blast.run('enemies[0].hp=20;boom(enemies[0].x+15,enemies[0].y+18);');eq(blast.read('enemies[0].hp'),14);
+});
+test('natural 72 tick expiry restores the frontal guard even during a longer stagger',()=>{
+  const g=brokenShield();g.run('enemies[0].stagger=10;enemies[0].hp=20;');tick(g,71);
+  assert(g.read('enemies[0].shieldBreak')>0);shieldShot(g);eq(g.read('enemies[0].shieldBreak'),0);eq(g.read('enemies[0].hp'),20);
+  eq(g.read('enemies[0].blockFlash'),.18);
+});
+test('a repeat top crossing refreshes instead of stacking and pays no extra resources',()=>{
+  const g=brokenShield();g.run('enemies[0].hp=20;');tick(g,20);
+  const before=g.state();g.run('player.x=enemies[0].x+5;player.y=enemies[0].y-player.h-4;player.vy=300;player.ground=false;');tick(g);
+  near(g.read('enemies[0].shieldBreak'),1.2);eq(g.state().stomps,2);eq(g.read('enemies[0].hp'),18);
+  eq(g.state().score,before.score);eq(g.state().grenades,before.grenades);eq(g.state().hp,before.hp);
+});
+test('broken shields remain dangerous on side contact and keep existing attack stun only',()=>{
+  const g=brokenShield();g.run('player.inv=0;player.x=enemies[0].x;player.y=G-player.h;player.ground=true;player.vy=0;');
+  const hp=g.state().hp;tick(g);eq(g.state().hp,hp-1);eq(g.state().stomps,1);
+  g.run('player.x=200;player.inv=100;');tick(g,19);assert(g.read('enemies[0].shieldBreak')>0);eq(g.read('enemies[0].stagger'),0);
+});
+test('piercing fire can continue through a broken guard but cannot bypass an intact one',()=>{
+  for(const broken of [false,true]){
+    const g=stompGame('shield');if(broken)tick(g);
+    g.run("player.x=200;player.y=G-player.h;player.ground=true;player.vy=0;player.inv=100;enemies[0].face=-1;enemies[0].stagger=10;enemies[0].hp=10;enemies[1]={...makeEnemy(535,'walker'),shot:100};");
+    shieldShot(g,{pierce:1});tick(g,8);eq(g.read('enemies[0].hp'),broken?9:10);eq(g.read('enemies[1].hp'),broken?2:3);
+  }
+});
+test('pause and canceled confirmation preserve break while retry and new waves clear it',()=>{
+  const g=brokenShield();g.key('p');const timer=g.read('enemies[0].shieldBreak');g.frames(90);near(g.read('enemies[0].shieldBreak'),timer);
+  g.click('restart');g.click('cancel-restart');g.frames(10);near(g.read('enemies[0].shieldBreak'),timer);
+  g.click('start');tick(g);assert(g.read('enemies[0].shieldBreak')<timer);
+  g.click('restart');g.click('start');assert(g.state().enemies.every(e=>!e.shieldBreak));
+  g.run('survivalWave=3;startWave();');assert(g.state().enemies.some(e=>e.type==='shield'&&e.shieldBreak===0));
+});
+test('fatal stomps never open a dead guard or duplicate kill reward and charge',()=>{
+  const g=stompGame('shield');g.run('enemies[0].hp=2;tacticalCharge=0;');tick(g);
+  eq(g.read('enemies[0].dead'),true);eq(g.read('enemies[0].shieldBreak'),0);eq(g.state().score,200);eq(g.state().tacticalCharge,18);
+  g.run('damageEnemy(enemies[0],99);');eq(g.state().score,200);eq(g.state().tacticalCharge,18);
+});
+test('shield break is local, detached, unsaved and legible with reduced motion',()=>{
+  for(const reducedMotion of [false,true]){
+    const g=brokenShield({reducedMotion});const labels=[];g.graphics.fillText=t=>labels.push(t);g.run('draw();');assert(labels.includes('破防 · 可射击'));assert(!labels.includes('震停'),'A broken shield has one legible state label');
+    g.win.__raidState.enemies.find(e=>e.type==='shield').shieldBreak=999;near(g.read('enemies[0].shieldBreak'),1.2);
+    assert(!JSON.stringify(g.state().progress).includes('shieldBreak'));g.run('enemies[0].shieldBreak=0;');labels.length=0;g.run('draw();');assert(!labels.includes('破防 · 可射击'));
+  }
+  for(const type of ['walker','turret','charger','drone','mortar']){const g=stompGame(type);tick(g);eq(g.read('enemies[0].shieldBreak'),0);}
+});
+
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
