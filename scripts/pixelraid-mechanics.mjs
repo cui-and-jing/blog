@@ -5118,4 +5118,116 @@ test('new waves and new runs never inherit an active diagonal dash',()=>{
   g.run("beginRun(0,'campaign');");eq(g.state().dashDive,false);eq(g.state().dashTime,0);
 });
 
+// Devices are one-use aerial routes, not extra enemies or free combat rewards.
+function deviceStompGame(options={}){
+  const g=stompGame('turret',options);
+  g.run(`enemies=[{...makeEnemy(100,'turret'),shot:100}];
+    devices=[{x:480,y:389,w:24,h:36,hp:2,spent:false}];
+    player.x=480;player.y=341;player.vy=300;player.inv=0;`);
+  return g;
+}
+test('device top contact detonates once and rebounds without self damage or free resources',()=>{
+  for(const hp of [1,2]){
+    const g=deviceStompGame();g.run(`devices[0].hp=${hp};`);const before=g.state();tick(g);const after=g.state();
+    eq(after.devices[0].spent,true);eq(after.vy,-400);eq(after.ground,false);eq(after.stompBurst.device,true);
+    for(const key of ['hp','lives','grenades','score','stomps','tacticalCharge','shots'])eq(after[key],before[key]);
+    eq(g.read('player.inv'),0);eq(g.read('player.coyote'),0);eq(g.read('player.jumpBuffer'),0);eq(after.deviceBursts.length,1);
+    tick(g,60);eq(g.state().deviceBursts.length,0);eq(g.state().stomps,0);eq(g.state().score,0);
+  }
+});
+test('device rebound uses contact-time jump with down priority and no repeated impulses',()=>{
+  for(const keys of [[],['w'],['s'],['w','s']]){
+    const g=deviceStompGame();for(const key of keys)g.key(key);tick(g);
+    const boost=keys.includes('w')&&!keys.includes('s');eq(g.state().vy,boost?-560:-400);eq(g.state().stompBurst.boosted,boost);
+    for(const key of keys)g.key(key,false);tick(g);near(g.state().vy,(boost?-560:-400)+1250/60);
+  }
+});
+test('spent, rising, side, preview and active dash contacts never trigger a device',()=>{
+  for(const setup of ['devices[0].spent=true;','player.y=370;player.vy=-300;',
+    'player.x=450;player.y=381;player.vy=0;player.ground=true;held.add("right");',
+    'spawnTime=1;','player.dashTime=.18;player.dashDir=1;',
+    'player.dashTime=.18;player.dashDir=1;player.dashDive=true;',"mode='campaign';"]){
+    const g=deviceStompGame();g.run(setup);tick(g);eq(g.state().deviceBursts,[]);eq(g.state().stompBurst,null);eq(g.state().stomps,0);
+    eq(g.state().devices[0].spent,setup.includes('spent=true'));
+  }
+});
+test('nearest top wins across device, enemy and supporting platform',()=>{
+  for(const first of ['device','enemy','platform']){
+    const g=deviceStompGame();g.run(`player.y=310;player.vy=800;
+      devices[0].y=${first==='device'?358:363};
+      enemies.push({...makeEnemy(480,'turret'),y:${first==='enemy'?358:363},shot:100});
+      stage.platforms=${first==='platform'?'[[470,357,100]]':'[]'};`);tick(g);
+    eq(g.state().devices[0].spent,first==='device');eq(g.state().stomps,first==='enemy'?1:0);
+    if(first==='platform'){eq(g.state().ground,true);eq(g.state().stompBurst,null);}
+  }
+});
+test('device crossing uses swept horizontal overlap rather than frame endpoint',()=>{
+  for(const hit of [true,false]){
+    const g=deviceStompGame();g.run(`player.y=344;player.vy=800;player.x=${hit?503:448};held.add('right');`);
+    // Old feet 388, device top 389: overlap near frame start, not its end.
+    tick(g);eq(g.state().devices[0].spent,hit);
+  }
+});
+test('device at the ignored drop platform stays hittable and lower support still catches descent',()=>{
+  const g=deviceStompGame();g.run('stage.platforms=[[470,330,100],[470,425,100]];player.dropPlatform=stage.platforms[0];player.dropTime=.2;');
+  tick(g);eq(g.state().devices[0].spent,true);eq(g.state().vy,-400);
+  const blocked=deviceStompGame();blocked.run('stage.platforms=[[470,387,100]];');tick(blocked);eq(blocked.state().devices[0].spent,false);eq(blocked.state().y+blocked.state().playerHeight,387);
+});
+test('device blast retains damage, chain and enemy-bullet clearing without extra stomp rewards',()=>{
+  const g=deviceStompGame();g.run(`devices.push({x:600,y:389,w:24,h:36,hp:2,spent:false});
+    enemies.push({...makeEnemy(550,'shield'),hp:9,maxHp:9,shot:100});
+    projectile(530,400,0,0,'e');projectile(800,400,0,0,'e');projectile(530,400,0,0,'p');`);
+  tick(g);eq(g.state().devices.filter(d=>d.spent).length,2);eq(g.read('enemies[1].hp'),1);
+  eq(g.read("bullets.filter(b=>b.owner==='e').length"),1);eq(g.read("bullets.filter(b=>b.owner==='p').length"),1);
+  eq(g.state().score,0);eq(g.state().tacticalCharge,24);eq(g.state().stomps,0);eq(g.state().hp,6);
+});
+test('device blast kills use existing score and energy once and cannot refund grenades',()=>{
+  const g=deviceStompGame();g.run("enemies.push({...makeEnemy(550,'walker'),shot:100});upgrades.blast=1;upgrades.pierce=1;");
+  tick(g);eq(g.state().score,100);eq(g.state().tacticalCharge,21);eq(g.state().grenades,3);eq(g.state().stomps,0);
+  tick(g,10);eq(g.state().score,100);eq(g.state().tacticalCharge,21);
+});
+test('device rebound grants no immunity against an unrelated projectile',()=>{
+  const g=deviceStompGame();g.run("projectile(490,365,0,0,'e');");tick(g);
+  // The blast clears nearby enemy rounds; a subsequent round still hurts.
+  eq(g.state().hp,6);g.run("projectile(player.x+12,player.y+20,0,0,'e');");tick(g);eq(g.state().hp,5);
+});
+test('touch and controller share device rebound choice without attack buttons',()=>{
+  const g=deviceStompGame(),button=[...g.nodes.values()].find(n=>n.dataset.action==='jump');
+  button.dispatch('pointerdown',{pointerId:801});tick(g);eq(g.state().vy,-560);eq(g.state().devices[0].spent,true);eq(g.state().shots,0);
+  button.dispatch('pointerup',{pointerId:801});eq(g.state().touchCount,0);
+  const pad=deviceStompGame();pad.pad();pad.frames(2);pad.run('player.x=480;player.y=341;player.vy=300;devices[0].spent=false;');pad.pad([0]);pad.frames(2);
+  assert(pad.state().vy< -500);eq(pad.state().devices[0].spent,true);
+});
+test('pause freezes device rebound, cancel preserves it and restart clears the effect',()=>{
+  const g=deviceStompGame();g.key('w');tick(g);g.key('p');const before=g.state();g.frames(40);eq(g.state(),before);
+  g.click('restart');g.click('cancel-restart');eq(g.state().stompBurst,before.stompBurst);g.click('start');tick(g);assert(g.state().vy>before.vy);
+  g.click('restart');g.click('start');eq(g.state().stompBurst,null);assert(g.state().devices.every(d=>!d.spent));
+});
+test('device feedback is static, detached and absent from saved progress and next wave',()=>{
+  for(const reducedMotion of [false,true]){
+    const g=deviceStompGame({reducedMotion});g.key('w');tick(g);const labels=[];g.graphics.fillText=text=>labels.push(text);g.run('drawStomp();');
+    assert(labels.includes('踏爆'));assert(labels.includes('跃升'));g.win.__raidState.stompBurst.device=false;eq(g.state().stompBurst.device,true);
+    g.run('saveProgress();');assert(!/stompBurst|deviceBursts/.test(JSON.stringify(g.state().progress)));
+    g.run('startWave();');eq(g.state().stompBurst,null);eq(g.state().deviceBursts,[]);
+  }
+});
+
+test('device and enemy exact top ties choose only the enemy stomp',()=>{
+  const g=deviceStompGame();g.run("enemies.push({...makeEnemy(480,'turret'),y:389,shot:100});");tick(g);
+  eq(g.state().stomps,1);eq(g.state().devices[0].spent,false);eq(g.state().stompBurst.device,false);
+});
+test('device is reachable through a real down-jump from the current platform only',()=>{
+  const g=deviceStompGame();g.run('stage.platforms=[[470,330,100],[470,425,100]];player.y=286;player.ground=true;player.vy=0;player.coyote=.1;');
+  g.key('s');g.key('w');tick(g);assert(g.state().dropTime>0);eq(g.state().ground,false);g.key('w',false);
+  tickUntil(g,'devices[0].spent',60);eq(g.state().vy,-400);eq(g.state().stomps,0);eq(g.state().stompBurst.device,true);
+});
+
+test('device native-route plan reaches the first-wave barrel using only crouch walk and held jump',()=>{
+  const g=createGame({reducedMotion:true});g.click('mode-survival');g.click('start');g.key('s');g.key('d');
+  tickUntil(g,'player.x>=585',100);g.key('d',false);g.key('s',false);assert(g.state().spawnTime>0);
+  tickUntil(g,'spawnTime===0',150);g.key('w');tickUntil(g,'devices[1].spent',100);
+  eq(g.state().vy,-560);eq(g.state().score,0);eq(g.state().hp,6);eq(g.state().stomps,0);eq(g.state().shots,0);
+  eq(g.state().deviceBursts.length,1);eq(g.state().enemies.length,3);assert(g.state().enemies.every(e=>e.hp===3));
+});
+
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);

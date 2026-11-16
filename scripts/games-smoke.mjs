@@ -25,6 +25,7 @@ import { checkRaidSurvival } from './lib/raid-survival-browser.mjs';
 import { checkRaidLobby } from './lib/raid-lobby-browser.mjs';
 import { checkRaidController } from './lib/raid-controller-browser.mjs';
 import { checkRaidDevices } from './lib/raid-devices-browser.mjs';
+import { checkRaidDeviceStomp } from './lib/raid-device-stomp-browser.mjs';
 import { checkRaidBeacon } from './lib/raid-beacon-browser.mjs';
 import { checkRaidMortar } from './lib/raid-mortar-browser.mjs';
 import { checkRaidStomp } from './lib/raid-stomp-browser.mjs';
@@ -471,6 +472,7 @@ async function checkGame(browser, file) {
       await checkRaidLobby(page, problems);
       await checkRaidController(page, problems);
       await checkRaidDevices(page, problems);
+      await checkRaidDeviceStomp(page, problems);
       await checkRaidBeacon(page, problems);
       await checkRaidMortar(page, problems);
       await checkRaidStomp(page, problems);
