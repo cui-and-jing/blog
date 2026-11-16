@@ -4538,4 +4538,76 @@ test('readout follows existing retry, wave and stage carry rules without new sav
   assert(!JSON.stringify(c.state().progress).includes('boostTime'));
 });
 
+// Aerial grenades reuse the established down + attack gesture, with no new mode.
+function grenadeGame(options={}){
+  const g=recapGame(options);
+  g.run(`pickups=[];devices=[];enemies=[];boss.dead=true;spawnTime=0;
+    player.x=450;player.y=200;player.h=44;player.ground=false;player.vy=0;player.inv=100;player.grenades=7;`);
+  // Retain an inert enemy so survival cannot end while testing the fuse.
+  g.run("enemies=[{...makeEnemy(50,'turret'),shot:100}];");
+  return g;
+}
+test('aerial down-grenades choose a short downward arc across modes and both facings',()=>{
+  for(const options of pickupModes)for(const face of [-1,1]){
+    const g=grenadeGame(options);g.run(`player.face=${face};`);g.key('s');g.key('k');tick(g);
+    const [b]=g.state().grenadeProjectiles;eq(b.aim,'down');near(b.vx,face*120);near(b.vy,260+1250*.83/60);
+    near(b.y,236+b.vy/60);near(b.timer,1.1-1/60);eq(g.state().grenades,6);
+  }
+});
+test('ordinary airborne and grounded crouch grenades preserve the original arc',()=>{
+  for(const ground of [false,true])for(const down of [false,true]){
+    if(!ground&&down)continue;
+    const g=grenadeGame();g.run(`player.ground=${ground};player.y=${ground?381:200};`);
+    if(down)g.key('s');g.key('k');tick(g);
+    const [b]=g.state().grenadeProjectiles;eq(b.aim,'arc');near(b.vx,330);near(b.vy,-320+1250*.83/60);
+    near(b.timer,1.1-1/60);eq(g.state().grenades,6);
+  }
+});
+test('same-frame jump, platform drop and dash use launch posture, down beats held jump',()=>{
+  for(const action of ['jump','drop','dash']){
+    const g=grenadeGame();
+    if(action!=='dash')g.run(`player.ground=true;player.y=${action==='drop'?281:381};stage.platforms=${action==='drop'?'[[400,325,180]]':'[]'};`);
+    g.key('s');g.key(action==='dash'?'l':'w');g.key('k');tick(g);
+    eq(g.state().grenadeProjectiles[0].aim,'down');eq(g.state().grenades,6);
+    if(action==='drop')assert(g.state().dropTime>0);
+  }
+});
+test('release down changes only the next grenade and holding grenade never auto-repeats',()=>{
+  const g=grenadeGame();g.key('s');g.key('k');tick(g);g.key('s',false);
+  const first=g.state().grenadeProjectiles[0];tick(g,8);eq(g.state().grenades,6);
+  eq(g.state().grenadeProjectiles[0].aim,'down');near(g.state().grenadeProjectiles[0].vx,first.vx);
+  g.key('k',false);g.key('k');tick(g);eq(g.state().grenadeProjectiles[1].aim,'arc');eq(g.state().grenades,5);
+});
+test('touch and controller down plus grenade follow the same launch path',()=>{
+  const touch=grenadeGame(),button=action=>[...touch.nodes.values()].find(n=>n.dataset.action===action);
+  button('down').dispatch('pointerdown',{pointerId:701});button('grenade').dispatch('pointerdown',{pointerId:702});tick(touch);
+  eq(touch.state().grenadeProjectiles[0].aim,'down');eq(touch.state().grenades,6);tick(touch,4);eq(touch.state().grenades,6);
+  button('down').dispatch('pointerup',{pointerId:701});button('grenade').dispatch('pointerup',{pointerId:702});
+  const pad=grenadeGame();pad.pad();pad.frames(2);pad.pad([1],[0,1]);pad.frames(2);
+  eq(pad.state().grenadeProjectiles[0].aim,'down');eq(pad.state().grenades,6);pad.frames(4);eq(pad.state().grenades,6);
+});
+test('downward grenades retain their fuse and existing explosion damage rather than contact detonation',()=>{
+  for(const downward of [false,true]){
+    const g=grenadeGame({mode:'campaign'});g.run("stage.platforms=[];enemies=[{...makeEnemy(480,'shield'),hp:20,shot:100}];");
+    if(downward)g.key('s');g.key('k');tick(g);g.key('k',false);tick(g,29);
+    eq(g.state().grenadeProjectiles.length,1);eq(g.read('enemies[0].hp'),20);
+    // Isolate blast geometry, not the clock or the real grenade update.
+    g.run('enemies[0].x=bombs[0].x-10;');tick(g,36);
+    eq(g.state().grenadeProjectiles.length,0);
+    if(downward)eq(g.read('enemies[0].hp'),14);
+  }
+});
+test('pause and cancel freeze live grenades, restart clears them and stale attack edges',()=>{
+  const g=grenadeGame();g.key('s');g.key('k');tick(g);g.key('p');const frozen=g.state().grenadeProjectiles;
+  g.frames(100);eq(g.state().grenadeProjectiles,frozen);g.click('restart');g.click('cancel-restart');g.frames(10);
+  eq(g.state().grenadeProjectiles,frozen);g.click('start');g.frames(2);eq(g.state().grenades,6);
+  g.click('restart');g.click('start');eq(g.state().grenadeProjectiles,[]);const ammo=g.state().grenades;g.frames(2);eq(g.state().grenades,ammo);
+});
+test('empty ammo, snapshot mutation and persisted progress do not manufacture grenades',()=>{
+  const g=grenadeGame();g.run('player.grenades=0;');g.key('s');g.key('k');tick(g);eq(g.state().grenadeProjectiles,[]);
+  g.key('k',false);g.run('player.grenades=1;');g.key('k');tick(g);const before=g.state().grenadeProjectiles;
+  g.win.__raidState.grenadeProjectiles[0].timer=999;eq(g.state().grenadeProjectiles,before);
+  assert(!JSON.stringify(g.state().progress).includes('grenadeProjectiles'));
+});
+
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
