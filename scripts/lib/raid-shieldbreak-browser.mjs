@@ -6,7 +6,7 @@ import { survivalTactics } from './raid-survival-tactics.mjs';
 export async function checkRaidShieldbreak(sourcePage, problems) {
   for (const mobile of [false, true]) {
     const context = await sourcePage.browser().createBrowserContext();
-    const page = await context.newPage(), held = new Map();
+    const page = await context.newPage(), held = new Map(), decisions = [];
     const label = mobile ? 'touch-320' : 'keyboard-1280';
     let stage = '初始化', checkpoint = '初始化';
     const require = (ok, message, details) => {
@@ -34,22 +34,50 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
       checkpoint = stage + '：按住 ' + action;
       if (mobile) {
         const point = await page.$eval(`[data-action="${action}"]`, element => {
-          element.scrollIntoView({ block: 'end' });const r = element.getBoundingClientRect();
-          return { x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height };
+          // Keep both rows in the same viewport while other fingers are held.
+          element.closest('.controls').scrollIntoView({ block: 'end', behavior: 'instant' });
+          const r = element.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
+          const hit = document.elementFromPoint(x, y);
+          return { x, y, w: r.width, h: r.height, hit: hit === element || element.contains(hit) };
         });
-        require(point.w >= 42 && point.h >= 44 && point.x > 0 && point.x < 320 && point.y > 0 && point.y < 844,
+        require(point.hit && point.w >= 42 && point.h >= 44 && point.x > 0 && point.x < 320 && point.y > 0 && point.y < 844,
           '触控目标不可达：' + action, point);
-        held.set(action, await page.touchscreen.touchStart(point.x, point.y));
+        const index = await page.evaluate(() => window.__shieldbreakObservations.inputs.length);
+        const handle = await page.touchscreen.touchStart(point.x, point.y);
+        // A requested touch is not evidence that the intended button received it.
+        const audit = await page.evaluate(from => ({
+          events: window.__shieldbreakObservations.inputs.slice(from).filter(event => event.type === 'pointerdown'),
+          active: [...document.querySelectorAll('[data-action].active')].map(el => el.dataset.action).sort(),
+          state: window.__raidState
+        }), index);
+        const event = audit.events[0];held.set(action, { handle, pointerId: event?.pointerId });
+        require(audit.events.length === 1 && event.action === action && event.trusted, '原生触点未命中所需动作', { action, point, audit });
+        if (audit.state.phase === 'playing') require(audit.state.touchCount === held.size &&
+          JSON.stringify(audit.active) === JSON.stringify([...held.keys()].sort()), '触点被取消或与实际按钮状态不同步', { action, audit, held: [...held.keys()] });
       } else { await page.keyboard.down(keys[action]);held.set(action, true); }
     };
     const up = async action => {
       if (!held.has(action)) return;
       checkpoint = stage + '：释放 ' + action;
-      if (mobile) await held.get(action).end();else await page.keyboard.up(keys[action]);
-      held.delete(action);
+      if (mobile) {
+        const contact = held.get(action), index = await page.evaluate(() => window.__shieldbreakObservations.inputs.length);
+        await contact.handle.end();held.delete(action);
+        const audit = await page.evaluate(from => ({
+          events: window.__shieldbreakObservations.inputs.slice(from).filter(event => event.type === 'pointerup' || event.type === 'pointercancel'),
+          active: [...document.querySelectorAll('[data-action].active')].map(el => el.dataset.action).sort(), state: window.__raidState
+        }), index);
+        require(audit.events.length === 1 && audit.events[0].action === action &&
+          audit.events[0].pointerId === contact.pointerId && audit.events[0].trusted, '原生触点未独立结束', { action, audit });
+        if (audit.state.phase === 'playing') require(audit.state.touchCount === held.size &&
+          JSON.stringify(audit.active) === JSON.stringify([...held.keys()].sort()), '释放后实际触点与输入记录不符', { action, audit, held: [...held.keys()] });
+      } else { await page.keyboard.up(keys[action]);held.delete(action); }
     };
     const release = async () => {
-      for (const action of [...held.keys()]) await up(action).catch(() => {});
+      let firstError;
+      for (const action of [...held.keys()]) {
+        try { await up(action); } catch (error) { firstError ??= error; }
+      }
+      if (firstError) throw firstError;
     };
     const shot = suffix => page.screenshot({ path: path.join(process.cwd(), '.shots', `pixelraid-shieldbreak-${label}-${suffix}.png`), fullPage: true });
     page.on('pageerror', error => problems.push(`Pixel Raid 踏击破盾 ${label}：${error.message}`));
@@ -64,7 +92,7 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
             const target = event.target.closest?.('[data-action], button');
             if (type === 'keydown' && ['a', 'd', 's', 'w', 'l', 'j', 'k'].includes(event.key) || target) {
               evidence.inputs.push({ type, key: event.key, action: target?.dataset.action, id: target?.id,
-                primary: event.isPrimary, trusted: event.isTrusted });
+                pointerId: event.pointerId, primary: event.isPrimary, trusted: event.isTrusted });
             }
           }, true);
         }
@@ -89,11 +117,23 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
       for (let wave = 1; wave <= 3; wave++) {
         stage = '真实清理第 ' + wave + ' 波';
         const decide = survivalTactics(), deadline = Date.now() + 45000;
+        let bossRetreat = false;
         await down('fire');
         while (Date.now() < deadline) {
           const s = await read();if (s.phase !== 'playing') break;
           require(s.survivalWave === wave, '战斗期间意外换波', s);
           const input = decide(s);
+          if (s.bossWave) {
+            // Touch dispatch spans real frames. Never treat the controller's
+            // predicted facing as proof that a direction actually took effect.
+            if (s.x > 570) bossRetreat = true;
+            if (s.x <= 500) bossRetreat = false;
+            input.move = bossRetreat ? 'a' : s.x < 500 || s.face < 0 ? 'd' : '';
+            input.dash = input.dash && !bossRetreat && s.face === 1;
+            input.grenade = input.grenade && !bossRetreat && s.face === 1;
+          }
+          decisions.push({ wave, time: s.survivalTime, x: s.x, face: s.face, touchCount: s.touchCount, held: [...held.keys()], input });
+          if (decisions.length > 30) decisions.shift();
           // Release the opposite movement first, preserving independent inputs.
           if (input.move !== 'a') await up('left');
           if (input.move !== 'd') await up('right');
@@ -177,8 +217,8 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
       const evidence = await page.evaluate(() => ({ state: window.__raidState, observation: window.__shieldbreakObservations,
         active: [...document.querySelectorAll('[data-action].active')].map(el => el.dataset.action)
       })).catch(diagnosticError => ({ error: diagnosticError.message }));
-      problems.push(`Pixel Raid 踏击破盾 ${label}：${checkpoint}：${error.message} · evidence=${JSON.stringify(evidence)}`);
+      problems.push(`Pixel Raid 踏击破盾 ${label}：${checkpoint}：${error.message} · evidence=${JSON.stringify({ ...evidence, decisions })}`);
       await shot('error').catch(() => {});
-    } finally { await release();await context.close(); }
+    } finally { await release().catch(() => {});await context.close(); }
   }
 }
