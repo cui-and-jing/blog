@@ -2,13 +2,14 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { survivalTactics } from './raid-survival-tactics.mjs';
+import { combatPhase, auditCombatTouch, dispatchCombatTouch } from './raid-combat-boundary.mjs';
 
 export async function checkRaidShieldbreak(sourcePage, problems) {
   for (const mobile of [false, true]) {
     const context = await sourcePage.browser().createBrowserContext();
     const page = await context.newPage(), held = new Map(), decisions = [];
     const label = mobile ? 'touch-320' : 'keyboard-1280';
-    let stage = '初始化', checkpoint = '初始化';
+    let stage = '初始化', checkpoint = '初始化', combatWave = null;
     const require = (ok, message, details) => {
       if (!ok) throw new Error(message + (details === undefined ? '' : ' ' + JSON.stringify(details)));
     };
@@ -30,34 +31,37 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
     };
     const keys = { left: 'a', right: 'd', down: 's', jump: 'w', dash: 'l', fire: 'j', grenade: 'k' };
     const down = async action => {
-      if (held.has(action)) return;
+      if (combatPhase(await read(), combatWave) === 'settled') return false;
+      if (held.has(action)) return true;
       checkpoint = stage + '：按住 ' + action;
       if (mobile) {
-        const point = await page.$eval(`[data-action="${action}"]`, element => {
-          // Keep both rows in the same viewport while other fingers are held.
-          element.closest('.controls').scrollIntoView({ block: 'end', behavior: 'instant' });
-          const r = element.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
-          const hit = document.elementFromPoint(x, y);
-          return { x, y, w: r.width, h: r.height, hit: hit === element || element.contains(hit) };
+        return dispatchCombatTouch({ action, wave: combatWave,
+          measure: () => page.$eval(`[data-action="${action}"]`, element => {
+            // Keep both rows in the same viewport while other fingers are held.
+            element.closest('.controls').scrollIntoView({ block: 'end', behavior: 'instant' });
+            const r = element.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
+            const hit = document.elementFromPoint(x, y);
+            return { x, y, w: r.width, h: r.height, hit: hit === element || element.contains(hit), state: window.__raidState };
+          }),
+          beforeDispatch: () => page.evaluate(() => ({ index: window.__shieldbreakObservations.inputs.length, state: window.__raidState })),
+          dispatch: point => page.touchscreen.touchStart(point.x, point.y),
+          observe: from => page.evaluate(index => ({
+            events: window.__shieldbreakObservations.inputs.slice(index).filter(event => event.type === 'pointerdown'),
+            active: [...document.querySelectorAll('[data-action].active')].map(el => el.dataset.action).sort(),
+            state: window.__raidState
+          }), from),
+          // Track the actual target too: a boundary contact can land on a supply
+          // card, whose native pointerup must still be audited and released.
+          track: (handle, event) => held.set(action, { handle, pointerId: event?.pointerId, action: event?.action, id: event?.id }),
+          heldActions: () => [...held.keys()]
         });
-        require(point.hit && point.w >= 42 && point.h >= 44 && point.x > 0 && point.x < 320 && point.y > 0 && point.y < 844,
-          '触控目标不可达：' + action, point);
-        const index = await page.evaluate(() => window.__shieldbreakObservations.inputs.length);
-        const handle = await page.touchscreen.touchStart(point.x, point.y);
-        // A requested touch is not evidence that the intended button received it.
-        const audit = await page.evaluate(from => ({
-          events: window.__shieldbreakObservations.inputs.slice(from).filter(event => event.type === 'pointerdown'),
-          active: [...document.querySelectorAll('[data-action].active')].map(el => el.dataset.action).sort(),
-          state: window.__raidState
-        }), index);
-        const event = audit.events[0];held.set(action, { handle, pointerId: event?.pointerId });
-        require(audit.events.length === 1 && event.action === action && event.trusted, '原生触点未命中所需动作', { action, point, audit });
-        if (audit.state.phase === 'playing') require(audit.state.touchCount === held.size &&
-          JSON.stringify(audit.active) === JSON.stringify([...held.keys()].sort()), '触点被取消或与实际按钮状态不同步', { action, audit, held: [...held.keys()] });
-      } else { await page.keyboard.down(keys[action]);held.set(action, true); }
+      } else {
+        await page.keyboard.down(keys[action]);held.set(action, true);
+        return combatPhase(await read(), combatWave) === 'playing';
+      }
     };
     const up = async action => {
-      if (!held.has(action)) return;
+      if (!held.has(action)) return combatPhase(await read(), combatWave) === 'playing';
       checkpoint = stage + '：释放 ' + action;
       if (mobile) {
         const contact = held.get(action), index = await page.evaluate(() => window.__shieldbreakObservations.inputs.length);
@@ -66,11 +70,11 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
           events: window.__shieldbreakObservations.inputs.slice(from).filter(event => event.type === 'pointerup' || event.type === 'pointercancel'),
           active: [...document.querySelectorAll('[data-action].active')].map(el => el.dataset.action).sort(), state: window.__raidState
         }), index);
-        require(audit.events.length === 1 && audit.events[0].action === action &&
-          audit.events[0].pointerId === contact.pointerId && audit.events[0].trusted, '原生触点未独立结束', { action, audit });
-        if (audit.state.phase === 'playing') require(audit.state.touchCount === held.size &&
-          JSON.stringify(audit.active) === JSON.stringify([...held.keys()].sort()), '释放后实际触点与输入记录不符', { action, audit, held: [...held.keys()] });
-      } else { await page.keyboard.up(keys[action]);held.delete(action); }
+        return auditCombatTouch({ kind: 'up', action, contact, audit, heldActions: [...held.keys()], wave: combatWave }).phase === 'playing';
+      } else {
+        await page.keyboard.up(keys[action]);held.delete(action);
+        return combatPhase(await read(), combatWave) === 'playing';
+      }
     };
     const release = async () => {
       let firstError;
@@ -92,7 +96,11 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
             const target = event.target.closest?.('[data-action], button');
             if (type === 'keydown' && ['a', 'd', 's', 'w', 'l', 'j', 'k'].includes(event.key) || target) {
               evidence.inputs.push({ type, key: event.key, action: target?.dataset.action, id: target?.id,
-                pointerId: event.pointerId, primary: event.isPrimary, trusted: event.isTrusted });
+                pointerId: event.pointerId, primary: event.isPrimary, trusted: event.isTrusted,
+                // Capture before target handlers and later RAF ticks. A wrong
+                // hit while playing must not be excused by a later settlement.
+                state: window.__raidState && (({ phase, mode, survivalWave, survivalCleared, hp, touchCount }) =>
+                  ({ phase, mode, survivalWave, survivalCleared, hp, touchCount }))(window.__raidState) });
             }
           }, true);
         }
@@ -111,16 +119,20 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
       await wait('等待游戏初始化', () => window.__raidReady);
       require(await page.evaluate(() => !('__raidQA' in window)), '发布页出现可写游戏入口');
       await activate('#mode-survival');await activate('#start');await phase('playing');
-      const tapAction = async action => { await down(action);await up(action); };
+      const tapAction = async action => {
+        const playing = await down(action);
+        const releasedPlaying = await up(action);
+        return playing && releasedPlaying;
+      };
       // Same player-like decisions as the existing survival suite, using real
       // touch contacts on mobile as well as real keyboard input on desktop.
       for (let wave = 1; wave <= 3; wave++) {
-        stage = '真实清理第 ' + wave + ' 波';
+        stage = '真实清理第 ' + wave + ' 波';combatWave = wave;
         const decide = survivalTactics(), deadline = Date.now() + 45000;
         let bossRetreat = false;
         await down('fire');
         while (Date.now() < deadline) {
-          const s = await read();if (s.phase !== 'playing') break;
+          const s = await read();if (combatPhase(s, combatWave) === 'settled') break;
           require(s.survivalWave === wave, '战斗期间意外换波', s);
           const input = decide(s);
           if (s.bossWave) {
@@ -135,23 +147,27 @@ export async function checkRaidShieldbreak(sourcePage, problems) {
           decisions.push({ wave, time: s.survivalTime, x: s.x, face: s.face, touchCount: s.touchCount, held: [...held.keys()], input });
           if (decisions.length > 30) decisions.shift();
           // Release the opposite movement first, preserving independent inputs.
-          if (input.move !== 'a') await up('left');
-          if (input.move !== 'd') await up('right');
-          if (input.move) await down(input.move === 'a' ? 'left' : 'right');
-          if (input.jump && s.ground) { await up('jump');await down('jump'); }
-          else if (!input.jump) await up('jump');
-          if (input.dash) await tapAction('dash');
-          if (input.grenade) await tapAction('grenade');
+          if (input.move !== 'a' && !await up('left')) break;
+          if (input.move !== 'd' && !await up('right')) break;
+          if (input.move && !await down(input.move === 'a' ? 'left' : 'right')) break;
+          if (input.jump && s.ground) { if (!await up('jump') || !await down('jump')) break; }
+          else if (!input.jump && !await up('jump')) break;
+          if (input.dash && !await tapAction('dash')) break;
+          if (input.grenade && !await tapAction('grenade')) break;
           await new Promise(resolve => setTimeout(resolve, 80));
         }
         await release();
         const cleared = await read();
         require(cleared.phase === 'waveClear' && cleared.survivalCleared === wave && cleared.hp > 0,
           '自然输入未完成前置波次', cleared);
+        require(combatPhase(cleared, wave) === 'settled' && held.size === 0, '补给选择前仍有未释放的战斗接触');
+        // A stale native touch may have selected a card during settlement. Do
+        // not trust that selection: choose explicitly only after all contacts end.
         let choice = cleared.supplyOffers.indexOf('armor');
         if (choice < 0) choice = cleared.hp < 4 ? cleared.supplyOffers.indexOf('heal') : 0;
         await activate('#supply-' + Math.max(0, choice));await activate('#start');await phase('playing');
       }
+      combatWave = null;
       stage = '第4波真实走位到平台间隙';
       const entered = await read(), original = entered.enemies.find(e => e.type === 'shield');
       require(entered.survivalWave === 4 && entered.survivalCleared === 3 && original?.hp === 5 && original.shieldBreak === 0,

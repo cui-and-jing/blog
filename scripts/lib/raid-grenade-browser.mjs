@@ -1,5 +1,6 @@
 /** Directional grenade routes, using only native input and detached observations. */
 import path from 'node:path';
+import fs from 'node:fs';
 
 export async function checkRaidGrenades(sourcePage, problems) {
   for (const mobile of [false, true]) {
@@ -64,7 +65,7 @@ export async function checkRaidGrenades(sourcePage, problems) {
       await page.evaluateOnNewDocument(() => {
         // Read-only observation avoids trying to catch the short launch frame
         // with a later CDP round trip. No game state, input, RNG or clock changes.
-        const evidence = window.__grenadeObservations = { launches: [], inputs: [] };
+        const evidence = window.__grenadeObservations = { launches: [], inputs: [], fuseFrames: [] };
         for (const type of ['keydown', 'keyup', 'pointerdown', 'pointerup', 'pointercancel', 'click']) document.addEventListener(type, event => {
           const target = event.target.closest?.('[data-action], button');
           if (type.startsWith('key') && ['s', ' ', 'k'].includes(event.key) || target) {
@@ -79,6 +80,22 @@ export async function checkRaidGrenades(sourcePage, problems) {
           if (state?.phase === 'playing' && previous?.phase === 'playing' && state.grenades < previous.grenades) {
             evidence.launches.push({ grenade: state.grenadeProjectiles.at(-1), ammo: state.grenades,
               ground: state.ground, face: state.face });
+          }
+          if (state?.phase === 'playing' && evidence.launches.length === 1 && state.grenadeProjectiles.length === 1) {
+            const grenade = state.grenadeProjectiles[0], canvas = document.getElementById('field');
+            const x = Math.round(grenade.x - 13) + Math.round(-state.cam), y = Math.round(grenade.y - 18);
+            if (x >= 0 && x + 26 <= canvas.width && y >= 0 && y + 4 <= canvas.height) {
+              const data = canvas.getContext('2d').getImageData(x, y, 26, 4).data;
+              let normal = 0, late = 0;
+              for (let i = 0; i < data.length; i += 4) {
+                if (data[i] === 255 && data[i + 1] === 226 && data[i + 2] === 154) normal++;
+                if (data[i] === 255 && data[i + 1] === 244 && data[i + 2] === 204) late++;
+              }
+              const expected = Math.max(1, Math.round(26 * Math.min(1, grenade.timer / 1.1)));
+              evidence.fuseFrames.push({ timer: grenade.timer, expected, normal, late });
+              if (grenade.timer <= .3 && !window.__grenadeFuseLateCanvas)
+                window.__grenadeFuseLateCanvas = canvas.toDataURL('image/png').split(',')[1];
+            }
           }
           previous = state;requestAnimationFrame(observe);
         }
@@ -115,6 +132,15 @@ export async function checkRaidGrenades(sourcePage, problems) {
         (await read()).grenades === initialAmmo - 1, '取消重开改变引信或弹药');
       await activate('#start');await phase('playing');
       await wait('等待落地及手雷自然引爆', () => window.__raidState.ground && window.__raidState.grenadeProjectiles.length === 0);
+      const fuse = await page.evaluate(() => window.__grenadeObservations.fuseFrames);
+      const early = fuse.filter(frame => frame.timer > .3), late = fuse.filter(frame => frame.timer <= .3);
+      require(early.length > 0 && late.length > 0 && early[0].expected > late.at(-1).expected &&
+        fuse.every(frame => frame.timer > 0 && (frame.timer <= .3 ?
+          frame.late === frame.expected * 4 && frame.normal === 0 : frame.normal === frame.expected * 4 && frame.late === 0)),
+      '实际画布引信条没有按真实计时缩短、在末段变亮或保持可见', fuse);
+      const fuseImage = await page.evaluate(() => window.__grenadeFuseLateCanvas);
+      require(typeof fuseImage === 'string' && fuseImage.length > 0, '缺少真实引信末段截图');
+      fs.writeFileSync(path.join(process.cwd(), '.shots', `pixelraid-grenade-${label}-fuse-late.png`), Buffer.from(fuseImage, 'base64'));
       stage = '地面下蹲保持普通抛投且长按不连掷';
       await down('down');await down('grenade');await waitLaunch(2);
       const ground = (await launches())[1];

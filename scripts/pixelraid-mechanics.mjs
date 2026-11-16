@@ -4859,4 +4859,43 @@ test('boosted stomp is detached, unsaved and marked without relying on animation
   }
 });
 
+// The fuse indicator reads the real timer; it is never a second gameplay clock.
+function grenadePaint(g,code='bombs[0]'){
+  const calls=[];g.graphics.fillRect=(...rect)=>calls.push({rect,color:g.graphics.fillStyle});
+  g.run(`drawGrenade(${code});`);g.graphics.fillRect=()=>{};return calls;
+}
+test('grenade fuse bar matches actual remaining time, stays visible until zero, and never flashes',()=>{
+  for(const reducedMotion of [false,true])for(const [timer,width,color] of [
+    [1.1,26,'#ffe29a'],[.55,13,'#ffe29a'],[.301,7,'#ffe29a'],[.3,7,'#fff4cc'],[.001,1,'#fff4cc'],[2,26,'#ffe29a']
+  ]){
+    const g=createGame({reducedMotion}),before=g.state();
+    const paint=grenadePaint(g,`{x:200,y:100,timer:${timer}}`);
+    eq(paint.length,4);eq(paint[2],{rect:[186,81,28,6],color:'#102536'});
+    eq(paint[3],{rect:[187,82,width,4],color});eq(g.state(),before);
+    g.run('clock+=.17;');eq(grenadePaint(g,`{x:200,y:100,timer:${timer}}`),paint);
+  }
+  const g=createGame();eq(grenadePaint(g,'{x:200,y:100,timer:0}'),[]);eq(grenadePaint(g,'{x:200,y:100,timer:-.01}'),[]);
+});
+test('all modes and both throw arcs render the real fuse without changing physics, resources or announcements',()=>{
+  for(const options of pickupModes)for(const downward of [false,true]){
+    const g=grenadeGame(options);if(downward)g.key('s');g.key('k');tick(g);g.key('k',false);
+    const first=g.state().grenadeProjectiles[0];near(first.timer,1.1-1/60);
+    g.run("announce('战斗提示');");const before=g.state();const paints=grenadePaint(g);
+    eq(g.state(),before);eq(g.nodes.get('announcer').textContent,'战斗提示');eq(paints.at(-1).rect[2],26);
+    tick(g,48);const late=g.state().grenadeProjectiles[0];assert(late.timer>0&&late.timer<=.3);
+    const short=grenadePaint(g);eq(short.at(-1).color,'#fff4cc');assert(short.at(-1).rect[2]<paints.at(-1).rect[2]);
+    tick(g,18);eq(g.state().grenadeProjectiles,[]);eq(g.state().grenades,6);
+  }
+});
+test('independent grenades keep independent indicator widths through pause, confirmation and visibility loss',()=>{
+  const g=grenadeGame();g.key('k');tick(g);g.key('k',false);tick(g,20);g.key('k');tick(g);g.key('k',false);
+  const a=grenadePaint(g,'bombs[0]'),b=grenadePaint(g,'bombs[1]');assert(a.at(-1).rect[2]<b.at(-1).rect[2]);
+  g.key('p');g.key('p',false);const frozen=g.state();g.frames(60);eq(g.state(),frozen);
+  eq(grenadePaint(g,'bombs[0]'),a);eq(grenadePaint(g,'bombs[1]'),b);
+  g.click('restart');g.frames(30);g.click('cancel-restart');eq(grenadePaint(g,'bombs[0]'),a);
+  g.click('start');tick(g,2);assert(g.state().grenadeProjectiles[0].timer<frozen.grenadeProjectiles[0].timer);
+  g.visibility(true);const hidden=g.state();g.frames(60);eq(g.state(),hidden);
+  g.click('restart');g.click('start');eq(g.state().grenadeProjectiles,[]);
+});
+
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
