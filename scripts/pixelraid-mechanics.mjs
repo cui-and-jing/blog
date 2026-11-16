@@ -2610,7 +2610,9 @@ test('simultaneous dash and descent cannot snap back to the ledge when ignore ti
     g.key('s'); g.key('w'); g.key('l'); tick(g);
     g.key('s', false); g.key('w', false); g.key('l', false);
     assert(g.state().dashTime > 0 && g.state().dropTime > 0);
-    tick(g, 13); assert(!g.state().ground, 'Dash must not reland on the ignored support');
+    for(let frame=0;frame<13;frame++){
+      tick(g);if(g.state().ground)eq(g.state().y + g.state().playerHeight,425,'Dive must land on ground, never the ignored support');
+    }
     tick(g, 36); eq(g.state().ground, true); eq(g.state().y + g.state().playerHeight, 425);
     eq(g.read('player.dropPlatform'), null);
   }
@@ -4993,6 +4995,127 @@ test('rolling grenades freeze through pause and confirmation and clear on restar
   assert(g.state().grenadeProjectiles[0].timer<frozen.grenadeProjectiles[0].timer);
   g.visibility(true);const hidden=g.state().grenadeProjectiles;g.frames(50);eq(g.state().grenadeProjectiles,hidden);
   g.click('restart');g.click('start');const ammo=g.state().grenades;tick(g,2);eq(g.state().grenadeProjectiles,[]);eq(g.state().grenades,ammo);
+});
+
+// A downward dash is a launch-time movement choice, not extra damage or charge.
+function diveDashGame(options={}){
+  const g=grenadeGame(options);g.run('player.coyote=0;player.inv=0;player.dashCooldown=0;');return g;
+}
+test('airborne down-dash chooses a mirrored diagonal dive across every mode',()=>{
+  for(const options of pickupModes)for(const face of [-1,1]){
+    const g=diveDashGame(options);g.run(`player.face=${face};`);const before=g.state(),delay=g.read('dashDelay()');
+    g.key('s');g.key('l');tick(g);const after=g.state();
+    eq(after.dashDive,true);near(after.vy,650);near(after.x,before.x+face*650/60);near(after.y,before.y+650/60);
+    near(after.dashTime,.18-1/60);near(after.dashCooldown,delay);
+    for(const key of ['hp','lives','grenades','score','stomps','tacticalCharge'])eq(after[key],before[key]);
+  }
+});
+test('ordinary air dashes and grounded crouch dashes retain the original horizontal path',()=>{
+  for(const [ground,down] of [[false,false],[true,false],[true,true]]){
+    const g=diveDashGame();if(ground)g.run('player.ground=true;player.y=G-player.h;');
+    if(down)g.key('s');const feet=g.state().y+g.state().playerHeight;g.key('l');tick(g);
+    eq(g.state().dashDive,false);eq(g.state().vy,0);near(g.state().y+g.state().playerHeight,feet);
+    g.key('s');tick(g,3);eq(g.state().dashDive,false);eq(g.state().vy,0);
+  }
+});
+test('dive trajectory latches at execution and cannot turn, float or repeat on held input',()=>{
+  const g=diveDashGame();g.key('s');g.key('l');tick(g);g.key('s',false);g.key('a');tick(g,3);
+  eq(g.state().dashDive,true);eq(g.state().face,1);eq(g.state().vy,650);assert(g.read('player.vx')>0);
+  tick(g,9);eq(g.state().dashDive,false);eq(g.state().dashTime,0);eq(g.state().face,-1);
+  tick(g,160);eq(g.state().dashTime,0);eq(g.state().dashDive,false);eq(g.state().dashCooldown,0);
+});
+test('dash pre-input reads airborne down intent only when cooldown actually expires',()=>{
+  for(const downAtStart of [false,true]){
+    const g=diveDashGame();g.run('player.dashCooldown=.08;');if(!downAtStart)g.key('s');
+    g.key('l');tick(g);eq(g.state().dashTime,0);assert(g.state().dashBuffer>0);
+    g.key('s',downAtStart);tick(g,4);eq(g.state().dashDive,downAtStart);assert(g.state().dashTime>0);
+    eq(g.state().vy,downAtStart?650:0);
+  }
+  const ground=diveDashGame();ground.run('player.y=G-player.h-1;player.vy=200;player.dashCooldown=.08;');
+  ground.key('s');ground.key('l');tick(ground,5);eq(ground.state().ground,true);eq(ground.state().dashDive,false);
+});
+test('same-frame jump or platform descent may dive but neither ignores a lower platform',()=>{
+  const jump=diveDashGame();jump.run('player.y=G-player.h;player.ground=true;');
+  jump.key('s');jump.key('w');jump.key('l');tick(jump);eq(jump.state().dashDive,true);eq(jump.state().ground,true);
+  // A dive made too close to the floor simply lands; it is not a second jump.
+  eq(jump.state().y+jump.state().playerHeight,425);
+  for(const face of [-1,1]){
+    const g=onLedge({below:true,x:face===1?500:700});g.run(`player.face=${face};`);
+    g.key('s');g.key('w');g.key('l');tick(g);eq(g.state().dashDive,true);assert(g.state().dropTime>0);
+    tick(g,5);eq(g.state().ground,true);eq(g.state().y+g.state().playerHeight,365);
+    g.key('w',false);g.key('l',false);tick(g,20);eq(g.state().y+g.state().playerHeight,365);
+  }
+});
+test('a dive lands on the first platform top and never phases through a ledge without drop input',()=>{
+  for(const face of [-1,1]){
+    const g=diveDashGame();g.run(`player.face=${face};stage.platforms=[[200,285,600],[200,325,600]];`);
+    g.key('s');g.key('l');tick(g,8);eq(g.state().ground,true);eq(g.state().y+g.state().playerHeight,285);
+    tick(g,12);eq(g.state().y+g.state().playerHeight,285);eq(g.read('player.dropPlatform'),null);
+  }
+});
+test('diagonal ledge collisions use impact-time overlap at both edges, not frame-end overlap',()=>{
+  for(const [x,face,lands] of [[474,1,false],[478,-1,true],[599,-1,false],[595,1,true]]){
+    const g=diveDashGame();g.run(`player.x=${x};player.face=${face};player.y=240;stage.platforms=[[500,285,100]];`);
+    g.key('s');g.key('l');tick(g);eq(g.state().ground,lands);
+    if(lands)eq(g.state().y+g.state().playerHeight,285);else assert(g.state().y+g.state().playerHeight>285);
+  }
+  const below=diveDashGame();below.run('player.y=242;stage.platforms=[[400,285,200]];');
+  below.key('s');below.key('l');tick(below);eq(below.state().ground,false);assert(below.state().y+below.state().playerHeight>286);
+});
+test('diagonal ground crossings use the impact-time center at pit edges and cannot snap up from below',()=>{
+  for(const [center,face,lands] of [[499,1,true],[501,-1,false],[601,-1,true],[599,1,false]]){
+    const g=diveDashGame();g.run(`player.x=${center}-player.w/2;player.face=${face};player.y=380.5;stage.gaps=[[500,600]];`);
+    g.key('s');g.key('l');tick(g);eq(g.state().ground,lands);
+    if(lands)eq(g.state().y+g.state().playerHeight,425);else assert(g.state().y+g.state().playerHeight>425);
+  }
+  const below=diveDashGame();below.run('player.y=382;');below.key('s');below.key('l');tick(below);
+  eq(below.state().ground,false);assert(below.state().y+below.state().playerHeight>426);
+});
+test('horizontal dash still preserves the original descent ledge exclusion until feet are safely below',()=>{
+  const g=onLedge();g.key('s');g.key('w');tick(g);g.key('s',false);g.key('w',false);g.key('l');tick(g);
+  eq(g.state().dashDive,false);const feet=g.state().y+g.state().playerHeight;
+  tick(g,10);near(g.state().y+g.state().playerHeight,feet);assert(g.read('player.dropPlatform')!==null);
+  tick(g,40);eq(g.state().ground,true);eq(g.state().y+g.state().playerHeight,425);eq(g.read('player.dropPlatform'),null);
+});
+test('diving retains reflection and contact immunity but never grants stomp damage',()=>{
+  const g=diveDashGame();g.run("enemies=[{...makeEnemy(460,'shield'),y:260,hp:10,maxHp:10,shot:100}];projectile(475,235,0,0,'e');");
+  const before=g.state();g.key('s');g.key('l');tick(g);
+  eq(g.state().reflections,before.reflections+1);eq(g.state().hp,before.hp);
+  tick(g,5);eq(g.state().stomps,0);eq(g.read('enemies[0].hp'),10);
+});
+test('diving into a deep pit is still a fall and clears the movement intent on checkpoint return',()=>{
+  const g=diveDashGame({mode:'campaign'});g.run('stage.gaps=[[350,800]];player.y=H+65;player.ground=false;player.checkpoint=64;');
+  const hp=g.state().hp;g.key('s');g.key('l');tick(g);eq(g.state().hp,hp-2);
+  eq(g.state().dashDive,false);eq(g.state().dashTime,0);eq(g.state().x,64);eq(g.state().ground,true);
+});
+test('touch and controller share diagonal dash intent and keep ordinary dash cooldown',()=>{
+  const touch=diveDashGame(),button=action=>[...touch.nodes.values()].find(n=>n.dataset.action===action);
+  button('down').dispatch('pointerdown',{pointerId:801});button('dash').dispatch('pointerdown',{pointerId:802});tick(touch);
+  eq(touch.state().dashDive,true);eq(touch.state().vy,650);near(touch.state().dashCooldown,2.4);
+  button('down').dispatch('pointerup',{pointerId:801});button('dash').dispatch('pointerup',{pointerId:802});tick(touch);
+  eq(touch.state().dashDive,true);eq(touch.state().touchCount,0);
+  const pad=diveDashGame();pad.pad();pad.frames(2);pad.pad([4],[0,1]);pad.frames(2);
+  eq(pad.state().dashDive,true);eq(pad.state().vy,650);
+});
+test('active dive freezes through pause and cancel, resumes its latched path and resets on retry',()=>{
+  const g=diveDashGame();g.key('s');g.key('l');tick(g);g.key('p');g.key('p',false);const frozen=g.state();
+  g.frames(40);eq(g.state(),frozen);g.click('restart');g.frames(20);g.click('cancel-restart');eq(g.state(),frozen);
+  g.click('start');tick(g);eq(g.state().dashDive,true);eq(g.state().vy,650);assert(g.state().y>frozen.y);
+  g.visibility(true);const hidden=g.state();g.frames(30);eq(g.state(),hidden);
+  g.click('restart');g.click('start');tick(g);eq(g.state().dashDive,false);eq(g.state().dashTime,0);
+});
+test('dive feedback is detached and unsaved and remains labeled under reduced motion',()=>{
+  for(const reducedMotion of [false,true])for(const inv of [0,1]){
+    const g=diveDashGame({reducedMotion});g.key('s');g.key('l');tick(g);g.run(`player.inv=${inv};clock=0;`);g.win.__raidState.dashDive=false;eq(g.state().dashDive,true);
+    assert(!JSON.stringify(g.state().progress).includes('dashDive'));
+    const labels=[];g.graphics.fillText=text=>labels.push(text);g.run('drawSoldier();');assert(labels.includes('俯冲'));
+  }
+});
+test('new waves and new runs never inherit an active diagonal dash',()=>{
+  const g=diveDashGame();g.key('s');g.key('l');tick(g);eq(g.state().dashDive,true);
+  finishDefenseWave(g);g.click('supply-0');g.click('start');eq(g.state().dashDive,false);eq(g.state().dashTime,0);
+  g.run('player.ground=false;player.y=200;spawnTime=0;');g.key('s');g.key('l');tick(g);eq(g.state().dashDive,true);
+  g.run("beginRun(0,'campaign');");eq(g.state().dashDive,false);eq(g.state().dashTime,0);
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
