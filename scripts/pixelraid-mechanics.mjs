@@ -4554,9 +4554,9 @@ test('aerial down-grenades choose a short downward arc across modes and both fac
     near(b.y,236+b.vy/60);near(b.timer,1.1-1/60);eq(g.state().grenades,6);
   }
 });
-test('ordinary airborne and grounded crouch grenades preserve the original arc',()=>{
-  for(const ground of [false,true])for(const down of [false,true]){
-    if(!ground&&down)continue;
+test('ordinary airborne and standing grenades preserve the original arc',()=>{
+  for(const ground of [false,true]){
+    const down=false;
     const g=grenadeGame();g.run(`player.ground=${ground};player.y=${ground?381:200};`);
     if(down)g.key('s');g.key('k');tick(g);
     const [b]=g.state().grenadeProjectiles;eq(b.aim,'arc');near(b.vx,330);near(b.vy,-320+1250*.83/60);
@@ -4876,9 +4876,9 @@ test('grenade fuse bar matches actual remaining time, stays visible until zero, 
   }
   const g=createGame();eq(grenadePaint(g,'{x:200,y:100,timer:0}'),[]);eq(grenadePaint(g,'{x:200,y:100,timer:-.01}'),[]);
 });
-test('all modes and both throw arcs render the real fuse without changing physics, resources or announcements',()=>{
-  for(const options of pickupModes)for(const downward of [false,true]){
-    const g=grenadeGame(options);if(downward)g.key('s');g.key('k');tick(g);g.key('k',false);
+test('all modes and all throw arcs render the real fuse without changing physics, resources or announcements',()=>{
+  for(const options of pickupModes)for(const aim of ['arc','down','roll']){
+    const g=grenadeGame(options);if(aim==='roll')g.run('player.ground=true;player.y=G-player.h;');if(aim!=='arc')g.key('s');g.key('k');tick(g);g.key('k',false);
     const first=g.state().grenadeProjectiles[0];near(first.timer,1.1-1/60);
     g.run("announce('战斗提示');");const before=g.state();const paints=grenadePaint(g);
     eq(g.state(),before);eq(g.nodes.get('announcer').textContent,'战斗提示');eq(paints.at(-1).rect[2],26);
@@ -4896,6 +4896,97 @@ test('independent grenades keep independent indicator widths through pause, conf
   g.click('start');tick(g,2);assert(g.state().grenadeProjectiles[0].timer<frozen.grenadeProjectiles[0].timer);
   g.visibility(true);const hidden=g.state();g.frames(60);eq(g.state(),hidden);
   g.click('restart');g.click('start');eq(g.state().grenadeProjectiles,[]);
+});
+
+// Low throws bank on their supporting surface without changing other arcs.
+function rollGame(options={}){
+  const g=grenadeGame(options);
+  g.run('stage.platforms=[];stage.gaps=[];player.ground=true;player.y=G-player.h;player.coyote=0;');
+  return g;
+}
+test('crouch rolls launch beside the feet across modes and both facings with one unchanged fuse',()=>{
+  for(const options of pickupModes)for(const face of [-1,1]){
+    const g=rollGame(options);g.run(`player.face=${face};`);const before=g.state();g.key('s');g.key('k');tick(g);
+    const [b]=g.state().grenadeProjectiles;
+    eq(b.aim,'roll');near(b.vx,face*220);near(b.vy,-80+1250*.83/60);
+    near(b.x,464+face*220/60);near(b.y,417+b.vy/60);near(b.timer,1.1-1/60);
+    eq(g.state().grenades,6);eq(g.state().hp,before.hp);eq(g.state().score,before.score);
+    eq(g.state().dashCooldown,before.dashCooldown);eq(g.state().tacticalCharge,before.tacticalCharge);
+  }
+});
+test('rolls stay low, bank and stop closer than ordinary throws without contact detonation',()=>{
+  for(const face of [-1,1]){
+    const g=rollGame(),arc=rollGame();g.run(`player.face=${face};`);arc.run(`player.face=${face};`);
+    g.key('s');g.key('k');arc.key('k');let bounce=false,previous;
+    for(let i=0;i<60;i++){
+      tick(g);tick(arc);const [b]=g.state().grenadeProjectiles;assert(b,'ground contact must not explode');
+      assert(b.y>=412&&b.y<=417,'low throw must stay within five pixels of the floor');
+      if(previous&&previous.vy>0&&b.vy<0){bounce=true;assert(Math.abs(b.vx)<Math.abs(previous.vx));}
+      previous=b;
+    }
+    assert(bounce);const b=g.state().grenadeProjectiles[0],a=arc.state().grenadeProjectiles[0];
+    assert(Math.abs(b.x-464)>25&&Math.abs(b.x-464)<100);assert(Math.abs(a.x-464)>150);
+    tick(g,6);eq(g.state().grenadeProjectiles,[]);eq(g.state().grenades,6);
+  }
+});
+test('only rolls bounce on the first crossed platform top, never underside or an overhang',()=>{
+  for(const aim of ['roll','arc','down'])for(const x of [399,450,581]){
+    const g=rollGame();g.run(`stage.platforms=[[400,325,180]];bombs=[{x:${x},y:310,vx:0,vy:700,timer:1,r:8,aim:'${aim}'}];`);tick(g);
+    const [b]=g.state().grenadeProjectiles;
+    if(aim==='roll'&&x===450){eq(b.y,317);assert(b.vy<0);}else assert(b.y>317);
+  }
+  const g=rollGame();g.run("stage.platforms=[[400,330,180],[400,325,180]];bombs=[{x:450,y:300,vx:0,vy:1500,timer:1,r:8,aim:'roll'}];");tick(g);
+  eq(g.state().grenadeProjectiles[0].y,317);
+  g.run("bombs=[{x:450,y:318,vx:0,vy:0,timer:1,r:8,aim:'roll'}];");tick(g);assert(g.state().grenadeProjectiles[0].y>317);
+  g.run("bombs=[{x:450,y:320,vx:0,vy:-300,timer:1,r:8,aim:'roll'}];");tick(g);
+  assert(g.state().grenadeProjectiles[0].vy<0);assert(g.state().grenadeProjectiles[0].y<317);
+});
+test('roll ledge collision uses horizontal overlap at the top crossing, not the end of a frame',()=>{
+  for(const [x,vx,land] of [[399,220,false],[401,-220,true],[581,-220,false],[579,220,true]]){
+    const g=rollGame();g.run(`stage.platforms=[[400,325,180]];bombs=[{x:${x},y:316.9,vx:${vx},vy:600,timer:1,r:8,aim:'roll'}];`);tick(g);
+    const [b]=g.state().grenadeProjectiles;if(land){eq(b.y,317);assert(b.vy<0);}else assert(b.y>317);
+  }
+});
+test('a platform roll banks then falls past the ledge edge and gaps do not become a phantom floor',()=>{
+  for(const face of [-1,1]){
+    const g=rollGame();g.run(`player.x=450;player.face=${face};player.y=281;stage.platforms=[[423,325,82]];`);
+    g.key('s');g.key('k');tick(g,12);const banked=g.state().grenadeProjectiles[0];
+    assert(banked.y<=317);assert(Math.abs(banked.vx)<220);
+    // Real motion carries it past the same ledge edge, without moving support.
+    tick(g,24);
+    assert(g.state().grenadeProjectiles[0].y>325);
+    const gap=rollGame();gap.run("stage.gaps=[[400,600]];bombs=[{x:450,y:410,vx:0,vy:500,timer:1,r:8,aim:'roll'}];");tick(gap,2);
+    assert(gap.state().grenadeProjectiles[0].y>417);
+  }
+});
+test('roll choice is latched and release, movement, airborne changes or a held grenade cannot retarget it',()=>{
+  const g=rollGame();g.key('s');g.key('k');tick(g);g.key('s',false);g.key('a');g.key('w');tick(g,5);
+  eq(g.state().grenadeProjectiles[0].aim,'roll');assert(g.state().grenadeProjectiles[0].vx>0);eq(g.state().grenades,6);
+  g.key('k',false);g.key('k');tick(g);eq(g.state().grenadeProjectiles[1].aim,'arc');eq(g.state().grenades,5);
+});
+test('touch and controller crouch rolls share the launch rule and consume only one grenade',()=>{
+  const touch=rollGame(),button=action=>[...touch.nodes.values()].find(n=>n.dataset.action===action);
+  button('down').dispatch('pointerdown',{pointerId:711});button('grenade').dispatch('pointerdown',{pointerId:712});tick(touch);
+  eq(touch.state().grenadeProjectiles[0].aim,'roll');tick(touch,12);eq(touch.state().grenades,6);
+  button('down').dispatch('pointerup',{pointerId:711});button('grenade').dispatch('pointerup',{pointerId:712});
+  const pad=rollGame();pad.pad();pad.frames(2);pad.pad([1],[0,1]);pad.frames(2);
+  eq(pad.state().grenadeProjectiles[0].aim,'roll');pad.frames(12);eq(pad.state().grenades,6);
+});
+test('roll explosions preserve damage bonuses rather than awarding contact damage',()=>{
+  for(const options of pickupModes){
+    const g=rollGame(options);g.run("enemies=[{...makeEnemy(500,'shield'),hp:100,shot:100}];upgrades.blast=1;");
+    g.key('s');g.key('k');tick(g,30);eq(g.read('enemies[0].hp'),100);eq(g.state().grenadeProjectiles.length,1);
+    const damage=g.read('6+2*((upgrades.blast||0)+(survival()?kit().blast:0))');
+    tick(g,36);eq(g.state().grenadeProjectiles,[]);eq(g.read('enemies[0].hp'),100-damage);eq(g.state().grenades,6);
+  }
+});
+test('rolling grenades freeze through pause and confirmation and clear on restart without stale edges',()=>{
+  const g=rollGame();g.key('s');g.key('k');tick(g);g.key('p');const frozen=g.state();g.frames(60);
+  eq(g.state().grenadeProjectiles,frozen.grenadeProjectiles);g.click('restart');g.frames(20);g.click('cancel-restart');
+  eq(g.state().grenadeProjectiles,frozen.grenadeProjectiles);g.click('start');tick(g,2);eq(g.state().grenades,6);
+  assert(g.state().grenadeProjectiles[0].timer<frozen.grenadeProjectiles[0].timer);
+  g.visibility(true);const hidden=g.state().grenadeProjectiles;g.frames(50);eq(g.state().grenadeProjectiles,hidden);
+  g.click('restart');g.click('start');const ammo=g.state().grenades;tick(g,2);eq(g.state().grenadeProjectiles,[]);eq(g.state().grenades,ammo);
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);

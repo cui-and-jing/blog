@@ -317,7 +317,7 @@
               <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。菜单中用方向键 / 左摇杆选择、A 确认、B 返回；按住方向可连续浏览。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
               <p>空中按住 S / ↓ 再开火可朝前下方俯射，松开下键恢复原方向；按住跳跃可仰射，同时按下时优先俯射。落地后仍是下蹲平射。手柄方向下 + 射击、触屏 ↓ + 射击同样适用，可从跳台、降层或踏击弹起中反击。</p>
               <p>反弹弹命中首领后可打出 1.5 秒破甲：趁头顶绿条持续时用步枪或散弹追击，每发额外造成 1 点伤害。再次反弹命中只刷新时长；反弹弹、手雷与震荡脉冲保持原伤害。破甲不会打断首领出招，仍需闪避。</p>
-              <p>空中按住 S / ↓ 再投手雷可向前下方俯掷，适合跳台上清除近处地面敌人；松开下键恢复远距离抛投。地面下蹲仍是普通抛投，引信、伤害与消耗不变。手雷上方短条显示剩余引信，最后 0.3 秒变亮但不闪烁。手柄方向下 + B、触屏 ↓ + 雷同样适用。</p>
+              <p>空中按住 S / ↓ 再投手雷可向前下方俯掷，适合跳台上清除近处地面敌人；松开下键恢复远距离抛投。地面或平台上按住下键则贴脚低抛，手雷沿支撑面弹跳、滚落边缘，适合近距离爆破；不按下键仍是远抛。三种轨迹的引信、伤害与消耗相同。手雷上方短条显示剩余引信，最后 0.3 秒变亮但不闪烁。手柄方向下 + B、触屏 ↓ + 雷同样适用。</p>
               <p>满血时医疗包、手雷满 7 枚时弹药留在原处，需要时再碰触领取；实际拾取才加 75 分。散弹与连射拾取后至少保留 12 秒，已有更长效果不会缩短。留存补给仅在当前场景有效。</p>
               <p>冲刺冷却结束前 0.12 秒内可提前按一次，到点自动冲刺；长按不会连冲，暂停或重开会清除预输入。触屏冲刺键底部短条显示恢复进度，亮绿表示就绪。炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
             </div>
@@ -1138,10 +1138,11 @@
         if(player.grenades<1)return;
         player.grenades--;grenadeQueued=false;
         // Match aerial down-fire: choose at launch, not on a later frame.
-        // Grounded crouch keeps the original arc; down wins over held jump.
-        const downward=!player.ground&&pressed('down');
-        bombs.push({x:player.x+14,y:downward?player.y+player.h-8:player.y+9,
-          vx:player.face*(downward?120:330),vy:downward?260:-320,timer:GRENADE_FUSE,r:8,aim:downward?'down':'arc'});
+        // Grounded down rolls nearby; airborne down dives. Latch at launch.
+        const down=pressed('down'),downward=down&&!player.ground,rolling=down&&player.ground;
+        bombs.push({x:player.x+14,y:down?player.y+player.h-8:player.y+9,
+          vx:player.face*(downward?120:rolling?220:330),vy:downward?260:rolling?-80:-320,
+          timer:GRENADE_FUSE,r:8,aim:downward?'down':rolling?'roll':'arc'});
         beep(280,.1);hud();
       }
       function boom(x,y){
@@ -1554,8 +1555,16 @@
           if(struck||b.y<20||b.y>H+30||b.x<cam-130||b.x>cam+W+130)bullets.splice(i,1);
         }
         for(let i=bombs.length-1;i>=0;i--){
-          const b=bombs[i];b.vy+=GRAV*.83*dt;b.x+=b.vx*dt;b.y+=b.vy*dt;b.timer-=dt;
-          if(b.y>=G-8&&!isGap(b.x)){b.y=G-8;b.vy*=-.4;b.vx*=.66;}
+          const b=bombs[i],oldX=b.x,oldY=b.y;b.vy+=GRAV*.83*dt;b.x+=b.vx*dt;b.y+=b.vy*dt;b.timer-=dt;
+          let support=b.y>=G-8&&!isGap(b.x)?G:Infinity;
+          // Only a low throw banks on ledge tops. Sweep downward crossings so
+          // it cannot tunnel through a thin platform or snap up from below.
+          if(b.aim==='roll'&&b.vy>=0)for(const [x,y,w] of stage.platforms){
+            if(oldY>y-8||b.y<y-8)continue;
+            const t=b.y===oldY?0:(y-8-oldY)/(b.y-oldY),crossX=oldX+(b.x-oldX)*t;
+            if(crossX>=x&&crossX<=x+w)support=Math.min(support,y);
+          }
+          if(support!==Infinity){b.y=support-8;b.vy*=-.4;b.vx*=.66;}
           if(b.timer<=0||b.y>H+20){boom(b.x,b.y);bombs.splice(i,1);}
         }
         bullets=bullets.filter(b=>b.life>0);

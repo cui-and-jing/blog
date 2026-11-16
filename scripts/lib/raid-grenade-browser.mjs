@@ -65,7 +65,7 @@ export async function checkRaidGrenades(sourcePage, problems) {
       await page.evaluateOnNewDocument(() => {
         // Read-only observation avoids trying to catch the short launch frame
         // with a later CDP round trip. No game state, input, RNG or clock changes.
-        const evidence = window.__grenadeObservations = { launches: [], inputs: [], fuseFrames: [] };
+        const evidence = window.__grenadeObservations = { launches: [], inputs: [], fuseFrames: [], rollFrames: [], rollEnd: null };
         for (const type of ['keydown', 'keyup', 'pointerdown', 'pointerup', 'pointercancel', 'click']) document.addEventListener(type, event => {
           const target = event.target.closest?.('[data-action], button');
           if (type.startsWith('key') && ['s', ' ', 'k'].includes(event.key) || target) {
@@ -79,7 +79,8 @@ export async function checkRaidGrenades(sourcePage, problems) {
           const state = window.__raidState;
           if (state?.phase === 'playing' && previous?.phase === 'playing' && state.grenades < previous.grenades) {
             evidence.launches.push({ grenade: state.grenadeProjectiles.at(-1), ammo: state.grenades,
-              ground: state.ground, face: state.face });
+              ground: state.ground, face: state.face, x: state.x, feet: state.y + state.playerHeight,
+              clock: state.clock, hp: state.hp });
           }
           if (state?.phase === 'playing' && evidence.launches.length === 1 && state.grenadeProjectiles.length === 1) {
             const grenade = state.grenadeProjectiles[0], canvas = document.getElementById('field');
@@ -95,6 +96,31 @@ export async function checkRaidGrenades(sourcePage, problems) {
               evidence.fuseFrames.push({ timer: grenade.timer, expected, normal, late });
               if (grenade.timer <= .3 && !window.__grenadeFuseLateCanvas)
                 window.__grenadeFuseLateCanvas = canvas.toDataURL('image/png').split(',')[1];
+            }
+          }
+          // Track the second throw without changing the simulation or its RAF.
+          // It is isolated: the dive grenade has already exploded and the third
+          // throw is not sent until this native hold/release route is complete.
+          if (state?.phase === 'playing' && evidence.launches.length === 2) {
+            const grenade = state.grenadeProjectiles.find(item => item.aim === 'roll');
+            const prior = evidence.rollFrames.at(-1), canvas = document.getElementById('field');
+            if (grenade) {
+              const frame = { ...grenade, clock: state.clock, ammo: state.grenades,
+                playerX: state.x, feet: state.y + state.playerHeight, hp: state.hp };
+              evidence.rollFrames.push(frame);
+              if (!window.__grenadeRollLaunchCanvas)
+                window.__grenadeRollLaunchCanvas = canvas.toDataURL('image/png').split(',')[1];
+              // Ground contact reduces horizontal speed and reverses descent.
+              // Keep the first real bounce image, not a later screenshot whose
+              // round trip might outlast this short low trajectory.
+              if (prior && Math.abs(grenade.vx) < Math.abs(prior.vx) * .9 && grenade.vy < 0 &&
+                  !window.__grenadeRollBounceCanvas)
+                window.__grenadeRollBounceCanvas = canvas.toDataURL('image/png').split(',')[1];
+            } else if (prior && !evidence.rollEnd) {
+              evidence.rollEnd = { clock: state.clock, phase: state.phase, ammo: state.grenades,
+                hp: state.hp, lastTimer: prior.timer, elapsedSinceLast: state.clock - prior.clock,
+                remaining: state.grenadeProjectiles.length };
+              window.__grenadeRollExplosionCanvas = canvas.toDataURL('image/png').split(',')[1];
             }
           }
           previous = state;requestAnimationFrame(observe);
@@ -141,13 +167,36 @@ export async function checkRaidGrenades(sourcePage, problems) {
       const fuseImage = await page.evaluate(() => window.__grenadeFuseLateCanvas);
       require(typeof fuseImage === 'string' && fuseImage.length > 0, '缺少真实引信末段截图');
       fs.writeFileSync(path.join(process.cwd(), '.shots', `pixelraid-grenade-${label}-fuse-late.png`), Buffer.from(fuseImage, 'base64'));
-      stage = '地面下蹲保持普通抛投且长按不连掷';
+      stage = '地面下蹲低位滚雷、自然反弹与长按不连掷';
       await down('down');await down('grenade');await waitLaunch(2);
       const ground = (await launches())[1];
-      require(ground.grenade?.aim === 'arc' && ground.grenade.vx === ground.face * 330 && ground.grenade.vy < 0 &&
-        ground.ammo === initialAmmo - 2 && ground.ground, '地面下键错误改成俯掷', ground);
+      require(ground.grenade?.aim === 'roll' && ground.grenade.vx === ground.face * 220 && ground.grenade.vy < 0 &&
+        ground.grenade.y >= ground.feet - 14 && ground.grenade.y <= ground.feet - 8 &&
+        ground.ammo === initialAmmo - 2 && ground.ground, '地面下蹲未从脚边低位发出滚雷', ground);
+      // Keep the actual native grenade contact held past the entire fuse. The
+      // observer records natural physics, not timer changes made by the test.
       await new Promise(resolve => setTimeout(resolve, 1300));
+      await wait('等待滚雷引信到期并留下实际反弹证据', () => window.__grenadeObservations.rollEnd !== null);
+      const rolled = await page.evaluate(() => ({ frames: window.__grenadeObservations.rollFrames, end: window.__grenadeObservations.rollEnd }));
+      const bounce = rolled.frames.find((frame, i, all) => i > 0 &&
+        Math.abs(frame.vx) < Math.abs(all[i - 1].vx) * .9 && frame.vy < 0 && frame.y >= ground.feet - 12);
+      const originX = ground.x + 14;
+      const range = rolled.frames.map(frame => (frame.x - originX) * ground.face);
+      require(rolled.frames.length >= 4 && bounce && range.every(distance => distance >= 0 && distance < 110) &&
+        range.at(-1) > range[0] && rolled.frames.every(frame => frame.y >= ground.feet - 14 &&
+          frame.y <= ground.feet - 8 && frame.ammo === initialAmmo - 2 && frame.hp === ground.hp) &&
+        rolled.end.phase === 'playing' && rolled.end.remaining === 0 && rolled.end.ammo === initialAmmo - 2 &&
+        rolled.end.hp === ground.hp && rolled.end.lastTimer > 0 && rolled.end.lastTimer <= .07 &&
+        rolled.end.elapsedSinceLast + .000001 >= rolled.end.lastTimer,
+      '滚雷未保持低位近距、自然地面反弹或在完整引信后引爆', { ground, rolled });
       require((await read()).grenades === initialAmmo - 2 && (await launches()).length === 2, '长按手雷重复消耗弹药');
+      for (const [name, key] of [['roll-launch', '__grenadeRollLaunchCanvas'], ['roll-bounce', '__grenadeRollBounceCanvas'],
+        ['roll-explosion', '__grenadeRollExplosionCanvas']]) {
+        const image = await page.evaluate(key => window[key], key);
+        require(typeof image === 'string' && image.length > 0, '缺少真实滚雷画布：' + name);
+        fs.writeFileSync(path.join(process.cwd(), '.shots', `pixelraid-grenade-${label}-${name}.png`), Buffer.from(image, 'base64'));
+      }
+      fs.writeFileSync(path.join(process.cwd(), '.shots', `pixelraid-grenade-${label}-roll-route.json`), JSON.stringify({ ground, rolled }, null, 2));
       await up('grenade');await up('down');
       stage = '空中松开下键恢复普通抛投';
       await down('down');await down('jump');
