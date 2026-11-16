@@ -3696,7 +3696,7 @@ function stompGame(type='walker',options={}){
   g.run(`spawnTime=0;devices=[];pickups=[];stage.platforms=[];tacticalCharge=0;
     enemies=[{...makeEnemy(480,'${type}'),age:0,shot:100}, {...makeEnemy(100,'turret'),shot:100}];
     player.x=485;player.y=enemies[0].y-player.h-4;player.vy=300;player.ground=false;player.inv=0;
-    player.dashCooldown=1;`);
+    player.dashCooldown=1;player.coyote=0;`);
   if(type==='drone')g.run('enemies[0].y=240;player.y=240-player.h-4;');
   return g;
 }
@@ -4771,6 +4771,92 @@ test('shield break is local, detached, unsaved and legible with reduced motion',
     assert(!JSON.stringify(g.state().progress).includes('shieldBreak'));g.run('enemies[0].shieldBreak=0;');labels.length=0;g.run('draw();');assert(!labels.includes('破防 · 可射击'));
   }
   for(const type of ['walker','turret','charger','drone','mortar']){const g=stompGame(type);tick(g);eq(g.read('enemies[0].shieldBreak'),0);}
+});
+
+// Rebound height is chosen through the same held-action path as movement/fire.
+test('held jump at a real top crossing chooses a high rebound for every ordinary enemy',()=>{
+  for(const type of ['walker','shield','turret','charger','mortar','drone']){
+    const low=stompGame(type),high=stompGame(type);high.key('w');tick(low);tick(high);
+    eq(high.state().vy,-560);eq(low.state().vy,-400);
+    eq(high.state().stompBurst.boosted,true);eq(low.state().stompBurst.boosted,false);
+    for(const key of ['hp','grenades','score','tacticalCharge','dashCooldown','stomps','reflections'])eq(high.state()[key],low.state()[key]);
+    eq(high.read('enemies[0].hp'),low.read('enemies[0].hp'));eq(high.read('player.inv'),0);
+    eq(high.read('player.jumpBuffer'),0);eq(high.read('player.coyote'),0);
+    high.key('w',false);tick(high,4);near(high.state().vy,-560+4*1250/60);eq(high.state().stomps,1);
+  }
+});
+test('rebound reads contact-time input and down wins without changing normal jump height',()=>{
+  for(const key of ['w','ArrowUp',' ']){
+    const g=stompGame();g.key(key);g.key(key,false);tick(g);eq(g.state().vy,-400);
+    const h=stompGame();h.key(key);tick(h);eq(h.state().vy,-560);
+  }
+  const aliases=stompGame();aliases.key('w');aliases.key('ArrowUp');aliases.key('w',false);tick(aliases);eq(aliases.state().vy,-560);
+  for(const down of ['s','ArrowDown']){
+    const g=stompGame();g.key('w');g.key(down);tick(g);eq(g.state().vy,-400);eq(g.state().stompBurst.boosted,false);
+    g.key(down,false);tick(g);near(g.state().vy,-400+1250/60);
+  }
+  for(const mode of ['campaign','survival']){
+    const g=createGame();if(mode==='survival')g.click('mode-survival');g.click('start');
+    g.key('w');tick(g);near(g.state().vy,-525+1250/60);eq(g.state().stomps,0);
+  }
+});
+test('touch and controller share rebound intent, including independent release and down priority',()=>{
+  // Use the actual parsed touch nodes, rather than a mutable input fixture.
+  for(const down of [false,true]){
+    const g=stompGame();
+    const controls=[...g.nodes.values()].filter(n=>n.dataset.action);
+    const button=action=>controls.find(n=>n.dataset.action===action);
+    button('jump').dispatch('pointerdown',{pointerId:41});
+    if(down)button('down').dispatch('pointerdown',{pointerId:42});
+    tick(g);eq(g.state().vy,down?-400:-560);
+    button('jump').dispatch('pointerup',{pointerId:41});
+    if(down)button('down').dispatch('pointerup',{pointerId:42});
+    eq(g.state().touchCount,0);
+    const pad=stompGame();pad.run("player.y-=100;");pad.pad();pad.frames(1);
+    // Restore only contact geometry after the release-to-arm frame.
+    pad.run('player.y=enemies[0].y-player.h-4;player.vy=300;');
+    pad.pad(down?[0,13]:[0]);pad.frames(1);eq(pad.state().stompBurst.boosted,!down);
+    near(pad.state().vy,down?-400:-560);
+  }
+});
+test('high rebound can reach the first arena upper ledge through ordinary movement, low rebound cannot',()=>{
+  for(const boosted of [false,true]){
+    const g=createGame({randomSeed:16437});g.click('mode-survival');g.click('start');
+    g.key('a');until(g,()=>g.state().x<=400,100);g.key('a',false);
+    until(g,()=>{const s=g.state();return s.spawnTime===0&&Math.min(...s.enemies.map(e=>Math.abs(e.x+e.w/2-s.x-13.5)))<=47;},500);
+    g.key('w');g.frames(1);if(!boosted)g.key('w',false);
+    until(g,()=>g.state().stomps>0,70);const impact=g.state();eq(impact.stompBurst.boosted,boosted);
+    g.key('w',false);g.key('d');until(g,()=>g.state().x>=445,30);g.key('d',false);
+    until(g,()=>g.state().ground,100);const landing=g.state();
+    eq(landing.stomps,1);eq(landing.y+landing.playerHeight,boosted?285:425);
+    eq(landing.shots,0);eq(landing.grenades,3);eq(landing.tacticalUses,0);
+  }
+});
+test('high rebound freezes through pause and confirmation but held intent does not survive interruptions',()=>{
+  const g=stompGame();g.key('w');tick(g);g.key('p');g.key('p',false);
+  const paused=g.state();g.frames(90);eq(g.state(),paused);
+  g.click('restart');g.click('cancel-restart');g.frames(10);eq(g.state(),paused);
+  g.click('start');g.run('player.y=enemies[0].y-player.h-4;player.vy=300;');
+  g.key('w',true,true);tick(g);eq(g.state().vy,-400);eq(g.state().stompBurst.boosted,false);
+  g.key('w',false);g.key('w');g.run('player.y=enemies[0].y-player.h-4;player.vy=300;enemies[0].hp=8;enemies[0].dead=false;');tick(g);eq(g.state().vy,-560);
+  g.click('restart');g.click('start');eq(g.state().stompBurst,null);eq(g.state().stomps,0);
+});
+test('successive natural rebounds resample high and low intent without a second jump impulse',()=>{
+  const g=stompGame('turret');g.run('enemies[0].hp=8;');g.key('w');tick(g);
+  eq(g.state().stomps,1);eq(g.state().vy,-560);g.key('w',false);
+  tickUntil(g,'stomps===2',90);eq(g.state().vy,-400);eq(g.state().stompBurst.boosted,false);
+  g.key('w');tick(g);near(g.state().vy,-400+1250/60);eq(g.state().stomps,2);
+  tickUntil(g,'stomps===3',90);eq(g.state().vy,-560);eq(g.read('enemies[0].hp'),2);
+  eq(g.state().hp,6);eq(g.state().score,0);eq(g.state().grenades,3);
+});
+test('boosted stomp is detached, unsaved and marked without relying on animation',()=>{
+  for(const reducedMotion of [false,true]){
+    const g=stompGame('shield',{reducedMotion});g.key('w');tick(g);const labels=[];
+    g.graphics.fillText=t=>labels.push(t);g.run('draw();');assert(labels.includes('跃升'));assert(labels.includes('破防 · 可射击'));
+    g.win.__raidState.stompBurst.boosted=false;eq(g.state().stompBurst.boosted,true);
+    g.run('saveProgress();');assert(!/boosted|rebound|stompBurst/.test(JSON.stringify(g.state().progress)));
+    g.run('startWave();');eq(g.state().stompBurst,null);labels.length=0;g.run('draw();');assert(!labels.includes('跃升'));
+  }
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);

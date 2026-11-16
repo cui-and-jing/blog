@@ -293,7 +293,7 @@
               <ul class="rules-list">
                 <li>一条命，固定标准难度。普通波轮换三套地形，双向增援提前 2.2 秒预警；平台可下蹲 + 跳跃降层。普通波清场恢复 1 体力、1 手雷。</li>
                 <li>普通波有两座黄色爆破装置：2 点伤害引爆，半径 145 内造成 4 点伤害并清敌弹，相邻装置可连锁。只伤敌，不伤自己；地面与平台上都有，可用射击、反弹弹、手雷或震荡脉冲引爆。每波只用一次，增援抵达前不可引爆。</li>
-                <li>空中踏击：下落时从正上方踩中杂兵可造成 2 点伤害并弹起，短暂震停、打断未出手的攻击。盾卫与无人机也可踩，首领不可踩。踩中存活的盾卫会破防 1.2 秒，正面射击也能命中；绿条结束后恢复格挡，重复踏击只刷新时长。侧面接触和已发射的弹药仍危险，不增加无敌时间。</li>
+                <li>空中踏击：下落时从正上方踩中杂兵可造成 2 点伤害并弹起，短暂震停、打断未出手的攻击。踩中瞬间按住跳跃可跃升至更高的平台，松开跳跃保持短弹；按住下键优先短弹，方便俯射。盾卫与无人机也可踩，首领不可踩。踩中存活的盾卫会破防 1.2 秒，正面射击也能命中；绿条结束后恢复格挡，重复踏击只刷新时长。侧面接触和已发射的弹药仍危险，不增加无敌时间。</li>
                 <li>第 4 波起，普通波有一名橙色冲锋兵：先沿标线蓄力 0.8 秒，再朝锁定方向突进，随后回气 1.1 秒。跳跃、登台或冲刺避开，再趁回气反击；冲锋兵不发射子弹。</li>
                 <li>第 5 波起，紫色投弹兵会锁定落脚层并投掷。离开紫框或换层避开，出手前击败或踏击可打断；已出手的投弹仍会落地，爆炸不能反弹。</li>
                 <li>每三波迎战一位首领，三位首领轮换，无杂兵干扰。首领清场恢复 2 体力、2 手雷，额外奖励 500 分。</li>
@@ -432,7 +432,7 @@
       const DEVICE_RADIUS=145,DEVICE_DAMAGE=4;
       const CHARGER={windup:.8,speed:480,distance:216,recover:1.1,cooldown:1.7,range:240};
       const MORTAR={windup:.9,flight:.85,cooldown:2.6,radius:58,height:64};
-      const STOMP={damage:2,rebound:400,stagger:.3};
+      const STOMP={damage:2,rebound:400,boostedRebound:560,stagger:.3};
       const SHIELD_BREAK_SECONDS=1.2;
       const BOSS_BREACH_SECONDS=1.5;
       const HIT_SOURCES={
@@ -1282,7 +1282,10 @@
       }
       function applyStomp(contact){
         const e=contact.enemy;
-        player.x=contact.x;player.y=contact.y-player.h;player.vy=-STOMP.rebound;player.ground=false;
+        // Choose at contact, not takeoff: down keeps a low rebound for dive-fire.
+        // Releasing jump afterwards cannot add/cancel impulses or queue a jump.
+        const boosted=pressed('jump')&&!pressed('down');
+        player.x=contact.x;player.y=contact.y-player.h;player.vy=-(boosted?STOMP.boostedRebound:STOMP.rebound);player.ground=false;
         player.coyote=0;player.jumpBuffer=0;stomps++;
         // Interrupt unlaunched attacks only. Existing shells/projectiles still
         // resolve normally, and neither the rebound nor stun grants immunity.
@@ -1290,7 +1293,7 @@
         if(e.type==='charger'){e.chargerPhase='recover';e.chargerTime=STOMP.stagger;}
         damageEnemy(e,STOMP.damage);
         if(!e.dead&&e.type==='shield')e.shieldBreak=SHIELD_BREAK_SECONDS;
-        stompBurst={x:contact.x+player.w/2,y:contact.y,time:.28};
+        stompBurst={x:contact.x+player.w/2,y:contact.y,time:.28,boosted};
         spark(stompBurst.x,stompBurst.y,'#b9ffe2',12);beep(680,.08,'triangle');
         combatNotice('空中踏击 · '+(e.dead?combatText:e.type==='shield'?'盾卫破防 1.2 秒 / 正面可射击':'2 点伤害 / 弹起反击'));hud();
       }
@@ -1866,6 +1869,10 @@
         // The static cross and solid outline also work with reduced motion.
         c.strokeStyle='#b9ffe2';c.lineWidth=3;c.beginPath();c.ellipse(x,y,24,7,0,0,Math.PI*2);c.stroke();
         line(x-9,y-17,x,y-24,'#b9ffe2',3);line(x,y-24,x+9,y-17,'#b9ffe2',3);
+        if(stompBurst.boosted){
+          line(x-9,y-26,x,y-33,'#b9ffe2',3);line(x,y-33,x+9,y-26,'#b9ffe2',3);
+          c.font='bold 12px system-ui';c.fillStyle='#b9ffe2';c.fillText('跃升',x+31,y-8);
+        }
       }
       function drawMortarWarnings(){
         const warnings=[...enemies.filter(e=>!e.dead&&e.type==='mortar'&&e.windup>0)
