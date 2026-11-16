@@ -55,3 +55,19 @@ export async function dispatchCombatTouch({ action, wave, measure, beforeDispatc
   track(handle, event);
   return auditCombatTouch({ kind: 'down', action, audit, heldActions: heldActions(), wave }).phase === 'playing';
 }
+
+/** CDP acknowledgement is not evidence of DOM pointer delivery. Observe only:
+ * never resend input, filter for the wanted target, or relax the final audit. */
+export async function waitForCombatPointer(readAudit, {
+  timeout = 2000, interval = 10, now = () => performance.now(),
+  pause = ms => new Promise(resolve => setTimeout(resolve, ms))
+} = {}) {
+  const deadline = now() + timeout;
+  for (;;) {
+    const audit = await readAudit();
+    // Return duplicates and wrong hits too; auditCombatTouch must reject them.
+    if (audit.events.length > 0) return audit;
+    if (now() >= deadline) throw new Error('Native pointer event did not arrive before timeout: ' + JSON.stringify(audit));
+    await pause(interval);
+  }
+}
