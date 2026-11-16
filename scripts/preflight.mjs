@@ -77,6 +77,7 @@ async function main() {
   run('阅读设置容错', 'node', ['scripts/reading-settings.test.mjs']);
   run('收藏存储容错', 'node', ['scripts/bookmarks.test.mjs']);
   run('类型检查', 'npx', ['astro', 'check']);
+  run('战斗触屏结算边界', 'node', ['scripts/raid-combat-boundary.test.mjs']);
   run('像素突围战斗契约', 'node', ['scripts/pixelraid-mechanics.mjs']);
 
   if (!skipBuild) {

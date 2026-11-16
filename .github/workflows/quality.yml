@@ -73,6 +73,9 @@ jobs:
 
       # Use a virtual clock to verify that the weapon timer, boss attack phases
       # and stage transitions actually work, without a fragile 30s robot run.
+      - name: Combat touch settlement boundary contract
+        run: npm run raid:boundary:check
+
       - name: Pixel Raid combat contracts
         run: npm run raid:test
 

@@ -317,7 +317,7 @@
               <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。菜单中用方向键 / 左摇杆选择、A 确认、B 返回；按住方向可连续浏览。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
               <p>空中按住 S / ↓ 再开火可朝前下方俯射，松开下键恢复原方向；按住跳跃可仰射，同时按下时优先俯射。落地后仍是下蹲平射。手柄方向下 + 射击、触屏 ↓ + 射击同样适用，可从跳台、降层或踏击弹起中反击。</p>
               <p>反弹弹命中首领后可打出 1.5 秒破甲：趁头顶绿条持续时用步枪或散弹追击，每发额外造成 1 点伤害。再次反弹命中只刷新时长；反弹弹、手雷与震荡脉冲保持原伤害。破甲不会打断首领出招，仍需闪避。</p>
-              <p>空中按住 S / ↓ 再投手雷可向前下方俯掷，适合跳台上清除近处地面敌人；松开下键恢复远距离抛投。地面下蹲仍是普通抛投，引信、伤害与消耗不变。手柄方向下 + B、触屏 ↓ + 雷同样适用。</p>
+              <p>空中按住 S / ↓ 再投手雷可向前下方俯掷，适合跳台上清除近处地面敌人；松开下键恢复远距离抛投。地面下蹲仍是普通抛投，引信、伤害与消耗不变。手雷上方短条显示剩余引信，最后 0.3 秒变亮但不闪烁。手柄方向下 + B、触屏 ↓ + 雷同样适用。</p>
               <p>满血时医疗包、手雷满 7 枚时弹药留在原处，需要时再碰触领取；实际拾取才加 75 分。散弹与连射拾取后至少保留 12 秒，已有更长效果不会缩短。留存补给仅在当前场景有效。</p>
               <p>冲刺冷却结束前 0.12 秒内可提前按一次，到点自动冲刺；长按不会连冲，暂停或重开会清除预输入。触屏冲刺键底部短条显示恢复进度，亮绿表示就绪。炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
             </div>
@@ -433,6 +433,7 @@
       const CHARGER={windup:.8,speed:480,distance:216,recover:1.1,cooldown:1.7,range:240};
       const MORTAR={windup:.9,flight:.85,cooldown:2.6,radius:58,height:64};
       const STOMP={damage:2,rebound:400,boostedRebound:560,stagger:.3};
+      const GRENADE_FUSE=1.1;
       const SHIELD_BREAK_SECONDS=1.2;
       const BOSS_BREACH_SECONDS=1.5;
       const HIT_SOURCES={
@@ -1140,7 +1141,7 @@
         // Grounded crouch keeps the original arc; down wins over held jump.
         const downward=!player.ground&&pressed('down');
         bombs.push({x:player.x+14,y:downward?player.y+player.h-8:player.y+9,
-          vx:player.face*(downward?120:330),vy:downward?260:-320,timer:1.1,r:8,aim:downward?'down':'arc'});
+          vx:player.face*(downward?120:330),vy:downward?260:-320,timer:GRENADE_FUSE,r:8,aim:downward?'down':'arc'});
         beep(280,.1);hud();
       }
       function boom(x,y){
@@ -1863,6 +1864,15 @@
           c.fillText('已满 · 留存',p.x,y-23);c.textAlign='left';
         }
       }
+      function drawGrenade(b){
+        if(b.timer<=0)return;
+        rect(b.x-7,b.y-7,14,14,'#c3d0a4');rect(b.x-3,b.y-9,7,5,'#eabd65');
+        // Read the simulation fuse directly: no second clock, flash or countdown
+        // announcement. A live fuse retains one pixel until actual detonation.
+        const width=Math.max(1,Math.round(26*clamp(b.timer/GRENADE_FUSE,0,1)));
+        rect(b.x-14,b.y-19,28,6,'#102536');
+        rect(b.x-13,b.y-18,width,4,b.timer<=.3?'#fff4cc':'#ffe29a');
+      }
       function drawStomp(){
         if(!stompBurst)return;
         const {x,y}=stompBurst;
@@ -1951,7 +1961,7 @@
             rect(b.x-2,b.y-5,4,10,b.owner==='p'?'#fffbd7':'#ffbcac');
           }
           for(const shot of shells){rect(shot.x-6,shot.y-6,12,12,'#e7b4ff');rect(shot.x-3,shot.y-3,6,6,'#4f325f');}
-          for(const b of bombs){rect(b.x-7,b.y-7,14,14,'#c3d0a4');rect(b.x-3,b.y-9,7,5,'#eabd65');}
+          for(const b of bombs)drawGrenade(b);
           for(const s of sparks)rect(s.x,s.y,s.r,s.r,s.color);
           if(!boss.dead&&(gauntlet()||Math.abs(boss.x-player.x)<750)){
             rect(cam+W/2-150,15,300,10,'#172338');

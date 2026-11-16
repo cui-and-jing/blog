@@ -12,6 +12,13 @@ const packageScripts = JSON.parse(read('../package.json')).scripts;
 
 const contracts = [
   {
+    label: '战斗触屏结算边界',
+    file: 'scripts/raid-combat-boundary.test.mjs',
+    npm: 'raid:boundary:check',
+    previous: "run('类型检查'",
+    next: "run('像素突围战斗契约'",
+  },
+  {
     label: '内容日期时区一致性',
     file: 'scripts/content-dates.test.mjs',
     npm: 'dates:check',
