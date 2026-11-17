@@ -3742,10 +3742,10 @@ test('rising, lateral, standing and dashing contacts do not become aerial stomps
   }
 });
 
-test('stomp remains survival-only and does not affect bosses or invulnerable ingress bodies',()=>{
+test('stomp reaches campaign practice and ordinary challenges but not bosses or invulnerable ingress bodies',()=>{
   for(const kind of ['campaign','practice','challenge']){
-    const g=stompGame();g.run(`mode='${kind}';${kind==='challenge'?"challengeId='counter';":''}`);tick(g);
-    eq(g.state().stomps,0);eq(g.read('enemies[0].hp'),3);eq(g.state().hp,5);
+    const g=stompGame();g.run(`mode='${kind}';${kind==='challenge'?"challengeId='counter';":''}player.hp=maxHealth();`);tick(g);
+    eq(g.state().stomps,1);eq(g.read('enemies[0].hp'),1);eq(g.state().hp,5);
   }
   for(const setup of ['spawnTime=1;','enemies[0].arrival=.001;','enemies[0].dead=true;']){
     const g=stompGame();g.run(setup);tick(g);eq(g.state().stomps,0);eq(g.state().hp,6);
@@ -5784,6 +5784,203 @@ test('protection rendering state is detached and neither clock nor duration is s
   protectionPaint(g,'drawSoldier();drawProtection();');eq(g.state(),before);eq(g.read('player'),player);eq([...g.values],saved);
   eq(g.nodes.get('announcer').textContent,'保留战斗提示');assert(!/protectionTime|protectionDuration|invDuration/.test(JSON.stringify(g.state().progress)));
   assert(!source.includes('__raidQA'));
+});
+
+// Travel modes share survival's aerial counterplay, not its arena or rewards.
+const travelStompModes=[
+  ...['campaign','practice'].flatMap(mode=>['standard','relaxed'].map(difficulty=>({mode,difficulty}))),
+  {mode:'challenge',challenge:'sprint'},{mode:'challenge',challenge:'counter'},
+];
+function travelStompGame({mode='campaign',difficulty='standard',stage=0,challenge='sprint',type='walker',...options}={}){
+  const g=createGame(options);g.click('difficulty-'+difficulty);
+  g.run(mode==='challenge'?`beginChallenge('${challenge}');`:`beginRun(${stage},'${mode}');`);
+  g.run(`stage.platforms=[];stage.gaps=[];pickups=[];intel=[];devices=[];bullets=[];bombs=[];shells=[];
+    enemies=[{...makeEnemy(480,'${type}'),age:0,shot:100},{...makeEnemy(100,'turret'),shot:100}];
+    boss.shot=100;boss.windup=0;boss.beamTime=0;tacticalCharge=0;
+    player.x=485;player.y=enemies[0].y-player.h-4;player.vy=300;player.ground=false;player.inv=0;player.coyote=0;player.dashCooldown=1;`);
+  if(type==='drone')g.run('enemies[0].y=240;player.y=240-player.h-4;');
+  return g;
+}
+test('shared enemy stomps reach all three chapters both difficulties and ordinary challenges with unchanged damage and rewards',()=>{
+  for(const options of travelStompModes)for(const stage of options.mode==='challenge'?[0]:[0,1,2]){
+    for(const type of ['walker','shield','turret','drone','charger','mortar']){
+      const g=travelStompGame({...options,stage,type}),before=g.state(),hp=g.read('enemies[0].hp');tick(g);const after=g.state();
+      eq(after.stomps,1);eq(after.vy,-400);eq(after.ground,false);eq(g.read('enemies[0].hp'),hp-2);eq(g.read('enemies[0].stagger'),.3);
+      for(const key of ['hp','lives','grenades','shots','tacticalCharge','reflections','challengeReflections'])eq(after[key],before[key]);
+      eq(after.protectionTime,0);near(after.dashCooldown,before.dashCooldown-1/60);eq(after.score,type==='drone'?100:0);
+      tick(g,5);eq(g.state().stomps,1);eq(g.read('enemies[0].hp'),hp-2);
+    }
+  }
+});
+test('shared enemy stomps choose ordinary high or down-priority rebounds without enabling ordinary jump cut',()=>{
+  for(const options of travelStompModes)for(const keys of [[],['w'],['w','s'],['w','ArrowUp']]){
+    const g=travelStompGame(options);for(const key of keys)g.key(key);tick(g);
+    const high=keys.includes('w')&&!keys.includes('s'),velocity=high?-560:-400;
+    eq(g.state().vy,velocity);eq(g.state().stompBurst.boosted,high);eq(g.state().jumpCutEligible,false);
+    for(const key of keys)g.key(key,false);tick(g,4);near(g.state().vy,velocity+4*1250/60);eq(g.state().stomps,1);
+    eq(g.state().jumpBuffer,0);eq(g.state().coyote,0);eq(g.state().jumpCutEligible,false);
+  }
+});
+test('shared enemy stomps reject ascent side contact dashes and earlier platforms in every travel mode',()=>{
+  for(const options of travelStompModes)for(const kind of ['up','side','dash','platform']){
+    const g=travelStompGame({...options,type:'shield'}),hp=g.state().hp;
+    if(kind==='up')g.run('player.vy=-300;');
+    if(kind==='side')g.run('player.y=G-player.h;player.vy=0;player.ground=true;');
+    if(kind==='dash')g.run('player.dashTime=.18;player.dashDir=1;player.dashDive=true;');
+    if(kind==='platform')g.run('stage.platforms=[[470,385,100]];player.y=380-player.h;player.vy=720;');
+    tick(g);eq(g.state().stomps,0);eq(g.read('enemies[0].hp'),5);
+    if(kind==='side')eq(g.state().hp,hp-1);if(kind==='platform'){eq(g.state().ground,true);eq(g.state().y+g.state().playerHeight,385);}
+  }
+});
+test('shared enemy stomps retain earliest moving-top selection regardless of array order',()=>{
+  for(const options of travelStompModes)for(const reversed of [false,true]){
+    const g=travelStompGame(options);g.run(`enemies=[{...makeEnemy(480,'shield'),y:387,stagger:1},
+      {...makeEnemy(480,'turret'),y:392,stagger:1}];player.y=380-player.h;player.vy=720;${reversed?'enemies.reverse();':''}`);
+    tick(g);eq(g.state().stomps,1);eq(g.read("enemies.find(e=>e.type==='shield').hp"),3);eq(g.read("enemies.find(e=>e.type==='turret').hp"),4);
+    const moving=travelStompGame({...options,type:'charger'});moving.run("enemies[0].chargerPhase='rush';enemies[0].chargerEnd=264;enemies[0].face=-1;");
+    tick(moving);eq(moving.state().stomps,1);eq(moving.state().hp,moving.state().maxHp);eq(moving.read('enemies[0].chargerPhase'),'recover');
+  }
+});
+test('shared enemy stomps keep staggered side bodies dangerous outside survival',()=>{
+  for(const options of travelStompModes)for(const type of ['walker','shield','turret','drone','charger','mortar']){
+    const g=travelStompGame({...options,type}),hp=g.state().hp;
+    g.run('enemies[0].stagger=.3;player.y=enemies[0].y+2;player.vy=0;');tick(g);
+    eq(g.state().stomps,0);eq(g.state().hp,hp-1);near(g.read('enemies[0].stagger'),.3-1/60);
+  }
+});
+test('shared enemy stomps do not inherit stale survival spawn time or enable non-survival devices and bosses',()=>{
+  for(const options of travelStompModes){
+    const g=travelStompGame(options);g.run('spawnTime=2.2;');tick(g);eq(g.state().stomps,1);eq(g.read('enemies[0].hp'),1);
+    const device=travelStompGame(options);device.run('enemies=[];devices=[{x:480,y:389,w:24,h:36,hp:2,spent:false}];');tick(device);
+    eq(device.state().stomps,0);eq(device.state().stompBurst,null);eq(device.state().devices[0].spent,false);assert(device.state().vy>0);
+    const boss=travelStompGame(options);boss.run('enemies=[];boss=makeBoss(32,480);boss.shot=100;player.y=boss.y-player.h-4;');tick(boss);
+    eq(boss.state().stomps,0);eq(boss.state().bossHp,32);eq(boss.state().hp,boss.state().maxHp-1);
+  }
+  const bossRush=operation('bosses');bossRush.run('player.x=boss.x+5;player.y=boss.y-player.h-4;player.vy=300;player.ground=false;player.inv=0;');
+  tick(bossRush);eq(bossRush.state().stomps,0);eq(bossRush.state().bossHp,66);eq(bossRush.state().hp,7); // Arena boundary keeps the player short of the boss body.
+});
+test('shared enemy stomps move and fire before impact but stop only unlaunched attacks',()=>{
+  for(const options of travelStompModes)for(const finalShot of [false,true]){
+    const g=travelStompGame({...options,type:'turret'});g.run(`enemies[0].windup=${finalShot?'DT/2':'.6'};enemies[0].aimX=100;enemies[0].aimY=200;
+      projectile(50,50,10,0,'e');`);tick(g);
+    eq(g.state().stomps,1);eq(g.read('enemies[0].windup'),0);eq(g.read('enemies[0].burst'),0);eq(g.state().hostiles.length,finalShot?2:1);
+    assert(g.state().hostiles.some(b=>b.x>50&&b.x<51));
+  }
+});
+test('shared enemy stomps open and refresh shield breaks without modifying frontal damage or expiry',()=>{
+  for(const options of travelStompModes){
+    const g=travelStompGame({...options,type:'shield'});tick(g);eq(g.read('enemies[0].shieldBreak'),1.2);eq(g.read('enemies[0].hp'),3);
+    g.run('player.x=200;player.y=G-player.h;player.ground=true;player.vy=0;player.inv=100;enemies[0].hp=20;enemies[0].stagger=10;');
+    shieldShot(g);eq(g.read('enemies[0].hp'),19);tick(g,20);
+    g.run('player.x=enemies[0].x+5;player.y=enemies[0].y-player.h-4;player.ground=false;player.vy=300;');tick(g);
+    eq(g.read('enemies[0].shieldBreak'),1.2);eq(g.read('enemies[0].hp'),17);eq(g.state().stomps,2);
+    g.run('player.x=200;player.y=G-player.h;player.ground=true;player.vy=0;enemies[0].stagger=10;');tick(g,71);shieldShot(g);
+    eq(g.read('enemies[0].shieldBreak'),0);eq(g.read('enemies[0].hp'),17);eq(g.state().score,0);eq(g.state().tacticalCharge,0);
+  }
+});
+test('shared enemy stomp bursts expire in travel modes freeze in menus and clear on death restart and terminal screens',()=>{
+  for(const options of travelStompModes){
+    const g=travelStompGame(options);tick(g);near(g.state().stompBurst.time,.28);g.key('p');g.key('p',false);const frozen=g.state();
+    g.frames(40);eq(g.state(),frozen);g.click('restart');g.frames(30);g.click('cancel-restart');eq(g.state(),frozen);
+    g.click('start');tick(g,17);eq(g.state().stompBurst,null);
+    const life=travelStompGame(options);tick(life);life.run('player.hp=2;player.inv=0;hurt(1);');assert(life.state().stompBurst);
+    life.run('player.lives=2;player.inv=0;hurt(1);');eq(life.state().phase,'playing');eq(life.state().stompBurst,null);eq(life.state().stomps,1);
+    const end=travelStompGame(options);tick(end);end.run('boss.dead=true;');end.exit();tick(end);assert(end.state().phase!=='playing');eq(end.state().stompBurst,null);
+    const restart=travelStompGame(options);tick(restart);restart.click('restart');restart.click('start');eq(restart.state().stomps,0);eq(restart.state().stompBurst,null);
+  }
+  const timeout=travelStompGame({mode:'challenge',challenge:'sprint'});tick(timeout);timeout.run('challengeTime=90-DT/2;');tick(timeout);
+  eq(timeout.state().phase,'challengeFailed');eq(timeout.state().challengeTime,90);eq(timeout.state().stompBurst,null);eq(timeout.state().progress.challenges.sprint,emptyOperationRecord());
+});
+test('shared enemy stomps never reuse a pre-respawn shell motion even while the run remains playing',()=>{
+  for(const options of travelStompModes){
+    const g=travelStompGame(options);g.run(`player.hp=1;player.lives=2;enemies[0].hp=2;
+      stompBurst={x:490,y:389,time:.28};shells=[{x:492,y:360,startX:492,startY:360,aimX:492,aimY:389,elapsed:MORTAR.flight-DT/2}];`);
+    tick(g);eq(g.state().phase,'playing');eq(g.state().lives,1);eq(g.state().x,g.state().checkpoint);eq(g.state().ground,true);
+    eq(g.state().stomps,0);eq(g.read('enemies[0].hp'),2);eq(g.state().score,0);eq(g.state().stompBurst,null);
+  }
+});
+test('shared enemy stomps cancel pit-return motion and burst even without losing a life',()=>{
+  for(const options of travelStompModes)for(const lethal of [false,true]){
+    const g=travelStompGame(options);g.run(`player.hp=${lethal?1:5};player.lives=2;player.y=H+71;player.vy=300;
+      enemies=[{...makeEnemy(480,'turret'),y:H+119,shot:100,hp:2}];stompBurst={x:490,y:389,time:.28};`);
+    tick(g);eq(g.state().phase,'playing');eq(g.state().lives,lethal?1:2);eq(g.state().x,g.state().checkpoint);eq(g.state().ground,true);
+    eq(g.state().stomps,0);eq(g.read('enemies[0].hp'),2);eq(g.state().score,0);eq(g.state().stompBurst,null);
+  }
+});
+test('shared enemy stomp kills retain earned points but lethal fired ammunition cannot grant clear records',()=>{
+  for(const options of travelStompModes){
+    const g=travelStompGame(options);g.run("enemies.length=1;enemies[0].hp=2;player.hp=1;player.lives=1;projectile(492,360,0,0,'e');");tick(g);
+    eq(g.state().stomps,1);eq(g.state().score,100);eq(g.state().hp,0);eq(g.state().stompBurst,null);eq(g.state().progress.unlocked,1);
+    if(options.mode==='challenge')eq(g.state().progress.challenges[options.challenge],emptyOperationRecord());
+    else eq(g.state().progress[options.mode][options.difficulty].stars,[0,0,0]);
+    const terminal=g.state();tick(g,20);eq(g.state(),terminal);
+  }
+});
+test('shared enemy stomps do not substitute for four versus five actual challenge reflections',()=>{
+  for(const count of [4,5]){
+    const g=travelStompGame({mode:'challenge',challenge:'counter'});reflectShots(g,count);
+    g.run("bullets=[];enemies=[{...makeEnemy(480,'walker'),hp:2,age:0,shot:100}];player.x=485;player.y=385-player.h;player.vy=300;player.ground=false;player.dashTime=0;player.inv=0;");
+    tick(g);eq(g.state().stomps,1);eq(g.state().challengeReflections,count);eq(g.state().reflections,count);eq(g.state().score,100);
+    finishOperation(g);eq(g.state().phase,count===5?'challengeClear':'challengeFailed');eq(g.state().challengeReflections,count);
+    eq(g.state().score,count===5?1900:1400);eq(g.state().progress.challenges.counter.clears,count===5?1:0);
+  }
+});
+test('shared enemy stomp exit settlement waits for lethal danger without accelerating a same-frame boss kill',()=>{
+  for(const options of travelStompModes){
+    const g=travelStompGame(options);g.run("enemies=[];player.x=stage.width-100;player.y=G-player.h;player.ground=true;player.vy=0;player.inv=100;boss.hp=1;projectile(boss.x+50,boss.y+52,0,0,'p');challengeReflections=5;");
+    tick(g);eq(g.state().bossHp,0);eq(g.state().phase,'playing');tick(g);assert(g.state().phase!=='playing');
+    for(const source of ['bullet','contact']){
+      const lethal=travelStompGame(options);lethal.run("enemies=[];boss.dead=true;player.x=stage.width-100;player.y=G-player.h;player.vy=0;player.ground=true;player.hp=1;player.lives=1;challengeReflections=5;");
+      lethal.run(source==='bullet'?"projectile(player.x+12,player.y+20,0,0,'e');":"enemies=[{...makeEnemy(player.x,'turret'),shot:100}];");
+      tick(lethal);eq(lethal.state().hp,0);eq(lethal.state().score,0);eq(lethal.state().progress.unlocked,1);
+      if(options.mode==='challenge')eq(lethal.state().progress.challenges[options.challenge],emptyOperationRecord());
+      else eq(lethal.state().progress[options.mode][options.difficulty].stars,[0,0,0]);
+    }
+  }
+});
+test('shared enemy stomp exit readiness is canceled by a surviving respawn or pit return but not an ordinary hit',()=>{
+  for(const options of travelStompModes)for(const cause of ['life','pit','hit']){
+    const g=travelStompGame(options);g.run(`enemies=[];boss.dead=true;player.x=stage.width-100;player.checkpoint=player.x;player.y=G-player.h;player.vy=0;player.ground=true;player.lives=2;player.hp=${cause==='life'?1:5};challengeReflections=5;`);
+    if(cause==='pit')g.run('player.y=H+71;player.ground=false;');else g.run("projectile(player.x+12,player.y+20,0,0,'e');");
+    tick(g);
+    if(cause==='hit')assert(g.state().phase!=='playing','A living ordinary hit must not block a valid exit');
+    else{eq(g.state().phase,'playing');eq(g.state().score,0);eq(g.state().lives,cause==='life'?1:2);eq(g.state().progress.unlocked,1);}
+  }
+});
+test('shared enemy stomp exit readiness rechecks the resolved impact position instead of the movement endpoint',()=>{
+  for(const options of travelStompModes)for(const offset of [-3,-.1]){
+    const g=travelStompGame(options);g.run(`boss.dead=true;challengeReflections=5;
+      player.x=stage.width-115+${offset};player.y=388.8-player.h;player.vy=300;
+      enemies=[{...makeEnemy(player.x,'walker'),stagger:1,shot:100}];`);g.key('d');tick(g);
+    eq(g.state().stomps,1);
+    if(offset===-3){
+      eq(g.state().phase,'playing');assert(g.state().x<g.state().worldWidth-115);eq(g.state().score,0);
+      tick(g);assert(g.state().phase!=='playing');
+    }else assert(g.state().phase!=='playing','An impact still inside the exit remains a legitimate clear');
+  }
+});
+test('shared enemy stomp control-only campaign routes turn the first walker into access to platform intel',()=>{
+  for(const difficulty of ['standard','relaxed'])for(const randomSeed of [1,17,932,16437])for(const cadence of [3,6]){
+    const g=createGame({randomSeed});g.click('difficulty-'+difficulty);g.click('start');const initial=g.state();
+    g.key('d');until(g,()=>g.state().x>=280,200);g.key('w');
+    for(let frames=0;frames<150&&g.state().stomps===0;frames+=cadence){
+      const state=g.state(),target=state.enemies.find(e=>e.type==='walker');assert(target&&state.phase==='playing');
+      const dx=target.x+target.w/2-state.x-13.5;g.key('d',dx>10);g.key('a',dx< -10);g.frames(cadence);
+    }
+    eq(g.state().stomps,1);assert(g.state().stompBurst?.boosted);g.key('a',false);g.key('d');
+    until(g,()=>g.state().x>=550,100);g.key('d',false);g.key('w',false);until(g,()=>g.state().ground,100);
+    eq(g.state().y+g.state().playerHeight,325);eq(g.state().intel,1);eq(g.state().stomps,1);
+    eq(g.state().lives,initial.lives);eq(g.state().grenades,initial.grenades);eq(g.state().shots,0);eq(g.state().reflections,0);
+    eq(g.state().phase,'playing');assert(g.state().hp>0);eq(g.state().progress.unlocked,1);
+  }
+});
+test('shared enemy stomp visuals and snapshots stay local unsaved and reduced-motion friendly',()=>{
+  for(const options of travelStompModes)for(const reducedMotion of [false,true]){
+    const g=travelStompGame({...options,reducedMotion});g.key('w');tick(g);const before=g.state(),labels=[];g.graphics.fillText=t=>labels.push(t);g.run('drawStomp();');
+    eq(g.state(),before);assert(labels.includes('跃升'));g.win.__raidState.stompBurst.time=999;eq(g.state(),before);
+    g.run('saveProgress();');assert(!/stomp|stagger|shieldBreak/.test(JSON.stringify(g.state().progress)));
+    g.run('openTitle();');eq(g.state().stompBurst,null);eq(g.state().stomps,0);
+  }
 });
 
 assert(passed > 0, 'No Pixel Raid contracts matched the requested filter');

@@ -321,7 +321,7 @@
             <summary>操作按键与战术提示</summary>
             <div class="details-body">
               <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。菜单中用方向键 / 左摇杆选择、A 确认、B 返回；按住方向可连续浏览。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
-              <p>普通跳跃轻点短跳、按住高跳；上升时松开可提前收跳。踏击弹起的力度仍在踩中瞬间确定，之后松开不会缩短。</p>
+              <p>普通跳跃轻点短跳、按住高跳；上升时松开可提前收跳。远征、练习、作战挑战与防线均可从上方踏击杂兵：2 点伤害并弹起，按住跳跃高弹、下键优先短弹；存活盾卫破防 1.2 秒。首领不可踩，侧面和已发弹药仍危险。踏击力度在踩中瞬间确定，之后松开不会缩短。</p>
               <p>空中按住 S / ↓ 再开火可朝前下方俯射，松开下键恢复原方向；按住跳跃可仰射，同时按下时优先俯射。落地后仍是下蹲平射。手柄方向下 + 射击、触屏 ↓ + 射击同样适用，可从跳台、降层或踏击弹起中反击。</p>
               <p>反弹弹命中首领后可打出 1.5 秒破甲：趁头顶绿条持续时用步枪或散弹追击，每发额外造成 1 点伤害。再次反弹命中只刷新时长；反弹弹、手雷与震荡脉冲保持原伤害。破甲不会打断首领出招，仍需闪避。</p>
               <p>反弹弹命中仍存活的盾卫后，开启 1.2 秒正面破防，可接射击追击；绿条结束恢复格挡，重复命中仅刷新时间，不增加伤害或震停。</p>
@@ -986,6 +986,7 @@
       }
       function finishChallenge(success,reason){
         if(phase!=='playing'||mode!=='challenge')return;
+        stompBurst=null;
         const record=progress.challenges[challengeId],time=Math.max(1,Math.ceil(challengeTime*100));
         let newBest=false;
         if(success){
@@ -1026,6 +1027,7 @@
       }
       function finishStage(){
         if(phase!=='playing'||survival())return;
+        stompBurst=null;
         if(mode==='challenge'){
           if(gauntlet()){
             bossWins++;
@@ -1106,7 +1108,7 @@
         player.hp=Math.max(0,player.hp-damage);player.inv=difficulty==='relaxed'?1.9:1.45;player.invDuration=player.inv;shake=8;beep(170,.2,'sawtooth');
         spark(player.x+12,player.y+20,'#f6a174',13);
         if(player.hp===0){
-          boss.breach=0;player.lives--;stageDeaths++;
+          stompBurst=null;boss.breach=0;player.lives--;stageDeaths++;
           if(player.lives<=0){
             const recap='致命来源：'+cause.name+'。'+cause.tip;
             if(survival()){finishSurvival(recap);return;}
@@ -1298,7 +1300,7 @@
         }
       }
       function stompContact(motion,tracks){
-        if(!survival()||phase!=='playing'||spawnTime>0||player.dashTime>0||motion.dy<=0)return null;
+        if(phase!=='playing'||(survival()&&spawnTime>0)||player.dashTime>0||motion.valid===false||motion.dy<=0)return null;
         let first=null;
         for(const track of tracks){
           const e=track.enemy;
@@ -1315,7 +1317,7 @@
         }
         // Devices share the same swept top-contact ordering as enemies. A
         // higher platform blocks both; side contact and active dashes do not.
-        for(const device of devices){
+        for(const device of survival()?devices:[]){
           if(device.spent||motion.bottom>device.y)continue;
           const t=(device.y-motion.bottom)/motion.dy;
           if(t<0||t>motion.limit)continue;
@@ -1392,12 +1394,12 @@
       function update(dt){
         if(phase!=='playing')return;
         clock+=dt;
+        if(stompBurst&&(stompBurst.time-=dt)<=0)stompBurst=null;
         if(survival()){
           tacticalTime=Math.max(0,tacticalTime-dt);
           if(tacticalPulse){tacticalPulse.time-=dt;if(tacticalPulse.time<=0)tacticalPulse=null;}
           deviceBursts=deviceBursts.filter(burst=>(burst.time-=dt)>0);
           mortarBursts=mortarBursts.filter(burst=>(burst.time-=dt)>0);
-          if(stompBurst&&(stompBurst.time-=dt)<=0)stompBurst=null;
           survivalTime+=dt;refluxCooldown=Math.max(0,refluxCooldown-dt);
           const spawning=spawnTime>0;spawnTime=Math.max(0,spawnTime-dt);
           if(spawning&&spawnTime===0)for(const e of enemies){
@@ -1463,7 +1465,7 @@
         if(tacticalQueued){tacticalQueued=false;useTactical();}
         if(grenadeQueued){grenadeQueued=false;throwBomb();}
         if(pressed('fire'))fire();
-        const motion={x:player.x,bottom:player.y+player.h,limit:1};
+        const motion={x:player.x,bottom:player.y+player.h,limit:1,lives:player.lives,valid:true};
         player.x=clamp(player.x+player.vx*dt,8,gauntlet()||bossWave()?boss.x-player.w-14:stage.width-player.w-6);
         const oldBottom=player.y+player.h;
         if(player.dashTime>0){player.vy=player.dashDive?650:0;}else player.vy=clamp(player.vy+GRAV*dt,-800,MAX_FALL);
@@ -1488,6 +1490,7 @@
         }
         if(player.ground||player.vy>=0)cancelJumpCut();
         if(player.y>H+70){
+          motion.valid=false;stompBurst=null;
           player.inv=0;player.dashTime=0;player.dashDive=false;player.dashBuffer=0;hurt(2,'fall');
           if(phase!=='playing')return;
           player.x=player.checkpoint;player.y=G-player.h;player.vy=0;player.vx=0;player.ground=true;player.coyote=.11;
@@ -1497,10 +1500,14 @@
             player.checkpoint=checkpoint;spark(checkpoint,G-40,'#9ee9c6',18);announce('检查点已激活，失去生命后从这里继续。');
           }
         }
-        if(!survival()&&boss.dead&&player.x>stage.width-115){finishStage();return;}
+        // Preserve next-tick boss-clear timing, but resolve this tick's hazards
+        // before an already-open exit can award a clear.
+        const exitReady=!survival()&&boss.dead&&player.x>stage.width-115;
         // Advance existing shells before new throws and projectile kills.
         // Launched shells survive their thrower's death, not a wave transition.
         updateShells(dt);if(phase!=='playing')return;
+        // A surviving life loss still teleports. Never reuse its pre-death sweep.
+        if(player.lives!==motion.lives)motion.valid=false;
         // Resolve all top crossings before body damage, including charger sweeps.
         const enemyTracks=[];
         // Moving threats remain near their patrol spawn; air units follow gentle sine paths.
@@ -1533,13 +1540,10 @@
           else if((survival()||Math.abs(e.x-player.x)<570)&&e.shot<=0){
             aimAtPlayer(e,235);e.shot=rng(2.3,3.5)/(survival()?1+Math.min(12,survivalWave-1)*.05:1);
           }
-          // Preserve campaign/challenge contact order; aerial counterplay is
-          // confined to survival and must not change their existing timings.
-          if(!survival()){if(hit(player,e))hurt(1);if(phase!=='playing')return;}
         }
         const stomp=stompContact(motion,enemyTracks);
         if(stomp)applyStomp(stomp);
-        for(const track of survival()?enemyTracks:[]){
+        for(const track of enemyTracks){
           if(track.enemy.dead||track.enemy===stomp?.enemy)continue;
           if(hit(player,track.body||track.enemy))hurt(1,track.enemy.type==='charger'?'charger':'contact');
           if(phase!=='playing')return;
@@ -1695,6 +1699,7 @@
           const s=sparks[i];s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=680*dt;s.life-=dt;
           if(s.life<=0)sparks.splice(i,1);
         }
+        if(exitReady&&motion.valid&&player.lives===motion.lives&&player.x>stage.width-115){finishStage();return;}
         if(survival()&&spawnTime===0&&activeEnemies()===0&&boss.dead){finishWave();return;}
         player.dashTime=Math.max(0,player.dashTime-dt);if(player.dashTime===0)player.dashDive=false;
         shake=Math.max(0,shake-28*dt);
