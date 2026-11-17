@@ -22,7 +22,9 @@ export function recoveryTactics() {
       bullet.y > state.y - 12 && bullet.y < state.y + state.playerHeight + 12);
     return {
       move, down,
-      jump: down || high && Math.abs(dx) < 155 && state.ground && state.y > target.y - 10,
+      // The elevated-node route needs a full hop; release once ascent ends.
+      jump: down || state.jumpHeld && state.jumpCutEligible && state.vy < 0 ||
+        high && Math.abs(dx) < 155 && state.ground && state.y > target.y - 10,
       // Stay on the jump arc near the ledge. On the long cross-field sprint,
       // dashing through incoming bullets is a real defensive player action.
       dash: !down && !high && Math.abs(dx) > 100 && state.dashCooldown === 0 && nearby,

@@ -1,6 +1,8 @@
 /** Observe the visible impact warning and time an ordinary jump, never edit state. */
 export function mortarJump(state) {
-  if (!state.ground) return false;
+  // Full-height evasions keep the ordinary ascent, then release at the apex
+  // so airborne gun aim returns to the route's existing intent.
+  if (!state.ground) return state.jumpHeld && state.jumpCutEligible && state.vy < 0;
   const warnings = [
     ...state.enemies.filter(e => e.type === 'mortar' && e.windup > 0)
       .map(e => ({ x: e.aimX - 58, y: e.aimY - 64, w: 116, h: 64, remaining: e.windup + .85 })),
