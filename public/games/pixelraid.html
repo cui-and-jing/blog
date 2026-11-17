@@ -329,6 +329,7 @@
               <p>空中按住 S / ↓ 再投手雷可向前下方俯掷，适合跳台上清除近处地面敌人；松开下键恢复远距离抛投。地面或平台上按住下键则贴脚低抛，手雷沿支撑面弹跳、滚落边缘，适合近距离爆破；不按下键仍是远抛。三种轨迹的引信、伤害与消耗相同。手雷上方短条显示剩余引信，最后 0.3 秒变亮但不闪烁。手柄方向下 + B、触屏 ↓ + 雷同样适用。</p>
               <p>满血时医疗包、手雷满 7 枚时弹药留在原处，需要时再碰触领取；实际拾取才加 75 分。散弹与连射拾取后至少保留 12 秒，已有更长效果不会缩短。留存补给仅在当前场景有效。</p>
               <p>空中按住 S / ↓ 再冲刺可向面朝方向斜下俯冲，快速换层或落地；松开下键不改变本次方向。地面冲刺、不按下键的空中冲刺保持水平。平台仍会接住俯冲；要穿过当前平台，先按下键 + 跳跃降层，再冲刺。俯冲不追加伤害或冷却优惠，注意深坑。键盘、触屏与手柄共用此组合。</p>
+              <p>先冲刺、再按跳跃可提前结束地面冲刺并起跳；离开边缘的原有短暂起跳宽限仍适用。按住跳高跳、轻点短跳，平台上按住下键再跳仍是降层。取消冲刺会立即结束冲刺保护，冷却照常计算；空中不能凭此多跳。同一瞬间按跳跃和冲刺仍优先执行冲刺。</p>
               <p>冲刺冷却结束前 0.12 秒内可提前按一次，到点自动冲刺；长按不会连冲，暂停或重开会清除预输入。触屏冲刺键底部短条显示恢复进度，亮绿表示就绪。炮塔瞄准线锁定后会三连射；冲刺触碰敌弹可反弹。盾卫挡住正面普通子弹，绕后、手雷或反弹弹可破防。5 秒内连续击败敌人，2 连击得分 ×2，4 连击起 ×3；受伤中断。</p>
             </div>
           </details>
@@ -1440,6 +1441,11 @@
         if(player.dropTime===0&&player.dropPlatform&&player.y+player.h>player.dropPlatform[1]+8)player.dropPlatform=null;
         if(jumpQueued){jumpQueued=false;player.jumpBuffer=.13;player.jumpBufferReleased=jumpQueuedReleased;jumpQueuedReleased=false;}
         if(player.jumpBuffer>0&&player.coyote>0){
+          // A jump accepted from ground/coyote grace can cancel an ALREADY
+          // active dash. Keep its spent cooldown, but end dash protection and
+          // latched direction immediately. Airborne presses gain no extra jump;
+          // a same-tick new dash still owns motion as before.
+          if(player.dashTime>0){player.dashTime=0;player.dashDive=false;player.dashBuffer=0;dashQueued=false;}
           const support=down&&player.ground?stage.platforms.find(([x,y,w])=>
             Math.abs(player.y+player.h-y)<1&&player.x+player.w>x+3&&player.x<x+w-3):null;
           if(support){

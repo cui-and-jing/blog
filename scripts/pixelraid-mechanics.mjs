@@ -6111,5 +6111,74 @@ test('stomp dash refill control-only rifle dash stomp route works across seeds a
   }
 });
 
+// Grounded jump cancel: spend the dash, then choose an ordinary jump/drop.
+function dashJumpGame(options={}){
+  const g=createGame();
+  if(options.mode==='survival'){g.click('mode-survival');g.click('start');g.run('spawnTime=0;');}
+  else if(options.mode==='challenge')g.run("beginChallenge('sprint');");
+  else g.run(`beginRun(0,'${options.mode||'campaign'}');`);
+  g.run('stage.platforms=[];stage.gaps=[];enemies=[{...makeEnemy(900,\'turret\'),shot:1000}];pickups=[];intel=[];devices=[];boss.dead=true;player.inv=0;');
+  return g;
+}
+test('ground dash jump cancel restores ordinary movement and keeps the spent cooldown in every mode',()=>{
+  for(const mode of ['campaign','practice','challenge','survival'])for(const face of [-1,1]){
+    const g=dashJumpGame({mode});g.run(`player.x=300;player.face=${face};`);g.key(face===1?'d':'a');g.key('l');tick(g,3);
+    const before=g.state();assert(before.dashTime>0);g.key('w');tick(g);const after=g.state();
+    eq(after.dashTime,0);eq(after.dashDive,false);eq(after.ground,false);near(after.vy,-525+1250/60);near(g.read('player.vx'),face*255);
+    near(after.dashCooldown,before.dashCooldown-1/60);eq(after.jumpCutEligible,true);eq(after.dashBuffer,0);
+    for(const key of ['hp','lives','score','grenades','shots','stomps','reflections','tacticalCharge'])eq(after[key],before[key]);
+  }
+});
+test('ground dash jump cancel preserves held full jumps released short hops and all keyboard aliases',()=>{
+  for(const key of ['w','ArrowUp',' '])for(const released of [false,true]){
+    const g=dashJumpGame();g.key('Shift');tick(g,2);g.key(key);if(released)g.key(key,false);tick(g);
+    near(g.state().vy,(released?-220:-525)+1250/60);eq(g.state().dashTime,0);assert(g.state().dashCooldown>0);
+    const apex=finishJump(g).apex;assert(released?apex>350:apex<280);
+    tick(g,20);eq(g.state().ground,true);eq(g.state().dashTime,0);
+  }
+});
+test('ground dash jump cancel honors down-through only on its actual support and catches a lower ledge',()=>{
+  for(const face of [-1,1]){
+    const g=onLedge({below:true,x:face===1?500:700});g.run(`player.face=${face};`);g.key('l');tick(g,2);const before=g.state();
+    g.key('s');g.key('w');tick(g);eq(g.state().dashTime,0);eq(g.state().dashDive,false);assert(g.state().dropTime>0);near(g.state().vy,80+1250/60);
+    near(g.state().dashCooldown,before.dashCooldown-1/60);eq(g.state().jumpCutEligible,false);
+    g.key('w',false);g.key('s',false);until(g,()=>g.state().ground,30);eq(g.state().y+g.state().playerHeight,365);
+  }
+});
+test('ground dash jump cancel consumes only existing coyote grace and never grants an air jump',()=>{
+  const edge=onLedge({x:735});edge.key('d');edge.key('l');tick(edge,2);assert(!edge.state().ground&&edge.state().coyote>0);
+  edge.key('w');tick(edge);eq(edge.state().dashTime,0);assert(edge.state().vy<0);eq(edge.state().coyote,0);
+  for(const dive of [false,true]){
+    const air=dashJumpGame();air.run('player.y=100;player.ground=false;player.coyote=0;');if(dive)air.key('s');
+    air.key('l');tick(air,2);air.key('w');tick(air);assert(air.state().dashTime>0);eq(air.state().vy,dive?650:0);eq(air.state().jumpCutEligible,false);
+  }
+  const expired=onLedge({x:735});expired.key('l');tick(expired,9);eq(expired.state().coyote,0);assert(expired.state().dashTime>0);
+  expired.key('w');tick(expired);assert(expired.state().dashTime>0);eq(expired.state().vy,0);
+});
+test('ground dash jump cancel ends protection immediately instead of carrying free invulnerability',()=>{
+  const g=dashJumpGame();g.key('l');tick(g,2);const hp=g.state().hp;
+  g.run("hurt(1,'contact');");eq(g.state().hp,hp);g.key('w');tick(g);eq(g.state().dashTime,0);eq(g.state().protectionTime,0);
+  g.run("hurt(1,'contact');");eq(g.state().hp,hp-1);near(g.state().protectionTime,1.45);
+});
+test('ground dash jump cancel shares touch and gamepad edges without rearming held dash',()=>{
+  for(const method of ['touch','pad']){
+    const g=dashJumpGame(),jump=jumpButton(g),dash=[...g.nodes.values()].find(n=>n.dataset.action==='dash');
+    if(method==='touch')dash.dispatch('pointerdown',{pointerId:4});else{pollPad(g);pollPad(g,[4]);}tick(g,2);
+    if(method==='touch')jump.dispatch('pointerdown',{pointerId:5});else pollPad(g,[4,0]);tick(g);
+    eq(g.state().dashTime,0);assert(g.state().vy<0);near(g.state().dashCooldown,g.read('dashDelay()')-2/60);
+    if(method==='touch')jump.dispatch('pointerup',{pointerId:5});else pollPad(g,[4]);tick(g);near(g.state().vy,-220+1250/60);
+    tick(g,170);eq(g.state().dashTime,0);eq(g.state().dashCooldown,0);
+  }
+});
+test('ground dash jump cancel respects same-frame dash priority and interrupted inputs',()=>{
+  const simultaneous=dashJumpGame();simultaneous.key('w');simultaneous.key('l');tick(simultaneous);assert(simultaneous.state().dashTime>0);eq(simultaneous.state().vy,0);
+  for(const interrupt of ['pause','blur','hidden']){
+    const g=dashJumpGame();g.key('l');tick(g,2);g.key('w');
+    if(interrupt==='pause')g.click('pause');else if(interrupt==='blur')g.event('blur');else g.visibility(true);
+    eq(g.state().phase,'pause');g.key('w',false);g.key('l',false);g.visibility(false);g.click('start');tick(g);
+    assert(g.state().dashTime>0);eq(g.state().vy,0);eq(g.state().jumpBuffer,0);
+  }
+});
+
 assert(passed > 0, 'No Pixel Raid contracts matched the requested filter');
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
