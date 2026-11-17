@@ -5,7 +5,7 @@ export async function checkRaidFooting(sourcePage, problems) {
   for (const mobile of [false, true]) {
     const context = await sourcePage.browser().createBrowserContext(), page = await context.newPage();
     const held = new Map(), label = mobile ? 'touch-320-reduced' : 'keyboard-1280';
-    const keys = { jump: 'w', right: 'd', down: 's', shoot: 'j' };
+    const keys = { jump: 'w', right: 'd', down: 's', fire: 'j' };
     let step = 'initialization';
     const wait = async (name, predicate) => { step = name;await page.waitForFunction(predicate, { polling: 'raf', timeout: 7000 }); };
     const down = async action => {
@@ -28,7 +28,7 @@ export async function checkRaidFooting(sourcePage, problems) {
       await page.setViewport({width:mobile?320:1280,height:mobile?844:960,isMobile:mobile,hasTouch:mobile,deviceScaleFactor:1});
       await page.emulateMediaFeatures([{name:'prefers-reduced-motion',value:mobile?'reduce':'no-preference'}]);
       await page.evaluateOnNewDocument(() => {
-        window.__footingEvidence=[];
+        window.__footingEvidence=[];window.__footingCanvases={};
         const observe=()=>{
           const s=window.__raidState,t=s?.footingGuide;
           if(t){
@@ -41,6 +41,10 @@ export async function checkRaidFooting(sourcePage, problems) {
                 if(pixels[i]===255&&pixels[i+1]===208&&pixels[i+2]===154)orange++;
               }
               const samples=window.__footingEvidence;
+              // A 100px platform leaves only ~6px below an ordinary jump apex:
+              // boots legitimately cover part of the bracket, not its whole bar.
+              if((t.kind==='gap'?orange>=30:blue>=40)&&!window.__footingCanvases[t.kind])
+                window.__footingCanvases[t.kind]=canvas.toDataURL('image/png').split(',')[1];
               samples.push({x:s.x,y:s.y,h:s.playerHeight,ground:s.ground,drop:s.dropTime,guide:t,blue,orange});
               if(samples.length>2500)samples.shift();
             }
@@ -53,9 +57,9 @@ export async function checkRaidFooting(sourcePage, problems) {
       await down('jump');await wait('floor projection',()=>window.__footingEvidence.some(s=>s.guide.kind==='floor'&&s.blue>=80));
       await page.screenshot({path:path.join(process.cwd(),'.shots',`pixelraid-footing-${label}.png`),fullPage:true});
       await up('jump');await wait('first landing',()=>window.__raidState.ground&&!window.__raidState.footingGuide);
-      await down('shoot');await down('right');await wait('approach platform',()=>window.__raidState.x>=440);await down('jump');
+      await down('fire');await down('right');await wait('approach platform',()=>window.__raidState.x>=440);await down('jump');
       await wait('over platform',()=>window.__raidState.x>=520);await up('right');
-      await wait('platform projection',()=>window.__footingEvidence.some(s=>s.guide.kind==='platform'&&s.guide.y===325&&s.blue>=80));
+      await wait('platform projection',()=>window.__footingEvidence.some(s=>s.guide.kind==='platform'&&s.guide.y===325&&s.blue>=40));
       await up('jump');await wait('land on platform',()=>window.__raidState.ground&&window.__raidState.y+window.__raidState.playerHeight===325);
       await down('down');await down('jump');
       await wait('drop-through projection',()=>window.__footingEvidence.some(s=>s.drop>0&&s.guide.kind==='floor'&&s.blue>=80));
@@ -63,12 +67,18 @@ export async function checkRaidFooting(sourcePage, problems) {
       await down('right');await wait('approach pit',()=>window.__raidState.x>=790);await down('jump');
       await wait('above pit',()=>window.__raidState.x>=844);await up('right');
       await wait('pit warning',()=>window.__footingEvidence.some(s=>s.guide.kind==='gap'&&s.orange>=30));
-      await up('jump');await up('shoot');
+      await up('jump');await up('fire');
       const evidence=await page.evaluate(()=>window.__footingEvidence);
       fs.writeFileSync(path.join(process.cwd(),'.shots',`pixelraid-footing-${label}.json`),JSON.stringify(evidence,null,2));
       // A real pause clears the marker immediately, without changing the floor.
       await activate('#pause');await wait('pause hides projection',()=>window.__raidState.phase==='pause'&&!window.__raidState.footingGuide);
     } catch(error){problems.push(`Pixel Raid 脚下地形 ${label} / ${step}: ${error.message}`);}
-    finally {for(const action of [...held.keys()])await up(action).catch(()=>{});await context.close();}
+    finally {
+      const evidence=await page.evaluate(()=>({state:window.__raidState,samples:window.__footingEvidence,canvases:window.__footingCanvases})).catch(()=>null);
+      if(evidence){
+        for(const [kind,data] of Object.entries(evidence.canvases||{}))fs.writeFileSync(path.join(process.cwd(),'.shots',`pixelraid-footing-${label}-${kind}.png`),Buffer.from(data,'base64'));
+        delete evidence.canvases;fs.writeFileSync(path.join(process.cwd(),'.shots',`pixelraid-footing-${label}.json`),JSON.stringify(evidence,null,2));
+      }
+      for(const action of [...held.keys()])await up(action).catch(()=>{});await context.close();}
   }
 }
