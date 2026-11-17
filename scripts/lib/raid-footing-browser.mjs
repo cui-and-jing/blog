@@ -67,7 +67,7 @@ export async function checkRaidFooting(sourcePage, problems) {
       const evidence=await page.evaluate(()=>window.__footingEvidence);
       fs.writeFileSync(path.join(process.cwd(),'.shots',`pixelraid-footing-${label}.json`),JSON.stringify(evidence,null,2));
       // A real pause clears the marker immediately, without changing the floor.
-      await activate('#pause');await wait('pause hides projection',()=>window.__raidState.phase==='paused'&&!window.__raidState.footingGuide);
+      await activate('#pause');await wait('pause hides projection',()=>window.__raidState.phase==='pause'&&!window.__raidState.footingGuide);
     } catch(error){problems.push(`Pixel Raid 脚下地形 ${label} / ${step}: ${error.message}`);}
     finally {for(const action of [...held.keys()])await up(action).catch(()=>{});await context.close();}
   }

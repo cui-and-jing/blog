@@ -6015,7 +6015,7 @@ test('footing guide is absent on ground, below the floor and outside active play
   const g=guideGame();g.run('player.ground=true;');eq(g.state().footingGuide,null);
   g.run('player.ground=false;player.y=407;');eq(g.state().footingGuide,null);
   g.run('player.y=200;');
-  for(const phase of ['title','paused','clear','over','supply']){g.run(`phase='${phase}';`);eq(g.state().footingGuide,null);}
+  for(const phase of ['title','pause','stageClear','gameOver','waveClear','confirmRestart']){g.run(`phase='${phase}';`);eq(g.state().footingGuide,null);}
 });
 test('footing guide painting is steady, unsaved and has no effects on physics combat or input',()=>{
   for(const gap of [false,true])for(const reduced of [false,true]){
