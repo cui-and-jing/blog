@@ -4968,6 +4968,115 @@ test('a platform roll banks then falls past the ledge edge and gaps do not becom
     assert(gap.state().grenadeProjectiles[0].y>417);
   }
 });
+// Ground contacts share all three launch styles. These fixtures specify whether
+// the top was crossed over solid terrain, independently of the frame-end x.
+function groundGrenadeStep(g,bomb,{land=false,support=425}={}){
+  const before={r:8,timer:1,...bomb},dt=1/60,vy=before.vy+1250*.83*dt;
+  g.run(`bombs=[${JSON.stringify(before)}];`);tick(g);
+  const [after]=g.state().grenadeProjectiles;assert(after,'A surface contact must not detonate the grenade');
+  near(after.x,before.x+before.vx*dt);near(after.y,land?support-8:before.y+vy*dt);
+  near(after.vy,land?vy*-.4:vy);near(after.vx,land?before.vx*.66:before.vx);
+  near(after.timer,before.timer-dt);eq(after.aim,before.aim);
+  return after;
+}
+test('grenade ground contacts never pull below-rim entry or upswing onto solid ground in any mode',()=>{
+  for(const options of pickupModes)for(const aim of ['arc','down','roll']){
+    const g=rollGame(options);g.run('stage.gaps=[[840,940]];');const before=g.state();
+    for(const [x,vx] of [[935,330],[845,-330],[450,0]])for(const vy of [100,-300,-40,0]){
+      groundGrenadeStep(g,{x,y:440,vx,vy,aim});
+    }
+    for(const key of ['grenades','hp','lives','score','tacticalCharge','progress'])eq(g.state()[key],before[key]);
+  }
+});
+test('grenade ground contacts test both sides of every campaign gap at the downward crossing',()=>{
+  const g=rollGame({mode:'campaign'}),maps=g.read('STAGES.map(s=>s.gaps)');
+  for(const gaps of maps){
+    g.run(`stage.gaps=${JSON.stringify(gaps)};`);
+    for(const [left,right] of gaps)for(const aim of ['arc','down','roll']){
+      // Cross inside the pit and finish over solid, then the inverse. Merely
+      // changing oldY eligibility would still get these diagonal cases wrong.
+      for(const [x,vx,land] of [[right-1,330,false],[left+1,-330,false],[right+1,-330,true],[left-1,330,true]]){
+        groundGrenadeStep(g,{x,y:416.9,vx,vy:600,aim},{land});
+      }
+    }
+  }
+});
+test('grenade ground contacts preserve exact gap endpoints and start or end of step contacts',()=>{
+  const g=rollGame({mode:'campaign'});g.run('stage.gaps=[[840,940]];');
+  const dt=1/60,vy=600-1250*.83*dt;
+  for(const aim of ['arc','down','roll'])for(const t of [0,.5,1])for(const vx of [-330,0,330]){
+    for(const [edge,inside] of [[840,1],[940,-1]])for(const offset of [-.000001,0,.000001]){
+      const crossX=edge+offset*inside;
+      groundGrenadeStep(g,{x:crossX-vx*dt*t,y:417-10*t,vx,vy,aim},{land:offset<=0});
+    }
+  }
+});
+test('grenade ground contacts distinguish ascent, zero vertical speed and downward exact contact',()=>{
+  const g=rollGame(),gravity=1250*.83/60;
+  for(const aim of ['arc','down','roll'])for(const [y,vy,land] of [
+    [417,-100,false],[417,-gravity,true],[417,0,true],[417,100,true],
+    [416.9,-gravity,false],[416.9,0,true],[417.000001,0,false],
+    [418,-300,false],[440,-40,false],[440,0,false],
+  ])groundGrenadeStep(g,{x:450,y,vx:220,vy,aim},{land});
+});
+test('grenade ground contacts sweep large motion across one or several gap boundaries',()=>{
+  const g=rollGame({mode:'campaign'});g.run('stage.gaps=[[840,940],[1700,1820]];');
+  for(const aim of ['arc','down','roll'])for(const [x,endX,land] of [
+    [800,1000,false],[1000,800,false],[850,1750,true],[1750,850,true],
+  ])groundGrenadeStep(g,{x,y:367,vx:(endX-x)*60,vy:6000-1250*.83/60,aim},{land});
+});
+test('grenade ground contacts preserve earlier roll-platform priority and ordinary arc pass-through',()=>{
+  const g=rollGame();g.run('stage.platforms=[[400,330,180],[400,300,180]];');
+  for(const aim of ['arc','down','roll']){
+    groundGrenadeStep(g,{x:450,y:200,vx:220,vy:18000-1250*.83/60,aim},{land:true,support:aim==='roll'?300:425});
+  }
+});
+test('grenade ground contacts allow a below-floor ascent to emerge and land only on its later descent',()=>{
+  for(const aim of ['arc','down','roll']){
+    const g=rollGame();let before=groundGrenadeStep(g,{x:450,y:418,vx:120,vy:-300,aim});
+    assert(before.y<417);let landed=false;
+    for(let frame=0;frame<60&&!landed;frame++){
+      const vy=before.vy+1250*.83/60,nextY=before.y+vy/60;
+      const land=before.y<=417&&nextY>=417&&vy>=0;
+      const after=groundGrenadeStep(g,before,{land});landed=land;before=after;
+    }
+    assert(landed,'Emerging from below must not disable a subsequent genuine ground contact');
+  }
+});
+test('grenade ground contacts leave pit fuse and offscreen explosions at their actual position exactly once',()=>{
+  for(const aim of ['arc','down','roll'])for(const [y,timer] of [[440,.01],[559,1],[559,.01]]){
+    const g=rollGame({mode:'campaign'});g.run(`stage.gaps=[[840,940]];
+      enemies=[{...makeEnemy(940,'turret'),hp:20,shot:100}];
+      window.__groundBoomCalls=[];const original=boom;
+      boom=(x,y)=>{window.__groundBoomCalls.push([x,y]);original(x,y);};`);
+    // Spend via the real input path before isolating the collision boundary.
+    g.key('k');tick(g);g.key('k',false);eq(g.state().grenades,6);
+    const before=g.state();g.run(`bombs=[{x:935,y:${y},vx:330,vy:100,timer:${timer},r:8,aim:'${aim}'}];`);tick(g);
+    eq(g.state().grenadeProjectiles,[]);const calls=g.read('window.__groundBoomCalls');eq(calls.length,1);
+    near(calls[0][0],940.5);near(calls[0][1],y+(100+1250*.83/60)/60);
+    eq(g.read('enemies[0].hp'),y===440?14:20,'Blast damage must use the actual below-floor position');
+    for(const key of ['grenades','hp','lives','score','tacticalCharge','progress'])eq(g.state()[key],before[key]);
+    tick(g,10);eq(g.read('window.__groundBoomCalls').length,1);eq(g.state().grenadeProjectiles,[]);
+  }
+});
+test('control-only first-gap throw stays below the rim across the far bank and expires without a phantom bounce',()=>{
+  for(const randomSeed of [1,17,932,16437]){
+    const g=createGame({randomSeed});g.click('start');g.key('j');g.key('d');
+    tickUntil(g,'player.x>=917',260);const launch=g.state();
+    assert(launch.y>460&&!launch.ground);g.key('k');tick(g);g.key('k',false);g.key('j',false);g.key('d',false);
+    let previous=g.state().grenadeProjectiles[0];assert(previous&&previous.y>417&&previous.x<940);
+    const ammo=g.state().grenades;eq(ammo,launch.grenades-1);let farBank=false,below=false;
+    for(let frame=0;frame<66&&g.state().grenadeProjectiles.length;frame++){
+      tick(g);const current=g.state().grenadeProjectiles[0];if(!current)break;
+      assert(current.y>417,'A below-rim throw must not be pulled onto the far bank');
+      near(current.vx,330);near(current.vy,previous.vy+1250*.83/60);
+      near(current.y,previous.y+current.vy/60);near(current.timer,previous.timer-1/60);
+      if(current.x>=940)farBank=true;if(current.y>540)below=true;previous=current;
+    }
+    assert(farBank&&below);eq(g.state().grenadeProjectiles,[]);eq(g.state().grenades,ammo);
+    eq(g.state().phase,'playing');assert(g.state().x<840,'The player must naturally respawn after the pit fall');
+  }
+});
 test('roll choice is latched and release, movement, airborne changes or a held grenade cannot retarget it',()=>{
   const g=rollGame();g.key('s');g.key('k');tick(g);g.key('s',false);g.key('a');g.key('w');tick(g,5);
   eq(g.state().grenadeProjectiles[0].aim,'roll');assert(g.state().grenadeProjectiles[0].vx>0);eq(g.state().grenades,6);
