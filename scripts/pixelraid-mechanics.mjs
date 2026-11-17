@@ -5983,5 +5983,62 @@ test('shared enemy stomp visuals and snapshots stay local unsaved and reduced-mo
   }
 });
 
+// The footing marker is only a vertical terrain reference; it cannot alter a run.
+function guideGame(reducedMotion=false){
+  const g=createGame({reducedMotion});g.click('start');
+  g.run('stage.platforms=[];stage.gaps=[];player.x=100;player.y=200;player.ground=false;');return g;
+}
+test('footing guide selects the first overlapping terrain below the feet independent of platform order',()=>{
+  const g=guideGame();eq(g.state().footingGuide,{x:113.5,y:425,kind:'floor'});
+  g.run('stage.platforms=[[90,380,100],[90,300,100],[90,220,100]];');
+  eq(g.state().footingGuide,{x:113.5,y:300,kind:'platform'});
+  g.run('stage.platforms.reverse();');eq(g.state().footingGuide,{x:113.5,y:300,kind:'platform'});
+  g.run('player.y=280;');eq(g.state().footingGuide,{x:113.5,y:380,kind:'platform'});
+});
+test('footing guide respects pit center and strict platform overlap without inventing a floor',()=>{
+  const g=guideGame();g.run('stage.gaps=[[80,180]];');eq(g.state().footingGuide.kind,'gap');
+  g.run('stage.platforms=[[123.5,320,100]];');eq(g.state().footingGuide,{x:127.5,y:320,kind:'platform'});
+  g.run('player.x=100-0.5;');eq(g.state().footingGuide.kind,'gap');
+  g.run('stage.platforms=[[0,320,103]];player.x=100;');eq(g.state().footingGuide.kind,'gap');
+  g.run('player.x=99.5;');eq(g.state().footingGuide,{x:99,y:320,kind:'platform'});
+  g.run('stage.platforms=[];player.x=190;');eq(g.state().footingGuide.kind,'floor');
+});
+test('footing guide skips only the dropped platform and remains truthful during jumps and dives',()=>{
+  const g=guideGame();g.run('stage.platforms=[[90,300,100],[90,380,100]];player.dropPlatform=stage.platforms[0];');
+  eq(g.state().footingGuide.y,380);
+  for(const vy of [-525,0,650])for(const dive of [false,true]){
+    g.run(`player.vy=${vy};player.dashDive=${dive};player.dashTime=.1;`);eq(g.state().footingGuide.y,380);
+  }
+  g.run('player.dropPlatform=null;');eq(g.state().footingGuide.y,300);
+});
+test('footing guide is absent on ground, below the floor and outside active play',()=>{
+  const g=guideGame();g.run('player.ground=true;');eq(g.state().footingGuide,null);
+  g.run('player.ground=false;player.y=407;');eq(g.state().footingGuide,null);
+  g.run('player.y=200;');
+  for(const phase of ['title','paused','clear','over','supply']){g.run(`phase='${phase}';`);eq(g.state().footingGuide,null);}
+});
+test('footing guide painting is steady, unsaved and has no effects on physics combat or input',()=>{
+  for(const gap of [false,true])for(const reduced of [false,true]){
+    const g=guideGame(reduced);if(gap)g.run('stage.gaps=[[80,180]];');
+    const before=g.state(),body=g.read('player'),saved=[...g.values];let reference;
+    for(const time of [0,.3,.9,12]){
+      g.run(`clock=${time};`);
+      const lines=[];let from,to;
+      g.graphics.moveTo=(x,y)=>{from=[x,y];};g.graphics.lineTo=(x,y)=>{to=[x,y];};
+      g.graphics.stroke=()=>lines.push({from,to,color:g.graphics.strokeStyle,width:g.graphics.lineWidth});
+      const fills=protectionPaint(g,'drawFootingGuide();').fills,paint={fills,lines};
+      if(gap){eq(fills,[]);eq(lines,[
+        {from:[105.5,413],to:[113.5,421],color:'#ffd09a',width:3},
+        {from:[113.5,421],to:[121.5,413],color:'#ffd09a',width:3}
+      ]);}else{eq(lines,[]);eq(fills.length,4);}
+      if(reference)eq(paint,reference);reference=paint;
+      eq(g.read('player'),body);eq([...g.values],saved);
+      const state=g.state();delete state.clock;const expected={...before};delete expected.clock;eq(state,expected);
+    }
+    const snapshot=g.win.__raidState;snapshot.footingGuide.y=999;eq(g.state().footingGuide.y,425);
+    g.run('saveProgress();');assert(!JSON.stringify(g.state().progress).includes('footingGuide'));
+  }
+});
+
 assert(passed > 0, 'No Pixel Raid contracts matched the requested filter');
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
