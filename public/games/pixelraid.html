@@ -323,6 +323,7 @@
               <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。菜单中用方向键 / 左摇杆选择、A 确认、B 返回；按住方向可连续浏览。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
               <p>空中按住 S / ↓ 再开火可朝前下方俯射，松开下键恢复原方向；按住跳跃可仰射，同时按下时优先俯射。落地后仍是下蹲平射。手柄方向下 + 射击、触屏 ↓ + 射击同样适用，可从跳台、降层或踏击弹起中反击。</p>
               <p>反弹弹命中首领后可打出 1.5 秒破甲：趁头顶绿条持续时用步枪或散弹追击，每发额外造成 1 点伤害。再次反弹命中只刷新时长；反弹弹、手雷与震荡脉冲保持原伤害。破甲不会打断首领出招，仍需闪避。</p>
+              <p>反弹弹命中仍存活的盾卫后，开启 1.2 秒正面破防，可接射击追击；绿条结束恢复格挡，重复命中仅刷新时间，不增加伤害或震停。</p>
               <p>空中按住 S / ↓ 再投手雷可向前下方俯掷，适合跳台上清除近处地面敌人；松开下键恢复远距离抛投。地面或平台上按住下键则贴脚低抛，手雷沿支撑面弹跳、滚落边缘，适合近距离爆破；不按下键仍是远抛。三种轨迹的引信、伤害与消耗相同。手雷上方短条显示剩余引信，最后 0.3 秒变亮但不闪烁。手柄方向下 + B、触屏 ↓ + 雷同样适用。</p>
               <p>满血时医疗包、手雷满 7 枚时弹药留在原处，需要时再碰触领取；实际拾取才加 75 分。散弹与连射拾取后至少保留 12 秒，已有更长效果不会缩短。留存补给仅在当前场景有效。</p>
               <p>空中按住 S / ↓ 再冲刺可向面朝方向斜下俯冲，快速换层或落地；松开下键不改变本次方向。地面冲刺、不按下键的空中冲刺保持水平。平台仍会接住俯冲；要穿过当前平台，先按下键 + 跳跃降层，再冲刺。俯冲不追加伤害或冷却优惠，注意深坑。键盘、触屏与手柄共用此组合。</p>
@@ -1218,7 +1219,14 @@
           e.blockFlash=.18;spark(b.x,b.y,'#91dbff',4);
           combatNotice('盾牌格挡 · 绕后 / 手雷 / 反弹弹');return false;
         }
-        damageEnemy(e,b.damage,b.tactical);return true;
+        damageEnemy(e,b.damage,b.tactical);
+        // Like a stomp, an actual returned hit opens a follow-up, not the
+        // reflection itself. Reuse one timer: no stacked damage or extra stun.
+        if(e.type==='shield'&&b.reflected&&!e.dead){
+          e.shieldBreak=SHIELD_BREAK_SECONDS;
+          combatNotice('反弹破盾 · 1.2 秒正面可射击');
+        }
+        return true;
       }
       function reflectBullet(b){
         if(b.owner!=='e')return;
