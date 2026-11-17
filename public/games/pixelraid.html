@@ -321,7 +321,7 @@
             <summary>操作按键与战术提示</summary>
             <div class="details-body">
               <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。菜单中用方向键 / 左摇杆选择、A 确认、B 返回；按住方向可连续浏览。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
-              <p>普通跳跃轻点短跳、按住高跳；上升时松开可提前收跳。远征、练习、作战挑战与防线均可从上方踏击杂兵：2 点伤害并弹起，按住跳跃高弹、下键优先短弹；存活盾卫破防 1.2 秒。首领不可踩，侧面和已发弹药仍危险。踏击力度在踩中瞬间确定，之后松开不会缩短。</p>
+              <p>普通跳跃轻点短跳、按住高跳；上升时松开可提前收跳。远征、练习、作战挑战与防线均可从上方踏击杂兵：2 点伤害并弹起，按住跳跃高弹、下键优先短弹；存活盾卫破防 1.2 秒。踩死杂兵会立即恢复正在冷却的冲刺，需重新按冲刺键使用；非致命踏击、踏爆装置或普通击杀不回充。首领不可踩，侧面和已发弹药仍危险。踏击力度在踩中瞬间确定，之后松开不会缩短。</p>
               <p>腾空时脚下蓝色托线标出当前正下方的平台或地面，橙色 V 表示深坑；只参考地形，不预测移动后的落点，也不代表没有敌人。降层时忽略刚穿过的平台，落地后隐藏。</p>
               <p>空中按住 S / ↓ 再开火可朝前下方俯射，松开下键恢复原方向；按住跳跃可仰射，同时按下时优先俯射。落地后仍是下蹲平射。手柄方向下 + 射击、触屏 ↓ + 射击同样适用，可从跳台、降层或踏击弹起中反击。</p>
               <p>反弹弹命中首领后可打出 1.5 秒破甲：趁头顶绿条持续时用步枪或散弹追击，每发额外造成 1 点伤害。再次反弹命中只刷新时长；反弹弹、手雷与震荡脉冲保持原伤害。破甲不会打断首领出招，仍需闪避。</p>
@@ -1351,8 +1351,14 @@
         e.windup=0;e.burst=0;e.stagger=STOMP.stagger;e.shot=Math.max(.35,e.shot);
         if(e.type==='charger'){e.chargerPhase='recover';e.chargerTime=STOMP.stagger;}
         damageEnemy(e,STOMP.damage);
+        // A lethal enemy stomp earns one escape, not extra damage or rewards.
+        // A device blast (even if lethal), ordinary kill or nonlethal bounce
+        // cannot refill it. Clear stale pre-input so the rebound never dashes
+        // by itself; the player chooses a fresh direction and press afterwards.
+        const dashRefilled=e.dead&&player.dashCooldown>0;
+        if(dashRefilled){player.dashCooldown=0;player.dashBuffer=0;stompBurst.dashRefilled=true;}
         if(!e.dead&&e.type==='shield')e.shieldBreak=SHIELD_BREAK_SECONDS;
-        combatNotice('空中踏击 · '+(e.dead?combatText:e.type==='shield'?'盾卫破防 1.2 秒 / 正面可射击':'2 点伤害 / 弹起反击'));hud();
+        combatNotice('空中踏击 · '+(e.dead?combatText:e.type==='shield'?'盾卫破防 1.2 秒 / 正面可射击':'2 点伤害 / 弹起反击')+(dashRefilled?' · 冲刺回充':''));hud();
       }
       function updateMortar(e,dt){
         if(e.windup>0){
@@ -2014,6 +2020,7 @@
         c.strokeStyle='#b9ffe2';c.lineWidth=3;c.beginPath();c.ellipse(x,y,24,7,0,0,Math.PI*2);c.stroke();
         line(x-9,y-17,x,y-24,'#b9ffe2',3);line(x,y-24,x+9,y-17,'#b9ffe2',3);
         if(stompBurst.device){c.font='bold 12px system-ui';c.fillStyle='#ffe1a0';c.fillText('踏爆',x+31,y+8);}
+        if(stompBurst.dashRefilled){c.font='bold 12px system-ui';c.fillStyle='#b9ffe2';c.fillText('冲刺回充',x+31,y+23);}
         if(stompBurst.boosted){
           line(x-9,y-26,x,y-33,'#b9ffe2',3);line(x,y-33,x+9,y-26,'#b9ffe2',3);
           c.font='bold 12px system-ui';c.fillStyle='#b9ffe2';c.fillText('跃升',x+31,y-8);
