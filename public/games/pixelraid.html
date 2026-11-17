@@ -802,7 +802,7 @@
         if(gauntlet())stage={...stage,name:'首领竞技场',width:W,gaps:[],checkpoints:[],
           platforms:[[260,320,170],[500,310,150]],intel:[],enemies:[],pickups:[]};
         player={x:64,y:G-44,w:27,h:44,vx:0,vy:0,face:1,hp:clamp(carry?.hp??maxHealth(),1,maxHealth()),
-          lives:carry?.lives??(difficulty==='relaxed'?4:3),grenades:carry?.grenades??3,ground:true,inv:1.2,shoot:0,boost:0,
+          lives:carry?.lives??(difficulty==='relaxed'?4:3),grenades:carry?.grenades??3,ground:true,inv:1.2,invDuration:1.2,shoot:0,boost:0,
           weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashBuffer:0,dashDir:1,dashDive:false,coyote:.1,jumpBuffer:0,jumpBufferReleased:false,jumpCutEligible:false,jumpReleasePending:false,crouch:false,dropPlatform:null,dropTime:0};
         enemies=stage.enemies.map(([x,type])=>makeEnemy(x,type));
         pickups=stage.pickups.map(([x,kind])=>({x,y:kind==='spread'?G-45:G-93,kind,done:false,age:0}));
@@ -840,7 +840,7 @@
         if(bossWave())stage={...stage,platforms:[[260,320,170],[500,310,150]]};
         boss=makeBoss(bossWave()?[32,44,56][stageIndex]+Math.min(48,Math.floor((survivalWave-1)/9)*12):0,790);
         player.x=W/2-player.w/2;player.h=44;player.y=G-44;player.vx=0;player.vy=0;player.ground=true;
-        player.crouch=false;player.inv=1.2;player.shoot=0;player.dashTime=0;player.dashDive=false;player.dashBuffer=0;player.dashCooldown=0;player.jumpBuffer=0;player.coyote=.11;player.dropPlatform=null;player.dropTime=0;
+        player.crouch=false;player.inv=1.2;player.invDuration=1.2;player.shoot=0;player.dashTime=0;player.dashDive=false;player.dashBuffer=0;player.dashCooldown=0;player.jumpBuffer=0;player.coyote=.11;player.dropPlatform=null;player.dropTime=0;
         devices=(arena?.devices||[]).map(([x,floor])=>({x:x-12,y:floor-36,w:24,h:36,hp:2,spent:false}));deviceBursts=[];
         const slots=arena?.slots||[],count=Math.min(8,3+Math.floor(survivalWave/2));
         const types=survivalWave===1?['walker']:survivalWave===2?['walker','drone']:['walker','turret','shield','drone'];
@@ -1103,7 +1103,7 @@
         // into this result, never a cached earlier hit or a persistent record.
         const cause=HIT_SOURCES[source]||HIT_SOURCES.contact;
         combo.count=0;combo.timer=0;combatNotice(cause.name+' · 连击中断');
-        player.hp=Math.max(0,player.hp-damage);player.inv=difficulty==='relaxed'?1.9:1.45;shake=8;beep(170,.2,'sawtooth');
+        player.hp=Math.max(0,player.hp-damage);player.inv=difficulty==='relaxed'?1.9:1.45;player.invDuration=player.inv;shake=8;beep(170,.2,'sawtooth');
         spark(player.x+12,player.y+20,'#f6a174',13);
         if(player.hp===0){
           boss.breach=0;player.lives--;stageDeaths++;
@@ -1114,7 +1114,7 @@
             saveBest();hud();showMenu('行动失败',recap+'本次得分 '+points+'，也可回指挥部切换轻松模式。','再试一次','gameOver');
             return;
           }
-          player.hp=maxHealth();player.x=player.checkpoint;player.h=44;player.y=G-player.h;player.vx=0;player.vy=0;player.ground=true;player.inv=2.2;player.dashTime=0;player.dashDive=false;player.dashBuffer=0;player.jumpBuffer=0;player.dropPlatform=null;player.dropTime=0;
+          player.hp=maxHealth();player.x=player.checkpoint;player.h=44;player.y=G-player.h;player.vx=0;player.vy=0;player.ground=true;player.inv=2.2;player.invDuration=2.2;player.dashTime=0;player.dashDive=false;player.dashBuffer=0;player.jumpBuffer=0;player.dropPlatform=null;player.dropTime=0;
           jumpQueued=false;jumpQueuedReleased=false;player.jumpBufferReleased=false;cancelJumpCut();
           bullets=bullets.filter(b=>b.owner==='p');
           announce('失去一条生命，从检查点继续。');
@@ -1790,9 +1790,8 @@
           c.globalAlpha=1;
           if(player.dashDive){c.font='bold 11px system-ui';c.fillStyle='#a6eaff';c.fillText('俯冲',player.x-1,player.y-9);}
         }
-        // Movement intent stays readable even during the body's respawn blink.
-        if(player.inv>0&&Math.floor(clock*13)%2===0)return;
-        c.save();c.translate(player.x+player.w/2,player.y);c.scale(player.face,1);
+        // Protection is a static cue, never a reason to hide the body or rifle.
+        c.save();c.globalAlpha=1;c.translate(player.x+player.w/2,player.y);c.scale(player.face,1);
         const crouch=player.crouch,run=Math.sin(clock*18)*3*(Math.abs(player.vx)>5?1:0);
         if(crouch){
           rect(-11,0,23,7,'#e5b85e');rect(-9,5,19,10,'#efc5a7');rect(-13,14,27,10,'#5bb4a5');
@@ -1805,7 +1804,22 @@
           rect(5,10,6,4,'#2a3c4b');
           drawRifle(20);
         }
-        c.restore();
+        c.restore();drawProtection();
+      }
+      function drawProtection(){
+        if(phase==='title'||player.hp<=0||player.inv<=0)return;
+        // Read the existing immunity clock. Duration only normalizes this bar;
+        // corner marks stay outside the body and never become a shield frame.
+        const left=player.x-6,right=player.x+player.w+1,top=player.y-3,bottom=player.y+player.h-6;
+        const color='#f6e3a1',width=Math.max(1,Math.round(24*clamp(player.inv/player.invDuration,0,1)));
+        c.save();c.globalAlpha=1;
+        rect(left,top,5,2,color);rect(left,top,2,6,color);
+        rect(right,top,5,2,color);rect(right+3,top,2,6,color);
+        rect(left,bottom+4,5,2,color);rect(left,bottom,2,6,color);
+        rect(right,bottom+4,5,2,color);rect(right+3,bottom,2,6,color);
+        // Above, not behind, the existing dive label; no extra text or panel.
+        rect(player.x+player.w/2-13,player.y-28,26,5,'#172c43');
+        rect(player.x+player.w/2-12,player.y-27,width,3,color);c.restore();
       }
       function drawIntel(item){
         if(item.done)return;
@@ -2311,6 +2325,7 @@
       Object.defineProperty(window,'__raidState',{get:()=>({
         ready:true,phase,stage:stageIndex+1,stageName:stage?.name??'',x:player?.x??0,y:player?.y??0,vy:player?.vy??0,hp:player?.hp??0,
         lives:player?.lives??0,score:points,shots:shotsFired,bullets:bullets.length,
+        protectionTime:player?.inv??0,protectionDuration:player?.invDuration??0,
         hostiles:bullets.filter(b=>b.owner==='e').map(b=>({x:b.x,y:b.y})),
         fireAim:player?fireAim():0,face:player?.face??1,
         playerProjectiles:bullets.filter(b=>b.owner==='p').map(b=>({x:b.x,y:b.y,vx:b.vx,vy:b.vy,damage:b.damage,reflected:b.reflected,tactical:!!b.tactical})),
