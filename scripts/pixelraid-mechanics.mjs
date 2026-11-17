@@ -3714,7 +3714,7 @@ test('descending aerial stomps hit every ordinary type for 2 and rebound without
     const g=stompGame(type),before=g.state(),enemy=g.read('({...enemies[0]})');
     tick(g);const after=g.state();eq(after.stomps,1);eq(after.vy,-400);eq(after.ground,false);
     eq(g.read('enemies[0].hp'),enemy.hp-2);eq(after.hp,before.hp);eq(g.read('player.inv'),0);
-    eq(after.grenades,before.grenades);eq(after.shots,0);near(after.dashCooldown,1-1/60);
+    eq(after.grenades,before.grenades);eq(after.shots,0);near(after.dashCooldown,type==='drone'?0:1-1/60);
     eq(after.score,type==='drone'?100:0);eq(after.tacticalCharge,type==='drone'?18:6);
     eq(g.read('player.coyote'),0);eq(g.read('player.jumpBuffer'),0);assert(after.stompBurst);
     eq(g.read('enemies[0].stagger'),.3);assert(after.combatText.includes('空中踏击'));
@@ -5807,7 +5807,7 @@ test('shared enemy stomps reach all three chapters both difficulties and ordinar
       const g=travelStompGame({...options,stage,type}),before=g.state(),hp=g.read('enemies[0].hp');tick(g);const after=g.state();
       eq(after.stomps,1);eq(after.vy,-400);eq(after.ground,false);eq(g.read('enemies[0].hp'),hp-2);eq(g.read('enemies[0].stagger'),.3);
       for(const key of ['hp','lives','grenades','shots','tacticalCharge','reflections','challengeReflections'])eq(after[key],before[key]);
-      eq(after.protectionTime,0);near(after.dashCooldown,before.dashCooldown-1/60);eq(after.score,type==='drone'?100:0);
+      eq(after.protectionTime,0);near(after.dashCooldown,type==='drone'?0:before.dashCooldown-1/60);eq(after.score,type==='drone'?100:0);
       tick(g,5);eq(g.state().stomps,1);eq(g.read('enemies[0].hp'),hp-2);
     }
   }
@@ -6037,6 +6037,77 @@ test('footing guide painting is steady, unsaved and has no effects on physics co
     }
     const snapshot=g.win.__raidState;snapshot.footingGuide.y=999;eq(g.state().footingGuide.y,425);
     g.run('saveProgress();');assert(!JSON.stringify(g.state().progress).includes('footingGuide'));
+  }
+});
+
+// Only an enemy killed by the physical stomp earns a fresh dash.
+const refillModes=[...travelStompModes,{mode:'survival'}];
+function refillGame(options={},hp=2){
+  const g=options.mode==='survival'?stompGame(options.type||'walker'):travelStompGame(options);
+  g.run(`enemies[0].hp=${hp};player.dashCooldown=1.7;`);return g;
+}
+test('stomp dash refill requires a lethal enemy impact in every mode and enemy type',()=>{
+  for(const options of refillModes)for(const type of ['walker','shield','turret','drone','charger','mortar'])for(const hp of [1,2,3]){
+    const g=refillGame({...options,type},hp),before=g.state();tick(g);const after=g.state(),lethal=hp<=2;
+    eq(after.stomps,1);eq(g.read('enemies[0].dead'),lethal);near(after.dashCooldown,lethal?0:1.7-1/60);
+    eq(!!after.stompBurst.dashRefilled,lethal);eq(after.dashTime,0);eq(after.vy,-400);
+    for(const key of ['hp','lives','grenades','shots','reflections','challengeReflections'])eq(after[key],before[key]);
+    eq(after.protectionTime,0);eq(after.combatText.includes('冲刺回充'),lethal);
+    if(lethal){eq(g.nodes.get('dash-status').textContent,'就绪');eq(g.nodes.get('dash-control').getAttribute('data-ready'),'true');eq(g.nodes.get('dash-meter').style.width,'100%');}
+  }
+});
+test('stomp dash refill is bounded and never auto-dashes from a held key or stale buffer',()=>{
+  for(const options of refillModes){
+    const g=refillGame(options);g.key('Shift');tick(g);eq(g.state().dashCooldown,0);eq(g.state().dashBuffer,0);eq(g.state().dashTime,0);
+    const score=g.state().score,energy=g.state().tacticalCharge;
+    tick(g,4);eq(g.state().dashTime,0);eq(g.state().score,score);eq(g.state().tacticalCharge,energy);eq(g.state().stomps,1);
+    g.key('Shift',false);g.key('a');g.key('Shift');tick(g);
+    assert(g.state().dashTime>0);eq(g.read('player.dashDir'),-1);near(g.state().dashCooldown,g.read('dashDelay()'));
+    g.key('Shift',false);g.key('a',false);tick(g,15);eq(g.state().dashTime,0);assert(g.state().dashCooldown>0);
+  }
+});
+test('stomp dash refill does not add a charge when already ready or alter damage score and energy',()=>{
+  for(const options of refillModes){
+    const g=refillGame(options),ready=refillGame(options);ready.run('player.dashCooldown=0;');tick(g);tick(ready);
+    const a=g.state(),b=ready.state();eq(a.dashCooldown,0);eq(b.dashCooldown,0);eq(b.stompBurst.dashRefilled,undefined);assert(!b.combatText.includes('冲刺回充'));
+    for(const key of ['score','hp','lives','grenades','tacticalCharge','reflections','stomps','vy'])eq(a[key],b[key]);
+  }
+});
+test('stomp dash refill excludes ordinary kills and device blast kills',()=>{
+  for(const attack of ['rifle','bomb','device']){
+    const g=attack==='device'?deviceStompGame():refillGame();
+    g.run('player.dashCooldown=1.7;');
+    if(attack==='device')g.run("enemies=[{...makeEnemy(570,'walker'),hp:1,shot:100},{...makeEnemy(100,'turret'),shot:100}];");
+    else g.run(attack==='rifle'?"player.ground=true;player.y=G-player.h;player.x=300;damageEnemy(enemies[0],2);":"player.ground=true;player.y=G-player.h;player.x=300;boom(enemies[0].x,enemies[0].y);");
+    tick(g);assert(g.read('enemies[0].dead'));near(g.state().dashCooldown,1.7-1/60);assert(!g.state().stompBurst?.dashRefilled);
+  }
+});
+test('stomp dash refill is transient through pause cancel retry and detached snapshots',()=>{
+  const g=refillGame();tick(g);eq(g.state().dashCooldown,0);g.win.__raidState.stompBurst.dashRefilled=false;eq(g.state().stompBurst.dashRefilled,true);
+  g.key('p');g.key('p',false);eq(g.state().phase,'pause');const before=g.state();tick(g,30);eq(g.state().stompBurst,before.stompBurst);eq(g.state().dashCooldown,0);
+  g.click('restart');g.click('cancel-restart');eq(g.state().phase,'pause');g.click('start');tick(g);eq(g.state().dashTime,0);
+  g.run('saveProgress();');assert(!/dashRefilled|stompBurst/.test(JSON.stringify(g.state().progress)));
+  g.click('restart');g.click('start');eq(g.state().stompBurst,null);eq(g.state().stomps,0);
+});
+test('stomp dash refill label uses actual refill only and drawing cannot change combat',()=>{
+  for(const reducedMotion of [false,true])for(const ready of [false,true]){
+    const g=travelStompGame({reducedMotion});g.run(`enemies[0].hp=2;player.dashCooldown=${ready?0:1};`);tick(g);
+    const before=g.state(),labels=[];g.graphics.fillText=t=>labels.push(t);g.run('drawStomp();');eq(g.state(),before);eq(labels.includes('冲刺回充'),!ready);
+  }
+});
+
+test('stomp dash refill control-only rifle dash stomp route works across seeds and observation cadences',()=>{
+  for(const randomSeed of [1,17,932,16437])for(const cadence of [1,3,6]){
+    const g=createGame({randomSeed});g.click('start');g.key('j');tick(g);g.key('j',false);
+    until(g,()=>g.state().enemies[0].hp===2,100);eq(g.state().shots,1);
+    g.key('Shift');tick(g);g.key('Shift',false);until(g,()=>g.state().dashTime===0,30);
+    g.key('d');until(g,()=>g.state().x>=280,100);g.key('w');
+    for(let frames=0;frames<180&&g.state().stomps===0;frames+=cadence){
+      const s=g.state(),enemy=s.enemies[0];eq(enemy.hp,2);const dx=enemy.x+enemy.w/2-s.x-13.5;
+      g.key('d',dx>10);g.key('a',dx< -10);tick(g,cadence);
+    }
+    eq(g.state().stomps,1);eq(g.state().dashCooldown,0);eq(g.state().dashTime,0);assert(g.state().stompBurst?.dashRefilled);eq(g.state().shots,1);
+    g.key('a',false);g.key('d');g.key('Shift');tick(g);assert(g.state().dashTime>0);eq(g.state().ground,false);near(g.state().dashCooldown,2.4);
   }
 });
 
