@@ -189,10 +189,11 @@ export async function checkRaidDevices(sourcePage, problems) {
         // left. No enemy, device, position, weapon or timing fixture is used.
         await page.keyboard.down('d');
         await page.waitForFunction(() => window.__raidState.x >= 570, { timeout: 1500, polling: 'raf' });
-        await page.keyboard.up('d'); await page.keyboard.press('w');
+        await page.keyboard.up('d'); await page.keyboard.down('w');
         await page.waitForFunction(() => {
           const s = window.__raidState; return s.ground && Math.abs(s.y + s.playerHeight - 365) < 1;
         }, { timeout: 2500 });
+        await page.keyboard.up('w');
         const beforeTurn = (await read()).x;
         await page.keyboard.down('a');
         await page.waitForFunction(x => window.__raidState.x < x, { timeout: 1000, polling: 'raf' }, beforeTurn);

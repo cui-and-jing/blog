@@ -162,7 +162,11 @@ export async function checkRaidStomp(sourcePage, problems) {
       const jumping = await observe(() => { const s = window.__raidState;
         return !s.ground && s.vy < 0 && s.stomps === 0 ? s : false;
       });
-      if (!boosted) await control('jump', false);
+      if (!boosted) {
+        // The comparison changes contact-time rebound intent, not takeoff.
+        await observe(() => window.__raidState.vy >= 0);
+        await control('jump', false);
+      }
       check(jumping.y < ready.y && (mobile ? jumping.touchCount === 1 : jumping.touchCount === 0),
         '原生跳跃没有使玩家起跳', { ready, jumping });
       const impact = await observe(() => window.__raidStompObserved || false);

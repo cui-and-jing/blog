@@ -97,16 +97,17 @@ export async function checkRaidChallenges(page, problems) {
           bullet.y > state.y - 15 && bullet.y < state.y + state.playerHeight + 15);
         if (nearby && state.dashCooldown === 0) await page.keyboard.press('l');
         if (state.bossAttackType === 'beam' && state.bossCharge > 0 && state.bossCharge <= .38 && !dodged) {
-          if (state.bossBeamY > 405) await page.keyboard.press('w');
+          if (state.bossBeamY > 405) await page.keyboard.down('w');
           else await page.keyboard.down('s');
           dodged = true;
         }
+        if (!state.ground && state.vy >= 0) await page.keyboard.up('w');
         if (state.bossCharge === 0 && state.bossBeamTime === 0) {
-          await page.keyboard.up('s'); dodged = false;
+          await page.keyboard.up('s'); await page.keyboard.up('w'); dodged = false;
         }
         await wait(100);
       }
-    } finally { await page.keyboard.up('j'); await page.keyboard.up('d'); await page.keyboard.up('s'); }
+    } finally { await page.keyboard.up('j'); await page.keyboard.up('d'); await page.keyboard.up('s'); await page.keyboard.up('w'); }
     check(state.phase === (round < 3 ? 'bossBreak' : 'challengeClear') && state.bossWins === round,
       '真实射击未完成第 ' + round + ' 位首领', state);
     if (state.phase !== 'bossBreak' && state.phase !== 'challengeClear') break;

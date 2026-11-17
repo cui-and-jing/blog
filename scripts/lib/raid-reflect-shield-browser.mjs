@@ -110,7 +110,8 @@ export async function checkRaidReflectShield(sourcePage, problems) {
       await wait(() => window.__raidState.x >= 350);await up('right');await up('jump');
       await wait(() => window.__raidState.ground);
       if ((await read()).y + (await read()).playerHeight === 425) {
-        await down('jump');await wait(() => !window.__raidState.ground);await up('jump');
+        await down('jump');await wait(() => !window.__raidState.ground);
+        await wait(() => window.__raidState.vy >= 0);await up('jump');
         await wait(() => window.__raidState.ground);
       }
       const ledge = await read();

@@ -162,7 +162,13 @@ function createGame({ storage = {}, blocked = false, reducedMotion = false, rand
 }
 
 let passed = 0;
+const matchIndex = process.argv.indexOf('--match');
+if (matchIndex >= 0 && (!process.argv[matchIndex + 1] || process.argv[matchIndex + 1].startsWith('--'))) {
+  throw new Error('--match requires a nonempty regular expression');
+}
+const testMatch = matchIndex < 0 ? null : new RegExp(process.argv[matchIndex + 1], 'i');
 function test(name, fn) {
+  if (testMatch && !testMatch.test(name)) return;
   try { fn(); passed++; console.log('✓ ' + name); }
   catch (error) { error.message = name + ': ' + error.message; throw error; }
 }
@@ -447,7 +453,7 @@ test('jump input just before landing is buffered into a real jump', () => {
   g.run('player.x=80; player.y=G-player.h-7; player.vy=300; player.ground=false;');
   g.frames(10); // Clear any initial grounded grace before arranging the landing.
   g.run('player.y=G-player.h-7; player.vy=300; player.ground=false; player.coyote=0;');
-  g.key('w'); g.key('w', false); g.frames(5);
+  g.key('w'); g.frames(5); g.key('w', false);
   assert(g.read('player.vy') < -350 && !g.state().ground, 'Buffered jump should fire on the landing');
 });
 
@@ -500,8 +506,8 @@ test('all nine intel are reachable from spawn through real jump/dash input', () 
       eq(g.state().lives, 3); eq(g.state().stageDeaths, 0);
     }
     function jumpTo(x) {
-      g.key('w'); g.key('w', false); runTo(x);
-      until(g, () => g.state().ground, 180);
+      g.key('w'); runTo(x);
+      until(g, () => g.state().ground, 180); g.key('w', false);
     }
     if (index === 0) {
       runTo(420); jumpTo(550); runTo(790); jumpTo(1010);
@@ -511,9 +517,9 @@ test('all nine intel are reachable from spawn through real jump/dash input', () 
       runTo(290); jumpTo(430); runTo(690); jumpTo(910);
       runTo(1210); jumpTo(1380); runTo(1400); jumpTo(1680);
       runTo(2035); jumpTo(2190); runTo(2270);
-      g.key('w'); g.key('w', false); runTo(2370);
+      g.key('w'); runTo(2370);
       g.key('l'); g.key('l', false); runTo(2640);
-      until(g, () => g.state().ground, 180);
+      until(g, () => g.state().ground, 180); g.key('w', false);
     } else {
       runTo(330); jumpTo(470); runTo(640); jumpTo(850);
       runTo(1210); jumpTo(1370); runTo(1410); jumpTo(1660);
@@ -3209,8 +3215,8 @@ test('grounded and crouching players take one rush hit, while real jumps reach a
   for(const reducedMotion of [false,true]){
     const g=chargerGame({reducedMotion});g.run('player.x=580;');tick(g,31);
     assert(charger(g).chargerPhase==='windup');const hp=g.state().hp;
-    g.key('w');tick(g);g.key('w',false);
-    tickUntil(g,"enemies[0].chargerPhase==='recover'",80);
+    g.key('w');tick(g);
+    tickUntil(g,"enemies[0].chargerPhase==='recover'",80);g.key('w',false);
     eq(g.state().hp,hp);assert(g.state().y+g.state().playerHeight<=335);
     tick(g,30);eq(g.state().hp,hp);near(g.state().y+g.state().playerHeight,335);
   }
@@ -3219,7 +3225,7 @@ test('grounded and crouching players take one rush hit, while real jumps reach a
 test('a late-windup ground jump clears the actual rushing body without a platform',()=>{
   const g=chargerGame();g.run('stage.platforms=[];');tick(g,37);
   eq(charger(g).chargerPhase,'windup');assert(charger(g).chargerTime>.15&&charger(g).chargerTime<.25);
-  const hp=g.state().hp;g.key('w');tick(g);g.key('w',false);
+  const hp=g.state().hp;g.key('w');tick(g);
   let crossed=false;
   for(let frame=0;frame<70;frame++){
     tick(g);const s=g.state(),e=charger(g);
@@ -3612,7 +3618,7 @@ test('genuine walk, timed jump and platform drop evade the locked impact while p
     const walk=mortarGame({reducedMotion});tick(walk);const target=mortar(walk).aimX;walk.key('a');tick(walk,30);walk.key('a',false);
     launchMortar(walk);const hp=walk.state().hp;impactMortar(walk);eq(walk.state().hp,hp);assert(walk.state().x+27<target-58);
     const jump=mortarGame({reducedMotion});jump.run('stage.platforms=[];');launchMortar(jump);tick(jump,30);
-    const health=jump.state().hp;jump.key('w');tick(jump);jump.key('w',false);impactMortar(jump);eq(jump.state().hp,health);assert(jump.state().y+jump.state().playerHeight<361);
+    const health=jump.state().hp;jump.key('w');tick(jump);impactMortar(jump);jump.key('w',false);eq(jump.state().hp,health);assert(jump.state().y+jump.state().playerHeight<361);
     const drop=beaconDefense({wave:5,reducedMotion});standAtBeacon(drop);
     drop.run("spawnTime=0;devices=[];pickups=[];enemies=[makeEnemy(100,'mortar')];enemies[0].shot=0;player.inv=0;fieldContract.beacon.progress=2;");
     tick(drop,10);launchMortar(drop);const progress=beaconProgress(drop),healthBefore=drop.state().hp;
@@ -3853,7 +3859,8 @@ test('all three loadouts can earn a first-wave stomp through ordinary keyboard o
       if(input==='controller'){g.pad();g.frames(1);}
       const before=g.state();
       if(input==='controller')g.pad([0]);else g.key('w');
-      g.frames(1);if(input==='controller')g.pad();else g.key('w',false);
+      g.frames(1);until(g,()=>g.state().vy>=0,40);
+      if(input==='controller')g.pad();else g.key('w',false);
       until(g,()=>g.state().stomps>0,70);const after=g.state();
       eq(after.stomps,1);eq(after.hp,before.hp);eq(after.enemies.filter(e=>e.hp===1).length,1);
       for(const key of ['score','shots','grenades','tacticalUses','reflections'])eq(after[key],before[key]);
@@ -4176,7 +4183,7 @@ const recapSources={
   bullet:['敌方子弹','冲刺接触敌弹可反弹'],contact:['敌人接触','拉开距离再开火'],
   charger:['冲锋兵接触','趁回气时反击'],mortar:['投弹爆炸','爆炸不能反弹'],
   lowBeam:['低位激光','跳跃或冲刺避开'],highBeam:['高位激光','下蹲或冲刺避开'],
-  boss:['首领接触','与首领保持距离'],fall:['坠落深坑','从坑前起跳'],
+  boss:['首领接触','与首领保持距离'],fall:['坠落深坑','从坑前按住跳跃'],
 };
 function recapGame({mode='survival',difficulty='standard',loadout='assault',blocked=false,reducedMotion=false}={}){
   const g=createGame({blocked,reducedMotion});
@@ -4826,7 +4833,7 @@ test('high rebound can reach the first arena upper ledge through ordinary moveme
     const g=createGame({randomSeed:16437});g.click('mode-survival');g.click('start');
     g.key('a');until(g,()=>g.state().x<=400,100);g.key('a',false);
     until(g,()=>{const s=g.state();return s.spawnTime===0&&Math.min(...s.enemies.map(e=>Math.abs(e.x+e.w/2-s.x-13.5)))<=47;},500);
-    g.key('w');g.frames(1);if(!boosted)g.key('w',false);
+    g.key('w');g.frames(1);if(!boosted){until(g,()=>g.state().vy>=0,40);g.key('w',false);}
     until(g,()=>g.state().stomps>0,70);const impact=g.state();eq(impact.stompBurst.boosted,boosted);
     g.key('w',false);g.key('d');until(g,()=>g.state().x>=445,30);g.key('d',false);
     until(g,()=>g.state().ground,100);const landing=g.state();
@@ -5311,4 +5318,232 @@ test('counter-break feedback reuses detached unsaved timer and reduced-motion sh
   }
 });
 
+// Ordinary-jump height is input intent, not a change to the fixed/boosted
+// stomp impulses. Fixtures isolate boundary geometry; browser acceptance below
+// separately uses only native controls on the shipped compressed page.
+function ordinaryJump(options) {
+  const g = createGame(options); g.start();
+  g.run('stage={...stage,gaps:[],platforms:[]};enemies=[];pickups=[];intel=[];boss.dead=true;');
+  return g;
+}
+function jumpButton(g) { return [...g.nodes.values()].find(node => node.dataset.action === 'jump'); }
+function finishJump(g) {
+  let apex = g.state().y, ticks = 0;
+  do { tick(g); apex = Math.min(apex, g.state().y); ticks++; } while (!g.state().ground && ticks < 120);
+  assert(g.state().ground, 'Jump did not return to its actual support');
+  return { apex, ticks };
+}
+function pollPad(g, buttons = [], id) { g.pad(buttons, [0, 0], id); g.run('pollGamepad();'); }
+
+test('variable ordinary jump retains exact full-height physics and makes an early release visibly shorter', () => {
+  const full = ordinaryJump(), short = ordinaryJump(), base = full.state().y;
+  const before = full.state(); full.key('w'); short.key('w'); tick(full, 2); tick(short, 2);
+  near(full.state().vy, -525 + 2 * 1250 / 60); near(short.state().vy, full.state().vy);
+  short.key('w', false); tick(short); near(short.state().vy, -220 + 1250 / 60);
+  const high = finishJump(full), low = finishJump(short);
+  assert(base - high.apex > 100 && base - high.apex < 110, 'Held jump changed the original full apex');
+  assert(base - low.apex > 20 && base - low.apex < 65, 'Early release did not create a short hop');
+  assert(low.ticks < high.ticks && low.apex - high.apex > 45, 'Tap and hold are not distinctly different');
+  for (const g of [full, short]) for (const name of ['hp','lives','grenades','score','shots','stomps','stageDeaths']) eq(g.state()[name], before[name]);
+  full.key('w', false);
+});
+
+test('variable ordinary jump cuts every keyboard alias and respects physical key ownership', () => {
+  for (const key of ['w', 'ArrowUp', ' ']) {
+    const g = ordinaryJump(); g.key(key); tick(g, 2); g.key(key, false); tick(g);
+    near(g.state().vy, -220 + 1250 / 60); eq(g.state().jumpHeld, false);
+  }
+  for (const aliases of [['w','ArrowUp'],['ArrowUp',' '],[' ','w']]) for (const reverse of [false,true]) {
+    const g = ordinaryJump(); for (const key of aliases) g.key(key); tick(g, 2);
+    g.key(aliases[reverse ? 1 : 0], false); tick(g);
+    near(g.state().vy, -525 + 3 * 1250 / 60); eq(g.state().jumpHeld, true);
+    g.key(aliases[reverse ? 0 : 1], false); tick(g); near(g.state().vy, -220 + 1250 / 60);
+  }
+  const layout = ordinaryJump(); layout.key('w', true, false, {code:'KeyW'}); tick(layout, 2);
+  layout.key('Z', false, false, {code:'KeyW', shiftKey:true}); tick(layout);
+  near(layout.state().vy, -220 + 1250 / 60); eq(layout.state().jumpHeld, false);
+});
+
+test('variable ordinary jump remembers a complete tap between physics ticks without losing the jump', () => {
+  for (const input of ['keyboard','touch']) {
+    const g = ordinaryJump(), base = g.state().y;
+    if (input === 'keyboard') { g.key('w'); g.key('w', false); }
+    else { jumpButton(g).dispatch('pointerdown',{pointerId:7}); jumpButton(g).dispatch('pointerup',{pointerId:7}); }
+    tick(g); assert(!g.state().ground && g.state().y < base);
+    near(g.state().vy, -220 + 1250 / 60); eq(g.state().jumpHeld, false);
+    const result = finishJump(g); assert(base - result.apex < 30 && base - result.apex > 10);
+    tick(g, 40); eq(g.state().ground, true); eq(g.state().jumpBuffer, 0);
+  }
+});
+
+test('variable ordinary jump repeated events and a re-press cannot add impulses or repeatedly cut ascent', () => {
+  const g = ordinaryJump(); g.key('w'); tick(g, 2);
+  g.key('w', true, true); g.key('w'); tick(g); near(g.state().vy, -525 + 3 * 1250 / 60);
+  g.key('w', false); tick(g); near(g.state().vy, -220 + 1250 / 60);
+  const speed = g.state().vy;
+  g.key('w'); g.key('w', false); g.key('w', false); tick(g);
+  near(g.state().vy, speed + 1250 / 60); eq(g.state().jumpCutEligible, false);
+  finishJump(g); tick(g, 20); eq(g.state().ground, true);
+});
+
+test('variable ordinary jump only a final real touch release cuts and cancellation never invents one', () => {
+  for (const type of ['pointerup','pointercancel','lostpointercapture']) {
+    const g = ordinaryJump(), jump = jumpButton(g);
+    jump.dispatch('pointerdown',{pointerId:10}); jump.dispatch('pointerdown',{pointerId:11}); tick(g, 2);
+    jump.dispatch(type,{pointerId:10}); tick(g); near(g.state().vy, -525 + 3 * 1250 / 60);
+    eq(g.state().touchCount, 1); assert(jump.classList.contains('active'));
+    jump.dispatch(type,{pointerId:11}); tick(g);
+    near(g.state().vy, type === 'pointerup' ? -220 + 1250 / 60 : -525 + 4 * 1250 / 60);
+    eq(g.state().touchCount, 0); assert(!jump.classList.contains('active'));
+    const speed = g.state().vy; jump.dispatch('lostpointercapture',{pointerId:11}); tick(g);
+    near(g.state().vy, speed + 1250 / 60);
+  }
+});
+
+test('variable ordinary jump aggregates keyboard touch and controller before deciding release', () => {
+  for (const order of [['keyboard','touch','pad'],['keyboard','pad','touch'],['touch','keyboard','pad'],
+    ['touch','pad','keyboard'],['pad','keyboard','touch'],['pad','touch','keyboard']]) {
+    const g = ordinaryJump(), jump = jumpButton(g); pollPad(g);
+    g.key('w'); jump.dispatch('pointerdown',{pointerId:5}); pollPad(g,[0]); tick(g, 2);
+    for (let index = 0; index < order.length; index++) {
+      if (order[index] === 'keyboard') g.key('w',false);
+      else if (order[index] === 'touch') jump.dispatch('pointerup',{pointerId:5});
+      else pollPad(g);
+      tick(g);
+      near(g.state().vy, index < 2 ? -525 + (3 + index) * 1250 / 60 : -220 + 1250 / 60);
+      eq(g.state().jumpHeld, index < 2);
+    }
+    eq(g.state().touchCount,0); eq(g.state().jumpBuffer,0);
+  }
+});
+
+test('variable ordinary jump gamepad release cuts but disconnect and replacement are not invented releases', () => {
+  const g = ordinaryJump(); pollPad(g); pollPad(g,[0]); tick(g,2); pollPad(g); tick(g);
+  near(g.state().vy,-220+1250/60);
+  for (const replacement of [false,true]) {
+    const h = ordinaryJump(); pollPad(h); pollPad(h,[0]); tick(h,2); const speed=h.state().vy;
+    if(replacement) pollPad(h,[],'replacement'); else { h.noPad(); h.run('pollGamepad();'); }
+    tick(h); near(h.state().vy,speed+1250/60); eq(h.state().jumpCutEligible,false);
+    pollPad(h); tick(h); near(h.state().vy,speed+2*1250/60);
+  }
+});
+
+test('variable ordinary jump release during coyote grace has the same short and full choices', () => {
+  for (const short of [false,true]) {
+    const g = onLedge({x:735}); g.key('d'); tick(g,4); g.key('d',false);
+    assert(!g.state().ground && g.state().coyote>0);
+    g.key('w'); if(short)g.key('w',false); tick(g);
+    near(g.state().vy,(short?-220:-525)+1250/60); eq(g.state().coyote,0);
+  }
+});
+
+test('variable ordinary jump buffered launch preserves released-tap intent until its landing', () => {
+  for(const short of [false,true]) {
+    const g=ordinaryJump();g.run('player.y=G-player.h-7;player.vy=300;player.ground=false;player.coyote=0;');
+    g.key('w');if(short)g.key('w',false);tick(g);
+    assert(g.state().jumpBuffer>0);tick(g);
+    eq(g.state().ground,true);tick(g);
+    near(g.state().vy,(short?-220:-525)+1250/60);eq(g.state().jumpBuffer,0);
+  }
+});
+
+test('variable ordinary jump expired buffered taps do not cut a later fresh held launch', () => {
+  const g=ordinaryJump();g.run('player.y=120;player.vy=0;player.ground=false;player.coyote=0;');
+  g.key('w');g.key('w',false);tick(g,10);eq(g.state().jumpBuffer,0);finishJump(g);
+  g.key('w');tick(g);near(g.state().vy,-525+1250/60);eq(g.state().jumpCutEligible,true);
+});
+
+test('variable ordinary jump release at late ascent or descent never increases speed or creates an air jump', () => {
+  for(const count of [18,26,32]) {
+    const g=ordinaryJump();g.key('w');tick(g,count);const speed=g.state().vy;
+    assert(speed>-220);g.key('w',false);tick(g);near(g.state().vy,speed+1250/60);
+    eq(g.state().jumpCutEligible,false);g.key('w');tick(g);near(g.state().vy,speed+2*1250/60);
+  }
+});
+
+test('variable ordinary jump landing resets the one-shot cut but holding never auto-jumps', () => {
+  const g=ordinaryJump();g.key('w');tick(g);finishJump(g);tick(g,20);
+  eq(g.state().ground,true);eq(g.state().jumpCutEligible,false);
+  g.key('w',false);g.key('w');tick(g,2);g.key('w',false);tick(g);near(g.state().vy,-220+1250/60);
+  finishJump(g);g.key('w');tick(g);near(g.state().vy,-525+1250/60);
+});
+
+test('variable ordinary jump input clearing never truncates or resurrects interrupted ascent', () => {
+  for(const interrupt of ['pause','restart-cancel','blur','visibility','clear']) {
+    for(const pendingRelease of [false,true]) {
+      const g=ordinaryJump();g.key('w');tick(g,2);const speed=g.state().vy;
+      if(pendingRelease)g.key('w',false);
+      if(interrupt==='pause')g.key('p');
+      else if(interrupt==='restart-cancel')g.click('restart');
+      else if(interrupt==='blur')g.event('blur');
+      else if(interrupt==='visibility')g.visibility(true);
+      else g.run('clearInput();');
+      eq(g.state().jumpCutEligible,false);eq(g.state().jumpBuffer,0);
+      if(interrupt!=='clear') { const frozen=g.state();g.frames(10);eq(g.state(),frozen); }
+      g.key('w',false);g.key('w',true,true);
+      if(interrupt==='visibility')g.visibility(false);
+      if(interrupt==='restart-cancel')g.click('cancel-restart');
+      else if(interrupt!=='clear')g.click('start');
+      tick(g);near(g.state().vy,speed+1250/60);eq(g.state().jumpCutEligible,false);
+      g.key('w',false);tick(g);near(g.state().vy,speed+2*1250/60);
+    }
+  }
+});
+
+test('variable ordinary jump touch release after pause is harmless and controls visibly reset', () => {
+  const g=ordinaryJump(),jump=jumpButton(g);jump.dispatch('pointerdown',{pointerId:9});tick(g,2);
+  const speed=g.state().vy;g.key('p');eq(g.state().touchCount,0);assert(!jump.classList.contains('active'));
+  jump.dispatch('pointerup',{pointerId:9});g.click('start');tick(g);near(g.state().vy,speed+1250/60);
+  jump.dispatch('lostpointercapture',{pointerId:9});tick(g);near(g.state().vy,speed+2*1250/60);
+});
+
+test('variable ordinary jump cleared queues do not escape menus or new runs', () => {
+  for(const transition of ['restart','home','death','wave']) {
+    const g=transition==='wave'?defense():ordinaryJump();g.key('w');g.key('w',false);
+    if(transition==='restart') {g.click('restart');g.click('start');}
+    else if(transition==='home') {g.key('p');g.click('menu-home');g.click('start');g.click('start');}
+    else if(transition==='death')g.run('player.inv=0;hurt(99);');
+    else g.run('startWave();');
+    tick(g,2);eq(g.state().ground,true,transition+' leaked a queued tap');eq(g.state().jumpCutEligible,false);eq(g.state().jumpBuffer,0);
+    g.key('w',false);g.key('w');tick(g);near(g.state().vy,-525+1250/60);
+  }
+});
+
+test('variable ordinary jump release never trims fixed or boosted enemy and device rebound impulses', () => {
+  for(const kind of ['enemy','device'])for(const boosted of [false,true]) {
+    const g=kind==='enemy'?stompGame():deviceStompGame();
+    if(boosted)g.key('w');tick(g);near(g.state().vy,boosted?-560:-400);
+    eq(g.state().jumpCutEligible,false);
+    if(!boosted)g.key('w');g.key('w',false);tick(g);
+    near(g.state().vy,(boosted?-560:-400)+1250/60);
+    eq(g.state().jumpBuffer,boosted?0:.13,'A fresh rebound-time press may buffer, never alter the fixed impulse');
+  }
+});
+
+test('variable ordinary jump dash or dive takes ownership and release cannot revive a pending cut', () => {
+  for(const dive of [false,true]) {
+    const g=ordinaryJump();g.key('w');tick(g,8);if(dive)g.key('s');g.key('l');tick(g);
+    assert(g.state().dashTime>0);eq(g.state().dashDive,dive);eq(g.state().jumpCutEligible,false);
+    g.key('w',false);g.key('l',false);g.key('s',false);tick(g);
+    near(g.state().vy,dive?650:0);eq(g.state().jumpCutEligible,false);
+    tickUntil(g,'player.dashTime===0',30);tick(g);assert(g.state().vy>=0);
+  }
+});
+
+test('variable ordinary jump drop-through remains a downward action and release does not change its motion', () => {
+  const released=onLedge(),held=onLedge();
+  for(const g of [released,held]){g.key('s');g.key('w');tick(g);eq(g.state().jumpCutEligible,false);assert(g.state().dropTime>0);}
+  released.key('w',false);
+  for(let i=0;i<8;i++){tick(released);tick(held);near(released.state().y,held.state().y);near(released.state().vy,held.state().vy);}
+});
+
+test('variable ordinary jump debug intent is detached unsaved and never opens a mutable API', () => {
+  const g=ordinaryJump();g.key('w');tick(g);eq(g.state().jumpCutEligible,true);eq(g.state().jumpHeld,true);
+  const snapshot=g.win.__raidState;snapshot.jumpCutEligible=false;snapshot.jumpHeld=false;
+  eq(g.state().jumpCutEligible,true);eq(g.state().jumpHeld,true);
+  g.run('saveProgress();');assert(!/jumpCut|jumpHeld|jumpReleased/.test(JSON.stringify(g.state().progress)));
+  assert(!source.includes('__raidQA'));
+});
+
+assert(passed > 0, 'No Pixel Raid contracts matched the requested filter');
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);

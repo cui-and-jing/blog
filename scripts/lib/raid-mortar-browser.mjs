@@ -268,19 +268,21 @@ export async function checkRaidMortar(sourcePage, problems) {
 
     checkpoint = '真实登台与空中禁止索敌';
     await moveTo(270);
-    await page.keyboard.press('w');
+    await key('w', true);
     await observe(() => { const s = window.__raidState; return s.ground && s.y + s.playerHeight === 325 ? s : false; });
+    await key('w', false);
     // Wait out the current shot, then jump just before the next acquisition is
     // due. Its cooldown runs out in mid-air but must not lock an airborne point.
     await observe(() => { const s = window.__raidState, e = s.enemies.find(e => e.type === 'mortar');
       return e && e.windup === 0 && e.shot > .1 && e.shot < .3 && s.ground ? s : false;
     });
-    await page.keyboard.press('w');
+    await key('w', true);
     const noAirLock = await observe(() => { const s = window.__raidState, e = s.enemies.find(e => e.type === 'mortar');
       return !s.ground && e?.shot <= -.1 ? s : false;
     });
     check(mortar(noAirLock).windup === 0 && noAirLock.shells.length === 0,
       '投弹兵在玩家腾空时锁定空中落点', noAirLock);
+    await observe(() => window.__raidState.vy >= 0);await key('w', false);
     warning = await getWarning(); locked = mortar(warning);
     require(warning.ground && warning.y + warning.playerHeight === 325 && locked.aimY === 325,
       '落地后预警未锁定高台实际支撑线', warning);

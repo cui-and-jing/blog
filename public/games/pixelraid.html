@@ -321,6 +321,7 @@
             <summary>操作按键与战术提示</summary>
             <div class="details-body">
               <p id="overlay-help">A/D 移动 · W / 空格跳跃 · J 射击 · K 手雷 · S 下蹲 · 平台上 S + 跳跃降层 · Shift / L 冲刺 · E 装具主动技 · P 暂停。手柄：A 跳跃、B 手雷、X / RB 射击、LB 冲刺、Y 主动技、Start 暂停。菜单中用方向键 / 左摇杆选择、A 确认、B 返回；按住方向可连续浏览。手机在开局后显示触屏按键；按住 ↓ 再点跳可降层。</p>
+              <p>普通跳跃轻点短跳、按住高跳；上升时松开可提前收跳。踏击弹起的力度仍在踩中瞬间确定，之后松开不会缩短。</p>
               <p>空中按住 S / ↓ 再开火可朝前下方俯射，松开下键恢复原方向；按住跳跃可仰射，同时按下时优先俯射。落地后仍是下蹲平射。手柄方向下 + 射击、触屏 ↓ + 射击同样适用，可从跳台、降层或踏击弹起中反击。</p>
               <p>反弹弹命中首领后可打出 1.5 秒破甲：趁头顶绿条持续时用步枪或散弹追击，每发额外造成 1 点伤害。再次反弹命中只刷新时长；反弹弹、手雷与震荡脉冲保持原伤害。破甲不会打断首领出招，仍需闪避。</p>
               <p>反弹弹命中仍存活的盾卫后，开启 1.2 秒正面破防，可接射击追击；绿条结束恢复格挡，重复命中仅刷新时间，不增加伤害或震停。</p>
@@ -362,7 +363,7 @@
   <script>
     (() => {
       'use strict';
-      const W=960,H=540,G=425,DT=1/60,GRAV=1250,MAX_FALL=720,DASH_BUFFER=.12;
+      const W=960,H=540,G=425,DT=1/60,GRAV=1250,MAX_FALL=720,DASH_BUFFER=.12,JUMP_CUT=220;
       const $=id=>document.getElementById(id);
       const canvas=$('field'),c=canvas.getContext('2d',{alpha:false});
       const overlay=$('overlay'),title=$('overlay-title'),kicker=$('overlay-kicker'),message=$('overlay-text'),action=$('start');
@@ -452,7 +453,7 @@
         lowBeam:{name:'低位激光',tip:'看到低位蓄力线就跳跃或冲刺避开；激光不能反弹。'},
         highBeam:{name:'高位激光',tip:'看到高位蓄力线就下蹲或冲刺避开；激光不能反弹。'},
         boss:{name:'首领接触',tip:'与首领保持距离，留出观察蓄力和闪避的空间。'},
-        fall:{name:'坠落深坑',tip:'从坑前起跳，空中冲刺可延长跨越距离。'}
+        fall:{name:'坠落深坑',tip:'从坑前按住跳跃，空中冲刺可延长跨越距离。'}
       };
       const mortarZone=shot=>({x:shot.aimX-MORTAR.radius,y:shot.aimY-MORTAR.height,w:MORTAR.radius*2,h:MORTAR.height});
       const STORAGE_KEY='pixel-raid.progress.v1';
@@ -460,7 +461,7 @@
       const held=new Set(),keyboardKeys=new Map(),padHeld=new Set(),touch=new Map();
       let phase='title',stageIndex=0,stage=null,player=null,enemies=[],bullets=[],bombs=[],pickups=[],intel=[],sparks=[],boss=null,cam=0;
       let combo={count:0,timer:0,best:0},combatText='',combatTime=0,reflections=0;
-      let points=0,best=0,shotsFired=0,jumpQueued=false,grenadeQueued=false,dashQueued=false,clock=0,shake=0,soundOn=false,audio=null;
+      let points=0,best=0,shotsFired=0,jumpQueued=false,jumpQueuedReleased=false,grenadeQueued=false,dashQueued=false,clock=0,shake=0,soundOn=false,audio=null;
       let frameLast=0,lag=0,bombPadLast=false,jumpPadLast=false,dashPadLast=false,pausePadLast=false,padBlocked=true;
       let padMenuDirection=0,padMenuRepeatAt=0,padFocus=null,padIdentity=null,padUsing=false;
       let mode='campaign',difficulty='standard',upgrades={rapid:0,dash:0,armor:0},selectedUpgrade=null;
@@ -566,9 +567,21 @@
         }catch{}
       }
       function announce(text){$('announcer').textContent=text;}
+      function cancelJumpCut(){
+        if(player){player.jumpCutEligible=false;player.jumpReleasePending=false;}
+      }
+      function releaseJump(wasPressed){
+        // Only a real aggregate release counts. Aliases and another device may
+        // still hold jump; clearing input for a menu is never a release edge.
+        if(!wasPressed||pressed('jump')||phase!=='playing')return;
+        if(jumpQueued)jumpQueuedReleased=true;
+        if(player.jumpBuffer>0)player.jumpBufferReleased=true;
+        if(player.jumpCutEligible)player.jumpReleasePending=true;
+      }
       function clearInput(){
-        held.clear();keyboardKeys.clear();padHeld.clear();touch.clear();jumpQueued=false;grenadeQueued=false;dashQueued=false;tacticalQueued=false;
-        if(player){player.jumpBuffer=0;player.dashBuffer=0;}
+        held.clear();keyboardKeys.clear();padHeld.clear();touch.clear();jumpQueued=false;jumpQueuedReleased=false;grenadeQueued=false;dashQueued=false;tacticalQueued=false;
+        if(player){player.jumpBuffer=0;player.jumpBufferReleased=false;player.dashBuffer=0;}
+        cancelJumpCut();
         resetPadInput();
         document.querySelectorAll('[data-action]').forEach(btn=>btn.classList.remove('active'));
       }
@@ -790,7 +803,7 @@
           platforms:[[260,320,170],[500,310,150]],intel:[],enemies:[],pickups:[]};
         player={x:64,y:G-44,w:27,h:44,vx:0,vy:0,face:1,hp:clamp(carry?.hp??maxHealth(),1,maxHealth()),
           lives:carry?.lives??(difficulty==='relaxed'?4:3),grenades:carry?.grenades??3,ground:true,inv:1.2,shoot:0,boost:0,
-          weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashBuffer:0,dashDir:1,dashDive:false,coyote:.1,jumpBuffer:0,crouch:false,dropPlatform:null,dropTime:0};
+          weaponTime:carry?.weaponTime??0,lastVolley:0,checkpoint:64,dashCooldown:0,dashTime:0,dashBuffer:0,dashDir:1,dashDive:false,coyote:.1,jumpBuffer:0,jumpBufferReleased:false,jumpCutEligible:false,jumpReleasePending:false,crouch:false,dropPlatform:null,dropTime:0};
         enemies=stage.enemies.map(([x,type])=>makeEnemy(x,type));
         pickups=stage.pickups.map(([x,kind])=>({x,y:kind==='spread'?G-45:G-93,kind,done:false,age:0}));
         intel=stage.intel.map(([x,y])=>({x,y,done:false}));
@@ -1102,6 +1115,7 @@
             return;
           }
           player.hp=maxHealth();player.x=player.checkpoint;player.h=44;player.y=G-player.h;player.vx=0;player.vy=0;player.ground=true;player.inv=2.2;player.dashTime=0;player.dashDive=false;player.dashBuffer=0;player.jumpBuffer=0;player.dropPlatform=null;player.dropTime=0;
+          jumpQueued=false;jumpQueuedReleased=false;player.jumpBufferReleased=false;cancelJumpCut();
           bullets=bullets.filter(b=>b.owner==='p');
           announce('失去一条生命，从检查点继续。');
         }
@@ -1109,6 +1123,7 @@
       }
       function dash(){
         if(player.dashCooldown>0||phase!=='playing')return;
+        cancelJumpCut();
         player.dashBuffer=0;player.dashTime=.18;player.dashDir=player.face;
         // Read the posture when the dash actually starts (including buffering),
         // then keep its trajectory even if down or direction is released.
@@ -1318,7 +1333,7 @@
         // Releasing jump afterwards cannot add/cancel impulses or queue a jump.
         const boosted=pressed('jump')&&!pressed('down');
         player.x=contact.x;player.y=contact.y-player.h;player.vy=-(boosted?STOMP.boostedRebound:STOMP.rebound);player.ground=false;
-        player.coyote=0;player.jumpBuffer=0;
+        player.coyote=0;player.jumpBuffer=0;player.jumpBufferReleased=false;cancelJumpCut();
         stompBurst={x:contact.x+player.w/2,y:contact.y,time:.28,boosted,device:!!contact.device};
         spark(stompBurst.x,stompBurst.y,'#b9ffe2',12);beep(680,.08,'triangle');
         if(contact.device){
@@ -1409,20 +1424,25 @@
         player.crouch=crouch;
         player.coyote=player.ground?.11:Math.max(0,player.coyote-dt);
         player.jumpBuffer=Math.max(0,player.jumpBuffer-dt);
+        if(player.jumpBuffer===0)player.jumpBufferReleased=false;
         player.dropTime=Math.max(0,player.dropTime-dt);
         // A simultaneous dash can hold vertical motion. Never re-enable this
         // ledge until the feet are below its landing tolerance.
         if(player.dropTime===0&&player.dropPlatform&&player.y+player.h>player.dropPlatform[1]+8)player.dropPlatform=null;
-        if(jumpQueued){jumpQueued=false;player.jumpBuffer=.13;}
+        if(jumpQueued){jumpQueued=false;player.jumpBuffer=.13;player.jumpBufferReleased=jumpQueuedReleased;jumpQueuedReleased=false;}
         if(player.jumpBuffer>0&&player.coyote>0){
           const support=down&&player.ground?stage.platforms.find(([x,y,w])=>
             Math.abs(player.y+player.h-y)<1&&player.x+player.w>x+3&&player.x<x+w-3):null;
           if(support){
-            player.dropPlatform=support;player.dropTime=.2;player.vy=80;
+            player.dropPlatform=support;player.dropTime=.2;player.vy=80;cancelJumpCut();
             // A downward step has no invulnerability, score or resource effect.
             beep(270,.04,'triangle');
-          }else{player.vy=-525;beep(370,.06);}
-          player.ground=false;player.coyote=0;player.jumpBuffer=0;
+          }else{
+            player.vy=-525;player.jumpCutEligible=true;
+            // A tap can end between physics steps or while waiting to land.
+            player.jumpReleasePending=player.jumpBufferReleased;beep(370,.06);
+          }
+          player.ground=false;player.coyote=0;player.jumpBuffer=0;player.jumpBufferReleased=false;
         }
         if(axis&&player.dashTime<=0)player.face=axis;
         player.dashCooldown=Math.max(0,player.dashCooldown-dt);
@@ -1431,6 +1451,11 @@
         // All input methods share this path; clearInput cancels menu interruptions.
         if(dashQueued){dashQueued=false;player.dashBuffer=DASH_BUFFER;}
         if(player.dashBuffer>0&&player.dashCooldown===0)dash();
+        if(player.dashTime>0)cancelJumpCut();
+        if(player.jumpCutEligible&&player.jumpReleasePending){
+          if(player.vy<0)player.vy=Math.max(player.vy,-JUMP_CUT);
+          cancelJumpCut();
+        }
         player.vx=player.dashTime>0?player.dashDir*650:axis*(crouch?110:255);
         player.shoot=Math.max(0,player.shoot-dt);
         player.inv=Math.max(0,player.inv-dt);player.boost=Math.max(0,player.boost-dt);
@@ -1461,6 +1486,7 @@
           }
           if(landing!==Infinity){motion.limit=motion.dy>0?clamp((landing-motion.bottom)/motion.dy,0,1):0;player.y=landing-player.h;player.vy=0;player.ground=true;}
         }
+        if(player.ground||player.vy>=0)cancelJumpCut();
         if(player.y>H+70){
           player.inv=0;player.dashTime=0;player.dashDive=false;player.dashBuffer=0;hurt(2,'fall');
           if(phase!=='playing')return;
@@ -2061,7 +2087,7 @@
         return '';
       }
       function queueAction(name){
-        if(name==='jump')jumpQueued=true;
+        if(name==='jump'&&!pressed('jump')){jumpQueued=true;jumpQueuedReleased=false;}
         if(name==='grenade')grenadeQueued=true;
         if(name==='dash')dashQueued=true;
         if(name==='tactical'&&survival()&&phase==='playing'&&spawnTime===0&&tacticalCharge>=100&&tacticalTime===0)tacticalQueued=true;
@@ -2097,7 +2123,9 @@
       window.addEventListener('keyup',e=>{
         // Resolve by the original key's code even if modifiers/layout changed.
         const id=e.code&&e.code!=='Unidentified'?e.code:e.key.toLowerCase(),name=keyboardKeys.get(id);
+        const jumpWasPressed=pressed('jump');
         if(name){keyboardKeys.delete(id);if(!Array.from(keyboardKeys.values()).includes(name))held.delete(name);}
+        releaseJump(jumpWasPressed);
         if((name||inputName(e.key))&&phase==='playing'&&!['BUTTON','SUMMARY'].includes(e.target?.tagName))e.preventDefault();
       });
       window.addEventListener('blur',()=>{clearInput();if(phase==='playing')togglePause();});
@@ -2107,8 +2135,13 @@
           try{btn.setPointerCapture(e.pointerId);}catch{/* Capture is optional on older touch browsers. */}
           const name=btn.dataset.action;queueAction(name);touch.set(e.pointerId,name);btn.classList.add('active');
         });
-        const release=e=>{touch.delete(e.pointerId);if(!touches(btn.dataset.action))btn.classList.remove('active');};
-        btn.addEventListener('pointerup',release);btn.addEventListener('pointercancel',release);btn.addEventListener('lostpointercapture',release);
+        const release=(e,cancel=false)=>{
+          const jumpWasPressed=pressed('jump');
+          touch.delete(e.pointerId);if(!touches(btn.dataset.action))btn.classList.remove('active');
+          if(cancel){if(jumpWasPressed&&!pressed('jump'))cancelJumpCut();}
+          else releaseJump(jumpWasPressed);
+        };
+        btn.addEventListener('pointerup',release);btn.addEventListener('pointercancel',e=>release(e,true));btn.addEventListener('lostpointercapture',e=>release(e,true));
       });
       function activate(){
         if(action.disabled||action.hidden)return;
@@ -2213,15 +2246,20 @@
       function pollGamepad(){
         const pads=navigator.getGamepads?.()||[];
         const pad=Array.from(pads).find(item=>item?.connected);
+        const jumpWasPressed=pressed('jump');
         padHeld.clear();
         $('controller-hint').hidden=!pad||document.hidden||phase==='playing';
         if(!pad||document.hidden){
+          if(jumpWasPressed&&!pressed('jump'))cancelJumpCut();
           if(padIdentity!==null)resetPadInput();
           padIdentity=null;padUsing=false;padBlocked=true;return;
         }
         // A replacement pad must also return to neutral before controlling the run.
         const identity=(pad.index??0)+':'+(pad.id??'');
-        if(identity!==padIdentity){resetPadInput();padIdentity=identity;padUsing=false;}
+        if(identity!==padIdentity){
+          if(jumpWasPressed&&!pressed('jump'))cancelJumpCut();
+          resetPadInput();padIdentity=identity;padUsing=false;
+        }
         const buttons=pad.buttons;
         const left=pad.axes[0]<-.35||buttons[14]?.pressed,right=pad.axes[0]>.35||buttons[15]?.pressed;
         const down=pad.axes[1]>.45||buttons[13]?.pressed,up=pad.axes[1]<-.45||buttons[12]?.pressed;
@@ -2247,8 +2285,9 @@
           return;
         }
         if(left)padHeld.add('left');if(right)padHeld.add('right');if(down)padHeld.add('down');
+        if(confirm)queueAction('jump');
         if(jump)padHeld.add('jump');if(fire)padHeld.add('fire');
-        if(confirm)jumpQueued=true;
+        releaseJump(jumpWasPressed);
         if(throwBomb)grenadeQueued=true;
         if(dashPressed)dashQueued=true;
         if(tacticalPressed)queueAction('tactical');
@@ -2279,7 +2318,7 @@
         mode,difficulty,intel:collected(),intelTotal:intel.length,challengeId,challengeTime,challengeReflections,bossWins,titleView,stageDeaths,stageStars,unlocked:progress.unlocked,
         upgrades:{...upgrades},dashCooldown:player?.dashCooldown??0,dashTime:player?.dashTime??0,dashDive:player?.dashDive??false,dashBuffer:player?.dashBuffer??0,
         checkpoint:player?.checkpoint??64,maxHp:maxHealth(),selectedUpgrade,storageAvailable,
-        crouch:player?.crouch??false,playerHeight:player?.h??44,coyote:player?.coyote??0,jumpBuffer:player?.jumpBuffer??0,dropTime:player?.dropTime??0,
+        crouch:player?.crouch??false,playerHeight:player?.h??44,coyote:player?.coyote??0,jumpBuffer:player?.jumpBuffer??0,jumpCutEligible:player?.jumpCutEligible??false,jumpHeld:pressed('jump'),dropTime:player?.dropTime??0,
         platforms:stage?.platforms.map(ledge=>[...ledge])||[],arena:survival()&&stage?.arena?{id:stage.arena.id,name:stage.arena.name,hint:stage.arena.hint}:null,
         devices:devices.map(device=>({...device})),deviceBursts:deviceBursts.map(burst=>({...burst})),stomps,stompBurst:stompBurst?{...stompBurst}:null,
         shells:shells.map(shot=>({...shot,zone:mortarZone(shot)})),mortarBursts:mortarBursts.map(burst=>({...burst})),

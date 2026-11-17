@@ -40,10 +40,11 @@ export async function checkPlatformDescent(page, { read, check, shot, phase, wai
       await page.keyboard.down('a');
       await page.waitForFunction(() => window.__raidState.x < 280, { timeout: 2500 });
       await page.keyboard.up('a');
-      await page.keyboard.press('w');
+      await page.keyboard.down('w');
       await page.waitForFunction(() => {
         const s = window.__raidState; return s.ground && Math.abs(s.y + s.playerHeight - 325) < 1;
       }, { timeout: 2500 });
+      await page.keyboard.up('w');
       const ledge = await read();
       check(ledge.x > 210 && ledge.x < 340, '未通过真实移动登上测试平台', ledge);
       if (touch) {

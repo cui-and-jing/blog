@@ -85,6 +85,9 @@ export async function checkRaidFirepower(sourcePage, problems) {
           { timeout: 12000, polling: 'raf' }, x);
         await down('jump');
         await wait(() => !window.__raidState.ground && window.__raidState.vy < 0);
+        // These are full-height traversal jumps, not short taps. Release at
+        // the apex so the remainder keeps its original horizontal gun aim.
+        await wait(() => window.__raidState.vy >= 0);
         await up('jump');
       }
       checkpoint = '领取连射且保留散弹';
