@@ -36,6 +36,7 @@ import { checkRaidDash } from './lib/raid-dash-browser.mjs';
 import { checkRaidJump } from './lib/raid-jump-browser.mjs';
 import { checkRaidDiveDash } from './lib/raid-divedash-browser.mjs';
 import { checkRaidRecap } from './lib/raid-recap-browser.mjs';
+import { checkRaidFooting } from './lib/raid-footing-browser.mjs';
 import { checkRaidProtection } from './lib/raid-protection-browser.mjs';
 import { checkRaidPickups } from './lib/raid-pickups-browser.mjs';
 import { captureRaidCombatProof, validRaidCombatProof } from './lib/raid-combat-proof.mjs';
@@ -489,6 +490,7 @@ async function checkGame(browser, file) {
       await checkRaidDiveDash(page, problems);
       await checkRaidRecap(page, problems);
       await checkRaidProtection(page, problems);
+      await checkRaidFooting(page, problems);
       await checkRaidPickups(page, problems);
       await checkRaidFirepower(page, problems);
       await checkRaidGrenades(page, problems);
