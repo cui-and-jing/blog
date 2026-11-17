@@ -1625,7 +1625,13 @@
         }
         for(let i=bombs.length-1;i>=0;i--){
           const b=bombs[i],oldX=b.x,oldY=b.y;b.vy+=GRAV*.83*dt;b.x+=b.vx*dt;b.y+=b.vy*dt;b.timer-=dt;
-          let support=b.y>=G-8&&!isGap(b.x)?G:Infinity;
+          let support=Infinity;
+          // Ground, like a ledge, only catches a downward top crossing. Use
+          // its impact x so a pit fall cannot snap up on reaching the far bank.
+          if(b.vy>=0&&oldY<=G-8&&b.y>=G-8){
+            const t=b.y===oldY?0:(G-8-oldY)/(b.y-oldY),crossX=oldX+(b.x-oldX)*t;
+            if(!isGap(crossX))support=G;
+          }
           // Only a low throw banks on ledge tops. Sweep downward crossings so
           // it cannot tunnel through a thin platform or snap up from below.
           if(b.aim==='roll'&&b.vy>=0)for(const [x,y,w] of stage.platforms){
