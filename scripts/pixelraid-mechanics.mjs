@@ -5654,5 +5654,137 @@ test('variable ordinary jump debug intent is detached unsaved and never opens a 
   assert(!source.includes('__raidQA'));
 });
 
+// Protection rendering reads the existing invulnerability timer, never drives it.
+function protectionPaint(g,draw='drawProtection();'){
+  const fills=[],strokes=[],labels=[];
+  g.graphics.fillRect=(...rect)=>fills.push({rect,color:g.graphics.fillStyle,alpha:g.graphics.globalAlpha});
+  g.graphics.strokeRect=(...rect)=>strokes.push({rect,color:g.graphics.strokeStyle});
+  g.graphics.fillText=text=>labels.push(text);
+  g.run(draw);g.graphics.fillRect=()=>{};g.graphics.strokeRect=()=>{};g.graphics.fillText=()=>{};
+  return {fills,strokes,labels};
+}
+function protectionHit(g){g.run("projectile(player.x+12,player.y+20,0,0,'e');");tick(g);}
+test('protection rendering keeps the entire soldier and rifle opaque at every former blink phase',()=>{
+  for(const reducedMotion of [false,true])for(const crouch of [false,true])for(const face of [-1,1]){
+    const g=createGame({reducedMotion});g.click('start');
+    g.run(`player.crouch=${crouch};player.h=${crouch?28:44};player.y=G-player.h;player.face=${face};player.vx=0;`);
+    let previous;
+    for(let frame=0;frame<26;frame++){
+      g.run(`clock=${frame/26};c.globalAlpha=.25;`);const before=g.state(),body=g.read('player');
+      const paint=protectionPaint(g,'drawSoldier();');
+      for(const color of ['#e5b85e','#efc5a7','#5bb4a5','#243c52','#25394e','#bfcbd0']){
+        const pieces=paint.fills.filter(fill=>fill.color===color);assert(pieces.length,'Protected body or rifle disappeared: '+color);
+        assert(pieces.every(fill=>fill.alpha===1),'Body and rifle must remain fully opaque');
+      }
+      eq(paint.labels,[]);eq(paint.strokes,[]);eq(g.state(),before);eq(g.read('player'),body);
+      if(previous)eq(paint,previous,'Protection must never pulse or blink with the clock');previous=paint;
+    }
+  }
+});
+test('protection rendering corners follow the real standing or crouched body without covering feet or muzzle',()=>{
+  for(const reducedMotion of [false,true])for(const h of [28,44])for(const face of [-1,1]){
+    const g=createGame({reducedMotion});g.click('start');g.run(`player.x=318.25;player.y=199.75;player.h=${h};player.face=${face};`);
+    const {fills,strokes,labels}=protectionPaint(g);eq(fills.length,10);eq(strokes,[]);eq(labels,[]);
+    const left=312.25,right=346.25,top=196.75,bottom=199.75+h-6;
+    eq(fills.slice(0,8).map(fill=>fill.rect),[
+      [left,top,5,2],[left,top,2,6],[right,top,5,2],[right+3,top,2,6],
+      [left,bottom+4,5,2],[left,bottom,2,6],[right,bottom+4,5,2],[right+3,bottom,2,6],
+    ].map(rect=>rect.map(Math.round)));
+    assert(fills.slice(0,8).every(fill=>fill.color==='#f6e3a1'&&fill.alpha===1));
+    assert(fills.slice(0,8).every(({rect:[x,,w]})=>x+w<=318.25||x>=318.25+27),'Corners stay beside, not on, the body');
+    eq(fills[8].rect,[319,172,26,5]);eq(fills[9].rect,[320,173,24,3]);
+    assert(fills[8].rect[1]+fills[8].rect[3]<199.75-21,'Bar must sit above the existing dive label');
+  }
+});
+test('protection rendering bar reads each real duration and keeps one pixel until actual expiry',()=>{
+  for(const duration of [1.2,1.45,1.9,2.2])for(const [ratio,width] of [[1,24],[.5,12],[.001,1],[2,24]]){
+    const g=createGame();g.click('start');g.run(`player.invDuration=${duration};player.inv=${duration*ratio};`);
+    const before=g.state(),paint=protectionPaint(g);eq(paint.fills.at(-1).rect[2],width);eq(paint.fills.at(-1).rect[3],3);
+    eq(paint.fills.at(-1).color,'#f6e3a1');eq(g.state(),before);
+    g.run('clock+=.1;');eq(protectionPaint(g),paint);
+  }
+  const g=createGame();g.click('start');
+  for(const inv of [0,-.01]){g.run(`player.inv=${inv};`);eq(protectionPaint(g).fills,[]);}
+});
+test('protection rendering durations match fresh campaigns practice challenges and survival without changing opening immunity',()=>{
+  for(const setup of ["beginRun(0,'campaign')","beginRun(2,'practice')","beginChallenge('sprint')","beginChallenge('counter')","beginChallenge('bosses')","beginSurvival()"]){
+    const g=createGame();g.run(setup);eq(g.state().protectionTime,1.2);eq(g.state().protectionDuration,1.2);
+    eq(protectionPaint(g).fills.at(-1).rect[2],24);const hp=g.state().hp;
+    protectionHit(g);eq(g.state().hp,hp);near(g.state().protectionTime,1.2-1/60);eq(g.state().protectionDuration,1.2);
+  }
+});
+test('protection rendering tracks actual standard or relaxed damage and does not refresh on blocked hits',()=>{
+  for(const difficulty of ['standard','relaxed']){
+    const g=recapGame({mode:'campaign',difficulty}),hp=g.state().hp,duration=difficulty==='relaxed'?1.9:1.45;
+    protectionHit(g);eq(g.state().hp,hp-1);eq(g.state().protectionTime,duration);eq(g.state().protectionDuration,duration);
+    eq(g.state().bullets,0);eq(g.state().reflections,0);eq(protectionPaint(g).fills.at(-1).rect[2],24);
+    const before=g.state();protectionHit(g);eq(g.state().hp,before.hp);near(g.state().protectionTime,duration-1/60);
+    eq(g.state().protectionDuration,duration);eq(g.state().score,before.score);eq(g.state().tacticalCharge,before.tacticalCharge);
+    tickUntil(g,'player.inv===0',150);eq(protectionPaint(g).fills,[]);protectionHit(g);
+    eq(g.state().hp,hp-2);eq(g.state().protectionTime,duration);eq(g.state().protectionDuration,duration);
+  }
+});
+test('protection rendering uses the existing life-respawn duration and hides after final death',()=>{
+  for(const difficulty of ['standard','relaxed'])for(const lives of [1,2]){
+    const g=recapGame({mode:'campaign',difficulty});g.run(`player.hp=1;player.lives=${lives};`);protectionHit(g);
+    if(lives===2){
+      eq(g.state().hp,g.state().maxHp);eq(g.state().lives,1);eq(g.state().x,g.state().checkpoint);
+      eq(g.state().protectionTime,2.2);eq(g.state().protectionDuration,2.2);eq(protectionPaint(g).fills.at(-1).rect[2],24);
+      protectionHit(g);eq(g.state().hp,g.state().maxHp);near(g.state().protectionTime,2.2-1/60);
+    }else{
+      eq(g.state().hp,0);eq(g.state().phase,'gameOver');assert(g.state().protectionTime>0);
+      eq(protectionPaint(g).fills,[]);assert(!protectionPaint(g,'drawSoldier();').fills.some(fill=>fill.color==='#f6e3a1'));
+    }
+  }
+});
+test('protection rendering restarts at the unchanged opening duration after stage or wave transitions and retry',()=>{
+  const campaign=createGame();campaign.click('start');campaign.clear();campaign.click('upgrade-rapid');campaign.click('start');
+  eq(campaign.state().stage,2);eq(campaign.state().protectionTime,1.2);eq(campaign.state().protectionDuration,1.2);
+  for(const loadout of ['assault','counter','demolition']){
+    const g=defense({loadout});g.run('player.inv=0;');protectionHit(g);eq(g.state().protectionDuration,1.45);
+    finishDefenseWave(g);g.click('supply-0');g.click('start');eq(g.state().survivalWave,2);
+    eq(g.state().protectionTime,1.2);eq(g.state().protectionDuration,1.2);eq(protectionPaint(g).fills.at(-1).rect[2],24);
+    g.click('restart');g.click('start');eq(g.state().survivalWave,1);eq(g.state().protectionTime,1.2);eq(g.state().protectionDuration,1.2);
+  }
+});
+test('protection rendering freezes with pause confirmation and visibility loss and leaves no lobby marker',()=>{
+  const g=recapGame({mode:'campaign'});protectionHit(g);tick(g,12);g.key('p');g.key('p',false);
+  const frozen=g.state(),paint=protectionPaint(g);g.frames(90);eq(g.state(),frozen);eq(protectionPaint(g),paint);
+  g.click('restart');g.frames(90);eq(protectionPaint(g),paint);g.click('cancel-restart');eq(g.state(),frozen);
+  g.click('start');tick(g,6);assert(g.state().protectionTime<frozen.protectionTime);eq(g.state().protectionDuration,1.45);
+  g.visibility(true);const hidden=g.state(),hiddenPaint=protectionPaint(g);g.frames(90);eq(g.state(),hidden);eq(protectionPaint(g),hiddenPaint);
+  g.click('menu-home');g.click('start');eq(g.state().phase,'title');eq(protectionPaint(g).fills,[]);
+  assert(!protectionPaint(g,'drawSoldier();').fills.some(fill=>fill.color==='#f6e3a1'));
+  g.click('start');eq(g.state().protectionTime,1.2);eq(g.state().protectionDuration,1.2);
+});
+test('protection rendering remains distinct beside dash trails dive text and the phase shield frame',()=>{
+  for(const reducedMotion of [false,true])for(const shield of [false,true])for(const dive of [false,true]){
+    const g=recapGame({reducedMotion,loadout:'counter'});protectionHit(g);
+    g.run(`player.ground=false;player.y=200;player.dashTime=.1;player.dashDive=${dive};tacticalTime=${shield?2:0};`);
+    const before=g.state(),paint=protectionPaint(g,'drawSoldier();');eq(g.state(),before);
+    eq(paint.fills.filter(fill=>fill.color==='#f6e3a1').length,9);
+    assert(paint.fills.filter(fill=>['#e5b85e','#5bb4a5','#25394e'].includes(fill.color)).every(fill=>fill.alpha===1));
+    eq(paint.labels,dive?['俯冲']:[]);eq(paint.strokes.length,shield?1:0);
+    if(shield)eq(paint.strokes[0],{rect:[458,194,41,56],color:'#a6eaff'});
+    protectionHit(g);eq(g.state().hp,before.hp);eq(g.state().protectionDuration,1.45);
+    near(g.state().protectionTime,before.protectionTime-1/60);eq(g.state().reflections,before.reflections+1);
+  }
+});
+test('protection rendering duration is presentation-only and never changes immunity or pit damage',()=>{
+  const g=recapGame({mode:'campaign'});g.run('player.invDuration=999;');const hp=g.state().hp;protectionHit(g);
+  eq(g.state().hp,hp-1);eq(g.state().protectionTime,1.45);eq(g.state().protectionDuration,1.45);
+  g.run('player.invDuration=.001;');protectionHit(g);eq(g.state().hp,hp-1);eq(protectionPaint(g).fills.at(-1).rect[2],24);
+  g.run('player.y=H+80;player.ground=false;');tick(g);eq(g.state().hp,hp-3);eq(g.state().x,g.state().checkpoint);
+  eq(g.state().protectionTime,1.45);eq(g.state().protectionDuration,1.45);
+});
+test('protection rendering state is detached and neither clock nor duration is saved or announced by drawing',()=>{
+  const g=recapGame({mode:'campaign'});protectionHit(g);g.run("announce('保留战斗提示');saveProgress();");
+  const before=g.state(),saved=[...g.values],player=g.read('player');
+  g.win.__raidState.protectionTime=999;g.win.__raidState.protectionDuration=999;eq(g.state(),before);
+  protectionPaint(g,'drawSoldier();drawProtection();');eq(g.state(),before);eq(g.read('player'),player);eq([...g.values],saved);
+  eq(g.nodes.get('announcer').textContent,'保留战斗提示');assert(!/protectionTime|protectionDuration|invDuration/.test(JSON.stringify(g.state().progress)));
+  assert(!source.includes('__raidQA'));
+});
+
 assert(passed > 0, 'No Pixel Raid contracts matched the requested filter');
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
