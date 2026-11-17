@@ -4722,7 +4722,7 @@ test('a real shield stomp retains damage and rebound while opening a short front
 test('intact shield still blocks front fire and retains rear and reflected damage',()=>{
   for(const front of [false,true])for(const reflected of [false,true]){
     const g=stompGame('shield');g.run('player.y=G-player.h;player.x=200;player.inv=100;player.vy=0;player.ground=true;');
-    shieldShot(g,{front,reflected,damage:2});eq(g.read('enemies[0].hp'),front&&!reflected?5:3);eq(g.read('enemies[0].shieldBreak'),0);
+    shieldShot(g,{front,reflected,damage:2});eq(g.read('enemies[0].hp'),front&&!reflected?5:3);near(g.read('enemies[0].shieldBreak'),reflected?1.2:0);
   }
 });
 test('shield break does not amplify rifle, spread, reflected or blast damage',()=>{
@@ -5228,6 +5228,87 @@ test('device native-route plan reaches the first-wave barrel using only crouch w
   tickUntil(g,'spawnTime===0',150);g.key('w');tickUntil(g,'devices[1].spent',100);
   eq(g.state().vy,-560);eq(g.state().score,0);eq(g.state().hp,6);eq(g.state().stomps,0);eq(g.state().shots,0);
   eq(g.state().deviceBursts.length,1);eq(g.state().enemies.length,3);assert(g.state().enemies.every(e=>e.hp===3));
+});
+
+// A returned shield hit opens the same follow-up as a stomp, in every mode.
+function counterShieldGame({mode='survival',difficulty='standard',face=-1,...options}={}){
+  const g=stompGame('shield',options);
+  g.run(`mode='${mode}';difficulty='${difficulty}';challengeId='counter';
+    player.x=200;player.y=G-player.h;player.vy=0;player.ground=true;player.inv=0;
+    enemies[0].face=${face};enemies[0].shot=100;enemies[0].turnTime=.6;`);
+  return g;
+}
+test('reflected hits open a shield follow-up across modes, difficulties and both faces',()=>{
+  for(const mode of ['campaign','practice','challenge','survival'])for(const difficulty of ['standard','relaxed'])for(const face of [-1,1]){
+    const g=counterShieldGame({mode,difficulty,face}),before=g.state();shieldShot(g,{reflected:true,damage:2});
+    eq(g.read('enemies[0].hp'),3);near(g.read('enemies[0].shieldBreak'),1.2);eq(g.read('enemies[0].stagger'),0);
+    for(const key of ['hp','lives','grenades','score','stomps','shots'])eq(g.state()[key],before[key]);
+    eq(g.state().combatText,'反弹破盾 · 1.2 秒正面可射击');shieldShot(g);eq(g.read('enemies[0].hp'),2);
+  }
+});
+test('a real dash return must reach the shield rather than granting remote break',()=>{
+  const g=counterShieldGame();g.run("player.dashCooldown=0;projectile(player.x+12,player.y+20,0,0,'e');Object.assign(bullets[0],{sourceX:enemies[0].x+15,sourceY:enemies[0].y+18});");
+  g.key('l');tick(g);g.key('l',false);eq(g.state().reflections,1);eq(g.read('enemies[0].shieldBreak'),0);eq(g.read('enemies[0].hp'),5);
+  tickUntil(g,'enemies[0].shieldBreak>0',60);eq(g.read('enemies[0].hp'),3);near(g.read('enemies[0].shieldBreak'),1.2);
+});
+test('ordinary rear hits, grenades and empty dashes cannot create shield break',()=>{
+  for(const action of ['rear','grenade','dash','miss']){
+    const g=counterShieldGame();g.run('enemies[0].hp=20;player.dashCooldown=0;');
+    if(action==='rear')shieldShot(g,{front:false});
+    if(action==='grenade')g.run('boom(enemies[0].x+15,enemies[0].y+18);');
+    if(action==='dash'){g.key('l');tick(g);}
+    if(action==='miss'){g.run("projectile(400,100,650,0,'p',2);bullets[0].reflected=true;");tick(g,20);}
+    eq(g.read('enemies[0].shieldBreak'),0);
+  }
+});
+test('reflected rear hits also open the window and repeated hits only refresh one timer',()=>{
+  const g=counterShieldGame();g.run('enemies[0].hp=30;');shieldShot(g,{front:false,reflected:true,damage:2});tick(g,30);
+  const before=g.state();assert(g.read('enemies[0].shieldBreak')<1);shieldShot(g,{reflected:true,damage:2});near(g.read('enemies[0].shieldBreak'),1.2);
+  eq(g.read('enemies[0].hp'),26);eq(g.read('enemies[0].stagger'),0);eq(g.state().score,before.score);eq(g.state().grenades,before.grenades);
+  // A real stomp refreshes this same timer, not a separate debuff stack.
+  g.run('player.x=enemies[0].x+5;player.y=enemies[0].y-player.h-4;player.vy=300;player.ground=false;player.coyote=0;');tick(g);
+  near(g.read('enemies[0].shieldBreak'),1.2);eq(g.read('enemies[0].hp'),24);eq(g.state().stomps,1);
+});
+test('counter break expires after 72 ticks and ordinary front hits cannot extend it',()=>{
+  const g=counterShieldGame();g.run('enemies[0].hp=30;');shieldShot(g,{reflected:true,damage:2});
+  tick(g,20);shieldShot(g);near(g.read('enemies[0].shieldBreak'),1.2-21/60);eq(g.read('enemies[0].hp'),27);
+  tick(g,50);assert(g.read('enemies[0].shieldBreak')>0);shieldShot(g);eq(g.read('enemies[0].shieldBreak'),0);eq(g.read('enemies[0].hp'),27);eq(g.read('enemies[0].blockFlash'),.18);
+});
+test('counter break preserves kit damage and tactical attribution without bonus energy',()=>{
+  for(const tactical of [false,true])for(const damage of [2,3,5]){
+    const g=counterShieldGame();g.run(`enemies[0].hp=20;projectile(enemies[0].x-8,enemies[0].y+18,650,0,'p',${damage});Object.assign(bullets[0],{reflected:true,tactical:${tactical}});`);tick(g);
+    eq(g.read('enemies[0].hp'),20-damage);near(g.read('enemies[0].shieldBreak'),1.2);eq(g.state().tacticalCharge,tactical?0:damage*3);
+  }
+});
+test('counter break does not stun attacks, erase launched bullets or grant contact immunity',()=>{
+  const g=counterShieldGame();g.run('enemies[0].shot=.5;');shieldShot(g,{reflected:true,damage:2});near(g.read('enemies[0].shot'),.5-1/60);eq(g.read('enemies[0].stagger'),0);
+  g.run("projectile(player.x+12,player.y+20,0,0,'e');");tick(g);eq(g.state().hp,5);
+  g.run('player.inv=0;player.x=enemies[0].x;player.y=G-player.h;player.ground=true;player.vy=0;');tick(g);eq(g.state().hp,4);
+});
+test('lethal reflected shield hits keep one original reward and no break after death',()=>{
+  const g=counterShieldGame();g.run('enemies[0].hp=2;');shieldShot(g,{reflected:true,damage:2});
+  eq(g.read('enemies[0].dead'),true);eq(g.read('enemies[0].shieldBreak'),0);eq(g.state().score,200);eq(g.state().tacticalCharge,18);
+  assert(g.state().combatText.includes('连击'));tick(g,10);eq(g.state().score,200);eq(g.state().tacticalCharge,18);
+});
+test('counter hits during ingress or on other enemy types never create shield break',()=>{
+  for(const setup of ['spawnTime=1;','enemies[0].arrival=1;']){
+    const g=counterShieldGame();g.run(setup);shieldShot(g,{reflected:true,damage:2});eq(g.read('enemies[0].hp'),5);eq(g.read('enemies[0].shieldBreak'),0);
+  }
+  for(const type of ['walker','turret','charger','mortar','drone']){
+    const g=counterShieldGame();g.run(`enemies[0].type='${type}';enemies[0].hp=20;`);shieldShot(g,{reflected:true,damage:2});eq(g.read('enemies[0].shieldBreak'),0);
+  }
+});
+test('counter break freezes through pause and canceled restart and clears on new runs',()=>{
+  const g=counterShieldGame();shieldShot(g,{reflected:true,damage:2});g.key('p');const timer=g.read('enemies[0].shieldBreak');g.frames(90);near(g.read('enemies[0].shieldBreak'),timer);
+  g.click('restart');g.click('cancel-restart');g.frames(30);near(g.read('enemies[0].shieldBreak'),timer);g.click('start');tick(g);assert(g.read('enemies[0].shieldBreak')<timer);
+  g.click('restart');g.click('start');assert(g.state().enemies.every(e=>!e.shieldBreak));g.run('survivalWave=3;startWave();');assert(g.state().enemies.every(e=>!e.shieldBreak));
+});
+test('counter-break feedback reuses detached unsaved timer and reduced-motion shield rendering',()=>{
+  for(const reducedMotion of [false,true]){
+    const g=counterShieldGame({reducedMotion}),labels=[];shieldShot(g,{reflected:true,damage:2});g.graphics.fillText=text=>labels.push(text);g.run('draw();');assert(labels.includes('破防 · 可射击'));
+    g.win.__raidState.enemies.find(e=>e.type==='shield').shieldBreak=999;near(g.read('enemies[0].shieldBreak'),1.2);
+    g.run('saveProgress();');assert(!JSON.stringify(g.state().progress).includes('shieldBreak'));g.run('enemies[0].shieldBreak=0;');labels.length=0;g.run('draw();');assert(!labels.includes('破防 · 可射击'));
+  }
 });
 
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
