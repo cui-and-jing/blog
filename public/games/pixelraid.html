@@ -1869,7 +1869,7 @@
       }
       function drawIntel(item){
         if(item.done)return;
-        const y=item.y+Math.sin(clock*3+item.x)*3;
+        const y=item.y+(reducedMotion?0:Math.sin(clock*3+item.x)*3);
         rect(item.x-13,y-13,26,26,'#80e5e1');rect(item.x-10,y-10,20,20,'#143743');
         rect(item.x-5,y-7,10,14,'#b8f6e6');rect(item.x-2,y-4,7,2,'#27878d');rect(item.x-2,y,7,2,'#27878d');
         c.font='bold 11px system-ui';c.fillStyle='#d8fff0';c.fillText('情报',item.x-12,y-21);
@@ -1996,15 +1996,25 @@
           p.kind==='grenade'&&player.grenades>=7?'手雷已满 · 弹药留待使用后领取':'';
       }
       function drawPickup(p){
-        if(p.done)return;const y=p.y+Math.sin(p.age*4)*7;
+        if(p.done)return;const y=p.y+(reducedMotion?0:Math.sin(p.age*4)*7);
         rect(p.x-13,y-13,27,27,p.kind==='heal'?'#60bb8c':p.kind==='grenade'?'#eeb468':
           p.kind==='spread'?'#a082dd':'#7bbedd');
         rect(p.x-9,y-9,19,19,'#213849');
-        if(p.kind==='heal'){rect(p.x-2,y-8,5,17,'#84ebb2');rect(p.x-8,y-2,17,5,'#84ebb2');}
-        else if(p.kind==='grenade'){rect(p.x-3,y-8,7,15,'#ffcf80');rect(p.x-7,y-4,15,7,'#ffcf80');}
-        else if(p.kind==='spread'){
-          rect(p.x-8,y-6,16,4,'#c3a9ff');rect(p.x-8,y,16,4,'#c3a9ff');rect(p.x-8,y+6,16,4,'#c3a9ff');
-        }else{rect(p.x-7,y-2,15,6,'#a4eafd');rect(p.x+1,y-8,6,18,'#a4eafd');}
+        // Keep each silhouette identifiable without its color: medical cross,
+        // grenade with pin, three spreading pellets, or rapid-fire double chevron.
+        if(p.kind==='heal'){rect(p.x-2,y-7,5,15,'#84ebb2');rect(p.x-7,y-2,15,5,'#84ebb2');}
+        else if(p.kind==='grenade'){
+          rect(p.x-2,y-7,7,3,'#ffcf80');rect(p.x+4,y-5,3,4,'#ffcf80');
+          rect(p.x-4,y-3,8,2,'#ffcf80');rect(p.x-6,y-1,12,7,'#ffcf80');rect(p.x-4,y+6,8,2,'#ffcf80');
+        }else if(p.kind==='spread'){
+          rect(p.x-7,y-1,5,3,'#c3a9ff');
+          for(const dy of [-6,0,6])rect(p.x+2,y+dy-1,6,3,'#c3a9ff');
+        }else{
+          for(const dx of [-7,1])for(let step=0;step<3;step++){
+            rect(p.x+dx+step*2,y-6+step*2,3,3,'#a4eafd');
+            rect(p.x+dx+step*2,y+4-step*2,3,3,'#a4eafd');
+          }
+        }
         if(pickupReserve(p)&&circRect(p.x,p.y,70,player)){
           c.font='bold 12px system-ui';c.fillStyle='#d9f6e4';c.textAlign='center';
           c.fillText('已满 · 留存',p.x,y-23);c.textAlign='left';
