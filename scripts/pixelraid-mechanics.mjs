@@ -6180,5 +6180,34 @@ test('ground dash jump cancel respects same-frame dash priority and interrupted 
   }
 });
 
+test('collectible silhouettes stay distinct even with color removed',()=>{
+  const g=createGame();g.start();
+  const masks=new Set();
+  for(const kind of ['heal','grenade','spread','boost']){
+    g.run(`window.ink=[];c.fillRect=(x,y,w,h)=>window.ink.push([x,y,w,h]);drawPickup({x:500,y:100,age:0,kind:'${kind}'});`);
+    const ink=g.read('window.ink').slice(2),pixels=new Set();
+    for(const [x,y,w,h] of ink)for(let i=x;i<x+w;i++)for(let j=y;j<y+h;j++){
+      assert(Math.abs(i-500)<=8&&Math.abs(j-100)<=8);pixels.add((i-500)+','+(j-100));
+    }
+    assert(pixels.size>=60);masks.add([...pixels].sort().join(';'));
+  }
+  eq(masks.size,4);
+});
+test('reduced motion anchors pickups and intel to their collision centers; collected items stay hidden',()=>{
+  for(const reducedMotion of [false,true]){
+    const g=createGame({reducedMotion});g.start();
+    for(const intel of [false,true]){
+      const tops=[];
+      for(const time of [0,.4,.8,1.2]){
+        g.run(`window.ink=[];clock=${time};c.fillRect=(x,y)=>window.ink.push(y);
+          ${intel?'drawIntel':'drawPickup'}({x:500,y:100,age:${time},kind:'spread'});`);
+        tops.push(g.read('window.ink[0]'));
+      }
+      if(reducedMotion)assert(tops.every(y=>y===87));else assert(new Set(tops).size>1);
+      g.run(`window.ink=[];${intel?'drawIntel':'drawPickup'}({done:true});`);eq(g.read('window.ink.length'),0);
+    }
+  }
+});
+
 assert(passed > 0, 'No Pixel Raid contracts matched the requested filter');
 console.log(`\nOK  Pixel Raid: ${passed} deterministic expedition, combat, operation and survival contracts passed`);
