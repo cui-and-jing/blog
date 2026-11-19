@@ -1023,6 +1023,38 @@ test('operation success commits one award once and fastest time and best score i
   eq(richer.clears, 3); assert(richer.best > faster.best); eq(richer.bestTime, faster.bestTime);
 });
 
+test('optional mastery is thresholded, success-only and independent of both bests', () => {
+  for (const [id,threshold,setup] of [
+    ['sprint',3,n=>'intel.forEach((v,i)=>v.done=i<'+n+');'],
+    ['counter',10,n=>'challengeReflections='+n+';'],
+    ['bosses',5,n=>'player.grenades='+n+';']
+  ]) {
+    const existing={clears:1,best:900000,bestTime:1};
+    const g=operation(id,{storage:{[STORE]:JSON.stringify(storedProgress({challenges:{[id]:existing}}))}});
+    const complete=n=>{
+      if(id==='bosses')for(let i=0;i<2;i++){finishArena(g);g.click('start');}
+      g.run(setup(n));if(id==='bosses')finishArena(g);else finishOperation(g);
+    };
+    g.run(setup(threshold)+"finishChallenge(false,'失败');");
+    eq(g.state().progress.challenges[id],existing);
+    g.click('start');complete(threshold-1);
+    eq(g.state().phase,'challengeClear');assert(!g.state().progress.challenges[id].mastered);
+    g.click('start');complete(threshold);
+    const earned=g.state().progress.challenges[id];
+    eq(earned.mastered,true);eq(earned.best,existing.best);eq(earned.bestTime,existing.bestTime);
+    assert(g.nodes.get('result-details').textContent.includes('获得精通徽章'));
+    g.click('start');complete(threshold-1);eq(g.state().progress.challenges[id].mastered,true);
+    const reload=createGame({storage:{[STORE]:g.values.get(STORE)}});eq(reload.state().progress.challenges[id].mastered,true);
+    assert(reload.nodes.get('challenge-record-'+id).textContent.includes('已获'));
+  }
+});
+test('mastery rejects malformed flags and invalid completion records',()=>{
+  for(const [clears,bestTime,mastered] of [[0,4,true],[2,0,true],[1,1,'true'],[1,1,1]]){
+    const g=createGame({storage:{[STORE]:JSON.stringify(storedProgress({challenges:{counter:{clears,bestTime,mastered}}}))}});
+    assert(!g.state().progress.challenges.counter.mastered);
+  }
+});
+
 test('operation failure never overwrites completed records or awards twice', () => {
   for (const id of operationIds) {
     const saved = storedProgress({ challenges: Object.fromEntries(operationIds.map(key => [key, { clears: 2, best: 9000, bestTime: 1234 }])) });

@@ -125,9 +125,10 @@ export async function checkRaidChallenges(page, problems) {
   }
   state = await read();
   if (state.phase === 'challengeClear') {
+    check(await page.$eval('#result-details', e => e.getBoundingClientRect().height > 0 && e.textContent.includes('获得精通徽章「弹药管家」')), '真实连战结算未展示精通徽章');
     await shot('challenge-complete');
     const record = state.progress.challenges.bosses;
-    check(record.clears === 1 && record.best > 3900 && record.bestTime > 0, '连战没有保存有效完成纪录', record);
+    check(record.mastered === true && record.clears === 1 && record.best > 3900 && record.bestTime > 0, '连战没有保存有效完成纪录', record);
     check(JSON.stringify(state.progress.campaign) === JSON.stringify(before.campaign) &&
       JSON.stringify(state.progress.practice) === JSON.stringify(before.practice) && state.progress.unlocked === before.unlocked,
       '挑战污染远征或练习纪录');
@@ -137,7 +138,7 @@ export async function checkRaidChallenges(page, problems) {
     check(state.difficulty === 'relaxed' && JSON.stringify(state.progress.challenges.bosses) === JSON.stringify(record),
       '重载后丢失挑战纪录或难度偏好', state);
     await page.click('#mode-challenges');
-    check(await page.$eval('#challenge-record-bosses', element => element.textContent.includes('完成 1 次') && element.textContent.includes('最快')),
+    check(await page.$eval('#challenge-record-bosses', element => element.textContent.includes('完成 1 次') && element.textContent.includes('最快') && element.textContent.includes('已获「弹药管家」')),
       '指挥部没有展示完成纪录');
   } else {
     await page.reload({ waitUntil: 'domcontentloaded' });

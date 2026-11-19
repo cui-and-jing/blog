@@ -313,7 +313,7 @@
           <details id="challenge-guide" class="menu-details" hidden>
             <summary>挑战计分与纪录</summary>
             <div class="details-body">
-              <p>固定标准难度与装具，无需解锁。挑战纪录独立，不影响远征星章。</p>
+              <p>完成任务时一并达成可选目标，即可收藏该项精通徽章。不影响得分、最快用时或远征星章。</p>
               <p>成功奖励 500 分；突袭剩余整秒 ×10 分，连战保留体力 ×100 分、手雷 ×25 分。最高分与最快用时独立记录。暂停与整备不计时；刷新页面会结束当前挑战。</p>
             </div>
           </details>
@@ -406,9 +406,9 @@
       const arenaForWave=wave=>wave%3===0?null:ARENAS[(wave-1-Math.floor(wave/3))%ARENAS.length];
       const ledgePoint=(arena,index,height)=>{const [x,y,w]=arena.platforms[index];return {x:x+w/2,y:y-height};};
       const CHALLENGES={
-        sprint:{name:'闪电突袭',stage:0,limit:90,goal:'90 秒内击败首领并抵达出口',upgrades:{rapid:0,dash:1,armor:0}},
-        counter:{name:'反击专线',stage:1,limit:0,goal:'反弹至少 5 枚敌弹，再击败首领并抵达出口',upgrades:{rapid:0,dash:2,armor:0}},
-        bosses:{name:'首领连战',stage:0,limit:0,goal:'一条命连续击败三位首领',upgrades:{rapid:1,dash:1,armor:2}}
+        sprint:{medal:'疾行斥候',optional:'带齐 3 份情报撤离',target:3,count:()=>collected(),name:'闪电突袭',stage:0,limit:90,goal:'90 秒内击败首领并抵达出口',upgrades:{rapid:0,dash:1,armor:0}},
+        counter:{medal:'弹幕回礼',optional:'反弹 10 枚敌弹后撤离',target:10,count:()=>challengeReflections,name:'反击专线',stage:1,limit:0,goal:'反弹至少 5 枚敌弹，再击败首领并抵达出口',upgrades:{rapid:0,dash:2,armor:0}},
+        bosses:{medal:'弹药管家',optional:'击败第三位首领时保留 5 枚手雷',target:5,count:()=>player.grenades,name:'首领连战',stage:0,limit:0,goal:'一条命连续击败三位首领',upgrades:{rapid:1,dash:1,armor:2}}
       };
       const UPGRADES={rapid:'疾速弹匣',dash:'闪步模组',armor:'战地装甲'};
       const SUPPLIES={
@@ -493,7 +493,7 @@
       })});
       function cleanChallenge(value){
         const clears=bounded(value?.clears,9999),time=bounded(value?.bestTime,36000000);
-        return clears&&time?{clears,best:bounded(value?.best,9999999),bestTime:time}:{clears:0,best:0,bestTime:0};
+        return clears&&time?{clears,best:bounded(value?.best,9999999),bestTime:time,...(value.mastered===true?{mastered:true}:{})}:{clears:0,best:0,bestTime:0};
       }
       function loadProgress(){
         let raw=null,legacy=0;
@@ -610,6 +610,8 @@
         for(const key of Object.keys(CHALLENGES)){
           const record=progress.challenges[key];
           $('challenge-record-'+key).textContent=record.clears?'完成 '+record.clears+' 次 · 最高 '+record.best+' 分 · 最快 '+formatTime(record.bestTime/100):'尚未完成 · 挑战自己的纪录';
+          const task=CHALLENGES[key];
+          $('challenge-record-'+key).textContent+=record.mastered?' · 已获「'+task.medal+'」':' · 可选：'+task.optional;
         }
       }
       function renderBuild(){
@@ -990,8 +992,10 @@
         if(phase!=='playing'||mode!=='challenge')return;
         stompBurst=null;
         const record=progress.challenges[challengeId],time=Math.max(1,Math.ceil(challengeTime*100));
+        const task=currentChallenge(),count=task.count(),met=count>=task.target,first=success&&met&&!record.mastered;
         let newBest=false;
         if(success){
+          if(met)record.mastered=true;
           points+=500+(challengeId==='sprint'?Math.floor(Math.max(0,90-challengeTime))*10:gauntlet()?player.hp*100+player.grenades*25:0);
           newBest=!record.clears||time<record.bestTime;
           record.clears=Math.min(9999,record.clears+1);record.best=Math.max(record.best,bounded(points,9999999));
@@ -999,7 +1003,8 @@
         }
         $('result-details').textContent='用时 '+formatTime(challengeTime)+' · 得分 '+points+
           (challengeId==='counter'?'\n反弹敌弹 '+challengeReflections+' / 5':gauntlet()?'\n击败首领 '+bossWins+' / 3':'')+
-          (success?'\n'+(newBest?'刷新最快用时！':'挑战完成，纪录已保留。'):'\n未完成，不计入挑战纪录。');
+          (success?'\n'+(newBest?'刷新最快用时！':'挑战完成，纪录已保留。'):'\n未完成，不计入挑战纪录。')+
+          '\n'+(first?'获得精通徽章':success&&met?'再次达成精通':'可选精通')+'「'+task.medal+'」：'+task.optional+'（'+count+'/'+task.target+'）';
         hud();showMenu(success?'挑战完成 · '+CHALLENGES[challengeId].name:'挑战未完成',reason,'重试本项挑战',success?'challengeClear':'challengeFailed');
       }
       function showBossBreak(){
